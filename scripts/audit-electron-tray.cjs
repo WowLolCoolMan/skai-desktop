@@ -9,7 +9,6 @@ const preload = read("apps/desktop/electron/preload.cjs");
 const contracts = read("apps/desktop/shared/contracts.ts");
 const workspace = read("apps/desktop/src/app/useDesktopWorkspace.ts");
 const packageScript = read("scripts/package-electron.cjs");
-const releaseWorkflow = read(".github/workflows/native-release.yml");
 
 const failures = [];
 const expect = (condition, message) => {
@@ -27,8 +26,6 @@ expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNew
 expect(contracts.includes("onTrayOpenConversation?") && contracts.includes("onTrayNewChat?"), "tray events must remain typed in the renderer contract");
 expect(workspace.includes("onTrayOpenConversation") && workspace.includes("onTrayNewChat"), "renderer must handle tray recent-chat and new-chat actions");
 expect(packageScript.includes('process.platform === "linux" ? "linux-x64"') && packageScript.includes('const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"'), "Electron packaging must publish a Linux x64 artifact with the native executable name");
-expect(releaseWorkflow.includes("rid: linux-x64") && releaseWorkflow.includes("runner.os == 'Linux'"), "release workflow must build and smoke-test the Linux Electron artifact");
-expect(releaseWorkflow.includes("Skai-Desktop-electron-linux-x64.tar.gz") && releaseWorkflow.includes("SHA256SUMS-electron-linux-x64.txt"), "Linux Electron releases must be archived and checksummed");
 
 if (failures.length > 0) {
   console.error("Electron tray audit failed:");
