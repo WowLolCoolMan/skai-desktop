@@ -405,7 +405,6 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .global-rail button:hover, .global-rail button:focus-visible { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
 .global-rail button.is-active { border-color: color-mix(in srgb, var(--skai-color-accent) 45%, transparent); color: var(--skai-color-accent); background: color-mix(in srgb, var(--skai-color-accent) 12%, transparent); box-shadow: inset 2px 0 var(--skai-color-accent); }
 .global-rail .nav-icon { width: 18px; height: 18px; }
-.thread-sidebar .sidebar-nav, .thread-sidebar .sidebar-nav-secondary, .thread-sidebar .sidebar-settings { display: none; }
 .thread-sidebar .sidebar-brand { padding-bottom: 4px; }
 .app-shell.sidebar-collapsed { grid-template-columns: 56px 78px minmax(0, 1fr); }
 .usage-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(260px, .7fr); gap: 16px; align-items: start; }
