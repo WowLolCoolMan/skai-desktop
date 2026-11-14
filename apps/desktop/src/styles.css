@@ -274,9 +274,11 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-workbench { display: flex; min-height: 0; flex-direction: column; padding-bottom: 24px; overflow: hidden; }
 .app-content-workbench .workbench-page { display: flex; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
 .app-content-workbench .workbench-page > .page-header, .app-content-workbench .workbench-page > .workbench-overview, .app-content-workbench .workbench-page > .workbench-filter-bar { flex: 0 0 auto; }
-.app-content-workbench .workbench-page > .workbench-layout, .app-content-workbench .workbench-page > .workbench-board { min-height: 0; flex: 1 1 0; overflow: hidden; }
+.app-content-workbench .workbench-page > .workbench-layout, .app-content-workbench .workbench-page > .workbench-board { min-height: 320px; flex: 1 1 auto; overflow: hidden; }.app-content-workbench .workbench-page > .scheduled-card { flex: 0 1 min(32vh, 260px); }
 .app-content-workbench .workbench-task-list, .app-content-workbench .workbench-task-detail { min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .app-content-workbench .workbench-page > .scheduled-card { min-height: 0; max-height: min(32vh, 260px); overflow: auto; }
+.app-content-workbench .workbench-page > .scheduled-card.is-collapsed { flex: 0 0 auto; max-height: none; overflow: hidden; }.app-content-workbench .workbench-page > .scheduled-card.is-expanded { flex: 0 0 min(32vh, 260px); }.scheduled-card-heading { margin-bottom: 0; }.scheduled-card-heading-actions { display: flex; align-items: center; gap: 8px; }.scheduled-card-heading-actions .ui-button { padding: 6px 9px; font-size: 10px; }.scheduled-card-body { min-height: 0; }.scheduled-card.is-expanded .scheduled-card-body { overflow: auto; }
+@supports selector(.app-content-workbench:has(.scheduled-card.is-expanded)) { .app-content-workbench:has(.scheduled-card.is-expanded) { overflow: auto; }.app-content-workbench:has(.scheduled-card.is-expanded) .workbench-page { height: auto; min-height: 100%; } }
 .app-content-workbench .workbench-task-list.is-empty, .app-content-workbench .workbench-task-detail.is-empty, .app-content-workbench .workbench-page > .scheduled-card.is-empty { overflow: hidden; }
 .app-content-workbench .workbench-task-list.is-empty .ui-empty, .app-content-workbench .workbench-task-detail.is-empty .ui-empty { min-height: 0; height: 100%; }
 .app-content-workbench .workbench-page > .scheduled-card.is-empty .ui-empty { min-height: 0; padding: 12px 14px 2px; }
