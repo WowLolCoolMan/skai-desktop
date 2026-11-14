@@ -289,6 +289,12 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
   .app-content-workbench .workbench-task-list, .app-content-workbench .workbench-task-detail, .app-content-workbench .workbench-page > .scheduled-card { max-height: none; overflow: visible; }
 }
 .app-content-settings { display: flex; min-height: 0; flex-direction: column; padding-bottom: 24px; overflow: hidden; }
+.app-content-terminal { display: flex; min-height: 0; flex-direction: column; padding-bottom: 24px; overflow: hidden; }
+.app-content-terminal .terminal-page { display: flex; width: 100%; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
+.app-content-terminal .terminal-page > .page-header { flex: 0 0 auto; margin-bottom: 14px; }
+.app-content-terminal .terminal-page > .terminal-card { width: 100%; max-width: none; min-height: 0; flex: 1 1 0; }
+.app-content-terminal .terminal-card > .ui-empty { min-height: 0; height: 100%; }
+@supports selector(.app-content-terminal .terminal-card:has(> .ui-empty)) { .app-content-terminal .terminal-card:has(> .ui-empty) { height: 300px; flex: 0 0 auto; } }
 .app-content-settings .settings-page { display: flex; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
 .app-content-settings .settings-page-header { flex: 0 0 auto; margin-bottom: 14px; }
 .app-content-settings .settings-page-header h2 { font-size: 26px; }
