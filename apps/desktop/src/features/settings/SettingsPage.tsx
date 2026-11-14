@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { Model, ThemeMode } from "../../app/types";
 import { saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceModels, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
-import { Button, Card, PageHeader, StatusBadge } from "../../components/ui/Primitives";
+import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 
 const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Updates", "Advanced"] as const;
@@ -91,7 +91,7 @@ export function SettingsPage(props: SettingsProps) {
 
   return <div className="feature-page settings-page">
     <PageHeader className="settings-page-header" eyebrow="CONTROL CENTER" title="Workspace settings" description="Tune the local runtime, appearance, voice, media, memory, and workspace behavior." />
-    <Card className="settings-window">
+    <div className="settings-window">
       <aside className="settings-nav"><p className="section-kicker">SETTINGS</p><input className="settings-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search settings…" aria-label="Search settings" />{normalizedQuery && <p className="settings-search-status" role="status">{visibleCategories.length} matching {visibleCategories.length === 1 ? "section" : "sections"}</p>}{visibleCategories.map((category) => <button className={activeCategory === category ? "is-active" : ""} key={category} onClick={() => setActiveCategory(category)} type="button"><NavIcon name={categoryIcons[category]} /><span>{category}</span></button>)}{visibleCategories.length === 0 && <p className="settings-no-results">No settings match. Try a label such as endpoint, motion, or memory.</p>}</aside>
       <main className="settings-content">
         <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h3>{activeCategory}</h3><p>{categoryDescription(activeCategory)}</p></div><StatusBadge tone={activeCategory === "Integrations" ? "neutral" : "success"}>{activeCategory === "Integrations" ? "Review connections" : "Available"}</StatusBadge></div>
@@ -122,7 +122,7 @@ export function SettingsPage(props: SettingsProps) {
 
         <div className="settings-footer"><span className={`settings-save-status settings-save-${saveState}`} role="status">{saveState === "saving" ? "Saving changes…" : saveState === "saved" ? "Saved locally" : "Changes apply across the workspace."}</span><Button variant="primary" disabled={saveState === "saving"} onClick={() => void save()}>{saveState === "saving" ? "Saving…" : "Save settings"}</Button></div>
       </main>
-    </Card>
+    </div>
   </div>;
 }
 
