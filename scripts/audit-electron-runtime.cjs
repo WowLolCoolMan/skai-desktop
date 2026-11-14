@@ -46,6 +46,11 @@ for (const method of ["scheduled.create", "scheduled.pause", "scheduled.resume",
   expect(main.includes(`"${method}"`), `Electron bridge must expose the local scheduled method ${method}`);
 }
 expect(main.includes("HOST_TIMEOUT"), "Electron bridge must bound pending host requests");
+expect(main.includes("new Tray") && main.includes("event.preventDefault()") && main.includes("mainWindow.hide()"), "Closing the main Electron window must hide it to the system tray instead of quitting");
+expect(main.includes("requestSingleInstanceLock") && main.includes('app.on("second-instance"'), "Electron must reopen the resident instance instead of creating duplicate desktop processes");
+expect(main.includes("Recent chats") && main.includes("tray:open-conversation") && main.includes("Quit Skai Desktop"), "The system tray menu must expose recent chats, reopen, and explicit quit actions");
+expect(main.includes("Hide Percy") && main.includes("Show Percy"), "The system tray menu must expose Percy visibility control");
+expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "The preload bridge must expose typed tray navigation events");
 expect(main.includes("taskkill") && main.includes("/T"), "Electron shutdown must terminate the full Windows host process tree");
 expect(main.includes("restartAgentHost"), "Electron must restart a timed-out host after resolving pending requests");
 expect(main.includes("timeoutSeconds: chatHostDeadlineSeconds"), "Electron must give chat requests a host-side deadline before the renderer deadline");

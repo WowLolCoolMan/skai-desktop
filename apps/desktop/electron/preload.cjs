@@ -2,6 +2,16 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("serverRockAgent", {
   request: (method, params) => ipcRenderer.invoke("agent:request", method, params),
+  onTrayOpenConversation: (handler) => {
+    const listener = (_event, id) => handler(String(id));
+    ipcRenderer.on("tray:open-conversation", listener);
+    return () => ipcRenderer.removeListener("tray:open-conversation", listener);
+  },
+  onTrayNewChat: (handler) => {
+    const listener = () => handler();
+    ipcRenderer.on("tray:new-chat", listener);
+    return () => ipcRenderer.removeListener("tray:new-chat", listener);
+  },
   pet: {
     setVisible: (visible) => ipcRenderer.send("pet:set-visible", Boolean(visible)),
     setMotion: (settings) => ipcRenderer.send("pet:set-motion", settings),

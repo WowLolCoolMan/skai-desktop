@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, screen, session } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, session, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -24,6 +24,8 @@ const chatHostDeadlineSeconds = 285;
 let isQuitting = false;
 let mainWindow;
 let petWindow;
+let tray;
+let trayRefreshSequence = 0;
 let petReady = false;
 let petDragOffset = null;
 let petDragTimer;
@@ -42,6 +44,13 @@ const PET_WINDOW_HEIGHT = 190;
 const PET_WINDOW_MARGIN = 16;
 const attachmentTextExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".json", ".xml", ".yaml", ".yml", ".toml", ".html", ".htm", ".css", ".js", ".ts", ".jsx", ".tsx", ".cs", ".py", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".log"]);
 const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets"]);
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => showMainWindow());
+}
 const isBlockedAttachmentName = (name) => blockedAttachmentNames.has(name.toLowerCase()) || name.toLowerCase().includes(".env.");
 const isPng = (bytes) => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 const isJpeg = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
@@ -240,6 +249,7 @@ function setPetVisible(visible) {
   if (visible && petReady) flushPetMessages();
   persistPetState();
   sendPetVisibility(visible);
+  void refreshTrayMenu();
 }
 
 function flushPetMessages() {
@@ -363,6 +373,85 @@ function createPetWindow() {
     }
   });
   return petWindow;
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function sendTrayEvent(eventName, value) {
+  showMainWindow();
+  const send = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(eventName, value);
+  };
+  if (mainWindow?.webContents.isLoading()) mainWindow.webContents.once("did-finish-load", send);
+  else setTimeout(send, 0);
+}
+
+function resolveTrayIconPath() {
+  const direct = path.join(runtimeRoot, "assets", "branding", "skaiwolficon.png");
+  if (fsSync.existsSync(direct)) return direct;
+  const distAssets = path.join(rendererRoot, "dist", "assets");
+  try {
+    const file = fsSync.readdirSync(distAssets).find((candidate) => candidate.startsWith("skaiwolficon") && candidate.endsWith(".png"));
+    return file ? path.join(distAssets, file) : null;
+  } catch {
+    return null;
+  }
+}
+
+function recentConversationMenuItems(conversations) {
+  if (!conversations.length) return [{ label: "No recent chats", enabled: false }];
+  return conversations.slice(0, 8).map((conversation) => {
+    const title = String(conversation.title || "Untitled chat").replace(/\s+/g, " ").trim().slice(0, 72) || "Untitled chat";
+    const project = conversation.projectName ? ` · ${String(conversation.projectName).slice(0, 28)}` : "";
+    return { label: `${title}${project}`, click: () => sendTrayEvent("tray:open-conversation", String(conversation.id)) };
+  });
+}
+
+function setTrayMenu(conversations = []) {
+  if (!tray || tray.isDestroyed()) return;
+  const petVisible = Boolean(petWindow && !petWindow.isDestroyed() && petWindow.isVisible());
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Show Skai Desktop", click: showMainWindow },
+    { label: "New chat", click: () => sendTrayEvent("tray:new-chat") },
+    { type: "separator" },
+    { label: "Recent chats", submenu: recentConversationMenuItems(conversations) },
+    { type: "separator" },
+    { label: petVisible ? "Hide Percy" : "Show Percy", click: () => setPetVisible(!petVisible) },
+    { type: "separator" },
+    { label: "Quit Skai Desktop", click: () => app.quit() },
+  ]));
+}
+
+async function refreshTrayMenu(popUp = false) {
+  if (!tray || tray.isDestroyed()) return;
+  const sequence = ++trayRefreshSequence;
+  const response = await requestAgent("conversations.list", { includeArchived: false });
+  if (sequence !== trayRefreshSequence || !tray || tray.isDestroyed()) return;
+  const conversations = response.ok && Array.isArray(response.result) ? response.result : [];
+  setTrayMenu(conversations);
+  if (popUp && !isQuitting) tray.popUpContextMenu();
+}
+
+function createTray() {
+  if (tray && !tray.isDestroyed()) return tray;
+  const iconPath = resolveTrayIconPath();
+  const source = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+  tray = new Tray(process.platform === "win32" ? source.resize({ width: 16, height: 16 }) : source);
+  tray.setToolTip("Skai Desktop");
+  setTrayMenu();
+  tray.on("click", showMainWindow);
+  tray.on("right-click", () => { void refreshTrayMenu(true); });
+  tray.on("double-click", showMainWindow);
+  void refreshTrayMenu();
+  return tray;
 }
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
@@ -509,7 +598,13 @@ function createWindow() {
   const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
   if (devUrl) mainWindow.loadURL(devUrl);
   else mainWindow.loadFile(path.join(rendererRoot, "dist", "index.html"));
-  mainWindow.on("closed", () => { mainWindow = undefined; if (petWindow && !petWindow.isDestroyed()) petWindow.close(); });
+  mainWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow.hide();
+    void refreshTrayMenu();
+  });
+  mainWindow.on("closed", () => { mainWindow = undefined; });
 }
 
 function applyProductionContentSecurityPolicy() {
@@ -615,6 +710,7 @@ app.whenReady().then(() => {
   });
   createWindow();
   createPetWindow();
+  createTray();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

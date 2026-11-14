@@ -125,6 +125,12 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const resizeSidebar = useCallback((width: number) => setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)))), []);
   const startNewChat = useCallback(() => { chat.startNewChat(); onNavigate("chat"); }, [chat, onNavigate]);
   useEffect(() => {
+    const bridge = window.serverRockAgent;
+    const removeConversation = bridge?.onTrayOpenConversation?.((id) => { chat.selectConversation(id); onNavigate("chat"); });
+    const removeNewChat = bridge?.onTrayNewChat?.(() => startNewChat());
+    return () => { removeConversation?.(); removeNewChat?.(); };
+  }, [chat.selectConversation, onNavigate, startNewChat]);
+  useEffect(() => {
     const initialRoute = routeFromLocation();
     setRoute(initialRoute);
     setNavigation(initializeNavigation(initialRoute));

@@ -147,6 +147,8 @@ export interface PetBridge {
 
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
+  onTrayOpenConversation?(handler: (id: string) => void): () => void;
+  onTrayNewChat?(handler: () => void): () => void;
   pet?: PetBridge;
 }
 

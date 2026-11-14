@@ -58,6 +58,11 @@ scoped compatibility fixes needed to validate the cutover.
 - The always-on-top Electron pet now uses the contributed 10x10 grid planner
   and eased path walk semantics, including display/work-area clamping and
   deterministic blocked-cell planning for future compositor obstacles.
+- Closing the Electron main window now hides it to the Windows notification
+  area instead of stopping the host. The resident tray menu can reopen Skai,
+  create a new chat, open the eight most recent chats, show/hide Percy, or
+  explicitly quit the application; a second launch reopens the resident
+  instance rather than creating a duplicate process.
 - The Electron renderer has persisted projects, conversations, settings, model
   discovery, chat, Agent Workbench, and a local ComfyUI Image Studio surface.
 - The Electron chat restores the newest local conversation and saves both the
