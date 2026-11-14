@@ -43,6 +43,15 @@ const providerChoices = [
   { id: "AirLLM", label: "AirLLM", detail: "Run very large models locally with AirLLM." },
 ];
 
+const builtInPetPreviews: Record<string, string> = {
+  percy: new URL("../../../../../assets/pets/percy-idle-frames.png", import.meta.url).href,
+  byte: new URL("../../../../../assets/pets/byte-idle-frames.png", import.meta.url).href,
+  ember: new URL("../../../../../assets/pets/ember-idle-frames.png", import.meta.url).href,
+  nova: new URL("../../../../../assets/pets/nova-idle-frames.png", import.meta.url).href,
+  rocky: new URL("../../../../../assets/pets/rocky-idle-frames.png", import.meta.url).href,
+  sprout: new URL("../../../../../assets/pets/sprout-idle-frames.png", import.meta.url).href,
+};
+
 type SettingsProps = {
   provider: string;
   endpoint: string;
@@ -149,7 +158,7 @@ function PetSettings({ props, change }: { props: SettingsProps; change: (key: st
     <div className="settings-callout"><strong>Separate desktop companion</strong><span>Percy is its own transparent, always-on-top window. It can be dragged anywhere and stays independent from the Skai workspace.</span></div>
     <Toggle label="Show Percy" detail="Open the companion above your other windows." checked={props.petVisible} onChange={(value) => change("petVisible", value)} />
     <Toggle label="Let Percy walk around" detail="Allow gentle ambient movement while Percy is idle. Dragging always pauses movement." checked={props.petWander} onChange={(value) => change("petWander", value)} />
-    <div className="settings-field"><label>Companion<select value={character} onChange={(event) => { setCharacter(event.target.value); localStorage.setItem("skai.pet.character", event.target.value); change("petCharacter", event.target.value); }}><option value="percy">Percy · Skai wolf</option><option value="byte">Byte · neon bot</option><option value="ember">Ember · ember fox</option><option value="nova">Nova · star cat</option><option value="rocky">Rocky · pocket rock</option><option value="sprout">Sprout · tiny plant</option></select></label><div className="pet-settings-preview"><img src={sprite || `/assets/pets/${character}-idle-1.png`} alt="" /><span>{sprite ? "Custom sprite sheet" : "Built-in sprite set"}</span></div></div>
+    <div className="settings-field"><label>Companion<select value={character} onChange={(event) => { setCharacter(event.target.value); localStorage.setItem("skai.pet.character", event.target.value); change("petCharacter", event.target.value); }}><option value="percy">Percy · Skai wolf</option><option value="byte">Byte · neon bot</option><option value="ember">Ember · ember fox</option><option value="nova">Nova · star cat</option><option value="rocky">Rocky · pocket rock</option><option value="sprout">Sprout · tiny plant</option></select></label><div className="pet-settings-preview"><img src={sprite || builtInPetPreviews[character] || builtInPetPreviews.percy} alt="" /><span>{sprite ? "Custom sprite sheet" : "Built-in sprite set"}</span></div></div>
     <div className="settings-provider-row pet-sprite-import"><span><strong>Use your own sprite sheet</strong><small>Import a PNG, WebP, or GIF up to 5 MB. Use a six-frame horizontal strip; it is stored locally in this profile.</small></span><label className="ui-button ui-button-secondary"><span>Choose image</span><input type="file" accept="image/png,image/webp,image/gif" onChange={onSpriteChange} /></label></div>
     {sprite && <div className="settings-inline-action"><span>Your custom sprite is active.</span><Button variant="ghost" onClick={() => { setSprite(""); localStorage.removeItem("skai.pet.sprite"); change("petSpriteDataUrl", ""); }}>Use built-in sprites</Button></div>}
   </>;
