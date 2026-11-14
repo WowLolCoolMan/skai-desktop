@@ -32,6 +32,8 @@ fs.cpSync(electronDist, outputRoot, { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "dist"), path.join(appRoot, "dist"), { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "electron"), path.join(appRoot, "electron"), { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "package.json"), path.join(appRoot, "package.json"), { force: true });
+fs.mkdirSync(path.join(appRoot, "assets", "branding"), { recursive: true });
+fs.copyFileSync(path.join(root, "assets", "branding", "skaiwolficon.png"), path.join(appRoot, "assets", "branding", "skaiwolficon.png"));
 fs.renameSync(path.join(outputRoot, electronBinary), path.join(outputRoot, packagedBinary));
 
 const publishedHost = path.join(hostRoot, hostBinary);

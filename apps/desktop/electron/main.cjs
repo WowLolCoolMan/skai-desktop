@@ -395,12 +395,24 @@ function sendTrayEvent(eventName, value) {
 }
 
 function resolveTrayIconPath() {
-  const direct = path.join(runtimeRoot, "assets", "branding", "skaiwolficon.png");
-  if (fsSync.existsSync(direct)) return direct;
+  const direct = resolveAppIconPath();
+  if (direct && fsSync.existsSync(direct)) return direct;
   const distAssets = path.join(rendererRoot, "dist", "assets");
   try {
     const file = fsSync.readdirSync(distAssets).find((candidate) => candidate.startsWith("skaiwolficon") && candidate.endsWith(".png"));
     return file ? path.join(distAssets, file) : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveAppIconPath() {
+  const direct = path.join(runtimeRoot, "assets", "branding", "skaiwolficon.png");
+  if (fsSync.existsSync(direct)) return direct;
+  const packaged = path.join(rendererRoot, "dist", "assets");
+  try {
+    const file = fsSync.readdirSync(packaged).find((candidate) => candidate.startsWith("skaiwolficon") && candidate.endsWith(".png"));
+    return file ? path.join(packaged, file) : null;
   } catch {
     return null;
   }
@@ -587,6 +599,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: "#10141d",
+    icon: resolveAppIconPath() || undefined,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
