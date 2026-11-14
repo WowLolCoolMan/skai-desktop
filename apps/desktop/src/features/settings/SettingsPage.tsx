@@ -90,7 +90,7 @@ export function SettingsPage(props: SettingsProps) {
   const localRoute = isLocalProvider(selectedProviderId);
 
   return <div className="feature-page settings-page">
-    <PageHeader className="settings-page-header" eyebrow="CONTROL CENTER" title="Settings" description="Tune the local runtime, appearance, voice, media, memory, and workspace behavior." />
+    <PageHeader className="settings-page-header" eyebrow="CONTROL CENTER" title="Workspace settings" description="Tune the local runtime, appearance, voice, media, memory, and workspace behavior." />
     <Card className="settings-window">
       <aside className="settings-nav"><p className="section-kicker">SETTINGS</p><input className="settings-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search settings…" aria-label="Search settings" />{normalizedQuery && <p className="settings-search-status" role="status">{visibleCategories.length} matching {visibleCategories.length === 1 ? "section" : "sections"}</p>}{visibleCategories.map((category) => <button className={activeCategory === category ? "is-active" : ""} key={category} onClick={() => setActiveCategory(category)} type="button"><NavIcon name={categoryIcons[category]} /><span>{category}</span></button>)}{visibleCategories.length === 0 && <p className="settings-no-results">No settings match. Try a label such as endpoint, motion, or memory.</p>}</aside>
       <main className="settings-content">
