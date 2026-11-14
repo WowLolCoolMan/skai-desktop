@@ -110,10 +110,27 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const onNavigate = useCallback((nextRoute: Route) => navigate(nextRoute), []);
   const coding = useCodingWorkspace({ request, connection, onError: setError, onNavigate: () => onNavigate("coding") });
   const chat = useChatWorkspace({ request, connection, provider, endpoint, model, cloudRouteEnabled, projectId: coding.selectedProject?.id ?? null, effortMode, webSearchEnabled, fullTextContextInjectionEnabled, cloudVoice: { enabled: cloudVoiceEnabled, voiceId: elevenLabsVoiceId, modelId: elevenLabsModelId }, onError: setError, onPetActivity: setPetActivity });
+  const { conversations, selectConversation } = chat;
   const openCommandPalette = useCallback(() => setCommandOpen(true), []);
   const closeCommandPalette = useCallback(() => setCommandOpen(false), []);
   const toggleSidebar = useCallback(() => setSidebarCollapsed((value) => !value), []);
   const startNewChat = useCallback(() => { chat.startNewChat(); onNavigate("chat"); }, [chat, onNavigate]);
+  useEffect(() => {
+    const unsubscribeNewChat = window.serverRockAgent.tray.onNewChat(() => startNewChat());
+    const unsubscribeConversation = window.serverRockAgent.tray.onOpenConversation((id) => {
+      selectConversation(id);
+      onNavigate("chat");
+    });
+    const unsubscribeNavigate = window.serverRockAgent.tray.onNavigate((nextRoute) => {
+      if (nextRoute === "marketplace") onNavigate("marketplace");
+    });
+    return () => {
+      unsubscribeNewChat();
+      unsubscribeConversation();
+      unsubscribeNavigate();
+    };
+  }, [onNavigate, selectConversation, startNewChat]);
+  useEffect(() => { window.serverRockAgent.tray.refresh(); }, [conversations]);
   useEffect(() => { const onPopState = () => setRoute(routeFromLocation()); window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
   useEffect(() => { document.title = `${PRODUCT_DISPLAY_NAME} · ${route}`; document.documentElement.dataset.theme = themeMode; document.documentElement.dataset.accent = accentColor; document.documentElement.dataset.density = density; document.documentElement.dataset.backdrop = backdrop; document.documentElement.dataset.reduceMotion = reduceMotion ? "true" : "false"; }, [route, themeMode, accentColor, density, backdrop, reduceMotion]);
   useEffect(() => { localStorage.setItem("skai.sidebar.collapsed", String(sidebarCollapsed)); }, [sidebarCollapsed]);

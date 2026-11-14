@@ -72,6 +72,10 @@ See [`docs/ELECTRON_MIGRATION_CUTOVER.md`](docs/ELECTRON_MIGRATION_CUTOVER.md)
 for the approved replacement boundary and [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md)
 for support details. The Uno surface is retained only until parity gates pass.
 
+### Resident desktop behavior
+
+Electron keeps Skai resident on Windows and Linux. Closing the main window hides it to the system tray; the tray menu can restore Skai, start a new chat, open host-backed recent chats, open Marketplace, show or hide Percy, or quit the process. The portable Electron packaging workflow emits `dist/electron/win-x64` on Windows and `dist/electron/linux-x64` on Linux, with the tray icon bundled into each artifact.
+
 ## Privacy and guardrails
 
 - No background analytics or telemetry.

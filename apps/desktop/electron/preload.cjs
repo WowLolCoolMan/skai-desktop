@@ -28,4 +28,22 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
     dragEnd: () => ipcRenderer.send("pet:drag-end"),
     hide: () => ipcRenderer.send("pet:hide"),
   },
+  tray: {
+    refresh: () => ipcRenderer.send("tray:refresh"),
+    onNewChat: (listener) => {
+      const handler = () => listener();
+      ipcRenderer.on("tray:new-chat", handler);
+      return () => ipcRenderer.removeListener("tray:new-chat", handler);
+    },
+    onOpenConversation: (listener) => {
+      const handler = (_event, id) => listener(id);
+      ipcRenderer.on("tray:open-conversation", handler);
+      return () => ipcRenderer.removeListener("tray:open-conversation", handler);
+    },
+    onNavigate: (listener) => {
+      const handler = (_event, route) => listener(route);
+      ipcRenderer.on("tray:navigate", handler);
+      return () => ipcRenderer.removeListener("tray:navigate", handler);
+    },
+  },
 });

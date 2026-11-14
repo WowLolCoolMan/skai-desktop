@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, session } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -24,6 +24,8 @@ const chatHostDeadlineSeconds = 285;
 let isQuitting = false;
 let mainWindow;
 let petWindow;
+let tray;
+let trayRefreshSequence = 0;
 let petDragging = false;
 let petDragOffset = { x: 0, y: 0 };
 let petActivity = "idle";
@@ -49,6 +51,103 @@ const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production",
 const isBlockedAttachmentName = (name) => blockedAttachmentNames.has(name.toLowerCase()) || name.toLowerCase().includes(".env.");
 const isPng = (bytes) => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 const isJpeg = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+function sendTrayEvent(channel, payload) {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return;
+  mainWindow.webContents.send(channel, payload);
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  syncPetWindowPosition();
+}
+
+function hideMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+}
+
+function resolveTrayIconPath() {
+  const candidates = [
+    path.join(runtimeRoot, "assets", "branding", "skaiwolficon.png"),
+    path.join(repoRoot, "assets", "branding", "skaiwolficon.png"),
+    path.join(process.resourcesPath, "app", "assets", "branding", "skaiwolficon.png"),
+  ];
+  return candidates.find((candidate) => fsSync.existsSync(candidate));
+}
+
+function createTrayIcon() {
+  const iconPath = resolveTrayIconPath();
+  if (!iconPath) return nativeImage.createEmpty();
+  const icon = nativeImage.createFromPath(iconPath);
+  return icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 });
+}
+
+async function recentTrayConversations() {
+  const response = await requestAgent("conversations.list", { includeArchived: false });
+  if (!response.ok || !Array.isArray(response.result)) return [];
+  return response.result
+    .filter((conversation) => conversation && typeof conversation.id === "string" && typeof conversation.title === "string")
+    .slice(0, 8)
+    .map((conversation) => ({ id: conversation.id, title: conversation.title.trim() || "Untitled chat" }));
+}
+
+async function refreshTrayMenu() {
+  if (!tray || tray.isDestroyed()) return;
+  const sequence = ++trayRefreshSequence;
+  const conversations = await recentTrayConversations().catch(() => []);
+  if (!tray || tray.isDestroyed() || sequence !== trayRefreshSequence) return;
+  const recentItems = conversations.length
+    ? conversations.map((conversation) => ({
+        label: conversation.title,
+        click: () => {
+          showMainWindow();
+          sendTrayEvent("tray:open-conversation", conversation.id);
+        },
+      }))
+    : [{ label: "No recent chats", enabled: false }];
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Show Skai Desktop", click: showMainWindow },
+    { label: "New Chat", click: () => { showMainWindow(); sendTrayEvent("tray:new-chat"); } },
+    { type: "separator" },
+    { label: "Recent chats", submenu: recentItems },
+    { type: "separator" },
+    { label: petSettings.visible ? "Hide Percy" : "Show Percy", click: togglePetVisibility },
+    { label: "Open Marketplace", click: () => { showMainWindow(); sendTrayEvent("tray:navigate", "marketplace"); } },
+    { type: "separator" },
+    { label: "Quit Skai Desktop", click: () => { isQuitting = true; app.quit(); } },
+  ]));
+}
+
+function togglePetVisibility() {
+  petSettings.visible = !petSettings.visible;
+  if (petSettings.visible) {
+    createPetWindow();
+    petWindow?.setAlwaysOnTop(true, "floating");
+    petWindow?.showInactive();
+    configurePetWander();
+  } else {
+    stopPetWander();
+    petWindow?.hide();
+  }
+  sendTrayEvent("pet:visibility", petSettings.visible);
+  sendPetConfig();
+  void refreshTrayMenu();
+}
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => showMainWindow());
+}
 const allowedMethods = new Set([
   "runtime.health", "models.list", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
   "scheduled.list", "tasks.plan", "tasks.queue", "tasks.approve", "tasks.deny", "tasks.cancel", "tasks.retry", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
@@ -352,7 +451,6 @@ function createPetWindow() {
     show: false,
     alwaysOnTop: true,
     backgroundColor: "#00000000",
-    parent: mainWindow,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -416,6 +514,12 @@ function createWindow() {
   else mainWindow.loadFile(path.join(rendererRoot, "dist", "index.html"));
   mainWindow.on("move", syncPetWindowPosition);
   mainWindow.on("resize", syncPetWindowPosition);
+  mainWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    hideMainWindow();
+    void refreshTrayMenu();
+  });
   mainWindow.on("closed", () => {
     stopPetWander();
     if (petWindow && !petWindow.isDestroyed()) petWindow.close();
@@ -499,6 +603,7 @@ app.whenReady().then(() => {
       } else petWindow.hide();
     }
     sendPetConfig();
+    void refreshTrayMenu();
   });
   ipcMain.on("pet:activity", (_event, activity) => {
     petActivity = allowedPetActivities.has(activity) ? activity : "idle";
@@ -525,19 +630,31 @@ app.whenReady().then(() => {
     petWindow?.hide();
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("pet:visibility", false);
     sendPetConfig();
+    void refreshTrayMenu();
   });
+  ipcMain.on("tray:refresh", () => { void refreshTrayMenu(); });
   createWindow();
+  app.setAppUserModelId?.("com.skai.desktop");
+  tray = new Tray(createTrayIcon());
+  tray.setToolTip("Skai Desktop");
+  tray.on("click", showMainWindow);
+  tray.on("double-click", showMainWindow);
+  void refreshTrayMenu();
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    showMainWindow();
   });
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") stopAgentHost();
-  if (process.platform !== "darwin") app.quit();
+  if (isQuitting || process.platform === "darwin") {
+    stopAgentHost();
+    if (process.platform !== "darwin") app.quit();
+  }
 });
 
 app.on("before-quit", () => {
   isQuitting = true;
+  tray?.destroy();
+  tray = undefined;
   stopAgentHost();
 });

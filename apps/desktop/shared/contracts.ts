@@ -166,6 +166,14 @@ export interface PetBridge {
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
   pet: PetBridge;
+  tray: TrayBridge;
+}
+
+export interface TrayBridge {
+  refresh(): void;
+  onNewChat(listener: () => void): () => void;
+  onOpenConversation(listener: (id: string) => void): () => void;
+  onNavigate(listener: (route: string) => void): () => void;
 }
 
 declare global {
