@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 
@@ -13,7 +14,8 @@ if (!fs.existsSync(executable)) {
   process.exit(1);
 }
 
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu"], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
@@ -76,6 +78,20 @@ async function main() {
   console.log(`Packaged Electron smoke passed: ${mainState.title}; main and separate transparent Percy surfaces rendered with animated sprite.`);
 }
 
-main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(() => {
-  if (!child.killed) child.kill();
-});
+async function cleanup() {
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill();
+    await new Promise((resolve) => child.once("close", resolve));
+  }
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      fs.rmSync(smokeUserDataDir, { recursive: true, force: true });
+      return;
+    } catch {
+      await sleep(100);
+    }
+  }
+  console.warn(`Unable to remove temporary Electron smoke data: ${smokeUserDataDir}`);
+}
+
+main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(cleanup);
