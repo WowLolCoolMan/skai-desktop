@@ -45,10 +45,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .sidebar-muted { margin: 3px 8px; color: var(--skai-color-sidebar-muted); font-size: 11px; }
 .sidebar-settings { flex: 0 0 auto; margin-top: 0; }
 .sidebar-top-actions { display: flex; gap: 6px; }.sidebar-collapse { width: 34px; border: 1px solid var(--skai-color-border); border-radius: 9px; color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: 18px; }.sidebar-search { width: 100%; padding: 9px 10px; border: 1px solid var(--skai-color-border); border-radius: 8px; color: var(--skai-color-text); background: var(--skai-color-surface-soft); font-size: 11px; }.app-sidebar.is-collapsed { width: 78px; padding-inline: 11px; }.app-shell.sidebar-collapsed { grid-template-columns: 78px minmax(0,1fr); }.app-sidebar.is-collapsed .sidebar-brand { justify-content: center; padding-inline: 0; }.app-sidebar.is-collapsed .sidebar-brand > div:last-child, .app-sidebar.is-collapsed .sidebar-nav .sidebar-label, .app-sidebar.is-collapsed .sidebar-nav-item, .app-sidebar.is-collapsed .sidebar-projects, .app-sidebar.is-collapsed .sidebar-history, .app-sidebar.is-collapsed .sidebar-settings, .app-sidebar.is-collapsed .new-chat-button span { font-size: 0; }.app-sidebar.is-collapsed .sidebar-nav-item, .app-sidebar.is-collapsed .sidebar-settings { justify-content: center; padding-inline: 5px; }.app-sidebar.is-collapsed .sidebar-nav-item span, .app-sidebar.is-collapsed .sidebar-settings span { font-size: 14px; }.app-sidebar.is-collapsed .new-chat-button { padding-inline: 8px; }.app-sidebar.is-collapsed .sidebar-top-actions { display: grid; }.app-sidebar.is-collapsed .sidebar-collapse { width: 100%; }.app-sidebar.is-collapsed .sidebar-nav-secondary { display: none; }
-.app-main { display: flex; height: 100vh; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; background: var(--skai-color-canvas); }
+.app-main { position: relative; isolation: isolate; display: flex; height: 100vh; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; background: var(--skai-color-canvas); }
+.app-main::before { position: absolute; z-index: -1; inset: -18%; pointer-events: none; content: ""; opacity: 0; transform: translate3d(0, 0, 0); will-change: transform; }
 @media (max-width:760px) { .app-shell { height: auto; min-height: 100vh; overflow: visible; }.app-main { height: auto; min-height: 0; } }
-[data-backdrop="deep-sea"] .app-main { background: radial-gradient(circle at 76% 8%, color-mix(in srgb, var(--skai-color-accent) 18%, transparent), transparent 30%), linear-gradient(145deg, color-mix(in srgb, var(--skai-color-canvas) 92%, #061a2c), var(--skai-color-canvas)); }
-[data-backdrop="deep-space"] .app-main { background: radial-gradient(circle at 78% 10%, color-mix(in srgb, var(--skai-color-accent) 16%, transparent), transparent 28%), radial-gradient(circle at 18% 82%, rgba(44,64,132,.12), transparent 32%), var(--skai-color-canvas); }
+[data-backdrop="deep-sea"] .app-main { background: linear-gradient(145deg, color-mix(in srgb, var(--skai-color-canvas) 92%, #061a2c), var(--skai-color-canvas)); }
+[data-backdrop="deep-sea"] .app-main::before { opacity: .52; background: radial-gradient(ellipse at 72% 24%, color-mix(in srgb, var(--skai-color-accent) 17%, transparent), transparent 34%), radial-gradient(ellipse at 25% 78%, rgba(0,126,160,.13), transparent 38%), repeating-linear-gradient(165deg, transparent 0 54px, rgba(103,232,249,.018) 55px 56px, transparent 57px 112px); animation: deep-sea-drift 34s ease-in-out infinite alternate; }
+[data-backdrop="deep-space"] .app-main { background: var(--skai-color-canvas); }
+[data-backdrop="deep-space"] .app-main::before { opacity: .48; background: radial-gradient(ellipse at 76% 20%, color-mix(in srgb, var(--skai-color-accent) 16%, transparent), transparent 29%), radial-gradient(ellipse at 20% 75%, rgba(44,64,132,.14), transparent 35%), radial-gradient(circle at 28% 27%, rgba(255,255,255,.22) 0 1px, transparent 1.5px), radial-gradient(circle at 67% 64%, rgba(211,203,255,.20) 0 1px, transparent 1.5px), radial-gradient(circle at 88% 72%, rgba(255,255,255,.16) 0 1px, transparent 1.5px); background-size: auto, auto, 170px 170px, 230px 230px, 290px 290px; animation: deep-space-drift 48s ease-in-out infinite alternate; }
+@keyframes deep-sea-drift { from { transform: translate3d(-1.2%, -.5%, 0) scale(1); } to { transform: translate3d(1.2%, .8%, 0) scale(1.025); } }
+@keyframes deep-space-drift { from { transform: translate3d(-.7%, .5%, 0) scale(1); } to { transform: translate3d(.8%, -.7%, 0) scale(1.02); } }
+[data-reduce-motion="true"] .app-main::before { animation: none !important; }
 .app-toolbar { display: flex; align-items: center; gap: 20px; min-height: 76px; padding: 15px clamp(22px,4vw,56px); border-bottom: 1px solid var(--skai-color-border); background: color-mix(in srgb, var(--skai-color-canvas) 90%, transparent); }
 .toolbar-history { display: flex; gap: 2px; }
 .toolbar-history .ui-button { width: 30px; padding: 5px; font-size: 21px; }
@@ -439,6 +445,9 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .global-rail-plugin:hover .global-rail-plugin-menu .overflow-menu-trigger-icon, .global-rail-plugin:focus-within .global-rail-plugin-menu .overflow-menu-trigger-icon, .global-rail-plugin-menu .overflow-menu-trigger-icon[aria-expanded="true"] { opacity: 1; }
 .global-rail-plugin-menu .overflow-menu-trigger-icon .nav-icon { width: 13px; height: 13px; }
 .global-rail-plugin-menu .overflow-menu-panel { top: -10px; right: auto; left: calc(100% + 8px); min-width: 180px; }
+.global-rail .overflow-menu-panel { width: max-content; min-width: 196px; max-width: min(260px, calc(100vw - 76px)); padding: 6px; }
+.global-rail .overflow-menu-panel > .overflow-menu-item { display: flex; place-items: initial; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-width: 0; height: auto; min-height: 38px; margin: 0; padding: 9px 10px; white-space: nowrap; }
+.global-rail .overflow-menu-panel > .overflow-menu-item .nav-icon { flex: 0 0 16px; width: 16px; height: 16px; }
 .global-rail-more .overflow-menu { width: 100%; }
 .global-rail-more .overflow-menu-trigger-icon { display: grid; place-items: center; width: 40px; height: 40px; margin: 0 auto; padding: 0; border: 1px solid transparent; border-radius: 9px; color: var(--skai-color-text-muted); background: transparent; }
 .global-rail-more .overflow-menu-panel { top: auto; right: auto; bottom: 0; left: calc(100% + 8px); }
@@ -890,3 +899,20 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 }
 /* Image Studio workflow buttons share a two-column row; let long labels wrap instead of spilling out at mid widths. */
 .workflow-source-row .ui-button { min-width: 0; white-space: normal; text-align: center; line-height: 1.25; }
+
+.plugins-topbar h2 { display: flex; align-items: center; gap: 9px; }
+.plugins-count, .plugins-category-count { color: var(--skai-color-text-muted); font-size: 9px; font-weight: 500; letter-spacing: .02em; }
+.plugins-category-count { margin-left: 2px; }
+.plugins-catalog-icon.is-official { color: #74d8ff; background: color-mix(in srgb, #1e9cc7 18%, var(--skai-color-surface)); }
+.plugins-download-notice { display: grid; gap: 6px; width: min(calc(100% - 56px), 984px); margin: 16px auto 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, #55bd83 38%, var(--skai-color-border)); border-radius: 10px; background: color-mix(in srgb, #267c4b 10%, var(--skai-color-surface)); }
+.plugins-download-notice > span:first-child { display: grid; gap: 3px; }
+.plugins-download-notice strong { color: var(--skai-color-text); font-size: 11px; }
+.plugins-download-notice small, .plugins-download-path { overflow-wrap: anywhere; color: var(--skai-color-text-muted); font-size: 9px; line-height: 1.45; }
+.plugins-download-path { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.plugins-detail-note { align-items: flex-start; }
+.plugins-detail-note .ui-button { margin-top: 4px; }
+@media (max-width: 760px) {
+  .plugins-download-notice { width: calc(100% - 28px); }
+  .plugins-topbar h2 { align-items: baseline; }
+}
+ .plugins-source-link { padding: 0; border: 0; color: var(--skai-color-accent); background: transparent; cursor: pointer; font: inherit; text-align: left; }.plugins-source-link:hover { text-decoration: underline; }

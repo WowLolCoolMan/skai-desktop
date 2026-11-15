@@ -32,6 +32,9 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
       return () => ipcRenderer.removeListener("updates:available", listener);
     },
   },
+  pluginDownloads: {
+    openFolder: () => ipcRenderer.invoke("plugins:open-downloads"),
+  },
   pet: {
     setVisible: (visible) => ipcRenderer.send("pet:set-visible", Boolean(visible)),
     setMotion: (settings) => ipcRenderer.send("pet:set-motion", settings),

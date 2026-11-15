@@ -174,15 +174,18 @@ function clampPetPosition(point) {
 function petWanderLayout() {
   const displays = screen.getAllDisplays()
     .map(({ workArea }) => ({ x: workArea.x, y: workArea.y, width: workArea.width, height: workArea.height }))
-    .filter(({ width, height }) => width > 0 && height > 0)
+    .filter(({ x, y, width, height }) => [x, y, width, height].every(Number.isFinite) && width > 0 && height > 0)
     .sort((left, right) => left.x - right.x || left.y - right.y);
-  const availableDisplays = displays.length > 0 ? displays : [screen.getPrimaryDisplay().workArea];
+  const primaryArea = screen.getPrimaryDisplay().workArea;
+  const safePrimaryArea = [primaryArea.x, primaryArea.y, primaryArea.width, primaryArea.height].every(Number.isFinite) && primaryArea.width > 0 && primaryArea.height > 0
+    ? primaryArea
+    : { x: 0, y: 0, width: PET_WINDOW_WIDTH + PET_WINDOW_MARGIN * 2, height: PET_WINDOW_HEIGHT + PET_WINDOW_MARGIN * 2 };
+  const availableDisplays = displays.length > 0 ? displays : [safePrimaryArea];
   const left = Math.min(...availableDisplays.map(({ x }) => x));
   const top = Math.min(...availableDisplays.map(({ y }) => y));
   const right = Math.max(...availableDisplays.map(({ x, width }) => x + width));
   const bottom = Math.max(...availableDisplays.map(({ y, height }) => y + height));
   const area = { x: left, y: top, width: right - left, height: bottom - top };
-  const primaryArea = screen.getPrimaryDisplay().workArea;
   const bounds = petWindow?.getBounds() ?? {
     x: primaryArea.x + primaryArea.width - PET_WINDOW_WIDTH - PET_WINDOW_MARGIN,
     y: primaryArea.y + primaryArea.height - PET_WINDOW_HEIGHT - PET_WINDOW_MARGIN,
@@ -246,9 +249,21 @@ function movePetTowardTarget() {
   }
   const elapsed = (Date.now() - petWanderStartedAt) / 1000;
   const position = grid.clampPetPosition(petWanderWalk.positionAt(elapsed));
+  const screenX = area.x + position.x;
+  const screenY = area.y + position.y;
+  if (!Number.isFinite(screenX) || !Number.isFinite(screenY)) {
+    console.warn("[pet] Skipping wander step with invalid screen coordinates.");
+    petWanderWalk = null;
+    petWanderStepTimer = undefined;
+    petWanderMoving = false;
+    setPetActivity("idle");
+    petWanderNextAt = Date.now() + 1000;
+    schedulePetWander();
+    return;
+  }
   petWanderMoving = true;
   setPetActivity("walk", petWanderWalk.facingAt(elapsed) || petActivity.facing);
-  petWindow.setPosition(Math.round(area.x + position.x), Math.round(area.y + position.y));
+  petWindow.setPosition(Math.round(screenX), Math.round(screenY));
   if (petWanderWalk.isFinished(elapsed)) {
     petWanderWalk = null;
     petWanderMoving = false;
@@ -617,7 +632,7 @@ function scheduleUpdateCheck() {
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
   "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
-  "settings.save", "image.generate", "image.models.list", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "corpus.list", "corpus.upsert", "corpus.remove",
+  "settings.save", "image.generate", "image.models.list", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
@@ -626,6 +641,7 @@ function startAgentHost() {
   const args = packagedRuntime ? ["--stdio"] : ["run", "--project", hostProject, "--no-launch-profile", "--", "--stdio"];
   host = spawn(command, args, {
     cwd: packagedRuntime ? path.dirname(packagedHost) : repoRoot,
+    env: { ...process.env, SKAI_PLUGIN_DOWNLOADS: path.join(app.getPath("downloads"), "Skai Plugins") },
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -950,6 +966,12 @@ app.whenReady().then(() => {
     if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") return false;
     await shell.openExternal(parsed.toString());
     return true;
+  });
+  ipcMain.handle("plugins:open-downloads", async (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return false;
+    const downloadsPath = path.join(app.getPath("downloads"), "Skai Plugins");
+    await fs.mkdir(downloadsPath, { recursive: true });
+    return !(await shell.openPath(downloadsPath));
   });
   ipcMain.on("pet:set-visible", (event, visible) => {
     if (BrowserWindow.fromWebContents(event.sender)) setPetVisible(Boolean(visible));

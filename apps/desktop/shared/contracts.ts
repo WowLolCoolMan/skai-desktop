@@ -185,6 +185,10 @@ export interface UpdatesBridge {
   onAvailable(handler: (result: UpdateCheckResult) => void): () => void;
 }
 
+export interface PluginDownloadsBridge {
+  openFolder(): Promise<boolean>;
+}
+
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
   onTrayOpenConversation?(handler: (id: string) => void): () => void;
@@ -192,6 +196,7 @@ export interface AgentBridge {
   pet?: PetBridge;
   window?: WindowBridge;
   updates?: UpdatesBridge;
+  pluginDownloads?: PluginDownloadsBridge;
 }
 
 declare global {
