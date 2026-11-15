@@ -74,7 +74,7 @@ async function main() {
   }
   if (!mainTarget || !petTarget) throw new Error(`Packaged Electron did not expose both main and Percy pages before timeout. Output: ${output.slice(-2_000)}`);
   console.log(`Packaged main target: ${JSON.stringify({ title: mainTarget.title, url: mainTarget.url, type: mainTarget.type, websocket: Boolean(mainTarget.webSocketDebuggerUrl) })}`);
-  console.log(`Packaged Percy target: ${JSON.stringify({ title: petTarget.title, url: petTarget.url, type: petTarget.type, websocket: Boolean(petTarget.webSocketDebuggerUrl) })}`);
+  console.log(`Packaged Percy target: ${JSON.stringify({ url: petTarget.url, type: petTarget.type, websocket: Boolean(petTarget.webSocketDebuggerUrl) })}`);
   const mainResult = await evaluate(mainTarget, "JSON.stringify({ title: document.title, settings: document.body.innerText.includes('Settings'), navigation: Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]')) })");
   const settingsResult = await evaluate(mainTarget, "(async () => { location.hash = '#/settings'; await new Promise((resolve) => setTimeout(resolve, 250)); const tab = [...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Models & Providers'); if (!tab) return JSON.stringify({ route: location.hash, tab: false, airLlmCheck: false }); tab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); return JSON.stringify({ route: location.hash, tab: true, airLlmCheck: [...document.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Check AirLLM') }); })()");
   const petResult = await evaluate(petTarget, "JSON.stringify((() => { const root = document.querySelector('[aria-label=\\\"Percy desktop companion. Drag to move.\\\"]'); const sprite = document.querySelector('.pet-window-sprite'); const style = sprite ? getComputedStyle(sprite) : null; return { title: document.title, companion: Boolean(root), sprite: Boolean(sprite), transparent: getComputedStyle(document.body).backgroundColor === 'rgba(0, 0, 0, 0)', animated: Boolean(style?.animationName && style.animationName !== 'none') }; })())");
@@ -85,7 +85,7 @@ async function main() {
   if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !petState.title.includes("Percy") || !petState.companion || !petState.sprite || !petState.transparent || !petState.animated) {
     throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, petState })}`);
   }
-  console.log(`Packaged Electron smoke passed: ${mainState.title}; main and separate transparent Percy surfaces rendered with animated sprite; AirLLM worker staged.`);
+  console.log(`Packaged Electron smoke passed: ${mainState.title}; Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }
 
 async function cleanup() {
