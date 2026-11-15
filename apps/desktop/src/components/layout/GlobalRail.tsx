@@ -9,7 +9,7 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
 ];
 
 export function GlobalRail({ route, onNavigate, onOpenLauncher }: { route: Route; onNavigate: (route: Route) => void; onOpenLauncher: () => void }) {
-  const quickActionsActive = ["coding", "models", "plugins", "workbench", "terminal", "memory"].includes(route);
+  const quickActionsActive = ["coding", "models", "workbench", "terminal", "memory"].includes(route);
   return <aside className="global-rail" aria-label="Global navigation">
     <nav className="global-rail-destinations" aria-label="Primary navigation">
       {destinations.map((item) => <button key={item.route} className={route === item.route ? "is-active" : ""} type="button" aria-current={route === item.route ? "page" : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.route)}><NavIcon name={item.icon} /></button>)}

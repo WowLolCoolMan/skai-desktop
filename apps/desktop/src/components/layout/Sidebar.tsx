@@ -8,7 +8,7 @@ import { Button } from "../ui/Primitives";
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 
 type ConversationPatch = { pinned?: boolean; archived?: boolean; title?: string };
-const activeSessionLabels: Record<Route, string> = { chat: "Home chat", coding: "Coding workspace", settings: "Settings", models: "Models", images: "Image Studio", marketplace: "Marketplace", plugins: "Plugins", workbench: "Agent workbench", terminal: "Terminal", memory: "Memory", usage: "Usage" };
+const activeSessionLabels: Record<Route, string> = { chat: "Home chat", coding: "Coding workspace", settings: "Settings", models: "Models", images: "Image Studio", marketplace: "Marketplace", plugins: "Marketplace", workbench: "Agent workbench", terminal: "Terminal", memory: "Memory", usage: "Usage" };
 
 export function Sidebar({ route, onNavigate, conversations, projects, query, collapsed, sidebarWidth, onSidebarWidthChange, onQueryChange, onToggleCollapsed, onNewChat, onOpenProject, onSelectConversation, onConversationMetadata, className = "" }: { route: Route; onNavigate: (route: Route) => void; conversations: DesktopConversation[]; projects: DesktopProject[]; query: string; collapsed: boolean; sidebarWidth: number; onSidebarWidthChange: (width: number) => void; onQueryChange: (query: string) => void; onToggleCollapsed: () => void; onNewChat: () => void; onOpenProject: (project: DesktopProject) => void; onSelectConversation: (id: string) => void; onConversationMetadata: (id: string, patch: ConversationPatch) => Promise<boolean>; className?: string }) {
   const [menuConversationId, setMenuConversationId] = useState<string | null>(null);

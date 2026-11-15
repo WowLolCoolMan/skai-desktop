@@ -952,6 +952,23 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .plugins-customize-nav button:hover, .plugins-customize-nav button.is-active { color: var(--skai-color-text); background: color-mix(in srgb, var(--skai-color-text) 9%, transparent); }
 .plugins-customize-nav button.is-active { font-weight: 600; }
 .plugins-customize-nav .nav-icon { width: 14px; height: 14px; }
+.voice-workbench-view { width: min(100%, 980px); margin: 0 auto; padding: 28px; }
+.voice-workbench-header { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 24px; }
+.voice-workbench-header h2 { margin: 3px 0 5px; color: var(--skai-color-text); font-size: 25px; letter-spacing: -.03em; }
+.voice-workbench-header p:last-child { margin: 0; color: var(--skai-color-text-muted); font-size: 12px; }
+.voice-workbench-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.voice-workbench-grid .ui-card { display: grid; align-content: start; gap: 10px; padding: 18px; }
+.voice-workbench-grid h3, .voice-workbench-grid p { margin: 0; }
+.voice-workbench-grid h3 { color: var(--skai-color-text); font-size: 16px; }
+.voice-workbench-grid p:not(.section-kicker) { color: var(--skai-color-text-muted); font-size: 11px; line-height: 1.5; }
+.marketplace-field { display: grid; gap: 6px; margin-top: 8px; color: var(--skai-color-text-muted); font-size: 10px; }
+.marketplace-field select { min-height: 34px; padding: 7px 9px; border: 1px solid var(--skai-color-border); border-radius: 8px; color: var(--skai-color-text); background: var(--skai-color-surface-soft); font: inherit; }
+.voice-workbench-actions { display: flex; gap: 8px; margin-top: 8px; }
+.marketplace-muted { color: var(--skai-color-text-muted); font-size: 10px !important; }
+.marketplace-toggle { display: flex; gap: 9px; align-items: flex-start; margin-top: 8px; color: var(--skai-color-text); font-size: 11px; }
+.marketplace-toggle input { margin-top: 2px; accent-color: var(--skai-color-accent); }
+.marketplace-toggle span { display: grid; gap: 3px; }
+.marketplace-toggle small { color: var(--skai-color-text-muted); font-size: 10px; }
 .plugins-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .plugins-topbar { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 58px; padding: 8px 22px; border-bottom: 1px solid var(--skai-color-border); background: color-mix(in srgb, var(--skai-color-surface) 92%, transparent); backdrop-filter: blur(12px); }
 .plugins-topbar h2 { grid-column: 2; margin: 0; color: var(--skai-color-text); font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
@@ -1011,6 +1028,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .plugins-main { overflow: visible; }
   .plugins-browser { grid-template-columns: 1fr; width: 100%; padding: 12px; }
   .plugins-inspector, .plugins-inspector-empty { position: static; max-height: none; }
+  .voice-workbench-view { padding: 18px 14px; }
+  .voice-workbench-header { flex-direction: column; gap: 12px; }
+  .voice-workbench-grid { grid-template-columns: 1fr; }
 }
 /* Image Studio workflow buttons share a two-column row; let long labels wrap instead of spilling out at mid widths. */
 .workflow-source-row .ui-button { min-width: 0; white-space: normal; text-align: center; line-height: 1.25; }
@@ -1020,6 +1040,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .plugins-category-count { margin-left: 2px; }
 .plugins-catalog-icon.is-official { color: #74d8ff; background: color-mix(in srgb, #1e9cc7 18%, var(--skai-color-surface)); }
 .plugins-download-notice { display: grid; gap: 6px; width: min(calc(100% - 56px), 984px); margin: 16px auto 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, #55bd83 38%, var(--skai-color-border)); border-radius: 10px; background: color-mix(in srgb, #267c4b 10%, var(--skai-color-surface)); }
+.plugins-catalog-notice { width: min(calc(100% - 56px), 984px); margin: 12px auto 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 28%, var(--skai-color-border)); border-radius: 9px; color: var(--skai-color-text-muted); background: color-mix(in srgb, var(--skai-color-accent) 7%, var(--skai-color-surface)); font-size: 10px; line-height: 1.45; }
 .plugins-download-notice > span:first-child { display: grid; gap: 3px; }
 .plugins-download-notice strong { color: var(--skai-color-text); font-size: 11px; }
 .plugins-download-notice small, .plugins-download-path { overflow-wrap: anywhere; color: var(--skai-color-text-muted); font-size: 9px; line-height: 1.45; }
@@ -1031,3 +1052,17 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .plugins-topbar h2 { align-items: baseline; }
 }
  .plugins-source-link { padding: 0; border: 0; color: var(--skai-color-accent); background: transparent; cursor: pointer; font: inherit; text-align: left; }.plugins-source-link:hover { text-decoration: underline; }
+
+/* Marketplace and Settings keep the global destination rail while hiding chat history. */
+.app-shell.thread-sidebar-hidden { grid-template-columns: 56px minmax(0, 1fr); }
+.app-shell.thread-sidebar-hidden .thread-sidebar { display: none; }
+.app-shell.thread-sidebar-hidden.sidebar-collapsed { grid-template-columns: 56px minmax(0, 1fr); }
+.backdrop-effects { position: absolute; z-index: 0; inset: 0; overflow: hidden; pointer-events: none; opacity: 0; }
+.app-main > .app-toolbar, .app-main > .app-content { position: relative; z-index: 1; }
+[data-backdrop="deep-sea"] .backdrop-effects { opacity: 1; }
+[data-backdrop="deep-sea"] .backdrop-effects::before { position: absolute; inset: -24%; content: ""; opacity: .3; background-image: radial-gradient(circle, rgba(125,225,255,.8) 0 1.5px, transparent 2.5px), radial-gradient(circle, rgba(125,225,255,.55) 0 2px, transparent 3px), radial-gradient(circle, rgba(125,225,255,.45) 0 1px, transparent 2px); background-size: 113px 181px, 197px 263px, 281px 149px; background-position: 21px 181px, 97px 263px, 163px 149px; animation: deep-sea-bubbles 42s linear infinite; }
+[data-backdrop="deep-sea"] .backdrop-effects::after { position: absolute; top: 34%; left: -200px; width: 150px; height: 44px; content: ""; opacity: .12; background: #8cecff; clip-path: polygon(0 50%, 58% 47%, 76% 0, 100% 12%, 83% 53%, 100% 88%, 76% 100%, 58% 57%, 0 56%, 17% 70%, 7% 66%); animation: deep-sea-shark 115s linear infinite; }
+@keyframes deep-sea-bubbles { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -6%, 0); } }
+@keyframes deep-sea-shark { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(100vw + 400px), 10vh, 0); } }
+[data-reduce-motion="true"] .backdrop-effects { display: none; }
+@media (prefers-reduced-motion: reduce) { .backdrop-effects { display: none !important; } }

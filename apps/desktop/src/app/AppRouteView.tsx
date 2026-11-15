@@ -154,7 +154,7 @@ export function AppRouteView({ state, actions }: { state: AppRouteState; actions
   // Marketplace is the unified capabilities catalog. Keep the legacy plugins
   // route as an alias so existing deep links continue to work, but render the
   // Plugins-style catalog as the single entry point.
-  if (route === "marketplace" || route === "plugins") return <PluginsPage onNavigate={(nextRoute) => actions.onNavigate(nextRoute)} />;
+  if (route === "marketplace") return <PluginsPage onNavigate={(nextRoute) => actions.onNavigate(nextRoute)} />;
   if (route === "workbench") return <WorkbenchPage tasks={state.tasks} scheduled={state.scheduledTasks} busyTask={state.taskBusy} loading={state.tasksLoading} error={state.tasksError} onRetry={actions.onRetryWorkbench} onNavigate={(route) => actions.onNavigate(route)} onTransition={actions.onTransitionTask} onExecuteTask={actions.onExecuteTask} onSchedule={actions.onScheduleTask} onScheduledTransition={actions.onTransitionScheduledTask} />;
   if (route === "memory") return <MemoryPage entries={state.memoryEntries} busy={state.memoryBusy} loading={state.memoryLoading} error={state.memoryError} onRetry={actions.onRetryMemory} onSearch={actions.onSearchMemory} onSave={actions.onSaveMemory} onToggle={actions.onToggleMemory} onRemove={actions.onRemoveMemory} onExport={actions.onExportMemory} corpusDocuments={state.corpusDocuments} corpusLoading={state.corpusLoading} corpusError={state.corpusError} onSearchCorpus={actions.onSearchCorpus ?? (() => undefined)} onSaveCorpus={actions.onSaveCorpus ?? (async () => false)} onRemoveCorpus={actions.onRemoveCorpus ?? (async () => false)} onImportCorpus={actions.onImportCorpus ?? (() => undefined)} />;
   if (route === "usage") return <UsagePage />;
