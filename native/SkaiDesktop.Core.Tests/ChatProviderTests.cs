@@ -194,6 +194,40 @@ internal static class ChatProviderTests
         }
         Check(sourceMessage.Content == "Find the rollback checklist" && sourceMessage.Attachments is [{ FileName: "release-notes.pdf" }],
             "provider attachment prompt construction does not mutate the saved conversation message");
+
+        string? millionContextPayload = null;
+        var millionContextProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
+        {
+            millionContextPayload = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"message\":{\"content\":\"large context request accepted\"}}\n", Encoding.UTF8, "application/x-ndjson")
+            };
+        })));
+        var millionContextMessages = new ChatMessage[]
+        {
+            new("user", "EARLY-USER " + new string('u', 998_000)),
+            new("assistant", "EARLY-ASSISTANT " + new string('a', 998_000)),
+            new("user", "RECENT-USER " + new string('r', 998_000)),
+            new("user", "LATEST-REQUEST")
+        };
+        await millionContextProvider.StreamChatAsync(
+            new AppSettings { Endpoint = "http://localhost:11434", Model = "long-context-local", ModelProvider = "Ollama", OllamaContextWindowTokens = 1_048_576 },
+            millionContextMessages, _ => { }, CancellationToken.None);
+        using (var millionContextRequest = JsonDocument.Parse(millionContextPayload!))
+        {
+            var options = millionContextRequest.RootElement.GetProperty("options");
+            var serializedMessages = millionContextRequest.RootElement.GetProperty("messages").EnumerateArray().ToArray();
+            Check(options.GetProperty("num_ctx").GetInt32() == 1_048_576,
+                "Ollama receives the configured 1M-token context window");
+            Check(serializedMessages.Length == 4
+                && serializedMessages[0].GetProperty("content").GetString()!.StartsWith("EARLY-USER ", StringComparison.Ordinal)
+                && serializedMessages[^1].GetProperty("content").GetString() == "LATEST-REQUEST",
+                "large Ollama context requests preserve the complete multi-message history and current request");
+            Check(Encoding.UTF8.GetByteCount(millionContextPayload!) < 8_000_000,
+                "large Ollama context request stays within the bounded serialized payload budget");
+        }
+
         string? ollamaImagePayload = null;
         var ollamaImageProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
         {
