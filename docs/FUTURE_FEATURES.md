@@ -57,7 +57,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Built-in browser panel.
 - [ ] Python sandbox execution.
 - [ ] Parallel sub-agent delegation.
-- [ ] Scheduled automations.
+- [x] Scheduled automations. (Local scheduled runs support create, pause, resume, cancel, and run-now; recurring and unattended reliability remain open.)
 - [x] Structured task lists. (Persisted local agent task plans with dependency-aware readiness, queue, search, and cancellation; autonomous dispatch remains open.)
 - [x] MCP tools over Streamable HTTP and stdio. (Explicit grants, revocation, read-only defaults, and protocol smoke coverage are implemented; richer lifecycle UI remains open.)
 - [x] OpenAPI tool auto-discovery. (Bounded local discovery is implemented; authenticated retrieval and broader schema coverage remain open.)
