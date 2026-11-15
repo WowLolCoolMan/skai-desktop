@@ -30,7 +30,11 @@ speech to finish, then resumes listening. Turning hands-free off stops both
 recognition and any reply currently being spoken. If local recognition is unavailable
 or a language pack is missing, the composer explains the limitation and keeps
 remote recognition disabled. Runtime microphone/language-pack acceptance is
-still open; barge-in and streamed speech are not implemented.
+still open. Packaged Windows smoke confirms that Electron exposes the local
+recognition and language-pack installer APIs; on the audited machine, the
+runtime reports the en-US pack unavailable, and the composer fails closed
+without requesting microphone access. Barge-in and streamed speech are not
+implemented.
 
 The renderer owns the selected voice profile, primary model, and low-resource
 model. OS-native speech ships as the installed default. Kokoro and Pocket TTS

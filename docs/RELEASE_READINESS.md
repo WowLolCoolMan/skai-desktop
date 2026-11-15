@@ -10,6 +10,7 @@ Status: **not ready to publish as the first major release**.
 - The persistent Agent Host builds cleanly and its protocol smoke passes.
 - Core tests pass, including AirLLM fallback policy and the pet wander planner.
 - The packaged Windows Electron artifact builds and passes bounded startup smoke, including the host-backed Marketplace catalog/search/install contract and AirLLM worker staging.
+- The packaged voice smoke verifies that Electron exposes on-device recognition APIs and reports the expected privacy-preserving error when the en-US pack is unavailable; microphone acceptance still requires an installed pack.
 - The Windows smoke gate runs 19 staged checks, including core tests, Electron-only architecture/release audits, packaged Percy/AirLLM verification, and responsive overflow coverage.
 - The portable Electron artifact now bundles the renderer, Electron runtime, and a self-contained Agent Host; its startup smoke verifies the rendered settings and pet surfaces.
 - Packaged artifacts include a versioned executable/Agent Host/AirLLM SHA-256 manifest; the Windows release workflow refreshes and verifies the executable hash after Authenticode signing.
