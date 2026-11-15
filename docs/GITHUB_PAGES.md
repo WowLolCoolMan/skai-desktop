@@ -12,10 +12,8 @@ when files under `docs/`, the workflow, or branding assets change on `main`. A
 manual run is also available from the Actions tab. The deployment uses the
 `github-pages` environment and GitHub's Pages artifact workflow.
 
-For the first deployment, open the repository's **Settings → Pages** and set
-the publishing source to **GitHub Actions**. Repository settings are not stored
-in Git, so this one-time selection cannot be made by the workflow source code.
-After that, successful workflow runs publish the site at
+The first workflow run enables Pages and selects **GitHub Actions** as its
+publishing source. Successful workflow runs publish the site at
 `https://wowlolcoolman.github.io/skai-desktop/`.
 
 ## Content maintenance
