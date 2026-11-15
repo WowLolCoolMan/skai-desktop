@@ -100,6 +100,5 @@ for the 6 pets × 7 non-walk states. There are no other duplicates under `assets
   missing), installing from the `extra` repo needs sudo, and downloading the release binary was blocked by the permission
   check. Nothing was changed. To unblock it, run `sudo pacman -S oxipng`; the next run will then do step 7.
   Step 8 was done first because it doesn't depend on step 7.
-- **Push blocked (2026-11-15):** the HTTPS remote has no credentials here, and pushing with the local SSH key (which signs
-  in as a different GitHub account) was blocked by the permission check. Steps 1–6 and 8 are committed locally on
-  `debloat-work` in `../skai-debloat` and still need pushing to `main`.
+- **Push (2026-11-15):** blocked at first because there were no HTTPS credentials. Steps 1–6 and 8 were rebased onto
+  `a633b42`, re-verified, and pushed to `main` over SSH once the owner approved it.
