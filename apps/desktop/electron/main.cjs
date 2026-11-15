@@ -148,7 +148,8 @@ function stopPetWander() {
 }
 
 function setPetActivity(state, facing = petActivity.facing) {
-  const nextState = state === "walk" ? "walk" : "idle";
+  const allowedStates = new Set(["idle", "walk", "thinking", "coding", "coding_malicious", "stuck", "needs-attention"]);
+  const nextState = allowedStates.has(state) ? state : "idle";
   const nextFacing = facing === -1 ? -1 : 1;
   if (petActivity.state === nextState && petActivity.facing === nextFacing) return;
   petActivity = { state: nextState, facing: nextFacing };
@@ -251,7 +252,9 @@ function movePetTowardTarget() {
   const position = grid.clampPetPosition(petWanderWalk.positionAt(elapsed));
   const screenX = area.x + position.x;
   const screenY = area.y + position.y;
-  if (!Number.isFinite(screenX) || !Number.isFinite(screenY)) {
+  const targetX = Math.trunc(screenX);
+  const targetY = Math.trunc(screenY);
+  if (!Number.isSafeInteger(targetX) || !Number.isSafeInteger(targetY) || Math.abs(targetX) > 10_000_000 || Math.abs(targetY) > 10_000_000) {
     console.warn("[pet] Skipping wander step with invalid screen coordinates.");
     petWanderWalk = null;
     petWanderStepTimer = undefined;
@@ -263,7 +266,18 @@ function movePetTowardTarget() {
   }
   petWanderMoving = true;
   setPetActivity("walk", petWanderWalk.facingAt(elapsed) || petActivity.facing);
-  petWindow.setPosition(Math.round(screenX), Math.round(screenY));
+  try {
+    petWindow.setPosition(targetX, targetY);
+  } catch (error) {
+    console.warn("[pet] Stopping wander after an invalid native window position.", { targetX, targetY, screenX, screenY, area }, error instanceof Error ? error.message : String(error));
+    petWanderWalk = null;
+    petWanderStepTimer = undefined;
+    petWanderMoving = false;
+    setPetActivity("idle");
+    petWanderNextAt = Date.now() + 1000;
+    schedulePetWander();
+    return;
+  }
   if (petWanderWalk.isFinished(elapsed)) {
     petWanderWalk = null;
     petWanderMoving = false;
@@ -447,7 +461,7 @@ function createPetWindow() {
   }
   // On native Wayland, dragging is handed to the compositor (app-region drag →
   // xdg_toplevel.move) because the app can neither read nor set its position.
-  const petQuery = { pet: "1", ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
+  const petQuery = { pet: "1", ...(process.env.SKAI_RIG_PET === "1" ? { rig: "1" } : {}), ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
   const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
   if (devUrl) {
     const url = new URL(devUrl);
@@ -632,7 +646,7 @@ function scheduleUpdateCheck() {
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
   "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
-  "settings.save", "image.generate", "image.models.list", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "corpus.list", "corpus.upsert", "corpus.remove",
+  "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
@@ -982,6 +996,14 @@ app.whenReady().then(() => {
     stopPetWander();
     petWindow?.webContents.send("pet:motion", petMotion);
     schedulePetWander();
+  });
+  ipcMain.on("pet:set-state", (event, state) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return;
+    const allowedStates = new Set(["idle", "thinking", "coding", "coding_malicious", "stuck", "needs-attention"]);
+    if (typeof state !== "string" || !allowedStates.has(state)) return;
+    if (state === "idle") schedulePetWander();
+    else stopPetWander();
+    setPetActivity(state);
   });
   ipcMain.on("pet:drag-start", (event, point) => {
     if (!windowPositioningAvailable || BrowserWindow.fromWebContents(event.sender) !== petWindow || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;

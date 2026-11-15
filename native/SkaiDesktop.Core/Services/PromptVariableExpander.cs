@@ -12,7 +12,7 @@ public static class PromptVariableExpander
     public static string Expand(string prompt, DateTimeOffset localNow, string? userName = null)
     {
         ArgumentNullException.ThrowIfNull(prompt);
-        if (prompt.Length > MaxPromptCharacters || prompt.Any(char.IsControl))
+        if (prompt.Length > MaxPromptCharacters || prompt.Any(character => char.IsControl(character) && character is not ('\r' or '\n' or '\t')))
             throw new ArgumentException($"A prompt must contain at most {MaxPromptCharacters:N0} non-control characters.", nameof(prompt));
         if (userName is not null && (userName.Length > 128 || userName.Any(char.IsControl)))
             throw new ArgumentException("The optional prompt variable name is invalid.", nameof(userName));

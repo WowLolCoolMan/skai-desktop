@@ -66,11 +66,74 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
             // runtime must not hide models served by every other local runtime.
             catch (InvalidDataException) { return Array.Empty<InstalledLocalModel>(); }
         }));
-        return results.SelectMany(models => models)
+        return results.SelectMany(models => models).Concat(DiscoverHuggingFaceCacheModels())
             .DistinctBy(model => (model.Model, model.Endpoint), StringTupleComparer.Instance)
             .OrderBy(model => model.Provider, StringComparer.OrdinalIgnoreCase)
             .ThenBy(model => model.Model, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static IReadOnlyList<InstalledLocalModel> DiscoverHuggingFaceCacheModels()
+    {
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var cacheHome = Environment.GetEnvironmentVariable("HF_HOME");
+        var xdgCache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
+        var transformersCache = Environment.GetEnvironmentVariable("TRANSFORMERS_CACHE");
+        var configuredRoots = new[]
+        {
+            Environment.GetEnvironmentVariable("HUGGINGFACE_HUB_CACHE"),
+            Environment.GetEnvironmentVariable("HF_HUB_CACHE"),
+            transformersCache,
+            string.IsNullOrWhiteSpace(cacheHome) ? null : Path.Combine(cacheHome, "hub"),
+            string.IsNullOrWhiteSpace(xdgCache) ? null : Path.Combine(xdgCache, "huggingface", "hub"),
+            Path.Combine(profile, ".cache", "huggingface", "hub"),
+            Path.Combine(localAppData, "huggingface", "hub"),
+        }.Where(path => !string.IsNullOrWhiteSpace(path));
+        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in configuredRoots)
+        {
+            try { roots.Add(Path.GetFullPath(path!)); }
+            catch (ArgumentException) { }
+            catch (PathTooLongException) { }
+            catch (NotSupportedException) { }
+        }
+        var found = new List<InstalledLocalModel>();
+        foreach (var root in roots)
+        {
+            try
+            {
+                if (!Directory.Exists(root) || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) continue;
+                foreach (var repositoryPath in Directory.EnumerateDirectories(root, "models--*", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        if ((File.GetAttributes(repositoryPath) & FileAttributes.ReparsePoint) != 0) continue;
+                        var repositoryFolder = Path.GetFileName(repositoryPath);
+                        var modelId = repositoryFolder["models--".Length..].Replace("--", "/", StringComparison.Ordinal);
+                        if (!IsSafeCatalogIdentifier(modelId) || !modelId.Contains('/')) continue;
+                        var snapshotsRoot = Path.GetFullPath(Path.Combine(repositoryPath, "snapshots"));
+                        var snapshotPrefix = snapshotsRoot + Path.DirectorySeparatorChar;
+                        if (!Directory.Exists(snapshotsRoot) || (File.GetAttributes(snapshotsRoot) & FileAttributes.ReparsePoint) != 0) continue;
+                        var usableSnapshot = Directory.EnumerateDirectories(snapshotsRoot, "*", SearchOption.TopDirectoryOnly)
+                            .Select(Path.GetFullPath)
+                            .Any(snapshotPath => snapshotPath.StartsWith(snapshotPrefix, StringComparison.OrdinalIgnoreCase)
+                                && (File.GetAttributes(snapshotPath) & FileAttributes.ReparsePoint) == 0
+                                && File.Exists(Path.Combine(snapshotPath, "config.json"))
+                                && (Directory.EnumerateFiles(snapshotPath, "*.safetensors", SearchOption.TopDirectoryOnly).Any()
+                                    || Directory.EnumerateFiles(snapshotPath, "*.bin", SearchOption.TopDirectoryOnly).Any()
+                                    || Directory.EnumerateFiles(snapshotPath, "*.pt", SearchOption.TopDirectoryOnly).Any()));
+                        if (!usableSnapshot) continue;
+                        found.Add(new InstalledLocalModel("AirLLM", modelId, string.Empty, "Hugging Face cache", null, true));
+                    }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return found;
     }
 
     public async Task<IReadOnlyDictionary<string, int?>> DiscoverOllamaContextLengthsAsync(string endpoint, IEnumerable<string> modelNames, CancellationToken cancellationToken = default)
@@ -296,6 +359,54 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
         }
         var filtered = (uncensored ? allModels.Where(model => model.IsUncensored) : allModels.Where(model => !model.IsUncensored));
         return filtered.DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase).OrderByDescending(model => model.Downloads).ToArray();
+    }
+
+    /// <summary>Finds text-generation repositories with full Transformers weights for the optional AirLLM route.</summary>
+    public async Task<IReadOnlyList<HubModel>> SearchHuggingFaceAirLlmAsync(string query, bool uncensored, CancellationToken cancellationToken = default)
+    {
+        var queryText = ValidateCatalogQuery(query);
+        var searchTerms = uncensored ? new[] { "uncensored", "abliterated", "abliteration" } : new[] { queryText };
+        var models = new List<HubModel>();
+        foreach (var term in searchTerms)
+        {
+            var searchText = string.Join(' ', new[] { queryText, term }.Where(value => value.Length > 0));
+            var uri = new Uri("https://huggingface.co/api/models?pipeline_tag=text-generation&search=" + Uri.EscapeDataString(searchText) + "&sort=downloads&direction=-1&limit=30&full=true");
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            request.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("local AirLLM model catalog"));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            using var response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            using var json = await BoundedHttpContent.ReadJsonAsync(response.Content, timeout.Token, "AirLLM model catalog response").ConfigureAwait(false);
+            foreach (var item in json.RootElement.EnumerateArray())
+            {
+                if (!item.TryGetProperty("id", out var modelIdElement)) continue;
+                var id = modelIdElement.GetString();
+                if (!IsSafeCatalogIdentifier(id) || id!.Count(character => character == '/') != 1) continue;
+                var tags = item.TryGetProperty("tags", out var tagElement) && tagElement.ValueKind == JsonValueKind.Array
+                    ? tagElement.EnumerateArray().Where(tag => tag.ValueKind == JsonValueKind.String).Select(tag => tag.GetString() ?? "").ToArray()
+                    : [];
+                var isUncensored = IsExplicitUncensoredLabel(id!, tags);
+                if (uncensored != isUncensored) continue;
+                if (!item.TryGetProperty("siblings", out var siblings) || siblings.ValueKind != JsonValueKind.Array) continue;
+                var weightFiles = siblings.EnumerateArray()
+                    .Where(file => file.TryGetProperty("rfilename", out var name) && name.GetString() is { } filename
+                        && (filename.EndsWith(".safetensors", StringComparison.OrdinalIgnoreCase)
+                            || filename.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)
+                            || filename.EndsWith(".pt", StringComparison.OrdinalIgnoreCase))
+                        && !filename.Contains("adapter_model", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                if (weightFiles.Length == 0) continue;
+                var weightSizes = weightFiles.Select(file => file.TryGetProperty("size", out var size) && size.TryGetInt64(out var bytes) ? bytes : 0).Where(bytes => bytes > 0).ToArray();
+                long? sizeBytes = weightSizes.Length > 0 ? weightSizes.Sum() : null;
+                if (sizeBytes is null && item.TryGetProperty("usedStorage", out var usedStorage) && usedStorage.TryGetInt64(out var repositorySize) && repositorySize > 0)
+                    sizeBytes = repositorySize;
+                var downloads = item.TryGetProperty("downloads", out var downloadsElement) && downloadsElement.TryGetInt64(out var count) ? count : 0;
+                var likes = item.TryGetProperty("likes", out var likesElement) && likesElement.TryGetInt32(out var likeCount) ? likeCount : 0;
+                models.Add(new HubModel(id!, downloads, likes, isUncensored, tags, sizeBytes));
+            }
+        }
+        return models.DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase).OrderByDescending(model => model.Downloads).ToArray();
     }
 
     private static bool IsExplicitUncensoredLabel(string id, IEnumerable<string> tags) =>

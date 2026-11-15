@@ -1,6 +1,6 @@
 const loopbackHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 
-export const LOCAL_PROVIDERS = ["Ollama", "LM Studio", "AirLLM"] as const;
+export const LOCAL_PROVIDERS = ["Ollama", "LM Studio", "Local API", "AirLLM"] as const;
 export type LocalProvider = typeof LOCAL_PROVIDERS[number];
 
 export const LOCAL_ENDPOINT_ERROR = "Skai Desktop only connects to local services. Use localhost, 127.0.0.1, or ::1.";

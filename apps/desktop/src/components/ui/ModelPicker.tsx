@@ -5,10 +5,13 @@ import { NavIcon } from "./NavIcon";
 type ModelPickerProps = {
   model: string;
   provider: string;
+  endpoint: string;
   models: Model[];
-  onChange: (model: string) => void;
+  onChange: (model: Model) => void;
   onOpenModels?: () => void;
 };
+
+const modelKey = (model: Model) => `${model.model}\u0000${model.provider ?? ""}\u0000${model.endpoint ?? ""}`;
 
 function modelProvider(model: Model, fallback: string) {
   if (model.provider) return model.provider;
@@ -16,7 +19,7 @@ function modelProvider(model: Model, fallback: string) {
   return separator > 0 ? model.model.slice(0, separator) : fallback || "Local runtime";
 }
 
-export function ModelPicker({ model, provider, models, onChange, onOpenModels }: ModelPickerProps) {
+export function ModelPicker({ model, provider, endpoint, models, onChange, onOpenModels }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -27,10 +30,11 @@ export function ModelPicker({ model, provider, models, onChange, onOpenModels }:
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const listId = useId();
   const options = useMemo(() => {
-    const current = models.some((item) => item.model === model) ? [] : [{ model, vision: "unknown", capabilities: [], provider }];
+    const current: Model[] = models.some((item) => item.model === model && (item.endpoint === endpoint || item.provider === "AirLLM" && provider === "AirLLM")) ? [] : [{ model, displayName: model, vision: "unknown", capabilities: [], provider, endpoint }];
     return [...current, ...models];
-  }, [model, models, provider]);
-  const filtered = useMemo(() => options.filter((item) => `${item.model} ${item.provider ?? ""} ${item.capabilities.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase())), [options, query]);
+  }, [endpoint, model, models, provider]);
+  const filtered = useMemo(() => options.filter((item) => `${item.displayName ?? ""} ${item.model} ${item.provider ?? ""} ${item.capabilities.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase())), [options, query]);
+  const isSelected = (item: Model) => item.model === model && (item.provider === "AirLLM" ? provider === "AirLLM" : item.endpoint ? item.endpoint === endpoint : item.provider === provider);
 
   const close = (restoreFocus = true) => {
     setOpen(false);
@@ -55,7 +59,7 @@ export function ModelPicker({ model, provider, models, onChange, onOpenModels }:
     setActiveIndex((index) => Math.min(index, filtered.length - 1));
   }, [filtered.length, open]);
 
-  const choose = (value: string) => {
+  const choose = (value: Model) => {
     onChange(value);
     close(false);
     window.requestAnimationFrame(() => triggerRef.current?.focus());
@@ -72,7 +76,7 @@ export function ModelPicker({ model, provider, models, onChange, onOpenModels }:
     if (event.key === "Escape") { event.preventDefault(); close(); return; }
     if (event.key === "ArrowDown") { event.preventDefault(); move(activeIndex + 1); optionRefs.current[Math.min(activeIndex + 1, filtered.length - 1)]?.focus(); }
     if (event.key === "ArrowUp") { event.preventDefault(); move(activeIndex - 1); optionRefs.current[Math.max(activeIndex - 1, 0)]?.focus(); }
-    if (event.key === "Enter" && filtered[activeIndex]) { event.preventDefault(); choose(filtered[activeIndex].model); }
+    if (event.key === "Enter" && filtered[activeIndex]) { event.preventDefault(); choose(filtered[activeIndex]); }
   };
 
   const onOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -94,13 +98,13 @@ export function ModelPicker({ model, provider, models, onChange, onOpenModels }:
 
   return <div className="model-picker" ref={rootRef}>
     <button ref={triggerRef} className="model-picker-trigger" type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((value) => !value)}>
-      <span className="model-picker-trigger-copy"><span className="model-picker-label">MODEL</span><strong>{model || "Choose a local model"}</strong></span>
+      <span className="model-picker-trigger-copy"><span className="model-picker-label">{provider === "AirLLM" ? "MODEL · AIRLLM" : `MODEL · ${provider.toUpperCase()}`}</span><strong>{model || "Choose a local model"}</strong></span>
       <NavIcon name="chevron-right" />
     </button>
     {open && <div ref={popoverRef} className="model-picker-popover" id={listId} role="dialog" aria-label="Choose local model" onKeyDown={onPopoverKeyDown}>
       <div className="model-picker-heading"><div><span className="section-kicker">LOCAL MODELS</span><strong>Choose a model</strong></div><span>{filtered.length} available</span></div>
       <input ref={searchRef} className="model-picker-search" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onSearchKeyDown} placeholder="Search models…" aria-label="Search local models" aria-controls={`${listId}-options`} aria-expanded="true" role="combobox" aria-autocomplete="list" aria-activedescendant={filtered[activeIndex] ? `${listId}-option-${activeIndex}` : undefined} />
-      {filtered.length ? <div className="model-picker-options" id={`${listId}-options`} role="listbox" aria-label="Available local models">{filtered.map((item, index) => <button ref={(node) => { optionRefs.current[index] = node; }} className={`model-picker-option ${item.model === model ? "is-selected" : ""} ${index === activeIndex ? "is-active" : ""}`} id={`${listId}-option-${index}`} key={item.model} type="button" role="option" aria-selected={item.model === model} onMouseEnter={() => setActiveIndex(index)} onFocus={() => setActiveIndex(index)} onKeyDown={(event) => onOptionKeyDown(event, index)} onClick={() => choose(item.model)}><span className="model-picker-option-copy"><strong>{item.model}</strong><small>{modelProvider(item, provider)} · {item.vision.toLowerCase() === "supported" ? "Vision" : "Text"} · {item.capabilities.join(" · ") || "Text generation"}</small></span>{item.model === model && <span className="model-picker-check" aria-label="Selected">Selected</span>}</button>)}</div> : <div className="model-picker-empty"><strong>No local models found</strong><span>Start a supported local runtime, then discover its models.</span>{onOpenModels && <button type="button" onClick={() => { close(false); onOpenModels(); }}>Open Models</button>}</div>}
+      {filtered.length ? <div className="model-picker-options" id={`${listId}-options`} role="listbox" aria-label="Available local models">{filtered.map((item, index) => { const selected = isSelected(item); return <button ref={(node) => { optionRefs.current[index] = node; }} className={`model-picker-option ${selected ? "is-selected" : ""} ${index === activeIndex ? "is-active" : ""}`} id={`${listId}-option-${index}`} key={modelKey(item)} type="button" role="option" aria-selected={selected} onMouseEnter={() => setActiveIndex(index)} onFocus={() => setActiveIndex(index)} onKeyDown={(event) => onOptionKeyDown(event, index)} onClick={() => choose(item)}><span className="model-picker-option-copy"><strong>{item.displayName || item.model}</strong><small>{modelProvider(item, provider)} · {item.vision.toLowerCase() === "supported" ? "Vision capable" : item.vision.toLowerCase() === "unknown" ? "Capability unknown" : "Text only"} · {item.capabilities.join(" · ") || "Text generation"}{item.provider === "AirLLM" ? " · slower disk-streamed runtime" : ""}</small></span>{selected && <span className="model-picker-check" aria-label="Selected">Selected</span>}</button>; })}</div> : <div className="model-picker-empty"><strong>No local models found</strong><span>Start a supported local runtime, then discover its models.</span>{onOpenModels && <button type="button" onClick={() => { close(false); onOpenModels(); }}>Open Models</button>}</div>}
       <p className="model-picker-hint">↑ ↓ browse · Enter select · Esc close</p>
     </div>}
   </div>;

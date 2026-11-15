@@ -25,8 +25,10 @@ internal static class CatalogTests
         Check(pluginCatalog.Single(item => item.Id == "gmail").ListLabel.EndsWith("· Not available yet", StringComparison.Ordinal) &&
               pluginCatalog.Single(item => item.Id == "github").ListLabel.EndsWith("· Built in", StringComparison.Ordinal),
             "plugin catalog list labels show built-in or not-available status");
-        Check(SkillCatalogService.BuiltIns.Count >= 3 && SkillCatalogService.Find("reverse-engineer")?.RequiredPermissions.SequenceEqual(["project.read"]) == true,
-            "built-in skills expose explicit read-only permissions");
+        Check(SkillCatalogService.BuiltIns.Count == 3 && SkillCatalogService.BuiltIns.All(skill => skill.RequiredPermissions.SequenceEqual(["project.read"])) &&
+              SkillCatalogService.Find("product-audit") is not null && SkillCatalogService.Find("project-audit") is not null &&
+              SkillCatalogService.Find("release-readiness") is not null && SkillCatalogService.Find("reverse-engineer") is null,
+            "product, project health, and release readiness skills are read-only and reverse-engineer is removed");
         Check(SkillCatalogService.Find("missing-skill") is null && SkillCatalogService.Find("RELEASE-READINESS")?.Category == "Delivery",
             "skill catalog lookup is case-insensitive and rejects unknown skills");
         var releasePrompt = SkillCatalogService.Find("release-readiness")!.Prompt;

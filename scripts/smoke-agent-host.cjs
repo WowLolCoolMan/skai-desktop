@@ -89,10 +89,10 @@ async function run() {
   if (!mcpConnections.ok || !Array.isArray(mcpConnections.result?.connections) || mcpConnections.result.connections.length !== 0)
     throw new Error("mcp.connections.list did not return the isolated empty registry.");
   const skills = await request("skills.list");
-  if (!skills.ok || !skills.result?.some(skill => skill.id === "reverse-engineer" && skill.enabled === true))
-    throw new Error(`skills.list did not expose the built-in local skill catalog: ${JSON.stringify(skills)}`);
-  const skill = await request("skills.read", { id: "reverse-engineer" });
-  if (!skill.ok || !String(skill.result?.content ?? "").includes("Reverse-engineer this project"))
+  if (!skills.ok || !["product-audit", "project-audit", "release-readiness"].every(id => skills.result?.some(skill => skill.id === id && skill.enabled === true)) || skills.result?.some(skill => skill.id === "reverse-engineer"))
+    throw new Error(`skills.list did not expose the requested read-only audit catalog: ${JSON.stringify(skills)}`);
+  const skill = await request("skills.read", { id: "product-audit" });
+  if (!skill.ok || !String(skill.result?.content ?? "").includes("Audit the selected product experience"))
     throw new Error(`skills.read did not lazily load the selected skill: ${JSON.stringify(skill)}`);
   const airLlm = await request("airllm.status");
   if (!airLlm.ok || airLlm.result?.workerAvailable !== true || typeof airLlm.result?.message !== "string")

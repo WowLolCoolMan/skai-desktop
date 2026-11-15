@@ -15,10 +15,14 @@ public static class AgentHostLoop
     private static readonly object TerminalSessionsGate = new();
     private static readonly Dictionary<string, ModelPullOperation> ModelPulls = new(StringComparer.Ordinal);
     private static readonly object ModelPullsGate = new();
+    private static readonly Dictionary<string, AirLlmInstallOperation> AirLlmInstalls = new(StringComparer.Ordinal);
+    private static readonly object AirLlmInstallsGate = new();
+    private static readonly Dictionary<string, ImageRuntimeInstallOperation> ImageRuntimeInstalls = new(StringComparer.Ordinal);
+    private static readonly object ImageRuntimeInstallsGate = new();
     private static readonly Dictionary<string, MarketplaceDownloadOperation> MarketplaceDownloads = new(StringComparer.Ordinal);
     private static readonly object MarketplaceDownloadsGate = new();
     private static readonly McpConnectionRegistry McpConnections = CreateMcpConnectionRegistry();
-    private static readonly Dictionary<string, McpStreamableHttpClient> ActiveMcpClients = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, IMcpClient> ActiveMcpClients = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, IReadOnlyList<McpToolDescriptor>> ActiveMcpTools = new(StringComparer.Ordinal);
     private static readonly object McpClientsGate = new();
 
@@ -73,8 +77,15 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "airllm.status", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel"])),
+                ["runtime.health", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
             "airllm.status" => GetAirLlmStatus(request),
+            "airllm.install.start" => StartAirLlmInstall(request),
+            "airllm.install.status" => GetAirLlmInstallStatus(request),
+            "airllm.install.cancel" => CancelAirLlmInstall(request),
+            "image.runtime.status" => GetImageRuntimeStatus(request),
+            "image.runtime.install.start" => StartImageRuntimeInstall(request),
+            "image.runtime.install.status" => GetImageRuntimeInstallStatus(request),
+            "image.runtime.install.cancel" => CancelImageRuntimeInstall(request),
             "models.list" => ListModels(request),
             "models.pull.start" => StartModelPull(request),
             "models.pull.status" => GetModelPullStatus(request),
@@ -149,6 +160,11 @@ public static class AgentHostLoop
             "marketplace.catalog" => ListMarketplaceCatalog(request),
             "plugins.directory" => ListOpenAiPluginDirectory(request),
             "plugins.download" => DownloadOpenAiPluginAsync(request).GetAwaiter().GetResult(),
+            "mcp.marketplace.download" => DownloadMcpMarketplaceItemAsync(request).GetAwaiter().GetResult(),
+            "marketplace.image-assets.search" => SearchImageAssetsAsync(request),
+            "marketplace.image-assets.list" => new(ProtocolVersion, request.Id, true, new ImageAssetLibrary().List()),
+            "marketplace.image-assets.install" => InstallImageAssetAsync(request),
+            "marketplace.image-assets.remove" => RemoveImageAsset(request),
             "marketplace.models.search" => SearchMarketplaceModelsAsync(request).GetAwaiter().GetResult(),
             "marketplace.models.install.start" => StartMarketplaceModelInstall(request),
             "marketplace.models.install.status" => GetMarketplaceModelInstallStatus(request),
@@ -163,6 +179,109 @@ public static class AgentHostLoop
         var status = new AirLlmProvider().GetRuntimeStatus(settings);
         return new(ProtocolVersion, request.Id, true, status);
     }
+
+    private static AgentResponse StartAirLlmInstall(AgentRequest request)
+    {
+        lock (AirLlmInstallsGate)
+        {
+            if (AirLlmInstalls.Values.Any(operation => operation.State == "running"))
+                throw new InvalidOperationException("AirLLM setup is already running.");
+            var operation = new AirLlmInstallOperation(Guid.NewGuid().ToString("N"), new CancellationTokenSource());
+            AirLlmInstalls[operation.Id] = operation;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await new AirLlmRuntimeInstaller().InstallAsync(operation.AddProgress, operation.Cancellation.Token).ConfigureAwait(false);
+                    operation.Complete();
+                }
+                catch (OperationCanceledException) when (operation.Cancellation.IsCancellationRequested) { operation.Cancelled(); }
+                catch (Exception error) { operation.Fail(error.Message); }
+            });
+            return AirLlmInstallResponse(request, operation);
+        }
+    }
+
+    private static AgentResponse GetAirLlmInstallStatus(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 64);
+        lock (AirLlmInstallsGate)
+            return AirLlmInstalls.TryGetValue(id, out var operation)
+                ? AirLlmInstallResponse(request, operation)
+                : throw new KeyNotFoundException("The AirLLM setup session no longer exists.");
+    }
+
+    private static AgentResponse CancelAirLlmInstall(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 64);
+        lock (AirLlmInstallsGate)
+        {
+            if (!AirLlmInstalls.TryGetValue(id, out var operation)) throw new KeyNotFoundException("The AirLLM setup session no longer exists.");
+            if (operation.State == "running") operation.Cancellation.Cancel();
+            return AirLlmInstallResponse(request, operation);
+        }
+    }
+
+    private static AgentResponse AirLlmInstallResponse(AgentRequest request, AirLlmInstallOperation operation) => new(ProtocolVersion, request.Id, true, new
+    {
+        id = operation.Id,
+        status = operation.State,
+        progress = operation.Progress.ToArray(),
+        error = operation.Error,
+    });
+
+    private static AgentResponse GetImageRuntimeStatus(AgentRequest request) =>
+        new(ProtocolVersion, request.Id, true, new DiffusersImageProvider().GetRuntimeStatus());
+
+    private static AgentResponse StartImageRuntimeInstall(AgentRequest request)
+    {
+        lock (ImageRuntimeInstallsGate)
+        {
+            if (ImageRuntimeInstalls.Values.Any(operation => operation.State == "running"))
+                throw new InvalidOperationException("The optional image runtime setup is already running.");
+            var operation = new ImageRuntimeInstallOperation(Guid.NewGuid().ToString("N"), new CancellationTokenSource());
+            ImageRuntimeInstalls[operation.Id] = operation;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await new DiffusersImageProvider().InstallRuntimeAsync(operation.AddProgress, operation.Cancellation.Token).ConfigureAwait(false);
+                    operation.Complete();
+                }
+                catch (OperationCanceledException) when (operation.Cancellation.IsCancellationRequested) { operation.Cancelled(); }
+                catch (Exception error) { operation.Fail(error.Message); }
+            });
+            return ImageRuntimeInstallResponse(request, operation);
+        }
+    }
+
+    private static AgentResponse GetImageRuntimeInstallStatus(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 64);
+        lock (ImageRuntimeInstallsGate)
+            return ImageRuntimeInstalls.TryGetValue(id, out var operation)
+                ? ImageRuntimeInstallResponse(request, operation)
+                : throw new KeyNotFoundException("The image runtime setup session no longer exists.");
+    }
+
+    private static AgentResponse CancelImageRuntimeInstall(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 64);
+        lock (ImageRuntimeInstallsGate)
+        {
+            if (!ImageRuntimeInstalls.TryGetValue(id, out var operation)) throw new KeyNotFoundException("The image runtime setup session no longer exists.");
+            if (operation.State == "running") operation.Cancellation.Cancel();
+            return ImageRuntimeInstallResponse(request, operation);
+        }
+    }
+
+    private static AgentResponse ImageRuntimeInstallResponse(AgentRequest request, ImageRuntimeInstallOperation operation) => new(ProtocolVersion, request.Id, true, new
+    {
+        id = operation.Id,
+        status = operation.State,
+        progress = operation.Progress.ToArray(),
+        error = operation.Error,
+    });
 
     private static AgentResponse ListVoiceModels(AgentRequest request) =>
         new(ProtocolVersion, request.Id, true, new
@@ -188,6 +307,14 @@ public static class AgentHostLoop
     {
         var id = RequiredBoundedString(request, "id", 80);
         var download = await new OpenAiPluginMarketplaceService().DownloadAsync(id).ConfigureAwait(false);
+        return new(ProtocolVersion, request.Id, true, download);
+    }
+
+    private static async Task<AgentResponse> DownloadMcpMarketplaceItemAsync(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 80);
+        if (!id.Equals("rea", StringComparison.Ordinal)) throw new KeyNotFoundException("That MCP package is not in Skai's pinned catalog.");
+        var download = await new McpMarketplaceDownloadService().DownloadReaAsync().ConfigureAwait(false);
         return new(ProtocolVersion, request.Id, true, download);
     }
 
@@ -223,24 +350,45 @@ public static class AgentHostLoop
     private static async Task<AgentResponse> ConnectMcpAsync(AgentRequest request)
     {
         var serverId = RequiredBoundedString(request, "serverId", 128);
-        var endpoint = RequiredBoundedString(request, "endpoint", 2_048);
+        var endpoint = OptionalString(request, "endpoint")?.Trim() ?? "";
         var transport = OptionalString(request, "transport") ?? "streamable-http";
-        if (transport != "streamable-http") throw new InvalidOperationException("Skai currently supports MCP Streamable HTTP connections here. Stdio requires a supervised local process profile.");
         var connectionId = OptionalString(request, "connectionId")?.Trim();
         if (string.IsNullOrWhiteSpace(connectionId)) connectionId = $"mcp-{Guid.NewGuid():N}";
         if (connectionId.Length > 128 || connectionId.Any(char.IsControl)) throw new InvalidOperationException("The MCP connection identity is invalid.");
-
         McpConnections.Configure(connectionId, serverId, transport);
-        var client = new McpStreamableHttpClient(serverId, endpoint, connectionRegistry: McpConnections);
+        IMcpClient? client = null;
         try
         {
-            await client.InitializeAsync().ConfigureAwait(false);
-            var tools = await client.ListToolsAsync().ConfigureAwait(false);
+            if (transport == "stdio")
+            {
+                var profileId = RequiredBoundedString(request, "profileId", 32);
+                if (!serverId.Equals("rea", StringComparison.Ordinal) || !profileId.Equals("rea", StringComparison.Ordinal) || endpoint.Length != 0)
+                    throw new InvalidOperationException("Only Skai's pinned REA stdio profile can be launched; arbitrary process commands are not accepted.");
+                client = McpReaProcessClient.Start(McpConnections);
+            }
+            else
+            {
+                if (transport != "streamable-http") throw new InvalidOperationException("The MCP transport is unsupported.");
+                if (endpoint.Length == 0 || endpoint.Length > 2_048) throw new InvalidOperationException("A valid MCP endpoint is required.");
+                client = new McpStreamableHttpClient(serverId, endpoint, connectionRegistry: McpConnections);
+            }
+        }
+        catch (Exception error)
+        {
+            try { McpConnections.MarkDegraded(connectionId, error.Message); } catch { }
+            if (client is not null) await client.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+        var activeClient = client!;
+        try
+        {
+            await activeClient.InitializeAsync().ConfigureAwait(false);
+            var tools = await activeClient.ListToolsAsync().ConfigureAwait(false);
             McpConnections.MarkHealthy(connectionId);
             lock (McpClientsGate)
             {
                 if (ActiveMcpClients.Remove(connectionId, out var previous)) previous.DisposeAsync().AsTask().GetAwaiter().GetResult();
-                ActiveMcpClients[connectionId] = client;
+                ActiveMcpClients[connectionId] = activeClient;
                 ActiveMcpTools[connectionId] = tools;
             }
             return new(ProtocolVersion, request.Id, true, new { connection = McpConnections.Get(connectionId), tools });
@@ -248,7 +396,7 @@ public static class AgentHostLoop
         catch (Exception error)
         {
             try { McpConnections.MarkDegraded(connectionId, error.Message); } catch { }
-            await client.DisposeAsync().ConfigureAwait(false);
+            await activeClient.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
@@ -291,7 +439,7 @@ public static class AgentHostLoop
         var arguments = request.Params?.TryGetProperty("arguments", out var argumentValue) == true ? argumentValue : emptyArguments.RootElement;
         if (arguments.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("MCP tool arguments must be a JSON object.");
 
-        McpStreamableHttpClient client;
+        IMcpClient client;
         McpToolDescriptor descriptor;
         lock (McpClientsGate)
         {
@@ -324,7 +472,7 @@ public static class AgentHostLoop
 
     private static async Task DisposeMcpClientsAsync()
     {
-        McpStreamableHttpClient[] clients;
+        IMcpClient[] clients;
         lock (McpClientsGate)
         {
             clients = ActiveMcpClients.Values.ToArray();
@@ -334,17 +482,26 @@ public static class AgentHostLoop
         foreach (var client in clients) await client.DisposeAsync().ConfigureAwait(false);
     }
 
+    private static AgentResponse SearchImageAssetsAsync(AgentRequest request) => new(ProtocolVersion, request.Id, true, new ImageAssetLibrary().SearchAsync(OptionalString(request, "query") ?? string.Empty).GetAwaiter().GetResult());
+
+    private static AgentResponse InstallImageAssetAsync(AgentRequest request) => new(ProtocolVersion, request.Id, true, new ImageAssetLibrary().InstallAsync(RequiredBoundedString(request, "repository", 200), RequiredBoundedString(request, "file", 512)).GetAwaiter().GetResult());
+
+    private static AgentResponse RemoveImageAsset(AgentRequest request) => new(ProtocolVersion, request.Id, true, new { removed = new ImageAssetLibrary().Remove(RequiredBoundedString(request, "id", 512)) });
+
     private static async Task<AgentResponse> SearchMarketplaceModelsAsync(AgentRequest request)
     {
         var query = OptionalString(request, "query") ?? string.Empty;
         var uncensored = request.Params?.TryGetProperty("uncensored", out var uncensoredValue) == true && uncensoredValue.ValueKind == JsonValueKind.True;
         var library = new ModelLibraryService();
+        var huggingFaceTask = library.SearchHuggingFaceAsync(query, uncensored);
+        var airLlmTask = library.SearchHuggingFaceAirLlmAsync(query, uncensored);
+        var modelScopeTask = library.SearchModelScopeGgufAsync(query, uncensored);
         var providers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var models = new List<object>();
 
         try
         {
-            var huggingFace = await library.SearchHuggingFaceAsync(query, uncensored).ConfigureAwait(false);
+            var huggingFace = await huggingFaceTask.ConfigureAwait(false);
             models.AddRange(huggingFace.Select(model => new
             {
                 id = $"huggingface:{model.Id}",
@@ -368,7 +525,32 @@ public static class AgentHostLoop
 
         try
         {
-            var modelScope = await library.SearchModelScopeGgufAsync(query, uncensored).ConfigureAwait(false);
+            var airLlmModels = await airLlmTask.ConfigureAwait(false);
+            models.AddRange(airLlmModels.Select(model => new
+            {
+                id = $"huggingface-airllm:{model.Id}",
+                repository = model.Id,
+                source = "Hugging Face",
+                kind = "llm",
+                downloads = model.Downloads,
+                likes = model.Likes,
+                uncensored = model.IsUncensored,
+                tags = model.Tags ?? [],
+                sizeBytes = model.SizeBytes,
+                installRoute = "airllm",
+                requiresAirLlm = true,
+                installable = false,
+            }));
+            providers["Hugging Face · AirLLM"] = "ready";
+        }
+        catch (Exception error) when (error is HttpRequestException or InvalidDataException or TaskCanceledException)
+        {
+            providers["Hugging Face · AirLLM"] = error.Message;
+        }
+
+        try
+        {
+            var modelScope = await modelScopeTask.ConfigureAwait(false);
             models.AddRange(modelScope.Select(model => new
             {
                 id = $"modelscope:{model.Repository}:{model.Name}",
@@ -502,20 +684,38 @@ public static class AgentHostLoop
     {
         var endpoint = RequiredLocalEndpoint(request, "endpoint", 2_000);
         var provider = new OpenAiCompatibleProvider();
-        var models = provider.DiscoverModelProfilesAsync(endpoint, CancellationToken.None, OptionalString(request, "apiKey"))
-            .GetAwaiter().GetResult();
+        IReadOnlyList<ProviderModelDescriptor> profiles;
+        try
+        {
+            profiles = provider.DiscoverModelProfilesAsync(endpoint, CancellationToken.None, OptionalString(request, "apiKey"))
+                .GetAwaiter().GetResult();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            // A slow or unavailable selected endpoint must not hide models found in
+            // other installed runtimes or the local Hugging Face cache.
+            profiles = Array.Empty<ProviderModelDescriptor>();
+        }
         var providerId = OptionalString(request, "provider")?.Trim();
         if (string.IsNullOrWhiteSpace(providerId)) providerId = CreateSettingsStore().Load().ModelProvider;
-        IReadOnlyDictionary<string, int?> contextLengths = new Dictionary<string, int?>();
-        if (providerId.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
-            contextLengths = new ModelLibraryService().DiscoverOllamaContextLengthsAsync(endpoint, models.Select(model => model.Model)).GetAwaiter().GetResult();
-        return new(ProtocolVersion, request.Id, true, models.Select(model => new
+        var inventory = new ModelLibraryService().DiscoverLocalModelsAsync(endpoint).GetAwaiter().GetResult();
+        return new(ProtocolVersion, request.Id, true, inventory.Select(model =>
         {
-            model = model.Model,
-            vision = model.Vision,
-            capabilities = model.Capabilities,
-            provider = providerId,
-            contextLength = contextLengths.TryGetValue(model.Model, out var contextLength) ? contextLength : null,
+            var profile = model.Endpoint.Equals(endpoint, StringComparison.OrdinalIgnoreCase)
+                ? profiles.FirstOrDefault(item => item.Model.Equals(model.Model, StringComparison.OrdinalIgnoreCase))
+                : null;
+            return new
+            {
+                model = model.Model,
+                displayName = model.DisplayName,
+                vision = profile?.Vision.ToString() ?? "unknown",
+                capabilities = profile?.Capabilities ?? Array.Empty<string>(),
+                provider = model.Provider == "Current local endpoint" ? providerId : model.Provider,
+                endpoint = model.Provider == "AirLLM" ? null : model.Endpoint,
+                sizeBytes = model.SizeBytes,
+                contextLength = model.ContextLength,
+                isLoaded = model.IsLoaded,
+            };
         }).ToArray());
     }
 
@@ -588,6 +788,34 @@ public static class AgentHostLoop
         public void Complete() { lock (gate) State = "completed"; }
         public void Cancelled() { lock (gate) State = "cancelled"; }
         public void Fail(string message) { lock (gate) { State = "failed"; Error = string.IsNullOrWhiteSpace(message) ? "Local model download failed." : message[..Math.Min(message.Length, 400)]; } }
+    }
+
+    private sealed class AirLlmInstallOperation(string id, CancellationTokenSource cancellation)
+    {
+        private readonly object gate = new();
+        public string Id { get; } = id;
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+        public string State { get; private set; } = "running";
+        public string? Error { get; private set; }
+        public List<string> Progress { get; } = [];
+        public void AddProgress(string? message) { if (!string.IsNullOrWhiteSpace(message)) lock (gate) { if (Progress.Count < 96) Progress.Add(message[..Math.Min(message.Length, 240)]); } }
+        public void Complete() { lock (gate) State = "completed"; }
+        public void Cancelled() { lock (gate) State = "cancelled"; }
+        public void Fail(string message) { lock (gate) { State = "failed"; Error = string.IsNullOrWhiteSpace(message) ? "AirLLM setup failed." : message[..Math.Min(message.Length, 400)]; } }
+    }
+
+    private sealed class ImageRuntimeInstallOperation(string id, CancellationTokenSource cancellation)
+    {
+        private readonly object gate = new();
+        public string Id { get; } = id;
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+        public string State { get; private set; } = "running";
+        public string? Error { get; private set; }
+        public List<string> Progress { get; } = [];
+        public void AddProgress(string? message) { if (!string.IsNullOrWhiteSpace(message)) lock (gate) { if (Progress.Count < 96) Progress.Add(message[..Math.Min(message.Length, 240)]); } }
+        public void Complete() { lock (gate) State = "completed"; }
+        public void Cancelled() { lock (gate) State = "cancelled"; }
+        public void Fail(string message) { lock (gate) { State = "failed"; Error = string.IsNullOrWhiteSpace(message) ? "Image runtime setup failed." : message[..Math.Min(message.Length, 400)]; } }
     }
 
     private sealed class MarketplaceDownloadOperation(string id, string source, string repository, CancellationTokenSource cancellation)
@@ -1574,9 +1802,19 @@ public static class AgentHostLoop
 
     private static async Task<AgentResponse> GenerateImageAsync(AgentRequest request)
     {
+        var prompt = RequiredBoundedString(request, "prompt", 8_000);
+        var provider = OptionalString(request, "provider") ?? "comfyui";
+        if (provider.Length > 32) throw new InvalidOperationException("Image provider name exceeds its safety limit.");
+        if (provider.Equals("diffusers", StringComparison.OrdinalIgnoreCase))
+        {
+            if (request.Params?.TryGetProperty("sourceImage", out _) == true)
+                throw new InvalidOperationException("Image editing is currently available through the ComfyUI workflow option.");
+            var generated = await new DiffusersImageProvider().GenerateAsync(prompt).ConfigureAwait(false);
+            return new(ProtocolVersion, request.Id, true, new { prompt, progress = "Generated locally with Stable Diffusion Turbo.", images = new[] { new { url = generated.DataUrl, fileName = generated.FileName } } });
+        }
+        if (!provider.Equals("comfyui", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Choose a supported local image provider.");
         var endpoint = RequiredLocalEndpoint(request, "endpoint", 512);
         var workflow = RequiredBoundedString(request, "workflow", 1_000_000);
-        var prompt = RequiredBoundedString(request, "prompt", 8_000);
         var progress = string.Empty;
         byte[]? sourceImage = null;
         string? sourceImageName = null;

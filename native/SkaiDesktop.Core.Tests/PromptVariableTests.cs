@@ -17,12 +17,14 @@ public static class PromptVariableTests
 
         try
         {
-            PromptVariableExpander.Expand("bad\ninput", now);
-            throw new Exception("Expected control characters to be rejected.");
+            var multiline = PromptVariableExpander.Expand("first line\nsecond line", now);
+            Check(multiline == "first line\nsecond line", "prompt variable expansion preserves normal multiline prompt formatting");
+            PromptVariableExpander.Expand("bad\0input", now);
+            throw new Exception("Expected unsafe control characters to be rejected.");
         }
         catch (ArgumentException)
         {
-            Check(true, "prompt variable expansion rejects control characters before use");
+            Check(true, "prompt variable expansion rejects unsafe control characters before use");
         }
 
         try

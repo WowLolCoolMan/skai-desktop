@@ -128,7 +128,7 @@ export type PetMotionSettings = {
 };
 
 export type PetActivity = {
-  state: "idle" | "walk";
+  state: "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "needs-attention";
   facing: 1 | -1;
 };
 
@@ -141,6 +141,7 @@ export type PetCompletionEvent = {
 export interface PetBridge {
   setVisible(visible: boolean): void;
   setMotion(settings: PetMotionSettings): void;
+  setState(state: PetActivity["state"]): void;
   beginDrag(point: { x: number; y: number }): void;
   moveDrag(point: { x: number; y: number }): void;
   endDrag(): void;

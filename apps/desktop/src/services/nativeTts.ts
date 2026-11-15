@@ -15,10 +15,16 @@ export const voiceProfiles: VoiceProfile[] = [
 
 export const voiceModels = [
   { id: "os-native", name: "OS-native speech", detail: "Windows and Linux system voices", size: "No model", installed: true, lowResource: true },
-  { id: "kokoro-82m-onnx", name: "Kokoro 82M ONNX", detail: "Natural multi-voice local runtime", size: "~90 MB quantized", installed: false, lowResource: false },
+  { id: "kokoro-82m-onnx", name: "Kokoro 82M ONNX", detail: "Natural multi-voice local runtime", size: "~163 MB fp16 model + voices", installed: false, lowResource: false },
   { id: "pocket-tts", name: "Pocket TTS", detail: "CPU-first streaming voice runtime", size: "Model-dependent", installed: false, lowResource: false },
   { id: "pocket-tts-low-resource", name: "Pocket TTS Low Resource", detail: "Small CPU-first English runtime", size: "Small model", installed: false, lowResource: true },
 ] as const;
+
+export const installedVoiceModels = voiceModels.filter((voice) => voice.installed);
+
+function resolveInstalledVoiceModel(value: string | null) {
+  return installedVoiceModels.find((voice) => voice.id === value)?.id ?? installedVoiceModels[0]?.id ?? "os-native";
+}
 
 const selectedProfileKey = "skai.voice.profile";
 const primaryModelKey = "skai.voice.primaryModel";
@@ -29,8 +35,8 @@ const voiceOutputKey = "skai.voice.outputEnabled";
 export function selectedVoiceSettings() {
   return {
     profileId: localStorage.getItem(selectedProfileKey) ?? "skai-neutral",
-    primaryModelId: localStorage.getItem(primaryModelKey) ?? "os-native",
-    lowResourceModelId: localStorage.getItem(lowResourceModelKey) ?? "os-native",
+    primaryModelId: resolveInstalledVoiceModel(localStorage.getItem(primaryModelKey)),
+    lowResourceModelId: resolveInstalledVoiceModel(localStorage.getItem(lowResourceModelKey)),
     lowResourceMode: localStorage.getItem(lowResourceModeKey) === "true",
     voiceOutputEnabled: localStorage.getItem(voiceOutputKey) === "true",
   };
@@ -38,7 +44,8 @@ export function selectedVoiceSettings() {
 
 export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled", value: string | boolean) {
   const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey }[key];
-  localStorage.setItem(storageKey, String(value));
+  const safeValue = key === "primaryModelId" || key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value)) : value;
+  localStorage.setItem(storageKey, String(safeValue));
 }
 
 export function stopNativeSpeech() {

@@ -8,7 +8,7 @@ using SkaiDesktop.Core.Models;
 namespace SkaiDesktop.Core.Services;
 
 /// <summary>Bounded JSON response path for an MCP Streamable HTTP endpoint.</summary>
-public sealed class McpStreamableHttpClient : IAsyncDisposable
+public sealed class McpStreamableHttpClient : IMcpClient
 {
     private const int MaxMessageCharacters = 256 * 1024;
     private const int MaxArgumentsCharacters = 32 * 1024;

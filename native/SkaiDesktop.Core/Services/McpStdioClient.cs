@@ -6,7 +6,7 @@ using SkaiDesktop.Core.Models;
 namespace SkaiDesktop.Core.Services;
 
 /// <summary>Small bounded MCP JSON-RPC client for a supervised stdio transport.</summary>
-public sealed class McpStdioClient : IAsyncDisposable
+public sealed class McpStdioClient : IMcpClient
 {
     private const int MaxMessageCharacters = 256 * 1024;
     private const int MaxArgumentsCharacters = 32 * 1024;

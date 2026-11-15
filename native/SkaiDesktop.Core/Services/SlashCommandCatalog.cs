@@ -18,7 +18,6 @@ public static class SlashCommandCatalog
         ("/rename", "Rename the current saved chat"),
         ("/delete", "Delete the current saved chat"),
         ("/project", "Open a local project context"),
-        ("/reverse-engineer", "Analyze the active project and produce a structured architecture report"),
         ("/health", "Run a free, offline project health scan with bounded evidence"),
         ("/map", "Show a compact local architecture and dependency map"),
         ("/skills", "Browse built-in read-only workflow skills"),

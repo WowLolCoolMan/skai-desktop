@@ -23,7 +23,7 @@ export function GlobalRail({ route, onNavigate, onOpenLauncher }: { route: Route
       <div className={`global-rail-plugin ${pluginActive ? "is-active" : ""}`}>
         <button className={`global-rail-plugin-main ${route === "plugins" ? "is-active" : ""}`} type="button" aria-current={route === "plugins" ? "page" : undefined} aria-label="Plugins" title="Plugins" onClick={() => onNavigate("plugins")}><NavIcon name="sparkle" /></button>
         <OverflowMenu
-          label="More plugin tools"
+          label="Extras"
           className="global-rail-plugin-menu"
           icon={<NavIcon name="more" />}
           items={[

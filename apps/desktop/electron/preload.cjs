@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
   pet: {
     setVisible: (visible) => ipcRenderer.send("pet:set-visible", Boolean(visible)),
     setMotion: (settings) => ipcRenderer.send("pet:set-motion", settings),
+    setState: (state) => ipcRenderer.send("pet:set-state", state),
     beginDrag: (point) => ipcRenderer.send("pet:drag-start", point),
     moveDrag: (point) => ipcRenderer.send("pet:drag-move", point),
     endDrag: () => ipcRenderer.send("pet:drag-end"),

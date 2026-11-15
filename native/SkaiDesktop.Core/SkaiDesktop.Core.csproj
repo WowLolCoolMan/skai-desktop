@@ -6,6 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Data\openai-plugin-marketplace.json" />
+    <Content Include="..\..\services\airllm\**\*" Link="airllm\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\services\diffusers\**\*" Link="diffusers\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Remove="artifacts\**" />
     <EmbeddedResource Remove="artifacts\**" />
     <None Remove="artifacts\**" />
