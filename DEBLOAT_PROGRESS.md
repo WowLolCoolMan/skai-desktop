@@ -28,7 +28,7 @@ new history, not the existing `.git` pack (127 MiB at the start).
   libvips/libimagequant 256-colour palette at Q=100 with dithering, then oxipng; same filenames and dimensions; PSNR 41–59 dB
   for the illustrations and 33.5 dB for the icon composited on the app background; checked by eye. Undithered output banded
   visibly, so it wasn't used. The `check:hygiene` allowlist is now empty.)
-- [ ] F4. Remove the `../skai-debloat` worktree.
+- [x] F4. Remove the `../skai-debloat` worktree. — 0 bytes in the repo (local cleanup only)
 
 ## Verification gate
 
