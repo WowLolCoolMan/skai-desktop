@@ -3,7 +3,9 @@
 ## Local model and media runtimes
 
 - Ollama, LM Studio/OpenAI-compatible loopback servers, LocalAI, llama.cpp, and vLLM are named local model targets in product documentation and provider code.
-- AirLLM is represented as an optional/partial provider path.
+- AirLLM is an optional local provider path. The packaged Agent Host exposes a
+  readiness check and can run the bundled JSON-lines worker when its user-local
+  Python environment is installed.
 - ComfyUI is the current image workflow integration, using local queue/poll behavior and local output handling.
 - OS-native speech/TTS is available as a local capability; a complete local STT/TTS model marketplace path is not finished.
 
@@ -11,14 +13,16 @@
 
 - GitHub is an explicit project integration for repository status, guarded actions, branches, pull requests, and remote operations.
 - Authentication and credential handling are local/policy-gated rather than a cloud model route.
-- The current main Electron Marketplace does not yet expose the earlier remote GitHub skill discovery/install flow as a live product feature.
+- The current Electron Marketplace does not expose remote GitHub skill
+  discovery/install as a live product feature; GitHub remains a project
+  integration with guarded repository and pull-request operations.
 
 ## Marketplace sources
 
 - Core contains model library, authored/curated skill catalog, package installer, plugin catalog, and MCP-related clients.
-- The current renderer `MarketplacePage.tsx` presents local categories and explicitly states that nothing is fetched from a hosted catalog; non-local categories are activation placeholders until backend wiring exists.
-- No current Agent Host marketplace method family was found. This is the key contract gap preventing the UI from being a real discovery/install surface.
-- Hugging Face/ModelScope-related provider logic exists below the UI, but the current main Electron route does not make it user-selectable with provider, size, quantization/ablation, license, and hardware filters. [TODO]
+- The Electron Marketplace has host-backed catalog, provider search, model-size/provider filters, selected-item details, and verified local model-install operations. Results are limited to sources supported by the host and clearly label provenance.
+- Skills, tools, voices, and image workflows are cataloged locally; remote package installation for those categories remains intentionally unavailable until a verified source and installer contract exists.
+- Hugging Face/ModelScope model discovery is user-selectable through provider and size filters. Quantization, licensing, and hardware suitability remain follow-up metadata/compatibility work rather than decorative claims.
 
 ## MCP and tool integrations
 
@@ -34,7 +38,7 @@
 ## Reliability boundary
 
 - Requests have bounds, cancellation, and timeout handling in several adapters.
-- There is no uniform retry, backoff, circuit-breaker, provider health, or resumable-download contract across all integrations. [TODO]
+- There is no uniform retry, backoff, circuit-breaker, provider health, or resumable-download contract across all integrations. Marketplace model installs expose bounded status and cancellation, but do not yet provide resumable downloads. [TODO]
 
 ## Evidence
 
