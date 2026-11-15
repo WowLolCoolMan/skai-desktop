@@ -28,11 +28,20 @@ function run(step) {
   return new Promise((resolve, reject) => {
     console.log(`\n[smoke:windows] npm run ${step}`);
     const args = process.platform === "win32" ? ["/d", "/s", "/c", `npm.cmd run ${step}`] : ["run", step];
-    const child = spawn(npmCommand, args, { cwd: root, stdio: "inherit", windowsHide: true });
+    // Mirror output to the console and keep the tail, so a failure can be reported as a
+    // GitHub Actions annotation (annotations are readable without access to the job log).
+    const child = spawn(npmCommand, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    let tail = "";
+    const keep = (chunk, stream) => { stream.write(chunk); tail = (tail + chunk.toString()).slice(-6000); };
+    child.stdout.on("data", (chunk) => keep(chunk, process.stdout));
+    child.stderr.on("data", (chunk) => keep(chunk, process.stderr));
     child.once("error", reject);
     child.once("exit", (code, signal) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${step} failed${signal ? ` with ${signal}` : ` with exit code ${code}`}.`));
+      if (code === 0) { resolve(); return; }
+      const error = new Error(`${step} failed${signal ? ` with ${signal}` : ` with exit code ${code}`}.`);
+      error.step = step;
+      error.tail = tail;
+      reject(error);
     });
   });
 }
@@ -42,7 +51,13 @@ async function main() {
   console.log(`\nWindows smoke passed: ${steps.length} staged checks.`);
 }
 
+const annotationEscape = (text) => text.replace(/%/g, "%25").replace(/\r/g, "").replace(/\n/g, "%0A");
+
 main().catch((error) => {
   console.error(`\nWindows smoke failed: ${error.message}`);
+  if (process.env.GITHUB_ACTIONS === "true") {
+    const lines = String(error.tail || "").split(/\r?\n/).filter((line) => line.trim()).slice(-25).join("\n");
+    console.log(`::error title=smoke:windows ${error.step || "step"} failed::${annotationEscape(`${error.message}\n${lines}`)}`);
+  }
   process.exitCode = 1;
 });
