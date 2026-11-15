@@ -28,7 +28,7 @@ Skai Desktop is **local-only** for AI runtime and application data:
 
 | Surface | Current state |
 | --- | --- |
-| **Chat** | Persistent conversations, attachments, queued follow-ups, Markdown/code rendering, retry, fork, pin, archive, rename, folders, tags, split view, search, and local memory controls. |
+| **Chat** | Persistent conversations, attachments, per-turn documents-only grounding, queued follow-ups, Markdown/code rendering, retry, fork, pin, archive, rename, folders, tags, split view, search, and local memory controls. |
 | **Coding Workspace** | Monaco editor, project-scoped browsing, bounded previews, editing, reviewable diffs, guarded terminal commands, undo, task planning, and focused project context. |
 | **Agent Workbench** | Durable local task plans, dependency-aware readiness, activity filters, cancellation, approvals, and reviewable task state. Autonomous dispatch is still in progress. |
 | **Scheduled work** | Local one-time and repeating schedules with pause/resume/cancel and reviewed Run now controls. No unattended provider request is implied. |

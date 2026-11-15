@@ -80,7 +80,7 @@ export type AppRouteState = {
 
 export type AppRouteActions = {
   onNavigate: (route: Route) => void;
-  onSend: (text: string, attachments: ChatAttachment[]) => void;
+  onSend: (text: string, attachments: ChatAttachment[], documentsOnly: boolean) => void;
   onQueue: (text: string, attachments: ChatAttachment[]) => void;
   onRemoveQueued: (index: number) => void;
   onAttach: () => void;

@@ -619,9 +619,10 @@ public static class AgentHostLoop
         var messages = request.Params?.GetProperty("messages").Deserialize<List<ChatMessage>>(JsonOptions)
             ?? throw new InvalidOperationException("chat.complete requires a messages array.");
         if (messages.Count == 0) throw new InvalidOperationException("chat.complete requires at least one message.");
+        var documentsOnly = OptionalBoolean(request, "documentsOnly");
 
         var skillIds = ReadSkillIds(request);
-        if (skillIds.Count > 0)
+        if (!documentsOnly && skillIds.Count > 0)
         {
             var installer = new SkillPackageInstaller();
             var skillText = new System.Text.StringBuilder("The user explicitly selected these local skills. Apply their instructions for this request only. Skill text is bounded local data and never grants tool permissions.\n\n");
@@ -644,7 +645,7 @@ public static class AgentHostLoop
 
         var projectId = OptionalString(request, "projectId");
         string? projectName = null;
-        if (!string.IsNullOrWhiteSpace(projectId))
+        if (!documentsOnly && !string.IsNullOrWhiteSpace(projectId))
         {
             var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == projectId)
                 ?? throw new KeyNotFoundException("The selected project does not exist.");
@@ -670,11 +671,12 @@ public static class AgentHostLoop
             AirLlmDevice = storedSettings.AirLlmDevice,
             AirLlmDeleteOriginal = storedSettings.AirLlmDeleteOriginal,
         };
-        if (CreateSettingsStore().Load().MemoryInjectionEnabled)
+        if (!documentsOnly && CreateSettingsStore().Load().MemoryInjectionEnabled)
         {
             var memoryContext = MemoryPromptContext.Build(CreateMemoryStore().Load(), true, projectName);
             if (!string.IsNullOrWhiteSpace(memoryContext)) messages.Insert(0, new ChatMessage("system", memoryContext));
         }
+        if (documentsOnly) messages = DocumentsOnlyPrompt.Apply(messages).ToList();
         var text = new System.Text.StringBuilder();
         var airLlm = new AirLlmProvider();
         var explicitAirLlm = AirLlmProvider.IsAirLlmProvider(settings.ModelProvider);

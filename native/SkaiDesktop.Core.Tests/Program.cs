@@ -8,6 +8,7 @@ CatalogTests.Run();
 await ProjectHealthTests.RunAsync();
 await ModelLibraryTests.RunAsync();
 await ChatProviderTests.RunAsync();
+DocumentsOnlyPromptTests.Run();
 AirLlmProviderTests.Run();
 await ImageGenerationTests.RunAsync();
 await AttachmentTests.RunAsync();

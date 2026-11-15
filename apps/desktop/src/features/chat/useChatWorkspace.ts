@@ -70,13 +70,13 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     return savedId;
   };
 
-  const sendMessage = async (text: string, messageAttachments: ChatAttachment[]) => {
+  const sendMessage = async (text: string, messageAttachments: ChatAttachment[], documentsOnly = false) => {
     if (!isLocalEndpoint(endpoint)) { onError(LOCAL_ENDPOINT_ERROR); return; }
     stopNativeSpeech();
     const next = [...messages, { role: "user" as const, content: text || "Attached files", attachments: messageAttachments.length ? messageAttachments : undefined }];
     setMessages(next); setAttachments([]); setBusy(true); onError(null);
     const savedId = await saveConversation(next);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next) });
+    const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
     setBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];

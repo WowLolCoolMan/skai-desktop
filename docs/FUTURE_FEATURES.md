@@ -49,7 +49,7 @@ cancellation, permission review, and local credential handling.
 - [ ] 1M+ token context support. (Opt-in Ollama context windows up to 1M tokens, bounded 32 MB request payloads, and Ollama model-context discovery are implemented; this computer's installed models currently advertise up to 262,144 tokens, so 1M execution with a compatible local model remains unverified.)
 - [ ] Omni-modal input for text, images, audio, and video.
 - [x] Chat export and split view.
-- [x] NotebookLM-style mode grounded only in uploaded documents. (Bounded session-only mode is available from the composer, More actions, and command palette; durable corpus management remains open.)
+- [x] NotebookLM-style mode grounded only in documents attached to the current turn. (Composer toggle adds a strict grounding prompt, requires a current-turn attachment, and skips memory, project, and skill context; durable corpus retrieval is separate.)
 
 ## Agents and tools
 

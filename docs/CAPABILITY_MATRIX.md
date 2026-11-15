@@ -12,7 +12,7 @@ means it is not yet implemented. A build alone never upgrades a feature to
 | Area | Status | Current evidence | Remaining boundary |
 | --- | --- | --- | --- |
 | Electron shell and navigation | working | Electron main/preload, React renderer, narrow global rail, project/conversation sidebar, launcher, route smoke, responsive overflow matrix | More packaged accessibility coverage on Linux |
-| Chat and persistence | working | Agent Host `chat.complete`, local conversation storage, streaming/error states, attachments, retry, export/import, chat smoke | Broader provider and multi-pane acceptance |
+| Chat and persistence | working | Agent Host `chat.complete`, local conversation storage, streaming/error states, text/PDF/image attachments, per-turn documents-only grounding, retry, export/import, chat smoke | Broader provider and multi-pane acceptance |
 | Local models | working | Ollama/OpenAI-compatible discovery, model selection, model library, benchmark metadata, Ollama context metadata discovery, local-only recovery | More runtime adapters and resource scheduling; 1M-token execution is unverified on compatible hardware/models |
 | AirLLM | partial | Core provider strategy, Agent Host route, packaged `airllm/skai_airllm.py` worker, and artifact smoke assertion exist | Managed Python dependency/runtime setup, model compatibility acceptance, and hardware-aware scheduling |
 | Marketplace | working | Host-backed catalog/provider search, installed model routes, verified install review, packaged artifact smoke | More catalogs and download recovery UX |
