@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon } from "../../components/ui/NavIcon";
+import type { Model, Route } from "../../app/types";
+import { MarketplacePage } from "./MarketplacePage";
 import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 
 type PluginFilter = "All" | "Skills" | "Tools" | "Installed" | "Official";
@@ -31,8 +33,8 @@ function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   </div>;
 }
 
-export function PluginsPage({ onNavigate }: { onNavigate?: (route: "models" | "images") => void } = {}) {
-  const [view, setView] = useState<"catalog" | "voice">("catalog");
+export function PluginsPage({ onNavigate, onSelectAirLlmModel }: { onNavigate?: (route: Route) => void; onSelectAirLlmModel?: (model: Model) => void } = {}) {
+  const [view, setView] = useState<"catalog" | "voice" | "model-hub" | "image-assets">("catalog");
   const [filter, setFilter] = useState<PluginFilter>("All");
   const [query, setQuery] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -148,8 +150,9 @@ export function PluginsPage({ onNavigate }: { onNavigate?: (route: "models" | "i
   };
 
   if (view === "voice") return <div className="feature-page plugins-page"><VoiceWorkbench onBack={() => setView("catalog")} /></div>;
+  if (view === "model-hub" || view === "image-assets") return <MarketplacePage initialSection={view === "model-hub" ? "Models" : "Image models"} onBack={() => setView("catalog")} onNavigate={onNavigate} onSelectAirLlmModel={onSelectAirLlmModel} />;
   return <div className="feature-page plugins-page">
-    <aside className="plugins-customize-nav" aria-label="Marketplace categories"><p className="plugins-customize-title">Marketplace</p><button type="button" className={filter === "All" ? "is-active" : ""} onClick={() => { setFilter("All"); setQuery(""); }}><NavIcon name="sparkle" />Discover</button><button type="button" className={filter === "Skills" ? "is-active" : ""} onClick={() => { setFilter("Skills"); setQuery(""); }}><NavIcon name="code" />Skills</button><button type="button" className={filter === "Tools" ? "is-active" : ""} onClick={() => { setFilter("Tools"); setQuery(""); }}><NavIcon name="terminal" />Tools</button><p className="plugins-customize-group">Workspaces</p><button type="button" onClick={() => onNavigate?.("models")}><NavIcon name="project" />Open Models</button><button type="button" className="is-active" onClick={() => setView("voice")}><NavIcon name="activity" />Voice Workbench</button><button type="button" onClick={() => onNavigate?.("images")}><NavIcon name="image" />Open Image Studio</button><p className="plugins-customize-group">Library</p><button type="button" className={filter === "Installed" ? "is-active" : ""} onClick={() => { setFilter("Installed"); setQuery(""); }}><NavIcon name="marketplace" />Installed</button></aside>
+    <aside className="plugins-customize-nav" aria-label="Marketplace categories"><p className="plugins-customize-title">Marketplace</p><button type="button" className={filter === "All" ? "is-active" : ""} onClick={() => { setFilter("All"); setQuery(""); }}><NavIcon name="sparkle" />Discover</button><button type="button" className={filter === "Skills" ? "is-active" : ""} onClick={() => { setFilter("Skills"); setQuery(""); }}><NavIcon name="code" />Skills</button><button type="button" className={filter === "Tools" ? "is-active" : ""} onClick={() => { setFilter("Tools"); setQuery(""); }}><NavIcon name="terminal" />Tools</button><p className="plugins-customize-group">Hubs</p><button type="button" onClick={() => setView("model-hub")}><NavIcon name="model" />Model hub</button><button type="button" onClick={() => setView("image-assets")}><NavIcon name="image" />Image LoRAs</button><p className="plugins-customize-group">Workspaces</p><button type="button" onClick={() => onNavigate?.("models")}><NavIcon name="project" />Open Models</button><button type="button" onClick={() => setView("voice")}><NavIcon name="activity" />Voice Workbench</button><button type="button" onClick={() => onNavigate?.("images")}><NavIcon name="image" />Open Image Studio</button><p className="plugins-customize-group">Library</p><button type="button" className={filter === "Installed" ? "is-active" : ""} onClick={() => { setFilter("Installed"); setQuery(""); }}><NavIcon name="marketplace" />Installed</button></aside>
     <div className="plugins-main">
       <header className="plugins-topbar"><h2>Marketplace <span className="plugins-count">{officialPlugins.length} curated</span></h2><div className="plugins-topbar-actions"><label className="plugins-search"><span className="sr-only">Search marketplace</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search marketplace" /></label><Button variant="ghost" className="plugins-icon-button" aria-label="Refresh marketplace" title="Refresh marketplace" disabled={loading} onClick={() => void load()}><NavIcon name="refresh" /></Button>{downloadNotice && <Button variant="secondary" className="plugins-add-button" onClick={() => void window.serverRockAgent?.pluginDownloads?.openFolder()}>Open downloads</Button>}<Button variant="primary" className="plugins-add-button" onClick={() => document.getElementById("plugins-endpoint")?.focus()}><NavIcon name="plus" />Connect server</Button></div></header>
       {downloadNotice && <div className="plugins-download-notice" role="status"><span><strong>{downloadNotice.name} downloaded</strong><small>{downloadNotice.version ? `Version ${downloadNotice.version} · npm integrity verified` : `${downloadNotice.fileCount} files · source integrity verified`} · SHA-256 {downloadNotice.sha256}</small></span><span className="plugins-download-path">{downloadNotice.filePath}</span></div>}
