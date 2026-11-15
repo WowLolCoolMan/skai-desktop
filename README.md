@@ -88,6 +88,7 @@ dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj
 
 ### Linux window managers
 
+- **Installing a Linux build:** extract the `Skai-Desktop-electron-linux-x64` archive and run `./install.sh`. It installs for your user (no root needed) and adds Skai to your app launcher and a `skai-desktop` command. On distributions that restrict unprivileged user namespaces (such as Ubuntu 24.04+), it offers the one `sudo` step Chromium's sandbox needs. `./uninstall.sh` removes the app and keeps your data.
 - **Wayland (Hyprland, Sway, GNOME, KDE):** Skai runs under XWayland by default, because native Wayland does not let apps position their own windows and Percy needs that to walk and be dragged. Set `SKAI_OZONE_PLATFORM=wayland` (or pass `--ozone-platform=wayland`) for native Wayland. Percy then stays where the compositor puts it and is moved by dragging.
 - **Tiling WMs (i3, bspwm, Hyprland, Sway):** Percy asks to float. Your WM decides borders, stickiness and always-on-top, so you can add rules for it, for example:
   - i3: `for_window [class="skai-desktop" title="^Percy"] floating enable, sticky enable, border none`

@@ -30,6 +30,13 @@ expect(contracts.includes("onTrayOpenConversation?") && contracts.includes("onTr
 expect(workspace.includes("onTrayOpenConversation") && workspace.includes("onTrayNewChat"), "renderer must handle tray recent-chat and new-chat actions");
 expect(packageScript.includes('process.platform === "linux" ? "linux-x64"') && packageScript.includes('const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"'), "Electron packaging must publish a Linux x64 artifact with the native executable name");
 
+// Linux desktop integration: the launcher entry must match the window class so docks
+// and "reopen from your app launcher" (Linux close prompt) work, and the sandbox must never be disabled.
+const linuxInstaller = read("packaging/linux/install.sh");
+expect(packageScript.includes('"install.sh"') && packageScript.includes('"uninstall.sh"') && packageScript.includes("skai-desktop.png"), "Linux artifacts must ship install.sh, uninstall.sh and the launcher icon");
+expect(linuxInstaller.includes("StartupWMClass=skai-desktop") && JSON.parse(read("apps/desktop/package.json")).name === "skai-desktop", "Linux launcher StartupWMClass must match the Electron window class (package name skai-desktop)");
+expect(!/--no-sandbox/.test(linuxInstaller.replace(/^\s*#.*$/gm, "")), "Linux installer must not disable Chromium's sandbox");
+
 if (failures.length > 0) {
   console.error("Electron tray audit failed:");
   for (const failure of failures) console.error(`- ${failure}`);

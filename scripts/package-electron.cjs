@@ -43,10 +43,26 @@ fs.renameSync(path.join(outputRoot, electronBinary), path.join(outputRoot, packa
 const publishedHost = path.join(hostRoot, hostBinary);
 if (!fs.existsSync(publishedHost)) throw new Error(`The self-contained Agent Host was not published at ${publishedHost}.`);
 if (!fs.existsSync(path.join(airLlmWorkerTarget, "skai_airllm.py"))) throw new Error(`The packaged AirLLM worker was not staged at ${path.join(airLlmWorkerTarget, "skai_airllm.py")}.`);
+// Linux: ship a per-user installer, app-launcher entry and icon alongside the portable folder.
+if (process.platform === "linux") {
+  for (const script of ["install.sh", "uninstall.sh"]) {
+    const target = path.join(outputRoot, script);
+    fs.copyFileSync(path.join(root, "packaging", "linux", script), target);
+    fs.chmodSync(target, 0o755);
+  }
+  fs.copyFileSync(path.join(root, "assets", "branding", "skaiwolficon.png"), path.join(outputRoot, "skai-desktop.png"));
+}
 fs.writeFileSync(path.join(outputRoot, "README-release.txt"), [
   "Skai Desktop portable Electron artifact",
   "",
   `Run ${packagedBinary} from this folder. The bundled Agent Host is in resources/agent-host, including the AirLLM worker contract.`,
+  ...(process.platform === "linux" ? [
+    "",
+    "Linux: run ./install.sh to install for your user (no root needed). It adds Skai Desktop to your app",
+    "launcher and a `skai-desktop` command. On systems that restrict unprivileged user namespaces",
+    "(for example Ubuntu 24.04+) it offers the one sudo step Chromium's sandbox needs. ./uninstall.sh",
+    "removes the app and keeps your chats and settings in ~/.config/ServerRock and ~/.config/skai-desktop.",
+  ] : []),
   "This portable artifact is for release validation; signed installers require the release signing gate.",
   "",
 ].join("\n"), "utf8");
