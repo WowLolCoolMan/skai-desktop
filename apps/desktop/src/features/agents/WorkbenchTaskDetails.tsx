@@ -38,6 +38,7 @@ export function TaskActions({ task, busyTask, onTransition, onExecute }: { task:
   return <div className="task-card-actions">
     {task.status === "proposed" && <Button variant="primary" disabled={busyTask === task.id} onClick={() => onTransition(task.id, "queue")}>Queue</Button>}
     {task.status === "queued" && onExecute && <Button variant="primary" disabled={busyTask === task.id} onClick={() => onExecute(task.id)}>Run locally</Button>}
+    {(task.status === "running" || task.status === "verifying") && <Button variant="danger" disabled={busyTask === task.id} onClick={() => onTransition(task.id, "cancel")}>Stop run</Button>}
     {task.status === "awaiting_approval" && <><Button variant="primary" disabled={busyTask === task.id} onClick={() => onTransition(task.id, "approve")}>Approve local run</Button><Button variant="danger" disabled={busyTask === task.id} onClick={() => onTransition(task.id, "deny")}>Deny</Button></>}
     {(task.status === "proposed" || task.status === "queued") && <Button variant="ghost" disabled={busyTask === task.id} onClick={() => onTransition(task.id, "cancel")}>Cancel</Button>}
     {task.status === "blocked" && <Button variant="secondary" disabled={busyTask === task.id} onClick={() => onTransition(task.id, "retry")}>Retry</Button>}

@@ -88,6 +88,8 @@ expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("ma
 expect(packageJson.scripts["smoke:electron:themes"] === "node scripts/smoke-electron-themes.cjs" && themeSmokeScript.includes("Emulation.setDeviceMetricsOverride") && themeSmokeScript.includes("Page.captureScreenshot") && themeSmokeScript.includes("deep-space"), "Packaged Electron theme acceptance must exercise constrained rendering and capture appearance states");
 expect(packageJson.scripts["smoke:electron:overflow"] === "node scripts/smoke-electron-overflow.cjs" && overflowSmokeScript.includes("1920") && overflowSmokeScript.includes("routes") && overflowSmokeScript.includes("getBoundingClientRect"), "Packaged Electron overflow acceptance must exercise every route across supported viewport widths");
 expect(workspace.includes("const hasActiveTasks") && workspace.includes("loadWorkbench(false)") && workspace.includes("window.setInterval"), "Workbench must refresh background task state while local execution is active");
+const workbenchDetails = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "agents", "WorkbenchTaskDetails.tsx"), "utf8");
+expect(workbenchDetails.includes('task.status === "running" || task.status === "verifying"') && workbenchDetails.includes('onTransition(task.id, "cancel")') && workbenchDetails.includes("Stop run"), "Workbench must expose cancellation for active local task execution");
 const alternateDesktopFiles = findAlternateDesktopFiles(root);
 expect(alternateDesktopFiles.length === 0, `alternate desktop UI files must not return to the project: ${alternateDesktopFiles.join(", ")}`);
 
