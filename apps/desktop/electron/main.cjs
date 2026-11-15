@@ -5,6 +5,25 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const readline = require("node:readline");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
+const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible } = require("./linux-windowing.cjs");
+
+// Chromium fixes its display backend before any of this file runs, and
+// app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
+// browser stays on Wayland while the GPU process starts on X11 and segfaults.
+// The launchers (scripts/launch-electron.cjs) pass the flag up front; for any
+// other entry point (packaged binary, `electron .`, desktop files) relaunch
+// once with the flag. resolveDisplayBackend() returns no switch when the flag
+// is already present, so this cannot loop.
+const displayBackend = resolveDisplayBackend();
+const relaunchingForDisplayBackend = Boolean(displayBackend.switchValue);
+if (relaunchingForDisplayBackend) {
+  const optOut = displayBackend.switchValue === "x11" ? "; set SKAI_OZONE_PLATFORM=wayland to keep native Wayland" : "";
+  console.log(`[windowing] relaunching with --ozone-platform=${displayBackend.switchValue} (${displayBackend.reason})${optOut}.`);
+  app.relaunch({ args: [...process.argv.slice(1), `--ozone-platform=${displayBackend.switchValue}`] });
+  app.exit(0);
+}
+const windowPositioningAvailable = canPositionWindows(displayBackend);
+if (process.platform === "linux" && !relaunchingForDisplayBackend) console.log(`[windowing] display backend: ${displayBackend.backend} (${displayBackend.reason})`);
 
 const repoRoot = path.resolve(__dirname, "../../..");
 const hostProject = path.join(repoRoot, "services", "agent-host", "ServerRock.AgentHost.csproj");
@@ -45,7 +64,7 @@ const PET_WINDOW_MARGIN = 16;
 const attachmentTextExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".json", ".xml", ".yaml", ".yml", ".toml", ".html", ".htm", ".css", ".js", ".ts", ".jsx", ".tsx", ".cs", ".py", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".log"]);
 const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets"]);
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const hasSingleInstanceLock = !relaunchingForDisplayBackend && app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
@@ -152,6 +171,7 @@ function petWanderLayout() {
 }
 
 function schedulePetWander() {
+  if (!windowPositioningAvailable) return;
   if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
   if (petWanderPauseTimer || petWanderStepTimer) return;
   const delay = Math.max(0, petWanderNextAt - Date.now()) || 1800 + Math.round(Math.random() * 2600);
@@ -221,7 +241,8 @@ function persistPetState() {
   if (!petWindow || petWindow.isDestroyed()) return;
   const state = readPetState();
   state.visible = petWindow.isVisible();
-  state.bounds = petWindow.getBounds();
+  // getBounds() reports 0,0 on native Wayland; keep the last real position.
+  if (windowPositioningAvailable) state.bounds = petWindow.getBounds();
   void fs.mkdir(app.getPath("userData"), { recursive: true }).then(() => fs.writeFile(petStatePath(), JSON.stringify(state, null, 2), "utf8")).catch(() => {});
 }
 
@@ -328,7 +349,13 @@ function createPetWindow() {
   const savedState = readPetState();
   petReady = false;
   petWindow = new BrowserWindow({
-    ...petBounds(),
+    // Native Wayland ignores client-chosen positions; let the compositor place it.
+    ...(windowPositioningAvailable ? petBounds() : { width: PET_WINDOW_WIDTH, height: PET_WINDOW_HEIGHT }),
+    // _NET_WM_WINDOW_TYPE_TOOLBAR makes tiling X11 window managers (i3, bspwm,
+    // awesome, and Hyprland/Sway for XWayland clients) float Percy instead of
+    // tiling it into the layout.
+    ...(process.platform === "linux" ? { type: "toolbar" } : {}),
+    title: "Percy · Skai companion",
     transparent: true,
     frame: false,
     resizable: false,
@@ -357,13 +384,16 @@ function createPetWindow() {
   if (typeof petWindow.setVisibleOnAllWorkspaces === "function") {
     petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
+  // On native Wayland, dragging is handed to the compositor (app-region drag →
+  // xdg_toplevel.move) because the app can neither read nor set its position.
+  const petQuery = windowPositioningAvailable ? { pet: "1" } : { pet: "1", drag: "compositor" };
   const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
   if (devUrl) {
     const url = new URL(devUrl);
-    url.searchParams.set("pet", "1");
+    for (const [key, value] of Object.entries(petQuery)) url.searchParams.set(key, value);
     void petWindow.loadURL(url.toString());
   } else {
-    void petWindow.loadFile(path.join(rendererRoot, "dist", "index.html"), { query: { pet: "1" } });
+    void petWindow.loadFile(path.join(rendererRoot, "dist", "index.html"), { query: petQuery });
   }
   petWindow.once("ready-to-show", () => {
     persistPetState();
@@ -614,8 +644,21 @@ function createWindow() {
   mainWindow.on("close", (event) => {
     if (isQuitting) return;
     event.preventDefault();
-    mainWindow.hide();
-    void refreshTrayMenu();
+    // Closing hides to the tray, but only where a tray can actually be shown.
+    // Many Linux setups (bare Hyprland/Sway, GNOME without the AppIndicator
+    // extension) have no tray host; hiding there would leave Skai running with
+    // no visible way back, so quit instead. Probe on every close because panels
+    // such as Waybar can start or restart at any time.
+    void hasStatusNotifierHost().then((statusNotifierHost) => {
+      if (isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
+      if (!isTrayLikelyVisible({ statusNotifierHost })) {
+        console.log("[windowing] no system tray host detected; quitting instead of hiding to the tray.");
+        app.quit();
+        return;
+      }
+      mainWindow.hide();
+      void refreshTrayMenu();
+    });
   });
   mainWindow.on("closed", () => { mainWindow = undefined; });
 }
@@ -634,6 +677,7 @@ function applyProductionContentSecurityPolicy() {
 }
 
 app.whenReady().then(() => {
+  if (relaunchingForDisplayBackend || !hasSingleInstanceLock) return;
   startAgentHost();
   if (!process.env.SERVER_ROCK_RENDERER_URL) applyProductionContentSecurityPolicy();
   ipcMain.handle("agent:request", async (event, method, params) => {
@@ -703,7 +747,7 @@ app.whenReady().then(() => {
     schedulePetWander();
   });
   ipcMain.on("pet:drag-start", (event, point) => {
-    if (BrowserWindow.fromWebContents(event.sender) !== petWindow || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    if (!windowPositioningAvailable || BrowserWindow.fromWebContents(event.sender) !== petWindow || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
     stopPetWander();
     stopPetDrag();
     const bounds = petWindow.getBounds();

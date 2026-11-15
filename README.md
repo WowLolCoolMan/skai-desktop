@@ -86,6 +86,15 @@ npm run open:desktop
 dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj
 ```
 
+### Linux window managers
+
+- **Wayland (Hyprland, Sway, GNOME, KDE):** Skai runs under XWayland by default, because native Wayland does not let apps position their own windows and Percy needs that to walk and be dragged. Set `SKAI_OZONE_PLATFORM=wayland` (or pass `--ozone-platform=wayland`) for native Wayland. Percy then stays where the compositor puts it and is moved by dragging.
+- **Tiling WMs (i3, bspwm, Hyprland, Sway):** Percy asks to float. Your WM decides borders, stickiness and always-on-top, so you can add rules for it, for example:
+  - i3: `for_window [class="skai-desktop" title="^Percy"] floating enable, sticky enable, border none`
+  - Hyprland: `windowrule = float, pin, noborder, noshadow, title:^(Percy)`
+- **X11 without a compositor** (plain i3, bspwm): transparent windows render with a black background. Run a compositor such as `picom`, or hide Percy from the tray or Settings.
+- **System tray:** closing the window keeps Skai in the tray only when a tray host is running (Waybar `tray`, KDE, the GNOME AppIndicator extension, or an X11 tray such as i3bar). Without one, closing the window quits Skai.
+
 ## Verification
 
 Before opening a pull request, run the checks that match your change:

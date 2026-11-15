@@ -9,6 +9,10 @@ const ERROR_SHEET = new URL("../../../../../assets/pets/percy-error-frames.png",
 
 type PetPose = "idle" | "walk" | "success" | "error";
 
+// Native Wayland: the app cannot move its own windows, so the compositor drags
+// Percy (CSS app-region) and Percy stays put instead of walking in place.
+const COMPOSITOR_DRAG = new URLSearchParams(window.location.search).get("drag") === "compositor";
+
 export function PetWindow() {
   const [pose, setPose] = useState<PetPose>("walk");
   const [bubble, setBubble] = useState<string | null>(null);
@@ -36,7 +40,7 @@ export function PetWindow() {
       window.clearTimeout(bubbleTimer.current);
       window.clearTimeout(poseTimer.current);
       bubbleTimer.current = window.setTimeout(() => setBubble(null), 6500);
-      poseTimer.current = window.setTimeout(() => setPose(motionRef.current.wander ? "walk" : "idle"), 1500);
+      poseTimer.current = window.setTimeout(() => setPose(motionRef.current.wander && !COMPOSITOR_DRAG ? "walk" : "idle"), 1500);
     };
     const removeMessage = pet.onMessage(showCompletion);
     const removeMotion = pet.onMotionChange(setMotion);
@@ -58,7 +62,7 @@ export function PetWindow() {
     };
   }, []);
 
-  const activePose = pose === "success" || pose === "error" ? pose : motion.wander ? "walk" : "idle";
+  const activePose = pose === "success" || pose === "error" ? pose : motion.wander && !COMPOSITOR_DRAG ? "walk" : "idle";
   const sheet = activePose === "success" ? SUCCESS_SHEET : activePose === "error" ? ERROR_SHEET : activePose === "idle" ? IDLE_SHEET : WALK_SHEET;
   const animationPaused = motion.reduceMotion;
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
@@ -78,7 +82,8 @@ export function PetWindow() {
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     window.serverRockAgent?.pet?.endDrag();
   };
-  return <main className="pet-window-root" aria-label="Percy desktop companion. Drag to move." data-pose={activePose} onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
+  const dragHandlers = COMPOSITOR_DRAG ? {} : { onPointerDown: beginDrag, onPointerMove: moveDrag, onPointerUp: endDrag, onPointerCancel: endDrag };
+  return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}`} aria-label="Percy desktop companion. Drag to move." data-pose={activePose} {...dragHandlers}>
     {bubble && <div className={`pet-window-bubble pet-window-bubble-${bubbleKind}`} role="status" aria-live="polite">{bubble}</div>}
     <button className="pet-window-hide" type="button" onClick={() => window.serverRockAgent?.pet?.hide()} aria-label="Hide Percy companion"><NavIcon name="close" /></button>
     <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}`} style={{ backgroundImage: `url(${sheet})` }} role="img" aria-label="Animated Percy companion" />
