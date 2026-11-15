@@ -9,6 +9,8 @@
   without changing the regular voice-output preference.
 - Added per-turn documents-only chat grounding for currently attached files, with
   project, memory, and skill context excluded from those requests.
+- Added local-model semantic summaries for oversized chat histories, with a
+  deterministic fallback and explicit untrusted-summary handling.
 - Added a responsive GitHub Pages project site, automated Pages deployment, and
   a curated documentation index.
 - Added checkpoint discovery and built-in ComfyUI text-to-image and image-edit

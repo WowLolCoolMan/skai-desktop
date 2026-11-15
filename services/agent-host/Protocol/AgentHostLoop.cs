@@ -681,11 +681,28 @@ public static class AgentHostLoop
         var text = new System.Text.StringBuilder();
         var airLlm = new AirLlmProvider();
         var explicitAirLlm = AirLlmProvider.IsAirLlmProvider(settings.ModelProvider);
+        var openAiProvider = new OpenAiCompatibleProvider();
         var usedFallback = false;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
         {
+            if (!documentsOnly && SemanticConversationCompactor.ShouldCompact(messages))
+            {
+                var summaryContextTokens = settings.ModelProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase)
+                    ? settings.OllamaContextWindowTokens
+                    : 0;
+                messages = (await SemanticConversationCompactor.CompactAsync(messages, summaryContextTokens, async (summaryMessages, token) =>
+                {
+                    var summaryText = new System.Text.StringBuilder();
+                    if (explicitAirLlm)
+                        await airLlm.StreamChatAsync(settings, summaryMessages, chunk => summaryText.Append(chunk), token, 512, OptionalString(request, "apiKey"));
+                    else
+                        await openAiProvider.StreamChatAsync(settings, summaryMessages, chunk => summaryText.Append(chunk), token, 512, OptionalString(request, "apiKey"));
+                    return summaryText.ToString();
+                }, deadline.Token)).ToList();
+            }
+
             if (explicitAirLlm)
             {
                 await airLlm.StreamChatAsync(settings, messages, chunk => text.Append(chunk), deadline.Token,
@@ -695,7 +712,7 @@ public static class AgentHostLoop
             {
                 try
                 {
-                    await new OpenAiCompatibleProvider().StreamChatAsync(settings, messages, chunk => text.Append(chunk), deadline.Token,
+                    await openAiProvider.StreamChatAsync(settings, messages, chunk => text.Append(chunk), deadline.Token,
                         OptionalInt(request, "maxTokens"), OptionalString(request, "apiKey"));
                 }
                 catch (Exception error) when (AirLlmProvider.ShouldAutoFallback(settings, endpoint, error, airLlm.IsRuntimeAvailable(settings)))

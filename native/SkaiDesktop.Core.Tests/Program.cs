@@ -45,6 +45,7 @@ McpConnectionRegistryTests.Run();
 await McpStreamableHttpClientTests.RunAsync();
 await ReleaseManifestVerifierTests.RunAsync();
 ConversationContextPlannerTests.Run();
+await SemanticConversationCompactorTests.RunAsync();
 MemoryStoreTests.Run();
 StatusMessageHistoryTests.Run();
 MemoryPromptContextTests.Run();

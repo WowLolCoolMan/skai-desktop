@@ -142,7 +142,7 @@ Engineering references:
 
 ## What is next
 
-The remaining work is tracked in the [Core Chat backlog](docs/FUTURE_FEATURES.md#core-chat) and the [capability matrix](docs/CAPABILITY_MATRIX.md): voice runtime acceptance and advanced voice, live image-generation acceptance, semantic context summarization, verified 1M-token execution, and audio/video input remain open. Agent dispatch, packaged platform/accessibility acceptance, retrieval, and additional local integrations are also in progress. These pages distinguish tested behavior from work that still needs compatible runtimes or hardware.
+The remaining work is tracked in the [Core Chat backlog](docs/FUTURE_FEATURES.md#core-chat) and the [capability matrix](docs/CAPABILITY_MATRIX.md): voice runtime acceptance and advanced voice, live image-generation acceptance, summary-quality acceptance, verified 1M-token execution, and audio/video input remain open. Agent dispatch, packaged platform/accessibility acceptance, retrieval, and additional local integrations are also in progress. These pages distinguish tested behavior from work that still needs compatible runtimes or hardware.
 
 ## Contributing
 
