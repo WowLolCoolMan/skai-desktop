@@ -1,5 +1,5 @@
 // Static list of built-in read-only workflow skills and their permissions.
-// Used by: MainPage /skills and /reverse-engineer.
+// Used by: the Agent Host skill catalog protocol.
 
 namespace SkaiDesktop.Core.Services;
 

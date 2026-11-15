@@ -1,6 +1,6 @@
 // Plain-language messages for chat/image request failures shown in the conversation and
 // status banner (server error vs unreachable server vs timeout, and image-rejected).
-// Depends on: nothing. Used by: MainPage chat sending and Image Studio.
+// Depends on: nothing. Used by: Agent Host chat and Image Studio protocols.
 
 using System.Net;
 

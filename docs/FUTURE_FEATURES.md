@@ -3,7 +3,7 @@
 This is the product backlog for future capabilities. It is intentionally broader
 than the current release roadmap. Features should be implemented one bounded
 vertical slice at a time, starting with the simplest useful item, and checked
-off only after the feature works in the native app with the appropriate tests
+off only after the feature works in the Electron app with the appropriate tests
 and acceptance evidence.
 
 ## How to use this list
@@ -19,29 +19,31 @@ and acceptance evidence.
 
 ## Current product boundary
 
-Skai Desktop is local-first, with explicit cloud access as a separate route.
-The local path may use a model server already running on this computer or
-AirLLM running locally. Cloud services are first-class through provider
-adapters, including OpenAI/ChatGPT, ElevenLabs voice, and future supported
-model, voice, image, search, and integration services. Local inference must
-never silently fall back to cloud inference, and cloud requests must never
-silently fall back to a local model. Every route needs explicit provider
-selection, auth, data-boundary disclosure, cancellation, and credential
-storage. External integrations such as GitHub remain separate workflows.
+Skai Desktop is local-only. The application does not use hosted model
+providers, cloud model execution, cloud sync, remote model routing, or cloud
+fallbacks. The local path may use a model server already running on this
+computer or AirLLM running locally. Prompts, attachments, credentials, and
+application state stay on this computer unless the user explicitly starts a
+separate external integration workflow such as GitHub.
+
+Any older backlog item that mentions cloud execution, cloud compute, hosted
+accounts, cloud sync, or remote device control is retained as historical
+product research only and is not a commitment for Skai Desktop. New features
+must preserve the local-only boundary and provide explicit provider selection,
+cancellation, permission review, and local credential handling.
 
 ## Core chat
 
 - [x] Multi-model picker supporting any compatible provider.
 - [x] Side-by-side model comparison.
-- [ ] File, image, and PDF upload with retrieval-augmented generation (RAG).
+- [x] File, image, and PDF upload with bounded local retrieval-augmented context. (Selectable-text PDFs, supported images, and text attachments are policy-checked; broader extraction and semantic retrieval remain open.)
 - [x] Web search with citations.
 - [x] Persistent memory with a view/edit management UI.
 - [x] Message queueing while the AI is responding.
 - [x] Folders, tags, and pinned chats.
 - [x] Search within the current chat and jump to a matching message.
 - [x] Fork a chat from any message.
-- [ ] Voice input, hands-free calls, and advanced voice mode.
-- [x] Bounded spoken replies with OS-native local speech and explicit opt-in ElevenLabs cloud voice.
+- [ ] Voice input/output, hands-free calls, and advanced voice mode.
 - [ ] Image generation and editing.
 - [x] Context compaction. (Deterministic bounded provider-side compaction with omitted-history markers; semantic summarization remains open.)
 - [ ] 1M+ token context support.
@@ -55,11 +57,11 @@ storage. External integrations such as GitHub remain separate workflows.
 - [ ] Built-in browser panel.
 - [ ] Python sandbox execution.
 - [ ] Parallel sub-agent delegation.
-- [ ] Scheduled automations.
+- [x] Scheduled automations. (Local scheduled runs support create, pause, resume, cancel, and run-now; recurring and unattended reliability remain open.)
 - [x] Structured task lists. (Persisted local agent task plans with dependency-aware readiness, queue, search, and cancellation; autonomous dispatch remains open.)
-- [ ] MCP tools over Streamable HTTP and stdio.
-- [ ] OpenAPI tool auto-discovery.
-- [ ] Git panel for stage, commit, push, and pull requests.
+- [x] MCP tools over Streamable HTTP and stdio. (Explicit grants, revocation, read-only defaults, and protocol smoke coverage are implemented; richer lifecycle UI remains open.)
+- [x] OpenAPI tool auto-discovery. (Bounded local discovery is implemented; authenticated retrieval and broader schema coverage remain open.)
+- [x] Git panel for stage, commit, push, and pull requests. (Guarded local project workflow is implemented; richer selective staging and live permission/error acceptance remain open.)
 - [ ] Coding-agent model integrations, including Claude Code and Codex.
 - [ ] AI planning mode: plan, execute, verify, iterate, retry, and pause for human decisions.
 - [ ] Auto mode for unattended agent execution.
@@ -88,10 +90,10 @@ storage. External integrations such as GitHub remain separate workflows.
 - [ ] Nested file browser with preview. (Bounded local project-folder browser with relative paths, filtering, text/image/PDF preview exists; full tree, mutation, and packaged acceptance remain open.)
 - [ ] Projects that group chats, shared knowledge, and context.
 - [ ] Saved environments for reusable folders, SSH hosts, and cloud contexts.
-- [ ] File connectors that open, edit, and save files directly.
-- [ ] Integrated file editor that writes approved changes back to disk.
-- [ ] Visual diff review.
-- [ ] Memory management UI for viewing and editing remembered information.
+- [x] File connectors that open, edit, and save files directly. (Bounded local project browser and approved file operations are implemented.)
+- [x] Integrated file editor that writes approved changes back to disk. (Review, save, undo, and bounded path checks are implemented.)
+- [x] Visual diff review. (Project Git diff inspection is implemented; selective staging remains open.)
+- [x] Memory management UI for viewing and editing remembered information. (Local search, edit, enable/disable, export, and safe import are implemented.)
 
 ## Workspace and desktop experience
 
@@ -131,7 +133,7 @@ storage. External integrations such as GitHub remain separate workflows.
 - [x] Presets bundling prompts, tools, and knowledge. (Bounded local AI presets can bundle user-authored instructions, explicitly marked reference knowledge, and descriptive tool guidance; activation is explicit and tool guidance never grants permissions.)
 - [x] Dynamic variables such as `{{USER_NAME}}` and `{{DATE}}`.
 - [ ] Lazy-loaded Markdown instruction-pack skills with `$` mentions.
-- [ ] Local model runner support for Ollama and LM Studio.
+- [x] Local model runner support for Ollama and LM Studio. (Loopback discovery, selection, model-library inventory, and bounded install/load paths are implemented.)
 - [ ] Offline-capable operation.
 - [ ] OpenAI-compatible API and personal API keys (local servers plus explicit cloud provider routes).
 - [ ] Plugin and pipeline framework.

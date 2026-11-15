@@ -1,5 +1,5 @@
 // One web search result shown under the assistant message that used it.
-// Used by: ChatMessage and MainPage (source cards). Never sent back to the model.
+// Used by: ChatMessage and the Electron source-card projection. Never sent back to the model.
 
 namespace SkaiDesktop.Core.Models;
 

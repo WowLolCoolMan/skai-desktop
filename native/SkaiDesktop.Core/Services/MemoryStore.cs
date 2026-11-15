@@ -16,7 +16,7 @@ public sealed class MemoryStore
 
     public MemoryStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "memory.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "memory.json");
     }
 
     public IReadOnlyList<MemoryEntry> Load()

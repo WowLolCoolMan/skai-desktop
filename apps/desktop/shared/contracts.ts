@@ -38,10 +38,9 @@ export type DesktopProjectFile = {
 
 export type DesktopGitChange = {
   status: string;
+  requiresApproval?: boolean;
   path: string;
   originalPath?: string | null;
-  protectedPath: boolean;
-  conflict: boolean;
 };
 
 export type DesktopGitStatus = {
@@ -51,6 +50,19 @@ export type DesktopGitStatus = {
   commitsBehind: number;
   hasConflicts: boolean;
   changes: DesktopGitChange[];
+};
+
+export type DesktopGitDiff = {
+  repository: string;
+  text: string;
+  includedFiles: number;
+  redactedFiles: number;
+  truncated: boolean;
+};
+
+export type DesktopPullRequestDraft = {
+  title: string;
+  body: string;
 };
 
 export type DesktopConversation = {
@@ -78,22 +90,12 @@ export type DesktopTask = {
   title: string;
   instruction: string;
   role: string;
-  projectId?: string | null;
-  environment: TaskEnvironment;
   status: string;
   resultSummary?: string | null;
+  artifactLabels?: string[];
   dependsOn: string[];
   updatedAt: string;
-  artifactLabels?: string[];
-  workspaceChanges?: DesktopTaskWorkspaceChange[];
-  workspaceCommands?: DesktopTaskWorkspaceCommand[];
-  worktreePath?: string | null;
-  worktreeBranch?: string | null;
-  worktreeRepositoryRoot?: string | null;
 };
-
-export type DesktopTaskWorkspaceChange = { relativePath: string; content: string; applied?: boolean; undoId?: string | null };
-export type DesktopTaskWorkspaceCommand = { relativeWorkingDirectory: string; command: string; timeoutSeconds: number };
 
 export type TaskEnvironment = "local" | "worktree";
 
@@ -120,60 +122,70 @@ export type DesktopQueuedMessage = {
   attachments?: Array<{ fileName: string; mediaType?: string | null }>;
 };
 
-export type PetActivity = "idle" | "walking" | "thinking" | "coding" | "working" | "success" | "error";
-export type PetAssetKind = "sprite" | "manifest";
-export type PetPosition = { x: number; y: number };
-export type PetManifest = {
-  frameWidth: number;
-  frameHeight: number;
-  columns: number;
-  rows: number;
-  states: Record<string, { row: number; frames: number[]; fps: number }>;
-};
-export type PetSettings = {
-  visible: boolean;
+export type PetMotionSettings = {
   wander: boolean;
   reduceMotion: boolean;
-  petId: string;
-  spritePath: string;
-  manifestPath: string;
-  position: PetPosition;
-};
-export type PetWindowConfig = PetSettings & {
-  activity: PetActivity;
-  alwaysOnTop: true;
-  customSpriteDataUrl?: string;
-  customManifest?: PetManifest;
 };
 
-export type PetAssetSelection = { path: string; fileName: string };
+export type PetCompletionEvent = {
+  text: string;
+  at: number;
+  kind: "success" | "error";
+};
 
 export interface PetBridge {
-  configure(settings: PetSettings): void;
-  setActivity(activity: PetActivity): void;
-  getConfig(): Promise<PetWindowConfig>;
-  onConfig(listener: (config: PetWindowConfig) => void): () => void;
-  onPosition(listener: (position: PetPosition) => void): () => void;
-  onVisibilityChange(listener: (visible: boolean) => void): () => void;
-  pickAsset(kind: PetAssetKind): Promise<PetAssetSelection | null>;
-  setPosition(position: PetPosition): void;
-  dragStart(position: { screenX: number; screenY: number }): void;
-  dragMove(position: { screenX: number; screenY: number }): void;
-  dragEnd(): void;
+  setVisible(visible: boolean): void;
+  setMotion(settings: PetMotionSettings): void;
+  beginDrag(point: { x: number; y: number }): void;
+  moveDrag(point: { x: number; y: number }): void;
+  endDrag(): void;
   hide(): void;
+  onMessage(handler: (event: PetCompletionEvent) => void): () => void;
+  onVisibilityChange(handler: (visible: boolean) => void): () => void;
+  onMotionChange(handler: (settings: PetMotionSettings) => void): () => void;
+}
+
+/** What closing the main window does. "ask" shows the Linux close prompt. */
+export type CloseBehavior = "ask" | "background" | "quit";
+export type CloseChoice = "background" | "quit" | "cancel";
+
+export interface WindowBridge {
+  /** process.platform of the desktop shell, e.g. "linux" or "win32". */
+  platform: string;
+  /** Fired on Linux when the user closes the main window and no choice is remembered. */
+  onCloseRequested(handler: (request: { trayAvailable: boolean }) => void): () => void;
+  respondToClose(choice: CloseChoice, remember: boolean): void;
+  getCloseBehavior(): Promise<CloseBehavior>;
+  setCloseBehavior(behavior: CloseBehavior): Promise<CloseBehavior>;
+}
+
+export type UpdateCheckResult = {
+  available: boolean;
+  currentVersion: string;
+  version?: string;
+  channel?: string;
+  releaseUrl?: string;
+  downloadUrl?: string;
+  assetName?: string | null;
+  publishedAt?: string | null;
+  checkedAt?: string;
+  message: string;
+  error?: string;
+};
+
+export interface UpdatesBridge {
+  check(): Promise<UpdateCheckResult>;
+  open(url: string): Promise<boolean>;
+  onAvailable(handler: (result: UpdateCheckResult) => void): () => void;
 }
 
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
-  pet: PetBridge;
-  tray: TrayBridge;
-}
-
-export interface TrayBridge {
-  refresh(): void;
-  onNewChat(listener: () => void): () => void;
-  onOpenConversation(listener: (id: string) => void): () => void;
-  onNavigate(listener: (route: string) => void): () => void;
+  onTrayOpenConversation?(handler: (id: string) => void): () => void;
+  onTrayNewChat?(handler: () => void): () => void;
+  pet?: PetBridge;
+  window?: WindowBridge;
+  updates?: UpdatesBridge;
 }
 
 declare global {

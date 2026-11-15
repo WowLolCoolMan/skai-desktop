@@ -15,18 +15,14 @@ public sealed class AgentTaskArtifactStore
     public const int MaxArtifactLabelCharacters = 160;
     public const int MaxDependencies = 8;
     public const int MaxArtifactLabels = 8;
-    public const int MaxWorkspaceChanges = 8;
-    public const int MaxWorkspaceCommands = 3;
-    public const int MaxWorkspaceCommandCharacters = 4_000;
     public const int MaxWorktreePathCharacters = 4_096;
     public const int MaxWorktreeBranchCharacters = 256;
-    public const int MaxProjectIdCharacters = 128;
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { WriteIndented = true, MaxDepth = 12 };
     private readonly string _path;
 
     public AgentTaskArtifactStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "agent-tasks.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "agent-tasks.json");
     }
 
     public IReadOnlyList<AgentTaskArtifact> Load()
@@ -44,7 +40,7 @@ public sealed class AgentTaskArtifactStore
         }
     }
 
-    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, string? projectId = null, string environment = AgentTaskEnvironments.Local)
+    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false)
     {
         var now = DateTimeOffset.UtcNow;
         var task = new AgentTaskArtifact
@@ -52,9 +48,8 @@ public sealed class AgentTaskArtifactStore
             Title = Normalize(title, MaxTitleCharacters, "task title"),
             Instruction = Normalize(instruction, MaxInstructionCharacters, "task instruction"),
             Role = Normalize(role, MaxRoleCharacters, "task role"),
+            RequiresApproval = requiresApproval,
             ParentRunId = NormalizeOptional(parentRunId, 128, "parent run ID"),
-            ProjectId = NormalizeOptional(projectId, MaxProjectIdCharacters, "project ID"),
-            Environment = NormalizeEnvironment(environment),
             DependsOn = NormalizeIds(dependsOn),
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -69,52 +64,15 @@ public sealed class AgentTaskArtifactStore
         return Copy(task);
     }
 
-    public AgentTaskArtifact Queue(string id) => Transition(id, AgentTaskStatuses.Proposed, AgentTaskStatuses.Queued);
-
-    /// <summary>Moves a planned task into the explicit approval inbox without claiming or executing it.</summary>
-    public AgentTaskArtifact RequestApproval(string id)
+    public AgentTaskArtifact Queue(string id)
     {
-        var tasks = Load().ToList();
-        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (task.Status != AgentTaskStatuses.Proposed)
-            throw new InvalidOperationException($"A task in {task.Status} state cannot request approval.");
-        task.Status = AgentTaskStatuses.AwaitingApproval;
-        task.ResultSummary = "Awaiting explicit approval before local execution.";
-        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        Save(tasks);
-        return Copy(task);
+        var task = Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+        return task.RequiresApproval ? Transition(id, AgentTaskStatuses.Proposed, AgentTaskStatuses.AwaitingApproval) : Transition(id, AgentTaskStatuses.Proposed, AgentTaskStatuses.Queued);
     }
 
-    /// <summary>Approves a task for the bounded local executor; approval never starts execution.</summary>
-    public AgentTaskArtifact Approve(string id, string approvalId)
-    {
-        if (string.IsNullOrWhiteSpace(approvalId) || approvalId.Length > 128 || approvalId.Any(char.IsControl))
-            throw new ArgumentException("Approval identity is invalid.", nameof(approvalId));
-        var tasks = Load().ToList();
-        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (task.Status != AgentTaskStatuses.AwaitingApproval)
-            throw new InvalidOperationException($"A task in {task.Status} state cannot be approved.");
-        task.Status = AgentTaskStatuses.Queued;
-        task.ResultSummary = $"Approved by {approvalId}; waiting for an explicit local executor.";
-        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        Save(tasks);
-        return Copy(task);
-    }
+    public AgentTaskArtifact Approve(string id) => Transition(id, AgentTaskStatuses.AwaitingApproval, AgentTaskStatuses.Queued, "Approval granted locally; ready for execution.");
 
-    /// <summary>Denies an awaiting task and records the bounded review reason without executing it.</summary>
-    public AgentTaskArtifact Deny(string id, string reason)
-    {
-        var normalizedReason = Normalize(reason, MaxResultCharacters, "approval denial reason");
-        var tasks = Load().ToList();
-        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (task.Status != AgentTaskStatuses.AwaitingApproval)
-            throw new InvalidOperationException($"A task in {task.Status} state cannot be denied.");
-        task.Status = AgentTaskStatuses.Cancelled;
-        task.ResultSummary = $"Approval denied: {normalizedReason}";
-        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        Save(tasks);
-        return Copy(task);
-    }
+    public AgentTaskArtifact Deny(string id) => Transition(id, AgentTaskStatuses.AwaitingApproval, AgentTaskStatuses.Cancelled, "Approval denied locally; no execution was started.");
 
     public AgentTaskArtifact Get(string id) => Copy(Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist."));
 
@@ -144,47 +102,12 @@ public sealed class AgentTaskArtifactStore
         return Copy(task);
     }
 
-    public AgentTaskArtifact MarkWorkspaceChangeApplied(string id, int proposalIndex, string appliedHash, string? undoId = null)
-    {
-        if (proposalIndex < 0) throw new ArgumentOutOfRangeException(nameof(proposalIndex));
-        var normalizedHash = NormalizeHash(appliedHash, "applied workspace change hash");
-        var normalizedUndoId = NormalizeOptional(undoId, 128, "workspace change undo ID");
-        var tasks = Load().ToList();
-        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (task.Status == AgentTaskStatuses.Running) throw new InvalidOperationException("A running task cannot apply a reviewed workspace change.");
-        if (proposalIndex >= task.WorkspaceChanges.Count) throw new ArgumentOutOfRangeException(nameof(proposalIndex), "The workspace change proposal does not exist.");
-        var change = task.WorkspaceChanges[proposalIndex];
-        if (change.AppliedHash is not null) throw new InvalidOperationException("This workspace change proposal has already been applied.");
-        change.AppliedHash = normalizedHash;
-        change.UndoId = normalizedUndoId;
-        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        Save(tasks);
-        return Copy(task);
-    }
-
-    public AgentTaskArtifact MarkWorkspaceChangeUndone(string id, int proposalIndex, string undoId)
-    {
-        if (proposalIndex < 0) throw new ArgumentOutOfRangeException(nameof(proposalIndex));
-        var normalizedUndoId = Normalize(undoId, 128, "workspace change undo ID");
-        var tasks = Load().ToList();
-        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (task.Status == AgentTaskStatuses.Running) throw new InvalidOperationException("A running task cannot undo a reviewed workspace change.");
-        if (proposalIndex >= task.WorkspaceChanges.Count) throw new ArgumentOutOfRangeException(nameof(proposalIndex), "The workspace change proposal does not exist.");
-        var change = task.WorkspaceChanges[proposalIndex];
-        if (!string.Equals(change.UndoId, normalizedUndoId, StringComparison.Ordinal)) throw new InvalidOperationException("The undo receipt does not match this workspace change proposal.");
-        change.AppliedHash = null;
-        change.UndoId = null;
-        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        Save(tasks);
-        return Copy(task);
-    }
-
     /// <summary>Cancels a proposed or queued plan before any future executor can claim it.</summary>
     public AgentTaskArtifact CancelPlanned(string id, string reason = "Cancelled before execution.")
     {
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Queued))
+        if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued))
             throw new InvalidOperationException($"A task in {task.Status} state cannot be cancelled before execution.");
         task.Status = AgentTaskStatuses.Cancelled;
         task.ResultSummary = Normalize(reason, MaxResultCharacters, "task cancellation reason");
@@ -224,21 +147,6 @@ public sealed class AgentTaskArtifactStore
             .FirstOrDefault();
     }
 
-    /// <summary>Claims one specific queued task when all of its dependencies are complete.</summary>
-    public AgentTaskArtifact TryClaim(string id, DateTimeOffset? now = null)
-    {
-        var tasks = Load().ToList();
-        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (!IsReady(task, tasks))
-            throw new InvalidOperationException(task.Status == AgentTaskStatuses.Queued
-                ? "This task is waiting for its dependencies to complete."
-                : $"A task in {task.Status} state cannot be executed.");
-        task.Status = AgentTaskStatuses.Running;
-        task.UpdatedAtUtc = now ?? DateTimeOffset.UtcNow;
-        Save(tasks);
-        return Copy(task);
-    }
-
     /// <summary>
     /// Reconciles tasks that were running when the process stopped. This is a
     /// local metadata transition only: it does not retry handlers, release
@@ -269,8 +177,27 @@ public sealed class AgentTaskArtifactStore
         var task = tasks.Where(item => IsReady(item, tasks))
             .OrderBy(item => item.CreatedAtUtc).FirstOrDefault();
         if (task is null) return null;
+        return Claim(tasks, task, current);
+    }
+
+    /// <summary>Claims one specific dependency-ready queued task for explicit execution.</summary>
+    public AgentTaskArtifact TryClaim(string id, DateTimeOffset? now = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        var tasks = Load().ToList();
+        var task = tasks.SingleOrDefault(item => item.Id == id)
+            ?? throw new KeyNotFoundException("The agent task does not exist.");
+        if (task.Status != AgentTaskStatuses.Queued)
+            throw new InvalidOperationException($"A task in {task.Status} state cannot be executed.");
+        if (!IsReady(task, tasks))
+            throw new InvalidOperationException("The task is waiting for a dependency to complete.");
+        return Claim(tasks, task, now ?? DateTimeOffset.UtcNow);
+    }
+
+    private AgentTaskArtifact Claim(List<AgentTaskArtifact> tasks, AgentTaskArtifact task, DateTimeOffset now)
+    {
         task.Status = AgentTaskStatuses.Running;
-        task.UpdatedAtUtc = current;
+        task.UpdatedAtUtc = now;
         Save(tasks);
         return Copy(task);
     }
@@ -279,8 +206,34 @@ public sealed class AgentTaskArtifactStore
         task.Status == AgentTaskStatuses.Queued && task.DependsOn.All(dependencyId =>
             tasks.Any(dependency => dependency.Id == dependencyId && dependency.Status == AgentTaskStatuses.Completed));
 
-    public AgentTaskArtifact Complete(string id, string resultSummary, IEnumerable<string>? artifactLabels = null, IEnumerable<AgentTaskWorkspaceChange>? workspaceChanges = null, IEnumerable<AgentTaskWorkspaceCommand>? workspaceCommands = null) =>
-        Finish(id, AgentTaskStatuses.Completed, resultSummary, artifactLabels, workspaceChanges, workspaceCommands);
+    public AgentTaskArtifact Complete(string id, string resultSummary, IEnumerable<string>? artifactLabels = null) =>
+        Finish(id, AgentTaskStatuses.Completed, resultSummary, artifactLabels);
+
+    public AgentTaskArtifact BeginVerification(string id, string resultSummary, IEnumerable<string>? artifactLabels = null)
+    {
+        var tasks = Load().ToList();
+        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+        if (task.Status != AgentTaskStatuses.Running) throw new InvalidOperationException("Only a running task can enter verification.");
+        task.Status = AgentTaskStatuses.Verifying;
+        task.ResultSummary = Normalize(resultSummary, MaxResultCharacters, "task result");
+        task.ArtifactLabels = NormalizeLabels(artifactLabels);
+        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        Save(tasks);
+        return Copy(task);
+    }
+
+    public AgentTaskArtifact Verify(string id)
+    {
+        var tasks = Load().ToList();
+        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+        if (task.Status != AgentTaskStatuses.Verifying) throw new InvalidOperationException("Only a task in verification can be completed.");
+        if (string.IsNullOrWhiteSpace(task.ResultSummary)) throw new InvalidOperationException("Verification failed because the task returned no result.");
+        if (task.ArtifactLabels.Count == 0) throw new InvalidOperationException("Verification failed because the task returned no artifact record.");
+        task.Status = AgentTaskStatuses.Completed;
+        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        Save(tasks);
+        return Copy(task);
+    }
 
     public AgentTaskArtifact Fail(string id, string resultSummary) => Finish(id, AgentTaskStatuses.Failed, resultSummary, null);
 
@@ -293,27 +246,26 @@ public sealed class AgentTaskArtifactStore
         return Load().Where(task => normalized.Length == 0 || task.Title.Contains(normalized, StringComparison.OrdinalIgnoreCase) || task.Instruction.Contains(normalized, StringComparison.OrdinalIgnoreCase) || task.Role.Contains(normalized, StringComparison.OrdinalIgnoreCase) || task.Status.Contains(normalized, StringComparison.OrdinalIgnoreCase)).ToArray();
     }
 
-    private AgentTaskArtifact Transition(string id, string expected, string next)
+    private AgentTaskArtifact Transition(string id, string expected, string next, string? summary = null)
     {
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
         if (task.Status != expected) throw new InvalidOperationException($"A task in {task.Status} state cannot be changed to {next}.");
         task.Status = next;
+        task.ResultSummary = summary;
         task.UpdatedAtUtc = DateTimeOffset.UtcNow;
         Save(tasks);
         return Copy(task);
     }
 
-    private AgentTaskArtifact Finish(string id, string status, string resultSummary, IEnumerable<string>? artifactLabels, IEnumerable<AgentTaskWorkspaceChange>? workspaceChanges = null, IEnumerable<AgentTaskWorkspaceCommand>? workspaceCommands = null)
+    private AgentTaskArtifact Finish(string id, string status, string resultSummary, IEnumerable<string>? artifactLabels)
     {
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
-        if (task.Status != AgentTaskStatuses.Running) throw new InvalidOperationException("Only a claimed running task can be finished.");
+        if (task.Status is not (AgentTaskStatuses.Running or AgentTaskStatuses.Verifying)) throw new InvalidOperationException("Only a claimed running or verifying task can be finished.");
         task.Status = status;
         task.ResultSummary = Normalize(resultSummary, MaxResultCharacters, "task result");
         task.ArtifactLabels = NormalizeLabels(artifactLabels);
-        task.WorkspaceChanges = NormalizeWorkspaceChanges(workspaceChanges);
-        task.WorkspaceCommands = NormalizeWorkspaceCommands(workspaceCommands);
         task.UpdatedAtUtc = DateTimeOffset.UtcNow;
         Save(tasks);
         return Copy(task);
@@ -337,16 +289,12 @@ public sealed class AgentTaskArtifactStore
             Normalize(task.Instruction, MaxInstructionCharacters, "task instruction");
             Normalize(task.Role, MaxRoleCharacters, "task role");
             NormalizeOptional(task.ParentRunId, 128, "parent run ID");
-            NormalizeOptional(task.ProjectId, MaxProjectIdCharacters, "project ID");
             NormalizeIds(task.DependsOn);
             if (task.DependsOn.Any(id => !ids.Contains(id)) || task.DependsOn.Contains(task.Id, StringComparer.Ordinal)) throw new InvalidDataException("The agent task store contains an invalid dependency.");
-            if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Queued or AgentTaskStatuses.Running or AgentTaskStatuses.Completed or AgentTaskStatuses.Failed or AgentTaskStatuses.Cancelled or AgentTaskStatuses.Blocked)) throw new InvalidDataException("The agent task store contains an invalid status.");
+            if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Running or AgentTaskStatuses.Verifying or AgentTaskStatuses.Completed or AgentTaskStatuses.Failed or AgentTaskStatuses.Cancelled or AgentTaskStatuses.Blocked)) throw new InvalidDataException("The agent task store contains an invalid status.");
             if (task.ResultSummary is not null) Normalize(task.ResultSummary, MaxResultCharacters, "task result");
             NormalizeLabels(task.ArtifactLabels);
-            NormalizeWorkspaceChanges(task.WorkspaceChanges);
-            NormalizeWorkspaceCommands(task.WorkspaceCommands);
             NormalizeOptional(task.WorktreeRepositoryRoot, MaxWorktreePathCharacters, "worktree repository root");
-            task.Environment = NormalizeEnvironment(task.Environment);
             NormalizeOptional(task.WorktreePath, MaxWorktreePathCharacters, "worktree path");
             NormalizeOptional(task.WorktreeBranch, MaxWorktreeBranchCharacters, "worktree branch");
             var hasRepositoryRoot = task.WorktreeRepositoryRoot is not null;
@@ -368,13 +316,6 @@ public sealed class AgentTaskArtifactStore
         return Normalize(value, maxLength, label);
     }
 
-    private static string NormalizeEnvironment(string? value)
-    {
-        var normalized = string.IsNullOrWhiteSpace(value) ? AgentTaskEnvironments.Local : value.Trim().ToLowerInvariant();
-        if (!AgentTaskEnvironments.IsSupported(normalized)) throw new ArgumentException("The task execution environment is unsupported.", nameof(value));
-        return normalized;
-    }
-
     private static List<string> NormalizeIds(IEnumerable<string>? values)
     {
         var result = (values ?? []).Select(value => Normalize(value, 128, "task dependency ID")).Distinct(StringComparer.Ordinal).ToList();
@@ -389,74 +330,22 @@ public sealed class AgentTaskArtifactStore
         return result;
     }
 
-    private static List<AgentTaskWorkspaceChange> NormalizeWorkspaceChanges(IEnumerable<AgentTaskWorkspaceChange>? values)
-    {
-        var result = (values ?? [])
-            .Take(MaxWorkspaceChanges + 1)
-            .Select(change => new AgentTaskWorkspaceChange
-            {
-                RelativePath = Normalize(change.RelativePath, 512, "workspace change path"),
-                Content = NormalizeContent(change.Content, "workspace change content"),
-                BaseHash = NormalizeHashOptional(change.BaseHash, "workspace change base hash"),
-                AppliedHash = NormalizeHashOptional(change.AppliedHash, "workspace change applied hash"),
-                UndoId = NormalizeOptional(change.UndoId, 128, "workspace change undo ID")
-            })
-            .ToList();
-        if (result.Count > MaxWorkspaceChanges) throw new ArgumentException($"A task can have at most {MaxWorkspaceChanges} workspace changes.");
-        if (result.Select(change => change.RelativePath).Distinct(StringComparer.OrdinalIgnoreCase).Count() != result.Count)
-            throw new ArgumentException("A task cannot contain duplicate workspace change paths.");
-        return result;
-    }
-
-    private static List<AgentTaskWorkspaceCommand> NormalizeWorkspaceCommands(IEnumerable<AgentTaskWorkspaceCommand>? values)
-    {
-        var result = (values ?? [])
-            .Take(MaxWorkspaceCommands + 1)
-            .Select(command => new AgentTaskWorkspaceCommand
-            {
-                RelativeWorkingDirectory = Normalize(command.RelativeWorkingDirectory, 512, "workspace command directory"),
-                Command = Normalize(command.Command, MaxWorkspaceCommandCharacters, "workspace command"),
-                TimeoutSeconds = Math.Clamp(command.TimeoutSeconds, 1, (int)WorkspaceCommandRunner.MaxTimeout.TotalSeconds)
-            })
-            .ToList();
-        if (result.Count > MaxWorkspaceCommands) throw new ArgumentException($"A task can have at most {MaxWorkspaceCommands} workspace commands.");
-        return result;
-    }
-
-    private static string NormalizeContent(string value, string label)
-    {
-        if (value is null || value.Length == 0 || value.Length > WorkspaceFileEditor.MaxCharacters || value.Contains('\0'))
-            throw new ArgumentException($"The {label} is invalid.", label);
-        return value;
-    }
-
     private static AgentTaskArtifact Copy(AgentTaskArtifact source) => new()
     {
         Id = source.Id,
         ParentRunId = source.ParentRunId,
-        ProjectId = source.ProjectId,
-        Environment = source.Environment,
         Title = source.Title,
         Instruction = source.Instruction,
         Role = source.Role,
         Status = source.Status,
+        RequiresApproval = source.RequiresApproval,
         DependsOn = source.DependsOn.ToList(),
         ResultSummary = source.ResultSummary,
         ArtifactLabels = source.ArtifactLabels.ToList(),
-        WorkspaceChanges = source.WorkspaceChanges.Select(change => new AgentTaskWorkspaceChange { RelativePath = change.RelativePath, Content = change.Content, BaseHash = change.BaseHash, AppliedHash = change.AppliedHash, UndoId = change.UndoId }).ToList(),
-        WorkspaceCommands = source.WorkspaceCommands.Select(command => new AgentTaskWorkspaceCommand { RelativeWorkingDirectory = command.RelativeWorkingDirectory, Command = command.Command, TimeoutSeconds = command.TimeoutSeconds }).ToList(),
         WorktreePath = source.WorktreePath,
         WorktreeBranch = source.WorktreeBranch,
         WorktreeRepositoryRoot = source.WorktreeRepositoryRoot,
         CreatedAtUtc = source.CreatedAtUtc,
         UpdatedAtUtc = source.UpdatedAtUtc
     };
-
-    private static string? NormalizeHashOptional(string? value, string label) => string.IsNullOrWhiteSpace(value) ? null : NormalizeHash(value, label);
-
-    private static string NormalizeHash(string value, string label)
-    {
-        if (value.Length != 64 || value.Any(character => !Uri.IsHexDigit(character))) throw new ArgumentException($"The {label} is invalid.", label);
-        return value.ToUpperInvariant();
-    }
 }

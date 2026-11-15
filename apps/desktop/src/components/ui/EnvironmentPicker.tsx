@@ -1,29 +1,26 @@
+import { useId } from "react";
 import type { TaskEnvironment } from "../../../shared/contracts";
 
 type EnvironmentPickerProps = {
   value: TaskEnvironment;
   onChange: (value: TaskEnvironment) => void;
-  hasProject?: boolean;
 };
 
 const environments: Array<{ id: TaskEnvironment; label: string; description: string }> = [
-  { id: "local", label: "Local", description: "Use the selected project for bounded context" },
-  { id: "worktree", label: "Worktree", description: "Create an isolated Git workspace after approval" },
+  { id: "local", label: "Local", description: "Edit the selected project directly" },
 ];
 
-export function EnvironmentPicker({ value, onChange, hasProject = false }: EnvironmentPickerProps) {
+export function EnvironmentPicker({ value, onChange }: EnvironmentPickerProps) {
+  const groupId = useId();
+  const noteId = `${groupId}-note`;
   return <fieldset className="environment-picker">
-    <legend>Run this task in</legend>
+    <legend id={`${groupId}-legend`}>Run this task in</legend>
     <div className="environment-options">
-      {environments.map((environment) => {
-        const available = environment.id === "local" || hasProject;
-        return <label className={`environment-option ${value === environment.id ? "is-selected" : ""} ${!available ? "is-unavailable" : ""}`} key={environment.id}>
-        <input type="radio" name="task-environment" value={environment.id} checked={value === environment.id} disabled={!available} onChange={() => onChange(environment.id)} />
+      {environments.map((environment) => <label className={`environment-option ${value === environment.id ? "is-selected" : ""}`} key={environment.id}>
+        <input type="radio" name={groupId} value={environment.id} checked={value === environment.id} aria-describedby={noteId} onChange={() => onChange(environment.id)} />
         <span className="environment-option-copy"><strong>{environment.label}</strong><small>{environment.description}</small></span>
-        {!available && <span className="environment-status">Select project</span>}
-      </label>;
-      })}
+      </label>)}
     </div>
-    <p className="environment-note">Worktree requires a selected Git project and keeps the isolated branch until you explicitly release it.</p>
+    <p className="environment-note" id={noteId}>Local is the only configured execution environment. Selecting it keeps the task plan bounded to this project.</p>
   </fieldset>;
 }

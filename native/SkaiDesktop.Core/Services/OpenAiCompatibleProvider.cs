@@ -1,7 +1,7 @@
 // HTTP client for OpenAI-compatible chat servers: streams /chat/completions (SSE)
 // and lists /models. Also shapes image attachments for vision models.
 // Depends on: AppSettings, ChatMessage, ChatAttachmentPolicy, BoundedHttpContent.
-// Used by: MainPage chat sending, connection check, prompt rewrite, and model benchmarks.
+// Used by: Agent Host chat, connection checks, prompt rewriting, and model benchmarks.
 
 using System.Net.Http.Json;
 using System.Text;
@@ -11,7 +11,7 @@ using SkaiDesktop.Core.Models;
 
 namespace SkaiDesktop.Core.Services;
 
-/// <summary>Transport for local and explicitly authorized HTTPS OpenAI-compatible servers.</summary>
+/// <summary>Transport for local and compatible chat-completions servers.</summary>
 public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
 {
     private const int MaxMessages = 500;
@@ -257,10 +257,12 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
 
     private static Uri BuildBaseUri(string endpoint)
     {
-        if (!ProviderRoutePolicy.IsAllowed(endpoint))
-            throw new InvalidOperationException("Skai Desktop accepts loopback endpoints or explicit HTTPS cloud endpoints without embedded credentials, queries, or URL fragments.");
-        if (!Uri.TryCreate(endpoint.Trim().TrimEnd('/'), UriKind.Absolute, out var uri) || uri is null)
-            throw new InvalidOperationException("The model endpoint is invalid.");
+        if (!Uri.TryCreate(endpoint.Trim().TrimEnd('/'), UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || !uri.IsLoopback
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Fragment))
+            throw new InvalidOperationException("Skai Desktop only accepts a local loopback model endpoint without embedded credentials or a URL fragment.");
         return uri;
     }
 

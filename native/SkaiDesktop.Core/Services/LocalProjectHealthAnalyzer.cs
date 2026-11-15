@@ -1,7 +1,7 @@
 // Offline project health scan (added on main): walks the selected project folders with hard
 // limits, skips links/reparse points, and reports manifests, entry points, and risk markers
 // (TODOs, secret-looking strings, very large UI files) as a compact Markdown report.
-// Depends on: nothing in Core. Used by: MainPage.ProjectHealth.cs (/health, /map, More menu).
+// Depends on: nothing in Core. Used by the Agent Host project-health protocol.
 
 using System.Text;
 

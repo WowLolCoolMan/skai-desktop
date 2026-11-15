@@ -1,12 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { PetWindowApp } from "./components/overlays/PetWindowApp";
+import { PetWindow } from "./components/overlays/PetWindow";
 import "./design-system/tokens.css";
 import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {window.location.hash === "#pet" ? <PetWindowApp /> : <App />}
+    {new URLSearchParams(window.location.search).get("pet") === "1" ? <PetWindow /> : <App />}
   </StrictMode>,
 );

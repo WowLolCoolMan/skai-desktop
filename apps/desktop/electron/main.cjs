@@ -1,9 +1,29 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, Tray } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const readline = require("node:readline");
+const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
+const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
+
+// Chromium fixes its display backend before any of this file runs, and
+// app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
+// browser stays on Wayland while the GPU process starts on X11 and segfaults.
+// The launchers (scripts/launch-electron.cjs) pass the flag up front; for any
+// other entry point (packaged binary, `electron .`, desktop files) relaunch
+// once with the flag. resolveDisplayBackend() returns no switch when the flag
+// is already present, so this cannot loop.
+const displayBackend = resolveDisplayBackend();
+const relaunchingForDisplayBackend = Boolean(displayBackend.switchValue);
+if (relaunchingForDisplayBackend) {
+  const optOut = displayBackend.switchValue === "x11" ? "; set SKAI_OZONE_PLATFORM=wayland to keep native Wayland" : "";
+  console.log(`[windowing] relaunching with --ozone-platform=${displayBackend.switchValue} (${displayBackend.reason})${optOut}.`);
+  app.relaunch({ args: [...process.argv.slice(1), `--ozone-platform=${displayBackend.switchValue}`] });
+  app.exit(0);
+}
+const windowPositioningAvailable = canPositionWindows(displayBackend);
+if (process.platform === "linux" && !relaunchingForDisplayBackend) console.log(`[windowing] display backend: ${displayBackend.backend} (${displayBackend.reason})`);
 
 const repoRoot = path.resolve(__dirname, "../../..");
 const hostProject = path.join(repoRoot, "services", "agent-host", "ServerRock.AgentHost.csproj");
@@ -19,44 +39,391 @@ let nextRequestId = 1;
 const pending = new Map();
 const standardRequestTimeoutMs = 30_000;
 const chatRequestTimeoutMs = 5 * 60_000;
-const longRunningMethods = new Set(["marketplace.models.download"]);
 const chatHostDeadlineSeconds = 285;
 let isQuitting = false;
 let mainWindow;
 let petWindow;
 let tray;
 let trayRefreshSequence = 0;
-let petDragging = false;
-let petDragOffset = { x: 0, y: 0 };
-let petActivity = "idle";
-let petWanderTimer;
-let petWanderTarget;
+let petReady = false;
+let petDragOffset = null;
+let petDragTimer;
+let petWanderPauseTimer;
+let petWanderStepTimer;
+let petWanderMoving = false;
+let petWanderWalk = null;
+let petWanderStartedAt = 0;
 let petWanderNextAt = 0;
-let petSettings = {
-  visible: false,
-  wander: false,
-  reduceMotion: false,
-  petId: "byte",
-  spritePath: "",
-  manifestPath: "",
-  // Dock the companion beside the global rail by default so it never obscures the chat canvas or composer.
-  position: { x: 72, y: 72 },
-};
-const petWindowSize = { width: 128, height: 146 };
-const petAssetLimitBytes = 8 * 1024 * 1024;
-const petManifestLimitBytes = 64 * 1024;
-const petAssetRoot = () => path.join(app.getPath("userData"), "pet-assets");
+let petWanderLayoutSignature = "";
+const petWanderPlanner = new PetWanderPlanner();
+let petMotion = { wander: true, reduceMotion: false };
+const pendingPetMessages = [];
+const PET_WINDOW_WIDTH = 220;
+const PET_WINDOW_HEIGHT = 190;
+const PET_WINDOW_MARGIN = 16;
 const attachmentTextExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".json", ".xml", ".yaml", ".yml", ".toml", ".html", ".htm", ".css", ".js", ".ts", ".jsx", ".tsx", ".cs", ".py", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".log"]);
 const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets"]);
+const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+let updateCheckTimer;
+
+const hasSingleInstanceLock = !relaunchingForDisplayBackend && app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => showMainWindow());
+}
 const isBlockedAttachmentName = (name) => blockedAttachmentNames.has(name.toLowerCase()) || name.toLowerCase().includes(".env.");
 const isPng = (bytes) => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 const isJpeg = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+function decodeDroppedAttachment(attachment) {
+  if (!attachment || typeof attachment.fileName !== "string" || typeof attachment.content !== "string") throw new Error("Dropped files must include a name and content.");
+  const rawName = attachment.fileName.trim();
+  const fileName = path.basename(rawName).slice(0, 240);
+  if (!fileName || fileName !== rawName || isBlockedAttachmentName(fileName)) throw new Error(`That file name cannot be attached: ${rawName.slice(0, 80)}.`);
+  if (attachment.content.length > 28_000_000 || attachment.content.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(attachment.content)) throw new Error(`The dropped file is not a valid local payload: ${fileName}`);
+  const extension = path.extname(fileName).toLowerCase();
+  const imageType = extension === ".png" ? "image/png" : [".jpg", ".jpeg"].includes(extension) ? "image/jpeg" : null;
+  const isPdf = extension === ".pdf";
+  if (!imageType && !isPdf && !attachmentTextExtensions.has(extension)) throw new Error(`That file type cannot be attached: ${fileName}`);
+  const bytes = Buffer.from(attachment.content, "base64");
+  if (bytes.length > (isPdf ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The dropped file is too large: ${fileName}`);
+  if (imageType) {
+    if (!(imageType === "image/png" ? isPng(bytes) : isJpeg(bytes))) throw new Error(`The dropped image is not valid: ${fileName}`);
+    return { fileName, mediaType: imageType, content: bytes.toString("base64"), byteLength: bytes.length, textLength: 0 };
+  }
+  if (isPdf) return { fileName, mediaType: null, content: bytes.toString("base64"), byteLength: bytes.length, textLength: 0 };
+  const content = bytes.toString("utf8").slice(0, 16_000);
+  return { fileName, mediaType: null, content, byteLength: bytes.length, textLength: content.length };
+}
 
-function sendTrayEvent(channel, payload) {
-  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return;
-  mainWindow.webContents.send(channel, payload);
+function petStatePath() {
+  return path.join(app.getPath("userData"), "pet-window.json");
+}
+
+function readPetState() {
+  try {
+    const parsed = JSON.parse(fsSync.readFileSync(petStatePath(), "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function petBounds() {
+  const stored = readPetState().bounds;
+  const width = PET_WINDOW_WIDTH;
+  const height = PET_WINDOW_HEIGHT;
+  const workArea = screen.getPrimaryDisplay().workArea;
+  if (!stored || ![stored.x, stored.y].every(Number.isFinite)) {
+    return { x: workArea.x + workArea.width - width - 28, y: workArea.y + workArea.height - height - 28, width, height };
+  }
+
+  // A saved position can outlive a monitor being disconnected. Keep Percy
+  // recoverable instead of creating an invisible companion window.
+  const display = screen.getAllDisplays().find(({ workArea: area }) => stored.x < area.x + area.width && stored.x + width > area.x && stored.y < area.y + area.height && stored.y + height > area.y) ?? screen.getPrimaryDisplay();
+  const area = display.workArea;
+  return {
+    x: Math.min(Math.max(stored.x, area.x + PET_WINDOW_MARGIN), area.x + area.width - width - PET_WINDOW_MARGIN),
+    y: Math.min(Math.max(stored.y, area.y + PET_WINDOW_MARGIN), area.y + area.height - height - PET_WINDOW_MARGIN),
+    width,
+    height,
+  };
+}
+
+function stopPetWander() {
+  if (petWanderPauseTimer) clearTimeout(petWanderPauseTimer);
+  if (petWanderStepTimer) clearTimeout(petWanderStepTimer);
+  petWanderPauseTimer = undefined;
+  petWanderStepTimer = undefined;
+  petWanderWalk = null;
+  petWanderMoving = false;
+}
+
+function stopPetDrag() {
+  if (petDragTimer) clearInterval(petDragTimer);
+  petDragTimer = undefined;
+  petDragOffset = null;
+}
+
+function petWorkArea() {
+  if (!petWindow || petWindow.isDestroyed()) return screen.getPrimaryDisplay().workArea;
+  const bounds = petWindow.getBounds();
+  return screen.getDisplayNearestPoint({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }).workArea;
+}
+
+function clampPetPosition(point) {
+  const area = screen.getDisplayNearestPoint(point).workArea;
+  const grid = new PetWanderGrid(area.width, area.height, { x: PET_WINDOW_WIDTH, y: PET_WINDOW_HEIGHT }, PET_WINDOW_MARGIN);
+  const position = grid.clampPetPosition({ x: point.x - area.x, y: point.y - area.y });
+  return {
+    x: Math.round(area.x + position.x),
+    y: Math.round(area.y + position.y),
+  };
+}
+
+function petWanderLayout() {
+  const area = petWorkArea();
+  const bounds = petWindow?.getBounds() ?? { x: area.x + area.width - PET_WINDOW_WIDTH - PET_WINDOW_MARGIN, y: area.y + area.height - PET_WINDOW_HEIGHT - PET_WINDOW_MARGIN };
+  const grid = new PetWanderGrid(area.width, area.height, { x: PET_WINDOW_WIDTH, y: PET_WINDOW_HEIGHT }, PET_WINDOW_MARGIN);
+  // This is a desktop-wide companion. Keep the contributed grid authoritative
+  // for bounds and neighboring-cell movement without treating a maximized
+  // main window as an obstacle that would block every cell.
+  return { area, bounds, grid, blocked: new Set() };
+}
+
+function schedulePetWander() {
+  if (!windowPositioningAvailable) return;
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+  if (petWanderPauseTimer || petWanderStepTimer) return;
+  const delay = Math.max(0, petWanderNextAt - Date.now()) || 1800 + Math.round(Math.random() * 2600);
+  petWanderPauseTimer = setTimeout(() => {
+    petWanderPauseTimer = undefined;
+    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+    startPetWander();
+  }, delay);
+}
+
+function startPetWander() {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+  const { area, bounds, grid, blocked } = petWanderLayout();
+  const signature = `${area.x}:${area.y}:${area.width}:${area.height}`;
+  const relative = grid.clampPetPosition({ x: bounds.x - area.x, y: bounds.y - area.y });
+  const plan = petWanderPlanner.tryPlanWalk(grid.cellForPetPosition(relative), blocked);
+  if (!plan.planned || plan.path.length === 0) {
+    petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
+    petWanderLayoutSignature = signature;
+    schedulePetWander();
+    return;
+  }
+  const walk = new PetWalk(relative, plan.path.map((cell) => grid.petPositionFor(cell)), 90);
+  if (walk.length < 1) {
+    petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
+    schedulePetWander();
+    return;
+  }
+  petWanderWalk = walk;
+  petWanderStartedAt = Date.now();
+  petWanderLayoutSignature = signature;
+  movePetTowardTarget();
+}
+
+function movePetTowardTarget() {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petWanderWalk || !petMotion.wander || petMotion.reduceMotion || petDragOffset) {
+    petWanderStepTimer = undefined;
+    petWanderMoving = false;
+    return;
+  }
+  const { area, grid } = petWanderLayout();
+  const signature = `${area.x}:${area.y}:${area.width}:${area.height}`;
+  if (signature !== petWanderLayoutSignature) {
+    petWanderWalk = null;
+    petWanderStepTimer = undefined;
+    petWanderMoving = false;
+    petWanderNextAt = Date.now() + 250;
+    schedulePetWander();
+    return;
+  }
+  const elapsed = (Date.now() - petWanderStartedAt) / 1000;
+  const position = grid.clampPetPosition(petWanderWalk.positionAt(elapsed));
+  petWanderMoving = true;
+  petWindow.setPosition(Math.round(area.x + position.x), Math.round(area.y + position.y));
+  if (petWanderWalk.isFinished(elapsed)) {
+    petWanderWalk = null;
+    petWanderMoving = false;
+    petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
+    petWanderStepTimer = undefined;
+    schedulePetWander();
+    return;
+  }
+  petWanderStepTimer = setTimeout(movePetTowardTarget, 55);
+}
+
+function persistPetState() {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const state = readPetState();
+  state.visible = petWindow.isVisible();
+  // getBounds() reports 0,0 on native Wayland; keep the last real position.
+  if (windowPositioningAvailable) state.bounds = petWindow.getBounds();
+  void fs.mkdir(app.getPath("userData"), { recursive: true }).then(() => fs.writeFile(petStatePath(), JSON.stringify(state, null, 2), "utf8")).catch(() => {});
+}
+
+function movePetWithCursor() {
+  if (!petWindow || petWindow.isDestroyed() || !petDragOffset) return;
+  const cursor = screen.getCursorScreenPoint();
+  const position = clampPetPosition({ x: cursor.x - petDragOffset.x, y: cursor.y - petDragOffset.y });
+  const bounds = petWindow.getBounds();
+  if (bounds.x !== position.x || bounds.y !== position.y) petWindow.setPosition(position.x, position.y);
+}
+
+function sendPetVisibility(visible) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("pet:visibility", visible);
+}
+
+function setPetVisible(visible) {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  if (visible) {
+    petWindow.showInactive();
+    schedulePetWander();
+  } else {
+    stopPetWander();
+    petWindow.hide();
+  }
+  if (visible && petReady) flushPetMessages();
+  persistPetState();
+  sendPetVisibility(visible);
+  void refreshTrayMenu();
+}
+
+function flushPetMessages() {
+  if (!petWindow || petWindow.isDestroyed() || !petReady || !petWindow.isVisible()) return;
+  for (const event of pendingPetMessages.splice(0)) petWindow.webContents.send("pet:message", event);
+}
+
+function sendPetMessage(text, kind = "success") {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const event = { text, kind, at: Date.now() };
+  if (!petReady) {
+    pendingPetMessages.push(event);
+    while (pendingPetMessages.length > 3) pendingPetMessages.shift();
+    return;
+  }
+  if (!petWindow.isVisible()) {
+    pendingPetMessages.push(event);
+    while (pendingPetMessages.length > 3) pendingPetMessages.shift();
+    return;
+  }
+  petWindow.webContents.send("pet:message", event);
+}
+
+function petTaskLabel(method) {
+  const labels = {
+    "chat.complete": "The local reply",
+    "project.save": "The local project save",
+    "project.file.write": "The reviewed file save",
+    "project.file.undo": "The file restore",
+    "project.command.run": "The local project command",
+    "tasks.plan": "The local task plan",
+    "tasks.queue": "The local task queue",
+    "tasks.execute": "The local task execution",
+    "tasks.retry": "The local task retry",
+    "tasks.cancel": "The local task stop",
+    "scheduled.create": "The local schedule",
+    "scheduled.pause": "The scheduled task pause",
+    "scheduled.resume": "The scheduled task resume",
+    "scheduled.cancel": "The scheduled task cancellation",
+    "scheduled.runNow": "The scheduled task run",
+    "memory.save": "The approved memory note",
+    "image.generate": "The local image workflow",
+  };
+  return labels[method] ?? null;
+}
+
+function petCompletionText(method, response) {
+  const task = petTaskLabel(method);
+  if (!task) return null;
+  if (!response?.ok) return { text: `${task} needs attention. Open Skai for details.`, kind: "error" };
+  const messages = {
+    "chat.complete": "Finished your local reply.",
+    "project.save": "Saved the local project.",
+    "project.file.write": "Saved the reviewed file.",
+    "project.file.undo": "Restored the previous file version.",
+    "project.command.run": "Finished the local project command.",
+    "tasks.plan": "Created a local task plan.",
+    "tasks.queue": "Queued the local task.",
+    "tasks.execute": "Started the local task execution.",
+    "tasks.retry": "Retried the local task.",
+    "tasks.cancel": "Stopped the local task.",
+    "scheduled.create": "Scheduled the local task for review.",
+    "scheduled.pause": "Paused the local scheduled task.",
+    "scheduled.resume": "Resumed the local scheduled task.",
+    "scheduled.cancel": "Canceled the scheduled local task.",
+    "scheduled.runNow": "Marked the local scheduled task due.",
+    "memory.save": "Saved the approved memory note.",
+    "image.generate": "Finished the local image workflow.",
+  };
+  const text = messages[method];
+  return text ? { text, kind: "success" } : null;
+}
+
+// X11 sessions without a compositor (plain i3/bspwm/Openbox) cannot show transparent
+// windows; Percy would be a black box there, so it gets an opaque card instead.
+let petOpaque = false;
+async function resolvePetSurface() {
+  if (process.platform !== "linux" || displayBackend.backend !== "x11" || isWaylandSession(process.env)) return;
+  const composited = await x11HasCompositor();
+  petOpaque = composited === false;
+  if (petOpaque) console.log("[windowing] no X11 compositor detected; Percy uses an opaque window.");
+}
+
+function createPetWindow() {
+  if (petWindow && !petWindow.isDestroyed()) return petWindow;
+  const savedState = readPetState();
+  petReady = false;
+  petWindow = new BrowserWindow({
+    // Native Wayland ignores client-chosen positions; let the compositor place it.
+    ...(windowPositioningAvailable ? petBounds() : { width: PET_WINDOW_WIDTH, height: PET_WINDOW_HEIGHT }),
+    // _NET_WM_WINDOW_TYPE_TOOLBAR makes tiling X11 window managers (i3, bspwm,
+    // awesome, and Hyprland/Sway for XWayland clients) float Percy instead of
+    // tiling it into the layout.
+    ...(process.platform === "linux" ? { type: "toolbar" } : {}),
+    title: "Percy · Skai companion",
+    transparent: !petOpaque,
+    frame: false,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    closable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    backgroundColor: petOpaque ? "#10141d" : "#00000000",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, "preload.cjs"),
+    },
+  });
+  petWindow.setAlwaysOnTop(true, "floating");
+  petWindow.on("moved", () => { if (!petWanderMoving) persistPetState(); });
+  petWindow.webContents.on("did-finish-load", () => {
+    petReady = true;
+    flushPetMessages();
+  });
+  // Window managers can close Percy directly (Hyprland/i3 close-window keybinds
+  // ignore `closable: false`). Treat that as "hide Percy" so the tray and
+  // Settings can bring it back, instead of destroying the window for the session.
+  petWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    setPetVisible(false);
+  });
+  petWindow.on("closed", () => { petReady = false; stopPetDrag(); petWindow = undefined; });
+  if (typeof petWindow.setVisibleOnAllWorkspaces === "function") {
+    petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
+  // On native Wayland, dragging is handed to the compositor (app-region drag →
+  // xdg_toplevel.move) because the app can neither read nor set its position.
+  const petQuery = { pet: "1", ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
+  const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
+  if (devUrl) {
+    const url = new URL(devUrl);
+    for (const [key, value] of Object.entries(petQuery)) url.searchParams.set(key, value);
+    void petWindow.loadURL(url.toString());
+  } else {
+    void petWindow.loadFile(path.join(rendererRoot, "dist", "index.html"), { query: petQuery });
+  }
+  petWindow.once("ready-to-show", () => {
+    persistPetState();
+    if (savedState.visible !== false) {
+      petWindow?.showInactive();
+      schedulePetWander();
+    }
+  });
+  return petWindow;
 }
 
 function showMainWindow() {
@@ -67,91 +434,157 @@ function showMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
-  syncPetWindowPosition();
 }
 
-function hideMainWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.hide();
+function sendTrayEvent(eventName, value) {
+  showMainWindow();
+  const send = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(eventName, value);
+  };
+  if (mainWindow?.webContents.isLoading()) mainWindow.webContents.once("did-finish-load", send);
+  else setTimeout(send, 0);
 }
 
 function resolveTrayIconPath() {
-  const candidates = [
-    path.join(runtimeRoot, "assets", "branding", "skaiwolficon.png"),
-    path.join(repoRoot, "assets", "branding", "skaiwolficon.png"),
-    path.join(process.resourcesPath, "app", "assets", "branding", "skaiwolficon.png"),
-  ];
-  return candidates.find((candidate) => fsSync.existsSync(candidate));
+  const direct = resolveAppIconPath();
+  if (direct && fsSync.existsSync(direct)) return direct;
+  const distAssets = path.join(rendererRoot, "dist", "assets");
+  try {
+    const file = fsSync.readdirSync(distAssets).find((candidate) => candidate.startsWith("skaiwolficon") && candidate.endsWith(".png"));
+    return file ? path.join(distAssets, file) : null;
+  } catch {
+    return null;
+  }
 }
 
-function createTrayIcon() {
-  const iconPath = resolveTrayIconPath();
-  if (!iconPath) return nativeImage.createEmpty();
-  const icon = nativeImage.createFromPath(iconPath);
-  return icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 });
+function resolveAppIconPath() {
+  const direct = path.join(runtimeRoot, "assets", "branding", "skaiwolficon.png");
+  if (fsSync.existsSync(direct)) return direct;
+  const packaged = path.join(rendererRoot, "dist", "assets");
+  try {
+    const file = fsSync.readdirSync(packaged).find((candidate) => candidate.startsWith("skaiwolficon") && candidate.endsWith(".png"));
+    return file ? path.join(packaged, file) : null;
+  } catch {
+    return null;
+  }
 }
 
-async function recentTrayConversations() {
-  const response = await requestAgent("conversations.list", { includeArchived: false });
-  if (!response.ok || !Array.isArray(response.result)) return [];
-  return response.result
-    .filter((conversation) => conversation && typeof conversation.id === "string" && typeof conversation.title === "string")
-    .slice(0, 8)
-    .map((conversation) => ({ id: conversation.id, title: conversation.title.trim() || "Untitled chat" }));
+function recentConversationMenuItems(conversations) {
+  if (!conversations.length) return [{ label: "No recent chats", enabled: false }];
+  return conversations.slice(0, 8).map((conversation) => {
+    const title = String(conversation.title || "Untitled chat").replace(/\s+/g, " ").trim().slice(0, 72) || "Untitled chat";
+    const project = conversation.projectName ? ` · ${String(conversation.projectName).slice(0, 28)}` : "";
+    return { label: `${title}${project}`, click: () => sendTrayEvent("tray:open-conversation", String(conversation.id)) };
+  });
 }
 
-async function refreshTrayMenu() {
+function setTrayMenu(conversations = []) {
   if (!tray || tray.isDestroyed()) return;
-  const sequence = ++trayRefreshSequence;
-  const conversations = await recentTrayConversations().catch(() => []);
-  if (!tray || tray.isDestroyed() || sequence !== trayRefreshSequence) return;
-  const recentItems = conversations.length
-    ? conversations.map((conversation) => ({
-        label: conversation.title,
-        click: () => {
-          showMainWindow();
-          sendTrayEvent("tray:open-conversation", conversation.id);
-        },
-      }))
-    : [{ label: "No recent chats", enabled: false }];
+  const petVisible = Boolean(petWindow && !petWindow.isDestroyed() && petWindow.isVisible());
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Show Skai Desktop", click: showMainWindow },
-    { label: "New Chat", click: () => { showMainWindow(); sendTrayEvent("tray:new-chat"); } },
+    { label: "New chat", click: () => sendTrayEvent("tray:new-chat") },
     { type: "separator" },
-    { label: "Recent chats", submenu: recentItems },
+    { label: "Recent chats", submenu: recentConversationMenuItems(conversations) },
     { type: "separator" },
-    { label: petSettings.visible ? "Hide Percy" : "Show Percy", click: togglePetVisibility },
-    { label: "Open Marketplace", click: () => { showMainWindow(); sendTrayEvent("tray:navigate", "marketplace"); } },
+    { label: petVisible ? "Hide Percy" : "Show Percy", click: () => setPetVisible(!petVisible) },
     { type: "separator" },
-    { label: "Quit Skai Desktop", click: () => { isQuitting = true; app.quit(); } },
+    { label: "Quit Skai Desktop", click: () => app.quit() },
   ]));
 }
 
-function togglePetVisibility() {
-  petSettings.visible = !petSettings.visible;
-  if (petSettings.visible) {
-    createPetWindow();
-    petWindow?.setAlwaysOnTop(true, "floating");
-    petWindow?.showInactive();
-    configurePetWander();
-  } else {
-    stopPetWander();
-    petWindow?.hide();
-  }
-  sendTrayEvent("pet:visibility", petSettings.visible);
-  sendPetConfig();
-  void refreshTrayMenu();
+async function refreshTrayMenu(popUp = false) {
+  if (!tray || tray.isDestroyed()) return;
+  const sequence = ++trayRefreshSequence;
+  const response = await requestAgent("conversations.list", { includeArchived: false });
+  if (sequence !== trayRefreshSequence || !tray || tray.isDestroyed()) return;
+  const conversations = response.ok && Array.isArray(response.result) ? response.result : [];
+  setTrayMenu(conversations);
+  if (popUp && !isQuitting) tray.popUpContextMenu();
 }
 
-if (!hasSingleInstanceLock) {
-  app.quit();
-} else {
-  app.on("second-instance", () => showMainWindow());
+function createTray() {
+  if (tray && !tray.isDestroyed()) return tray;
+  const iconPath = resolveTrayIconPath();
+  const source = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+  tray = new Tray(process.platform === "win32" ? source.resize({ width: 16, height: 16 }) : source);
+  tray.setToolTip("Skai Desktop");
+  setTrayMenu();
+  tray.on("click", showMainWindow);
+  tray.on("right-click", () => { void refreshTrayMenu(true); });
+  tray.on("double-click", showMainWindow);
+  void refreshTrayMenu();
+  return tray;
 }
+
+function parseReleaseVersion(value) {
+  const match = String(value ?? "").replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/);
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+}
+
+function isNewerRelease(candidate, current) {
+  const next = parseReleaseVersion(candidate);
+  const installed = parseReleaseVersion(current);
+  if (!next || !installed) return false;
+  for (let index = 0; index < next.length; index += 1) {
+    if (next[index] !== installed[index]) return next[index] > installed[index];
+  }
+  return false;
+}
+
+function updateAssetForPlatform(assets = []) {
+  const name = process.platform === "win32" ? "win-x64.zip" : process.platform === "linux" ? "linux-x64.tar.gz" : null;
+  if (!name) return null;
+  return assets.find((asset) => String(asset?.name ?? "").toLowerCase().endsWith(name)) ?? null;
+}
+
+async function checkForUpdates() {
+  const currentVersion = app.getVersion();
+  const releaseUrl = `https://github.com/${UPDATE_REPOSITORY}/releases/latest`;
+  try {
+    const response = await fetch(`https://api.github.com/repos/${UPDATE_REPOSITORY}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "Skai-Desktop-Update-Checker" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (response.status === 404) return { available: false, currentVersion, channel: "stable", releaseUrl, checkedAt: new Date().toISOString(), message: "No stable release has been published yet." };
+    if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}.`);
+    const release = await response.json();
+    const version = String(release.tag_name ?? "");
+    const asset = updateAssetForPlatform(release.assets);
+    const available = isNewerRelease(version, currentVersion);
+    return {
+      available,
+      currentVersion,
+      version: version.replace(/^v/i, ""),
+      channel: release.prerelease ? "preview" : "stable",
+      releaseUrl: String(release.html_url || releaseUrl),
+      downloadUrl: asset?.browser_download_url ?? String(release.html_url || releaseUrl),
+      assetName: asset?.name ?? null,
+      publishedAt: release.published_at ?? null,
+      checkedAt: new Date().toISOString(),
+      message: available ? `Skai Desktop ${version} is ready.` : "You are running the latest stable version.",
+    };
+  } catch (error) {
+    return { available: false, currentVersion, channel: "stable", releaseUrl, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : "Update check failed.", message: "Update check could not reach GitHub." };
+  }
+}
+
+function scheduleUpdateCheck() {
+  if (updateCheckTimer) clearInterval(updateCheckTimer);
+  void checkForUpdates().then((result) => {
+    if (result.available && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", result);
+  });
+  updateCheckTimer = setInterval(() => {
+    void checkForUpdates().then((result) => {
+      if (result.available && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", result);
+    });
+  }, UPDATE_CHECK_INTERVAL_MS);
+}
+
 const allowedMethods = new Set([
-  "runtime.health", "models.list", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
-  "scheduled.list", "tasks.plan", "tasks.queue", "tasks.approve", "tasks.deny", "tasks.cancel", "tasks.retry", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
-  "settings.save", "credentials.status", "credentials.save", "credentials.clear", "image.generate", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.speak.cloud", "voice.stop", "marketplace.models.search", "marketplace.models.download", "marketplace.skills.search", "marketplace.skills.inspect", "marketplace.skills.remote.preview", "marketplace.skills.remote.install", "marketplace.tools.list", "marketplace.mcp.list", "skills.installed.list", "skills.installed.inspect", "skills.installed.remove", "skills.local.preview", "skills.local.install", "skills.enabled.set", "skills.rollback",
+  "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
+  "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
+  "settings.save", "image.generate", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
@@ -177,6 +610,8 @@ function startAgentHost() {
     if (!entry) return;
     pending.delete(message.id);
     clearTimeout(entry.timer);
+    const completion = petCompletionText(entry.method, message);
+    if (completion) sendPetMessage(completion.text, completion.kind);
     entry.resolve(message);
   });
 
@@ -189,6 +624,8 @@ function startAgentHost() {
     hostReader?.close();
     for (const entry of pending.values()) {
       clearTimeout(entry.timer);
+      const completion = petCompletionText(entry.method, error);
+      if (completion) sendPetMessage(completion.text, completion.kind);
       entry.resolve(error);
     }
     pending.clear();
@@ -237,261 +674,38 @@ function requestAgent(method, params) {
     return Promise.resolve({ v: 1, ok: false, error: { code: "INVALID_PARAMS", message: "Agent parameters must be an object." } });
   }
   if (!host || host.stdin.destroyed) {
-    return Promise.resolve({ v: 1, ok: false, error: { code: "HOST_UNAVAILABLE", message: "Agent host is not running." } });
+    const response = { v: 1, ok: false, error: { code: "HOST_UNAVAILABLE", message: "Agent host is not running." } };
+    const completion = petCompletionText(method, response);
+    if (completion) sendPetMessage(completion.text, completion.kind);
+    return Promise.resolve(response);
   }
   const id = `desktop-${nextRequestId++}`;
   const requestParams = method === "chat.complete"
     ? { ...params, timeoutSeconds: chatHostDeadlineSeconds }
     : params;
   return new Promise((resolve) => {
-    const timeoutMs = method === "chat.complete" ? chatRequestTimeoutMs : longRunningMethods.has(method) ? 50 * 60_000 : standardRequestTimeoutMs;
+    const timeoutMs = method === "chat.complete" ? chatRequestTimeoutMs : standardRequestTimeoutMs;
     const timer = setTimeout(() => {
       if (!pending.has(id)) return;
       pending.delete(id);
-      resolve({ v: 1, ok: false, error: { code: "HOST_TIMEOUT", message: `The local agent host did not answer ${method} within the allowed time.` } });
+      const response = { v: 1, ok: false, error: { code: "HOST_TIMEOUT", message: `The local agent host did not answer ${method} within the allowed time.` } };
+      const completion = petCompletionText(method, response);
+      if (completion) sendPetMessage(completion.text, completion.kind);
+      resolve(response);
       restartAgentHost();
     }, timeoutMs);
-    pending.set(id, { resolve, timer });
+    pending.set(id, { resolve, timer, method });
     try {
       host.stdin.write(`${JSON.stringify({ v: 1, id, method, params: requestParams })}\n`);
     } catch {
       clearTimeout(timer);
       pending.delete(id);
-      resolve({ v: 1, ok: false, error: { code: "HOST_WRITE_FAILED", message: "The local agent host could not accept the request." } });
+      const response = { v: 1, ok: false, error: { code: "HOST_WRITE_FAILED", message: "The local agent host could not accept the request." } };
+      const completion = petCompletionText(method, response);
+      if (completion) sendPetMessage(completion.text, completion.kind);
+      resolve(response);
     }
   });
-}
-
-const allowedPetIds = new Set(["byte", "percy", "rocky", "sprout", "nova", "ember", "custom"]);
-const allowedPetActivities = new Set(["idle", "walking", "thinking", "coding", "working", "success", "error"]);
-
-function boundedText(value, fallback = "", max = 2_000) {
-  if (typeof value !== "string" || value.length > max || value.includes("\0") || [...value].some((character) => character.charCodeAt(0) < 32 && character !== "\r" && character !== "\n" && character !== "\t")) return fallback;
-  return value.trim();
-}
-
-function sanitizePetSettings(value) {
-  const input = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const position = input.position && typeof input.position === "object" ? input.position : {};
-  return {
-    visible: input.visible !== false,
-    wander: input.wander !== false,
-    reduceMotion: input.reduceMotion === true,
-    petId: allowedPetIds.has(input.petId) ? input.petId : "byte",
-    spritePath: boundedText(input.spritePath, "", 1_024),
-    manifestPath: boundedText(input.manifestPath, "", 1_024),
-    position: {
-      x: Number.isFinite(position.x) ? Math.round(position.x) : petSettings.position.x,
-      y: Number.isFinite(position.y) ? Math.round(position.y) : petSettings.position.y,
-    },
-  };
-}
-
-function isWithin(directory, candidate) {
-  const root = path.resolve(directory);
-  const resolved = path.resolve(candidate);
-  const relative = path.relative(root, resolved);
-  return relative === "" || (relative && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
-}
-
-function petMimeType(filePath) {
-  const extension = path.extname(filePath).toLowerCase();
-  return extension === ".png" ? "image/png" : extension === ".jpg" || extension === ".jpeg" ? "image/jpeg" : extension === ".webp" ? "image/webp" : null;
-}
-
-function validatePetManifest(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("The pet manifest must be a JSON object.");
-  const frameWidth = Number(value.frameWidth);
-  const frameHeight = Number(value.frameHeight);
-  const columns = Number(value.columns);
-  const rows = Number(value.rows);
-  if (![frameWidth, frameHeight, columns, rows].every(Number.isInteger) || frameWidth < 8 || frameWidth > 2_048 || frameHeight < 8 || frameHeight > 2_048 || columns < 1 || columns > 32 || rows < 1 || rows > 32) throw new Error("The pet manifest has invalid frame dimensions.");
-  const states = {};
-  if (!value.states || typeof value.states !== "object" || Array.isArray(value.states)) throw new Error("The pet manifest must define animation states.");
-  for (const [name, rawState] of Object.entries(value.states).slice(0, 24)) {
-    if (!/^[a-z][a-z0-9_-]{0,31}$/i.test(name) || !rawState || typeof rawState !== "object" || Array.isArray(rawState)) continue;
-    const row = Number(rawState.row);
-    const fps = Number(rawState.fps ?? 6);
-    const frames = Array.isArray(rawState.frames) ? rawState.frames.filter(Number.isInteger).slice(0, 32) : [];
-    if (!Number.isInteger(row) || row < 0 || row >= rows || !Number.isFinite(fps) || fps < 1 || fps > 30 || frames.length === 0 || frames.some((frame) => frame < 0 || frame >= columns)) continue;
-    states[name.toLowerCase()] = { row, frames, fps };
-  }
-  if (Object.keys(states).length === 0) throw new Error("The pet manifest does not contain a usable state.");
-  return { frameWidth, frameHeight, columns, rows, states };
-}
-
-async function readPetAssetData(filePath, maxBytes = petAssetLimitBytes) {
-  const root = petAssetRoot();
-  if (!filePath || !isWithin(root, filePath)) return null;
-  const stat = await fs.stat(filePath).catch(() => null);
-  if (!stat?.isFile() || stat.size > maxBytes) return null;
-  const bytes = await fs.readFile(filePath);
-  const mimeType = petMimeType(filePath);
-  if (!mimeType) return null;
-  return `data:${mimeType};base64,${bytes.toString("base64")}`;
-}
-
-async function readPetManifest(filePath) {
-  const root = petAssetRoot();
-  if (!filePath || !isWithin(root, filePath)) return undefined;
-  const stat = await fs.stat(filePath).catch(() => null);
-  if (!stat?.isFile() || stat.size > petManifestLimitBytes) return undefined;
-  const raw = await fs.readFile(filePath, "utf8");
-  return validatePetManifest(JSON.parse(raw));
-}
-
-async function buildPetWindowConfig() {
-  let customSpriteDataUrl;
-  let customManifest;
-  try { customSpriteDataUrl = await readPetAssetData(petSettings.spritePath); } catch { customSpriteDataUrl = undefined; }
-  try { customManifest = await readPetManifest(petSettings.manifestPath); } catch { customManifest = undefined; }
-  return { ...petSettings, activity: petActivity, alwaysOnTop: true, ...(customSpriteDataUrl ? { customSpriteDataUrl } : {}), ...(customManifest ? { customManifest } : {}) };
-}
-
-function mainWindowBounds() {
-  return mainWindow && !mainWindow.isDestroyed() ? mainWindow.getBounds() : null;
-}
-
-function clampPetPosition(position) {
-  const bounds = mainWindowBounds();
-  if (!bounds) return position;
-  // Keep the always-on-top companion in the rail/sidebar dock. Dragging and wandering
-  // remain available, but the pet must not cover the active workspace or composer.
-  const maxX = Math.max(12, Math.min(160, bounds.width - petWindowSize.width - 12));
-  const maxY = Math.max(56, Math.min(220, bounds.height - petWindowSize.height - 12));
-  return { x: Math.max(12, Math.min(Math.round(position.x), maxX)), y: Math.max(56, Math.min(Math.round(position.y), maxY)) };
-}
-
-function syncPetWindowPosition() {
-  if (!petWindow || petWindow.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) return;
-  const bounds = mainWindow.getBounds();
-  if (petSettings.position.x < 0 || petSettings.position.y < 0) petSettings.position = { x: 72, y: 72 };
-  petSettings.position = clampPetPosition(petSettings.position);
-  petWindow.setPosition(bounds.x + petSettings.position.x, bounds.y + petSettings.position.y, false);
-}
-
-function sendPetPosition() {
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("pet:position", petSettings.position);
-}
-
-function sendPetConfig() {
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.webContents) return;
-  void buildPetWindowConfig().then((config) => {
-    if (petWindow && !petWindow.isDestroyed()) petWindow.webContents.send("pet:config", config);
-  });
-}
-
-function stopPetWander() {
-  if (petWanderTimer) clearInterval(petWanderTimer);
-  petWanderTimer = undefined;
-  petWanderTarget = undefined;
-  petWanderNextAt = 0;
-  if (petActivity === "walking") {
-    petActivity = "idle";
-    sendPetConfig();
-  }
-}
-
-function stepPetWander() {
-  if (!petSettings.visible || !petSettings.wander || petSettings.reduceMotion || petDragging || petActivity !== "idle" || !petWindow || petWindow.isDestroyed()) return;
-  const bounds = mainWindowBounds();
-  if (!bounds) return;
-  const now = Date.now();
-  if (!petWanderTarget && now >= petWanderNextAt) {
-    const maxX = Math.max(12, Math.min(160, bounds.width - petWindowSize.width - 12));
-    const maxY = Math.max(56, Math.min(220, bounds.height - petWindowSize.height - 12));
-    petWanderTarget = { x: 12 + Math.random() * Math.max(1, maxX - 12), y: 56 + Math.random() * Math.max(1, maxY - 56) };
-    petActivity = "walking";
-    sendPetConfig();
-  }
-  if (!petWanderTarget) return;
-  const current = petSettings.position;
-  const dx = petWanderTarget.x - current.x;
-  const dy = petWanderTarget.y - current.y;
-  const distance = Math.max(1, Math.hypot(dx, dy));
-  if (distance < 4) {
-    petSettings.position = clampPetPosition(petWanderTarget);
-    petWanderTarget = undefined;
-    petWanderNextAt = now + 2_000 + Math.round(Math.random() * 4_000);
-    petActivity = "idle";
-    syncPetWindowPosition();
-    sendPetPosition();
-    sendPetConfig();
-    return;
-  }
-  const step = Math.min(distance, 3.2);
-  petSettings.position = clampPetPosition({ x: current.x + (dx / distance) * step, y: current.y + (dy / distance) * step });
-  syncPetWindowPosition();
-  sendPetPosition();
-}
-
-function configurePetWander() {
-  stopPetWander();
-  if (!petSettings.visible || !petSettings.wander || petSettings.reduceMotion) return;
-  petWanderNextAt = Date.now() + 2_000;
-  petWanderTimer = setInterval(stepPetWander, 120);
-}
-
-function createPetWindow() {
-  if (petWindow && !petWindow.isDestroyed()) return petWindow;
-  petWindow = new BrowserWindow({
-    width: petWindowSize.width,
-    height: petWindowSize.height,
-    minWidth: petWindowSize.width,
-    minHeight: petWindowSize.height,
-    maxWidth: petWindowSize.width,
-    maxHeight: petWindowSize.height,
-    frame: false,
-    transparent: true,
-    hasShadow: false,
-    resizable: false,
-    movable: false,
-    focusable: true,
-    skipTaskbar: true,
-    show: false,
-    alwaysOnTop: true,
-    backgroundColor: "#00000000",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      preload: path.join(__dirname, "preload.cjs"),
-    },
-  });
-  petWindow.setAlwaysOnTop(true, "floating");
-  petWindow.setMenuBarVisibility(false);
-  const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
-  if (devUrl) void petWindow.loadURL(`${devUrl}#pet`);
-  else void petWindow.loadFile(path.join(rendererRoot, "dist", "index.html"), { hash: "pet" });
-  petWindow.webContents.on("did-finish-load", () => { syncPetWindowPosition(); sendPetConfig(); if (petSettings.visible) petWindow.showInactive(); });
-  petWindow.on("closed", () => { petWindow = undefined; petDragging = false; });
-  return petWindow;
-}
-
-async function pickPetAsset(kind) {
-  if (kind !== "sprite" && kind !== "manifest") throw new Error("Unknown pet asset type.");
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ["openFile"],
-    filters: kind === "sprite"
-      ? [{ name: "Pet sprites", extensions: ["png", "jpg", "jpeg", "webp"] }]
-      : [{ name: "Pet manifests", extensions: ["json"] }],
-  });
-  if (result.canceled || !result.filePaths[0]) return null;
-  const sourcePath = result.filePaths[0];
-  const sourceStat = await fs.stat(sourcePath);
-  const maxBytes = kind === "manifest" ? petManifestLimitBytes : petAssetLimitBytes;
-  if (!sourceStat.isFile() || sourceStat.size > maxBytes) throw new Error(`The selected ${kind} is too large.`);
-  const destinationRoot = petAssetRoot();
-  await fs.mkdir(destinationRoot, { recursive: true });
-  const destination = kind === "manifest" ? path.join(destinationRoot, "custom-manifest.json") : path.join(destinationRoot, `custom-sprite${path.extname(sourcePath).toLowerCase()}`);
-  if (kind === "sprite") {
-    if (!petMimeType(sourcePath)) throw new Error("Choose a PNG, JPEG, or WebP sprite image.");
-    await fs.copyFile(sourcePath, destination);
-  } else {
-    const manifest = validatePetManifest(JSON.parse(await fs.readFile(sourcePath, "utf8")));
-    await fs.writeFile(destination, JSON.stringify(manifest, null, 2), "utf8");
-  }
-  return { path: destination, fileName: path.basename(sourcePath) };
 }
 
 function createWindow() {
@@ -501,6 +715,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: "#10141d",
+    icon: resolveAppIconPath() || undefined,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -512,21 +727,97 @@ function createWindow() {
   const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
   if (devUrl) mainWindow.loadURL(devUrl);
   else mainWindow.loadFile(path.join(rendererRoot, "dist", "index.html"));
-  mainWindow.on("move", syncPetWindowPosition);
-  mainWindow.on("resize", syncPetWindowPosition);
   mainWindow.on("close", (event) => {
     if (isQuitting) return;
     event.preventDefault();
-    hideMainWindow();
-    void refreshTrayMenu();
+    void handleMainWindowClose();
   });
-  mainWindow.on("closed", () => {
-    stopPetWander();
-    if (petWindow && !petWindow.isDestroyed()) petWindow.close();
-    mainWindow = undefined;
+  mainWindow.on("closed", () => { mainWindow = undefined; closePromptOpen = false; });
+  // A reload or renderer crash drops any open close prompt; let the next close ask again.
+  mainWindow.webContents.on("did-start-loading", () => { closePromptOpen = false; });
+  mainWindow.webContents.on("render-process-gone", () => { closePromptOpen = false; });
+}
+
+// --- Closing the main window -------------------------------------------------
+// Windows/macOS: closing hides Skai to the tray. Linux: window managers close
+// windows from keybindings (Hyprland/Sway/i3 "close window"), where silently
+// vanishing to a tray reads as a full quit, so Skai asks "Fully close" or "Run
+// in background" (remembered on request, changeable in Settings → General).
+const CLOSE_BEHAVIORS = new Set(["ask", "background", "quit"]);
+let closePromptOpen = false;
+
+function windowBehaviorPath() {
+  return path.join(app.getPath("userData"), "window-behavior.json");
+}
+
+function readCloseBehavior() {
+  try {
+    const value = JSON.parse(fsSync.readFileSync(windowBehaviorPath(), "utf8"))?.closeBehavior;
+    if (CLOSE_BEHAVIORS.has(value)) return value;
+  } catch { /* first run or unreadable: fall through to the default */ }
+  return process.platform === "linux" ? "ask" : "background";
+}
+
+function writeCloseBehavior(value) {
+  if (!CLOSE_BEHAVIORS.has(value)) return readCloseBehavior();
+  fsSync.mkdirSync(app.getPath("userData"), { recursive: true });
+  fsSync.writeFileSync(windowBehaviorPath(), JSON.stringify({ closeBehavior: value }, null, 2), "utf8");
+  return value;
+}
+
+function runMainWindowInBackground() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+  void refreshTrayMenu();
+}
+
+async function handleMainWindowClose() {
+  // Probe on every close because panels such as Waybar can start or restart at any time.
+  const trayAvailable = isTrayLikelyVisible({ statusNotifierHost: await hasStatusNotifierHost() });
+  if (isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
+  if (process.platform !== "linux") {
+    if (trayAvailable) runMainWindowInBackground();
+    else app.quit();
+    return;
+  }
+  const behavior = readCloseBehavior();
+  if (behavior === "quit") { app.quit(); return; }
+  if (behavior === "background") { runMainWindowInBackground(); return; }
+  if (closePromptOpen) return;
+  closePromptOpen = true;
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+  const contents = mainWindow.webContents;
+  if (contents.isLoading() || contents.isCrashed()) {
+    // The renderer cannot show its prompt; fall back to a native dialog.
+    await askCloseWithNativeDialog(trayAvailable);
+    return;
+  }
+  contents.send("window:close-requested", { trayAvailable });
+}
+
+async function askCloseWithNativeDialog(trayAvailable) {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "question",
+    buttons: ["Run in background", "Fully close", "Cancel"],
+    defaultId: 0,
+    cancelId: 2,
+    title: "Close Skai Desktop",
+    message: "Keep Skai running in the background?",
+    detail: trayAvailable
+      ? "Skai stays in your system tray with Percy and the local agent host. Use the tray icon to reopen it or quit."
+      : "No system tray was found. Skai keeps running; launch it again from your app launcher to reopen the window.",
+    checkboxLabel: "Remember my choice",
   });
-  createPetWindow();
-  return mainWindow;
+  applyCloseChoice(["background", "quit", "cancel"][result.response] ?? "cancel", result.checkboxChecked);
+}
+
+function applyCloseChoice(choice, remember) {
+  closePromptOpen = false;
+  if (choice !== "background" && choice !== "quit") return;
+  if (remember) writeCloseBehavior(choice);
+  if (choice === "quit") app.quit();
+  else runMainWindowInBackground();
 }
 
 function applyProductionContentSecurityPolicy() {
@@ -535,7 +826,7 @@ function applyProductionContentSecurityPolicy() {
       responseHeaders: {
         ...details.responseHeaders,
         "Content-Security-Policy": [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8188 http://localhost:8188; media-src 'self' blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8188 http://localhost:8188; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
         ],
       },
     });
@@ -543,6 +834,7 @@ function applyProductionContentSecurityPolicy() {
 }
 
 app.whenReady().then(() => {
+  if (relaunchingForDisplayBackend || !hasSingleInstanceLock) return;
   startAgentHost();
   if (!process.env.SERVER_ROCK_RENDERER_URL) applyProductionContentSecurityPolicy();
   ipcMain.handle("agent:request", async (event, method, params) => {
@@ -583,78 +875,95 @@ app.whenReady().then(() => {
       }
       return { v: 1, ok: true, result: { attachments } };
     }
+    if (method === "workspace.importDroppedFiles") {
+      if (!params || !Array.isArray(params.attachments)) throw new Error("Dropped attachments were not provided.");
+      const attachments = [];
+      let textCharacters = 0;
+      let imageBytes = 0;
+      for (const candidate of params.attachments.slice(0, 5)) {
+        const attachment = decodeDroppedAttachment(candidate);
+        textCharacters += attachment.textLength;
+        imageBytes += attachment.mediaType ? attachment.byteLength : 0;
+        if (textCharacters > 48_000) throw new Error("Dropped text files exceed the combined character limit.");
+        if (imageBytes > 6 * 1024 * 1024) throw new Error("Dropped images exceed the combined size limit.");
+        const { byteLength, textLength, ...safeAttachment } = attachment;
+        attachments.push(safeAttachment);
+      }
+      return { v: 1, ok: true, result: { attachments } };
+    }
     return requestAgent(method, params);
   });
-  ipcMain.handle("pet:get-config", () => buildPetWindowConfig());
-  ipcMain.handle("pet:pick-asset", async (_event, kind) => pickPetAsset(kind));
-  ipcMain.on("pet:set-position", (_event, position) => {
-    if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return;
-    petSettings.position = clampPetPosition({ x: position.x, y: position.y });
-    syncPetWindowPosition();
+  ipcMain.on("window:close-choice", (event, response) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents || !closePromptOpen) return;
+    const choice = response?.choice;
+    applyCloseChoice(choice === "background" || choice === "quit" ? choice : "cancel", Boolean(response?.remember));
   });
-  ipcMain.on("pet:configure", (_event, settings) => {
-    petSettings = sanitizePetSettings(settings);
-    configurePetWander();
-    syncPetWindowPosition();
-    if (petWindow && !petWindow.isDestroyed()) {
-      if (petSettings.visible) {
-        petWindow.setAlwaysOnTop(true, "floating");
-        if (petWindow.webContents.isLoading() === false) petWindow.showInactive();
-      } else petWindow.hide();
-    }
-    sendPetConfig();
-    void refreshTrayMenu();
+  ipcMain.handle("window:get-close-behavior", (event) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return "background";
+    return readCloseBehavior();
   });
-  ipcMain.on("pet:activity", (_event, activity) => {
-    petActivity = allowedPetActivities.has(activity) ? activity : "idle";
-    if (petActivity !== "idle") petWanderTarget = undefined;
-    sendPetConfig();
+  ipcMain.handle("window:set-close-behavior", (event, behavior) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return readCloseBehavior();
+    return writeCloseBehavior(behavior);
   });
-  ipcMain.on("pet:drag-start", (_event, position) => {
-    if (!petWindow || petWindow.isDestroyed() || !mainWindow || !Number.isFinite(position?.screenX) || !Number.isFinite(position?.screenY)) return;
-    const bounds = petWindow.getBounds();
-    petDragging = true;
-    petDragOffset = { x: position.screenX - bounds.x, y: position.screenY - bounds.y };
+  ipcMain.handle("updates:check", async (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return { available: false, message: "Update checks are unavailable." };
+    return checkForUpdates();
   });
-  ipcMain.on("pet:drag-move", (_event, position) => {
-    if (!petDragging || !petWindow || petWindow.isDestroyed() || !mainWindow || !Number.isFinite(position?.screenX) || !Number.isFinite(position?.screenY)) return;
-    const bounds = mainWindow.getBounds();
-    petSettings.position = clampPetPosition({ x: position.screenX - bounds.x - petDragOffset.x, y: position.screenY - bounds.y - petDragOffset.y });
-    syncPetWindowPosition();
-    sendPetPosition();
+  ipcMain.handle("updates:open", async (event, url) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || typeof url !== "string") return false;
+    let parsed;
+    try { parsed = new URL(url); } catch { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") return false;
+    await shell.openExternal(parsed.toString());
+    return true;
   });
-  ipcMain.on("pet:drag-end", () => { petDragging = false; });
-  ipcMain.on("pet:hide", () => {
-    petSettings.visible = false;
+  ipcMain.on("pet:set-visible", (event, visible) => {
+    if (BrowserWindow.fromWebContents(event.sender)) setPetVisible(Boolean(visible));
+  });
+  ipcMain.on("pet:set-motion", (event, settings) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || !settings || typeof settings !== "object") return;
+    petMotion = { wander: Boolean(settings.wander), reduceMotion: Boolean(settings.reduceMotion) };
     stopPetWander();
-    petWindow?.hide();
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("pet:visibility", false);
-    sendPetConfig();
-    void refreshTrayMenu();
+    petWindow?.webContents.send("pet:motion", petMotion);
+    schedulePetWander();
   });
-  ipcMain.on("tray:refresh", () => { void refreshTrayMenu(); });
+  ipcMain.on("pet:drag-start", (event, point) => {
+    if (!windowPositioningAvailable || BrowserWindow.fromWebContents(event.sender) !== petWindow || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    stopPetWander();
+    stopPetDrag();
+    const bounds = petWindow.getBounds();
+    petDragOffset = { x: point.x - bounds.x, y: point.y - bounds.y };
+    petDragTimer = setInterval(movePetWithCursor, 16);
+  });
+  ipcMain.on("pet:drag-move", (event, point) => {
+    if (BrowserWindow.fromWebContents(event.sender) !== petWindow || !petDragOffset || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    const position = clampPetPosition({ x: point.x - petDragOffset.x, y: point.y - petDragOffset.y });
+    petWindow.setPosition(position.x, position.y);
+  });
+  ipcMain.on("pet:drag-end", (event) => {
+    if (BrowserWindow.fromWebContents(event.sender) !== petWindow) return;
+    stopPetDrag();
+    persistPetState();
+    schedulePetWander();
+  });
   createWindow();
-  app.setAppUserModelId?.("com.skai.desktop");
-  tray = new Tray(createTrayIcon());
-  tray.setToolTip("Skai Desktop");
-  tray.on("click", showMainWindow);
-  tray.on("double-click", showMainWindow);
-  void refreshTrayMenu();
+  void resolvePetSurface().finally(createPetWindow);
+  createTray();
+  scheduleUpdateCheck();
   app.on("activate", () => {
-    showMainWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on("window-all-closed", () => {
-  if (isQuitting || process.platform === "darwin") {
-    stopAgentHost();
-    if (process.platform !== "darwin") app.quit();
-  }
+  if (process.platform !== "darwin") stopAgentHost();
+  if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
   isQuitting = true;
-  tray?.destroy();
-  tray = undefined;
+  stopPetWander();
+  if (petWindow && !petWindow.isDestroyed()) petWindow.destroy();
   stopAgentHost();
 });

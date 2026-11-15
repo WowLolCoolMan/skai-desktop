@@ -2,31 +2,76 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("serverRockAgent", {
   request: (method, params) => ipcRenderer.invoke("agent:request", method, params),
+  onTrayOpenConversation: (handler) => {
+    const listener = (_event, id) => handler(String(id));
+    ipcRenderer.on("tray:open-conversation", listener);
+    return () => ipcRenderer.removeListener("tray:open-conversation", listener);
+  },
+  onTrayNewChat: (handler) => {
+    const listener = () => handler();
+    ipcRenderer.on("tray:new-chat", listener);
+    return () => ipcRenderer.removeListener("tray:new-chat", listener);
+  },
+  window: {
+    platform: process.platform,
+    onCloseRequested: (handler) => {
+      const listener = (_event, request) => handler({ trayAvailable: Boolean(request?.trayAvailable) });
+      ipcRenderer.on("window:close-requested", listener);
+      return () => ipcRenderer.removeListener("window:close-requested", listener);
+    },
+    respondToClose: (choice, remember) => ipcRenderer.send("window:close-choice", { choice: String(choice), remember: Boolean(remember) }),
+    getCloseBehavior: () => ipcRenderer.invoke("window:get-close-behavior"),
+    setCloseBehavior: (behavior) => ipcRenderer.invoke("window:set-close-behavior", String(behavior)),
+  },
+  updates: {
+    check: () => ipcRenderer.invoke("updates:check"),
+    open: (url) => ipcRenderer.invoke("updates:open", String(url)),
+    onAvailable: (handler) => {
+      const listener = (_event, result) => handler(result);
+      ipcRenderer.on("updates:available", listener);
+      return () => ipcRenderer.removeListener("updates:available", listener);
+    },
+  },
   pet: {
-    configure: (settings) => ipcRenderer.send("pet:configure", settings),
-    setActivity: (activity) => ipcRenderer.send("pet:activity", activity),
-    getConfig: () => ipcRenderer.invoke("pet:get-config"),
-    onConfig: (listener) => {
-      const handler = (_event, config) => listener(config);
-      ipcRenderer.on("pet:config", handler);
-      return () => ipcRenderer.removeListener("pet:config", handler);
+    setVisible: (visible) => ipcRenderer.send("pet:set-visible", Boolean(visible)),
+    setMotion: (settings) => ipcRenderer.send("pet:set-motion", settings),
+    beginDrag: (point) => ipcRenderer.send("pet:drag-start", point),
+    moveDrag: (point) => ipcRenderer.send("pet:drag-move", point),
+    endDrag: () => ipcRenderer.send("pet:drag-end"),
+    hide: () => ipcRenderer.send("pet:set-visible", false),
+    onMessage: (handler) => {
+      const listener = (_event, message) => handler(message);
+      ipcRenderer.on("pet:message", listener);
+      return () => ipcRenderer.removeListener("pet:message", listener);
     },
-    onPosition: (listener) => {
-      const handler = (_event, position) => listener(position);
-      ipcRenderer.on("pet:position", handler);
-      return () => ipcRenderer.removeListener("pet:position", handler);
+    onVisibilityChange: (handler) => {
+      const listener = (_event, visible) => handler(Boolean(visible));
+      ipcRenderer.on("pet:visibility", listener);
+      return () => ipcRenderer.removeListener("pet:visibility", listener);
     },
-    onVisibilityChange: (listener) => {
-      const handler = (_event, visible) => listener(visible);
-      ipcRenderer.on("pet:visibility", handler);
-      return () => ipcRenderer.removeListener("pet:visibility", handler);
+    onMotionChange: (handler) => {
+      const listener = (_event, settings) => handler(settings);
+      ipcRenderer.on("pet:motion", listener);
+      return () => ipcRenderer.removeListener("pet:motion", listener);
     },
-    pickAsset: (kind) => ipcRenderer.invoke("pet:pick-asset", kind),
-    setPosition: (position) => ipcRenderer.send("pet:set-position", position),
-    dragStart: (position) => ipcRenderer.send("pet:drag-start", position),
-    dragMove: (position) => ipcRenderer.send("pet:drag-move", position),
-    dragEnd: () => ipcRenderer.send("pet:drag-end"),
-    hide: () => ipcRenderer.send("pet:hide"),
+  },
+  tray: {
+    refresh: () => ipcRenderer.send("tray:refresh"),
+    onNewChat: (listener) => {
+      const handler = () => listener();
+      ipcRenderer.on("tray:new-chat", handler);
+      return () => ipcRenderer.removeListener("tray:new-chat", handler);
+    },
+    onOpenConversation: (listener) => {
+      const handler = (_event, id) => listener(id);
+      ipcRenderer.on("tray:open-conversation", handler);
+      return () => ipcRenderer.removeListener("tray:open-conversation", handler);
+    },
+    onNavigate: (listener) => {
+      const handler = (_event, route) => listener(route);
+      ipcRenderer.on("tray:navigate", handler);
+      return () => ipcRenderer.removeListener("tray:navigate", handler);
+    },
   },
   tray: {
     refresh: () => ipcRenderer.send("tray:refresh"),

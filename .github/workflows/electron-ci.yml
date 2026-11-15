@@ -39,8 +39,24 @@ jobs:
       - name: Typecheck Electron renderer
         run: npm run desktop:typecheck
 
+      - name: Repository and release checks
+        run: |
+          npm run check:syntax
+          npm run check:hygiene
+          npm run check:release-config
+          npm run audit:release-workflow
+
       - name: Audit Electron replacement boundary
-        run: npm run audit:electron-runtime
+        run: |
+          npm run audit:electron-runtime
+          npm run audit:electron-tray
+          npm run audit:bridge-methods
+          npm run audit:local-only
+
+      - name: Electron main-process unit checks
+        run: |
+          npm run test:pet
+          npm run test:linux-windowing
 
       - name: Build Electron renderer
         run: npm run desktop:build
@@ -69,6 +85,9 @@ jobs:
       - name: Build persistent agent host
         run: npm run agent-host:build
 
+      - name: Core tests
+        run: npm test
+
       - name: Smoke replacement protocol
         run: npm run smoke:agent-host
 
@@ -89,3 +108,30 @@ jobs:
 
       - name: Smoke durable chat queue
         run: npm run smoke:chat-queue
+
+  windows-smoke:
+    name: Windows Electron smoke
+    runs-on: windows-2022
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Electron dependencies
+        run: npm ci --prefix apps/desktop
+
+      - name: Ensure Electron runtime payload
+        run: node apps/desktop/node_modules/electron/install.js
+
+      - name: Smoke the Windows package and runtime
+        run: npm run smoke:windows

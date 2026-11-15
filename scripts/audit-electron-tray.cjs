@@ -2,30 +2,45 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const main = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "main.cjs"), "utf8");
-const preload = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "preload.cjs"), "utf8");
-const contracts = fs.readFileSync(path.join(root, "apps", "desktop", "shared", "contracts.ts"), "utf8");
-const workspace = fs.readFileSync(path.join(root, "apps", "desktop", "src", "app", "useDesktopWorkspace.ts"), "utf8");
-const packageScript = fs.readFileSync(path.join(root, "scripts", "package-electron.cjs"), "utf8");
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
+
+const main = read("apps/desktop/electron/main.cjs");
+const preload = read("apps/desktop/electron/preload.cjs");
+const contracts = read("apps/desktop/shared/contracts.ts");
+const workspace = read("apps/desktop/src/app/useDesktopWorkspace.ts");
+const packageScript = read("scripts/package-electron.cjs");
+const releaseWorkflow = read(".github/workflows/release.yml");
 
 const failures = [];
-const expect = (condition, message) => { if (!condition) failures.push(message); };
+const expect = (condition, message) => {
+  if (!condition) failures.push(message);
+};
 
-expect(main.includes("Tray") && main.includes("new Tray"), "Electron main must create a system tray icon.");
-expect(main.includes("mainWindow.on(\"close\""), "Main window close must be intercepted for resident tray behavior.");
-expect(main.includes("event.preventDefault()") && main.includes("hideMainWindow()"), "Close-to-tray behavior must hide the window without quitting.");
-expect(main.includes("Recent chats") && main.includes("conversations.list"), "Tray menu must expose host-backed recent chats.");
-expect(main.includes("Show Percy") && main.includes("Hide Percy"), "Tray menu must control Percy visibility.");
-expect(main.includes("process.platform") && main.includes("window-all-closed"), "Tray lifecycle must retain explicit platform handling.");
-expect(preload.includes("onOpenConversation") && preload.includes("onNewChat"), "Preload must expose tray chat actions without Node access.");
-expect(contracts.includes("TrayBridge") && contracts.includes("tray: TrayBridge"), "Renderer contracts must describe the tray bridge.");
-expect(workspace.includes("tray.onOpenConversation") && workspace.includes("tray.onNewChat"), "Workspace must consume tray chat actions.");
-expect(packageScript.includes("assets", "branding") && packageScript.includes("skaiwolficon.png"), "Electron packaging must include the tray icon asset.");
+expect(main.includes("requestSingleInstanceLock") && main.includes('app.on("second-instance"'), "tray app must restore the existing resident instance");
+expect(main.includes('mainWindow.on("close"') && main.includes("event.preventDefault()") && main.includes("mainWindow.hide()"), "closing the main window must hide it instead of quitting");
+expect(main.includes("new Tray") && main.includes('tray.on("click"') && main.includes('tray.on("right-click"'), "tray must support click and context-menu interactions");
+expect(main.includes("Recent chats") && main.includes("conversations.list") && main.includes("tray:open-conversation"), "tray must expose host-backed recent chats");
+expect(main.includes("Show Percy") && main.includes("Hide Percy") && main.includes("setPetVisible"), "tray must expose Percy visibility control");
+expect(main.includes("Quit Skai Desktop") && main.includes("app.quit()"), "tray must expose an explicit quit action");
+expect(main.includes('process.platform === "win32" ? source.resize({ width: 16, height: 16 }) : source'), "tray icon sizing must use the Windows-specific size while preserving the native Linux icon");
+expect(releaseWorkflow.includes("rid: linux-x64") && releaseWorkflow.includes("runner.os == 'Linux'"), "release workflow must build and smoke-test the Linux Electron artifact");
+expect(releaseWorkflow.includes("Skai-Desktop-electron-linux-x64.tar.gz") && releaseWorkflow.includes("SHA256SUMS-electron-linux-x64.txt"), "Linux Electron releases must be archived and checksummed");
+expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "preload must expose tray navigation events");
+expect(contracts.includes("onTrayOpenConversation?") && contracts.includes("onTrayNewChat?"), "tray events must remain typed in the renderer contract");
+expect(workspace.includes("onTrayOpenConversation") && workspace.includes("onTrayNewChat"), "renderer must handle tray recent-chat and new-chat actions");
+expect(packageScript.includes('process.platform === "linux" ? "linux-x64"') && packageScript.includes('const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"'), "Electron packaging must publish a Linux x64 artifact with the native executable name");
 
-if (failures.length) {
+// Linux desktop integration: the launcher entry must match the window class so docks
+// and "reopen from your app launcher" (Linux close prompt) work, and the sandbox must never be disabled.
+const linuxInstaller = read("packaging/linux/install.sh");
+expect(packageScript.includes('"install.sh"') && packageScript.includes('"uninstall.sh"') && packageScript.includes("skai-desktop.png"), "Linux artifacts must ship install.sh, uninstall.sh and the launcher icon");
+expect(linuxInstaller.includes("StartupWMClass=skai-desktop") && JSON.parse(read("apps/desktop/package.json")).name === "skai-desktop", "Linux launcher StartupWMClass must match the Electron window class (package name skai-desktop)");
+expect(!/--no-sandbox/.test(linuxInstaller.replace(/^\s*#.*$/gm, "")), "Linux installer must not disable Chromium's sandbox");
+
+if (failures.length > 0) {
   console.error("Electron tray audit failed:");
   for (const failure of failures) console.error(`- ${failure}`);
-  process.exitCode = 1;
-} else {
-  console.log("Electron tray audit passed: resident close, recent chats, Percy controls, and cross-platform packaging are present.");
+  process.exit(1);
 }
+
+console.log("Electron tray audit passed: resident Windows behavior and Linux packaging contracts are present.");

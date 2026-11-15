@@ -1,5 +1,5 @@
 // Loads/saves named projects (projects.json). A corrupt file is reported and left untouched.
-// Depends on: LocalProject, BoundedFileReader, AtomicFileWriter. Used by: MainPage projects.
+// Depends on: LocalProject, BoundedFileReader, AtomicFileWriter. Used by: the Agent Host project protocol.
 
 using System.Text.Json;
 using SkaiDesktop.Core.Models;
@@ -22,7 +22,7 @@ public sealed class ProjectStore
     public ProjectStore(string? path = null)
     {
         _path = path ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
             "ServerRock", "AI", "projects.json");
     }
 

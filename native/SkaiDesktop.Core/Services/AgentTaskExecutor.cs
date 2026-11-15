@@ -20,23 +20,9 @@ public sealed class AgentTaskExecutor
         ArgumentNullException.ThrowIfNull(handler);
         var task = _store.TryClaimReady();
         if (task is null) return null;
-        try
-        {
-            var result = await handler(task, cancellationToken).ConfigureAwait(false);
-            return _store.Complete(task.Id, result.Summary, result.ArtifactLabels, result.WorkspaceChanges, result.WorkspaceCommands);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return _store.Cancel(task.Id, "Execution was cancelled before the handler completed.");
-        }
-        catch (Exception error)
-        {
-            var summary = string.IsNullOrWhiteSpace(error.Message) ? "The task handler failed." : error.Message;
-            return _store.Fail(task.Id, summary);
-        }
+        return await ExecuteClaimedAsync(task, handler, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Executes one explicitly selected queued task through the injected handler.</summary>
     public async Task<AgentTaskArtifact> ExecuteAsync(
         string taskId,
         Func<AgentTaskArtifact, CancellationToken, Task<AgentTaskExecutionResult>> handler,
@@ -45,10 +31,19 @@ public sealed class AgentTaskExecutor
         ArgumentException.ThrowIfNullOrWhiteSpace(taskId);
         ArgumentNullException.ThrowIfNull(handler);
         var task = _store.TryClaim(taskId);
+        return await ExecuteClaimedAsync(task, handler, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<AgentTaskArtifact> ExecuteClaimedAsync(
+        AgentTaskArtifact task,
+        Func<AgentTaskArtifact, CancellationToken, Task<AgentTaskExecutionResult>> handler,
+        CancellationToken cancellationToken)
+    {
         try
         {
             var result = await handler(task, cancellationToken).ConfigureAwait(false);
-            return _store.Complete(task.Id, result.Summary, result.ArtifactLabels, result.WorkspaceChanges, result.WorkspaceCommands);
+            _store.BeginVerification(task.Id, result.Summary, result.ArtifactLabels);
+            return _store.Verify(task.Id);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -89,7 +84,7 @@ public sealed class AgentTaskExecutor
             lease = await coordinator.CreateAsync(repositoryPath, target, $"codex/agent-task/{task.Id}", cancellationToken: cancellationToken).ConfigureAwait(false);
             task = _store.AttachWorktree(task.Id, lease.RepositoryRoot, lease.WorktreePath, lease.Branch);
             var result = await handler(task, lease, cancellationToken).ConfigureAwait(false);
-            return _store.Complete(task.Id, result.Summary, result.ArtifactLabels, result.WorkspaceChanges, result.WorkspaceCommands);
+            return _store.Complete(task.Id, result.Summary, result.ArtifactLabels);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -116,8 +111,4 @@ public sealed class AgentTaskExecutor
     }
 }
 
-public sealed record AgentTaskExecutionResult(
-    string Summary,
-    IReadOnlyList<string>? ArtifactLabels = null,
-    IReadOnlyList<AgentTaskWorkspaceChange>? WorkspaceChanges = null,
-    IReadOnlyList<AgentTaskWorkspaceCommand>? WorkspaceCommands = null);
+public sealed record AgentTaskExecutionResult(string Summary, IReadOnlyList<string>? ArtifactLabels = null);

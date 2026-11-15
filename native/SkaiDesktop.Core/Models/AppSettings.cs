@@ -1,15 +1,13 @@
 // Every non-secret user preference, saved as settings.json.
 // Depends on: nothing (plain data).
 // Used by: JsonSettingsStore (load/save), OpenAiCompatibleProvider (endpoint, model, temperature),
-// and MainPage everywhere settings are read or changed. Secrets (API keys, tokens) never go here.
+// and the Agent Host settings protocol. Secrets (API keys, tokens) never go here.
 
 namespace SkaiDesktop.Core.Models;
 
 public sealed class AppSettings
 {
     public string Endpoint { get; set; } = "http://localhost:11434/v1";
-    /// <summary>Explicit consent to send model requests to the selected HTTPS cloud endpoint.</summary>
-    public bool CloudRouteEnabled { get; set; }
     public string Model { get; set; } = "llama3.2";
     public string ModelProvider { get; set; } = "Ollama";
     /// <summary>Automatically retry a local model through AirLLM after a capacity/compatibility failure.</summary>
@@ -44,12 +42,6 @@ public sealed class AppSettings
     /// <summary>Bounded split-chat ratios keyed by workspace and project context.</summary>
     public Dictionary<string, double> SplitChatRatios { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool VoiceOutputEnabled { get; set; }
-    /// <summary>Explicit consent to send spoken-reply text to the configured cloud voice provider.</summary>
-    public bool CloudVoiceEnabled { get; set; }
-    /// <summary>ElevenLabs voice identifier used when cloud voice is enabled.</summary>
-    public string ElevenLabsVoiceId { get; set; } = "JBFqnCBsd6RMkjVDRZzb";
-    /// <summary>ElevenLabs model identifier used when cloud voice is enabled.</summary>
-    public string ElevenLabsModelId { get; set; } = "eleven_multilingual_v2";
     /// <summary>Voice runtime used by normal conversational replies.</summary>
     public string VoicePrimaryModelId { get; set; } = "os-native";
     /// <summary>Voice runtime selected for constrained/low-resource mode.</summary>
@@ -57,8 +49,8 @@ public sealed class AppSettings
     public bool VoiceLowResourceModeEnabled { get; set; }
     public string VoiceProfileId { get; set; } = "skai-neutral";
     public List<VoiceProfile> VoiceProfiles { get; set; } = [];
-    public string AccentColor { get; set; } = "violet";
-    public string ThemeMode { get; set; } = "dark";
+    public string AccentColor { get; set; } = "cyan";
+    public string ThemeMode { get; set; } = "light";
     /// <summary>Ambient workspace backdrop preset. Kept separate from the light/dark palette.</summary>
     public string BackdropPreset { get; set; } = "none";
     /// <summary>Disables decorative backdrop motion while retaining the selected visual preset.</summary>
@@ -66,18 +58,6 @@ public sealed class AppSettings
     /// <summary>Enables local-only developer diagnostics and verbose inspection surfaces.</summary>
     public bool DeveloperMode { get; set; }
     public string InterfaceDensity { get; set; } = "comfortable";
-    /// <summary>Whether the separate always-on-top companion window is visible.</summary>
-    public bool PetVisible { get; set; }
-    /// <summary>Whether the companion may wander inside the main workspace bounds.</summary>
-    public bool PetWanderEnabled { get; set; }
-    /// <summary>Built-in companion id or custom when user assets are selected.</summary>
-    public string PetId { get; set; } = "byte";
-    /// <summary>Copied local sprite asset path, never a remote URL.</summary>
-    public string PetSpritePath { get; set; } = "";
-    /// <summary>Copied local animation manifest path, never a remote URL.</summary>
-    public string PetManifestPath { get; set; } = "";
-    public int PetPositionX { get; set; } = -1;
-    public int PetPositionY { get; set; } = -1;
     public string HostLabel { get; set; } = "This device";
     /// <summary>Optional explicit value used only when a reviewed prompt contains {{USER_NAME}}.</summary>
     public string PromptUserName { get; set; } = "";

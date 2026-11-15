@@ -1,6 +1,12 @@
 # Model library and hotswapper
 
-The native app has one Model Library entry from the sidebar and the composer’s model hotswapper. The library scans standard loopback endpoints for Ollama, GPT4All, LM Studio, Jan, LocalAI/llama.cpp, vLLM, KoboldCpp, and Text Generation WebUI, plus a configured custom loopback endpoint. Models with the same ID in different runtimes remain separate choices. Selecting or pinning a model preserves its provider and endpoint; pinning stays a small quick-switch subset while every discovered model remains in the library.
+Skai Desktop has one Model Library entry from the launcher and the composer’s
+model hotswapper. The library scans standard loopback endpoints for Ollama,
+GPT4All, LM Studio, Jan, LocalAI/llama.cpp, vLLM, KoboldCpp, and Text
+Generation WebUI, plus a configured custom loopback endpoint. Models with the
+same ID in different runtimes remain separate choices. Selecting or pinning a
+model preserves its provider and endpoint; pinning stays a small quick-switch
+subset while every discovered model remains in the library.
 
 ## Currently integrated sources
 
@@ -30,18 +36,38 @@ Official APIs used by this slice:
 - [Ollama blob API](https://github.com/ollama/ollama/blob/main/docs/api.md#push-a-blob)
 - [ModelScope Hub SDK](https://github.com/modelscope/modelscope_hub) and [official ModelScope API guide](https://github.com/modelscope/modelscope-skills/blob/main/skills/ms-hub/SKILL.md)
 
-## ModelScope catalog and UI follow-up (2026-11-04)
+## ModelScope catalog
 
-ModelScope search and GGUF manifest routes were checked against the public service using `Qwen3-0.6B-GGUF`; the live search returned repository IDs and download counts, and the repository manifest returned GGUF paths, byte sizes, and SHA-256 values. A Windows app UI search surfaced embedding, ASR, projector, reranker, and guard-model repositories among regular chat models, and confirmed installed-model rows clear when switching sources. The reranker and guard repositories advertised text-generation tasks, so explicit non-chat name exclusions now take precedence over conflicting task metadata. The catalog also filters by task metadata (with conservative name-based exclusions when tasks are absent), removes MMProj/projector sidecars, cancels superseded catalog queries, and shows a searching state. Automated checks cover regular/uncensored filtering, conflicting reranker and guard task tags, chat-task exclusions, split-shard grouping, Ollama blob/create calls, digest mismatch, invalid GGUF signatures, and path traversal. `dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj` passed after the latest filtering and identifier-validation changes. The `net10.0-desktop` target built with zero warnings. The Windows App SDK target built with the existing missing `win-AnyCPU.pubxml` (`NETSDK1198`) warning. The latest build's catalog result filtering and cancellation behavior still need a successful fresh UI runtime recheck. No real multi-gigabyte download/import was attempted; Ollama blob/create behavior is covered by stubbed HTTP tests.
+ModelScope search and GGUF manifest routes return repository IDs, download
+counts, GGUF paths, byte sizes, and SHA-256 values. The catalog filters by
+task metadata and conservative non-chat name exclusions, removes MMProj and
+projector sidecars, cancels superseded queries, and exposes a searching state.
+Core tests cover regular/uncensored filtering, conflicting reranker and guard
+task tags, chat-task exclusions, split-shard grouping, Ollama blob/create
+calls, digest mismatch, invalid GGUF signatures, and path traversal. Packaged
+Electron smoke covers the current Model Library/Marketplace surfaces; no
+multi-gigabyte download is performed in CI.
 
-## Model Library opens on installed models (2026-11-07)
+## Model Library opens on installed models
 
-Owner decision: the Models action opens the **Model Library** (previously titled "AI SuperMarket") on **Installed models**, so nothing is sent to Hugging Face until the user switches the source to the Hugging Face GGUF catalog. That keeps the README promise that Hugging Face is contacted only when you choose to browse or search it, or download a model. The catalog, Ollama, and ModelScope sources work as described below.
+The Models action opens the **Model Library** on **Installed models**, so
+nothing is sent to Hugging Face until the user switches to the Marketplace
+catalog and chooses to browse, search, or download a model. Ollama and
+ModelScope remain explicit local model sources.
 
-## Native AI SuperMarket migration (2026-11-04)
+## Electron model library surface
 
-The native Models action now opens **AI SuperMarket** directly instead of an empty, query-first library. Its default source is a populated Hugging Face GGUF catalog of chat-ready repositories; the user can refine it by model name or capability, switch between regular and explicitly labelled uncensored/abliterated results, download through the configured local LM Studio runtime, then switch to Installed models to select, pin, or benchmark the download. Ollama and ModelScope remain distinct sources so their installation behavior stays accurate. The action controls deliberately enable model selection, pinning, and benchmarking only for installed local models. `dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj` and `dotnet build native/ServerRock.Native.sln --no-restore` passed after this migration slice. The new explicit `win-AnyCPU` profile maps the solution's default Windows configuration to the supported `win-x64` self-contained build, so the solution-level build is now warning-free.
+The Electron Models surface opens a local installed-model inventory with
+inspect-first rows, runtime/capability metadata, model selection, pinning, and
+benchmarking. Remote model discovery and verified local installation live in
+Marketplace, where provider provenance and install state remain explicit.
+Shared Core tests and the packaged Electron artifact are the release evidence
+for this workflow.
 
-## Hotswapper follow-up (2026-11-03)
+## Hotswapper behavior
 
-The composer dropdown is the quick switch control. It lists pinned profiles only, marks the active pinned profile, shows local speed measurements for each pinned model, and offers **Pin current model** when the active profile is not pinned. The model button has a screen-reader name and help text. A previous runtime inspection of the composer confirmed the active unpinned model was excluded; the new one-click pin action still needs a runtime pass with a disposable app-data profile.
+The composer dropdown is the quick switch control. It lists pinned profiles
+only, marks the active pinned profile, shows local speed measurements, and
+offers **Pin current model** when the active profile is not pinned. The model
+button has a screen-reader name and help text. Pinned profiles are stored in
+the local settings file and only installed local models can be pinned.

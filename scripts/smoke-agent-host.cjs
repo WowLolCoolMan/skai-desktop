@@ -6,27 +6,45 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawn, execFileSync } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const readline = require("node:readline");
 
 const root = path.resolve(__dirname, "..");
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-agent-host-smoke-"));
+const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-agent-host-profile-"));
 const env = {
   ...process.env,
-  SRAI_SETTINGS_PATH: path.join(tempRoot, "settings.json"),
-  SRAI_CONVERSATIONS_PATH: path.join(tempRoot, "conversations.json"),
-  SRAI_TASKS_PATH: path.join(tempRoot, "agent-tasks.json"),
-  SRAI_SCHEDULED_TASKS_PATH: path.join(tempRoot, "scheduled-tasks.json"),
-  SRAI_PROJECTS_PATH: path.join(tempRoot, "projects.json"),
-  SRAI_SKILLS_PATH: path.join(tempRoot, "installed-skills"),
+  SRAI_SETTINGS_PATH: path.join(profileRoot, "settings.json"),
+  SRAI_CONVERSATIONS_PATH: path.join(profileRoot, "conversations.json"),
+  SRAI_TASKS_PATH: path.join(profileRoot, "agent-tasks.json"),
+  SRAI_SCHEDULED_TASKS_PATH: path.join(profileRoot, "scheduled-tasks.json"),
+  SRAI_PROJECTS_PATH: path.join(profileRoot, "projects.json"),
+  SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
 };
-const skillSource = path.join(tempRoot, "review-skill");
-fs.mkdirSync(skillSource, { recursive: true });
-fs.writeFileSync(path.join(skillSource, "skill.json"), JSON.stringify({ id: "review-skill", name: "Review skill", version: "1.0.0", publisher: "Smoke publisher", requiredPermissions: ["project.read"] }));
-fs.writeFileSync(path.join(skillSource, "SKILL.md"), "# Review\n\nRead-only review instructions.");
-fs.writeFileSync(path.join(tempRoot, "task-context.md"), "Bounded task context fixture.\n");
-execFileSync("git", ["init", "-q", tempRoot], { cwd: root, stdio: "ignore", windowsHide: true });
-const hostOutput = process.env.SRAI_AGENT_HOST_OUTPUT || path.join(root, "services", "agent-host", "bin", "Debug", "net10.0");
+spawnSync("git", ["init", "--quiet", tempRoot], { cwd: tempRoot, windowsHide: true });
+spawnSync("git", ["config", "user.email", "smoke@example.invalid"], { cwd: tempRoot, windowsHide: true });
+spawnSync("git", ["config", "user.name", "Skai smoke"], { cwd: tempRoot, windowsHide: true });
+fs.writeFileSync(path.join(tempRoot, ".gitkeep"), "smoke\n");
+spawnSync("git", ["add", ".gitkeep"], { cwd: tempRoot, windowsHide: true });
+spawnSync("git", ["commit", "--quiet", "-m", "Initial smoke state"], { cwd: tempRoot, windowsHide: true });
+fs.writeFileSync(path.join(tempRoot, "status-smoke.txt"), "status\n");
+const interruptedTaskId = "interrupted-smoke-task";
+fs.writeFileSync(env.SRAI_TASKS_PATH, JSON.stringify([{
+  id: interruptedTaskId,
+  title: "Interrupted smoke task",
+  instruction: "Verify restart recovery.",
+  role: "specialist",
+  status: "running",
+  dependsOn: [],
+  resultSummary: null,
+  artifactLabels: [],
+  worktreePath: null,
+  worktreeBranch: null,
+  worktreeRepositoryRoot: null,
+  createdAtUtc: new Date().toISOString(),
+  updatedAtUtc: new Date().toISOString(),
+}], null, 2));
+const hostOutput = path.join(root, "services", "agent-host", "bin", "Debug", "net10.0");
 const hostProgram = process.platform === "win32" ? path.join(hostOutput, "ServerRock.AgentHost.exe") : "dotnet";
 const hostArgs = process.platform === "win32" ? ["--stdio"] : [path.join(hostOutput, "ServerRock.AgentHost.dll"), "--stdio"];
 const child = spawn(hostProgram, hostArgs, {
@@ -60,49 +78,70 @@ function request(method, params) {
 
 async function run() {
   const health = await request("runtime.health");
-  if (!health.ok || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("credentials.status") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("voice.speak.cloud") || !health.result?.capabilities?.includes("marketplace.models.search") || !health.result?.capabilities?.includes("marketplace.models.download") || !health.result?.capabilities?.includes("marketplace.skills.search") || !health.result?.capabilities?.includes("marketplace.skills.inspect") || !health.result?.capabilities?.includes("skills.local.preview") || !health.result?.capabilities?.includes("skills.local.install") || !health.result?.capabilities?.includes("skills.enabled.set") || !health.result?.capabilities?.includes("skills.installed.inspect") || !health.result?.capabilities?.includes("skills.installed.remove") || !health.result?.capabilities?.includes("skills.rollback") || !health.result?.capabilities?.includes("project.git.status") || !health.result?.capabilities?.includes("tasks.approve") || !health.result?.capabilities?.includes("tasks.deny") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("tasks.worktree.release") || !health.result?.capabilities?.includes("tasks.worktree.change.apply") || !health.result?.capabilities?.includes("tasks.worktree.change.undo"))
+  if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
-  const tools = await request("marketplace.tools.list");
-  if (!tools.ok || !Array.isArray(tools.result) || !tools.result.some(item => item.id === "github" && item.builtIn === true)) throw new Error("marketplace.tools.list did not return the built-in tool catalog.");
-  const mcp = await request("marketplace.mcp.list");
-  if (!mcp.ok || !Array.isArray(mcp.result) || !mcp.result.some(item => item.id === "filesystem" && item.transport === "stdio")) throw new Error("marketplace.mcp.list did not return the MCP server catalog.");
-  const emptyModelScope = await request("marketplace.models.search", { query: "", kind: "llm", provider: "modelscope", limit: 20 });
-  if (!emptyModelScope.ok || !Array.isArray(emptyModelScope.result)) throw new Error("marketplace.models.search did not accept the ModelScope provider lane.");
-  const invalidModelProvider = await request("marketplace.models.search", { query: "", kind: "llm", provider: "unknown-provider", limit: 20 });
-  if (invalidModelProvider.ok) throw new Error("marketplace.models.search accepted an unknown provider filter.");
-  const unsupportedDownloadProvider = await request("marketplace.models.download", { provider: "unknown-provider", endpoint: "http://127.0.0.1:11434/v1", id: "example/model" });
-  if (unsupportedDownloadProvider.ok) throw new Error("marketplace.models.download accepted an unknown provider.");
-  const invalidSkillRepository = await request("marketplace.skills.inspect", { repository: "https://evil.invalid/skill" });
-  if (invalidSkillRepository.ok || !invalidSkillRepository.error?.message.includes("owner/name")) throw new Error("marketplace.skills.inspect accepted an unsafe repository identifier.");
-  const emptySkills = await request("skills.installed.list");
-  if (!emptySkills.ok || !Array.isArray(emptySkills.result) || emptySkills.result.length !== 0) throw new Error("Disposable skill library was not empty.");
-  const skillPreview = await request("skills.local.preview", { sourceDirectory: skillSource });
-  if (!skillPreview.ok || skillPreview.result?.isUpdate || skillPreview.result?.requiredPermissions?.[0] !== "project.read" || skillPreview.result?.packageSha256?.length !== 64) throw new Error("skills.local.preview did not return a bounded package review.");
-  const installedSkill = await request("skills.local.install", { sourceDirectory: skillSource, expectedPackageSha256: skillPreview.result.packageSha256 });
-  if (!installedSkill.ok || installedSkill.result?.enabled !== false || installedSkill.result?.sourceRef !== "local-folder:review-skill") throw new Error("skills.local.install did not require explicit enablement or preserve local provenance.");
-  const enabledSkill = await request("skills.enabled.set", { id: "review-skill", enabled: true });
-  if (!enabledSkill.ok || enabledSkill.result?.enabled !== true) throw new Error("skills.enabled.set did not enable the installed skill.");
-  fs.writeFileSync(path.join(skillSource, "skill.json"), JSON.stringify({ id: "review-skill", name: "Review skill", version: "2.0.0", publisher: "Smoke publisher", requiredPermissions: ["project.read"] }));
-  fs.writeFileSync(path.join(skillSource, "SKILL.md"), "# Review v2\n\nUpdated read-only review instructions.");
-  const updatePreview = await request("skills.local.preview", { sourceDirectory: skillSource });
-  if (!updatePreview.ok || updatePreview.result?.isUpdate !== true || updatePreview.result?.existingVersion !== "1.0.0") throw new Error("skills.local.preview did not identify a skill update.");
-  const updatedSkill = await request("skills.local.install", { sourceDirectory: skillSource, expectedPackageSha256: updatePreview.result.packageSha256 });
-  if (!updatedSkill.ok || updatedSkill.result?.version !== "2.0.0" || updatedSkill.result?.canRollback !== true) throw new Error("skills.local.install did not activate the update with rollback metadata.");
-  const rolledBackSkill = await request("skills.rollback", { id: "review-skill" });
-  if (!rolledBackSkill.ok || rolledBackSkill.result?.version !== "1.0.0" || rolledBackSkill.result?.enabled !== true) throw new Error("skills.rollback did not restore the prior enabled package.");
-  const inspectedSkill = await request("skills.installed.inspect", { id: "review-skill" });
-  if (!inspectedSkill.ok || !inspectedSkill.result?.instructions?.includes("Read-only review instructions")) throw new Error("skills.installed.inspect did not return bounded instructions.");
-  const removedSkill = await request("skills.installed.remove", { id: "review-skill" });
-  if (!removedSkill.ok || removedSkill.result?.removed !== true) throw new Error("skills.installed.remove did not remove the owned package.");
-  const finalSkills = await request("skills.installed.list");
-  if (!finalSkills.ok || finalSkills.result.length !== 0) throw new Error("skills.installed.remove left an installed package behind.");
+  const airLlm = await request("airllm.status");
+  if (!airLlm.ok || airLlm.result?.workerAvailable !== true || typeof airLlm.result?.message !== "string")
+    throw new Error(`airllm.status did not report the packaged worker: ${JSON.stringify(airLlm)}`);
+  const pullStart = await request("models.pull.start", { endpoint: "http://127.0.0.1:1/v1", model: "smoke-model" });
+  if (!pullStart.ok || typeof pullStart.result?.id !== "string") throw new Error("models.pull.start did not create a disposable local operation.");
+  let pullStatus;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    pullStatus = await request("models.pull.status", { id: pullStart.result.id });
+    if (["failed", "cancelled", "completed"].includes(pullStatus.result?.status)) break;
+  }
+  if (!pullStatus?.ok || pullStatus.result?.status !== "failed") throw new Error(`models.pull.status did not recover a closed local endpoint: ${JSON.stringify(pullStatus)}`);
+  const recovered = await request("tasks.list");
+  const interrupted = recovered.result?.find(task => task.id === interruptedTaskId);
+  if (!recovered.ok || interrupted?.status !== "blocked" || !interrupted.resultSummary?.includes("interrupted"))
+    throw new Error("Agent Host did not reconcile an interrupted task after restart.");
+  const project = await request("project.save", { name: "Git status smoke", folderPaths: [tempRoot] });
+  if (!project.ok || typeof project.result?.id !== "string") throw new Error("project.save did not create the Git status smoke project.");
+  const terminal = await request("project.terminal.start", { id: project.result.id, relativeWorkingDirectory: ".", columns: 80, rows: 24 });
+  if (!terminal.ok || typeof terminal.result?.sessionId !== "string") throw new Error("project.terminal.start did not create a persistent PTY session.");
+  const terminalWrite = await request("project.terminal.write", { sessionId: terminal.result.sessionId, text: "echo terminal-smoke\r\n" });
+  if (!terminalWrite.ok) throw new Error(`project.terminal.write did not accept input: ${JSON.stringify(terminalWrite)}`);
+  await new Promise(resolve => setTimeout(resolve, 1_500));
+  const terminalRead = await request("project.terminal.read", { sessionId: terminal.result.sessionId });
+  if (!terminalRead.ok || !String(terminalRead.result?.screen ?? "").toLowerCase().includes("terminal-smoke")) throw new Error(`project.terminal.read did not render the PTY response: ${JSON.stringify(terminalRead)}`);
+  const terminalClosed = await request("project.terminal.close", { sessionId: terminal.result.sessionId });
+  if (!terminalClosed.ok || terminalClosed.result?.closed !== true) throw new Error("project.terminal.close did not close the persistent session.");
+  const gitStatus = await request("project.git.status", { id: project.result.id });
+  if (!gitStatus.ok || gitStatus.result?.repository !== "local repository" || typeof gitStatus.result?.branch !== "string" || !Array.isArray(gitStatus.result?.changes))
+    throw new Error("project.git.status did not return bounded local Git state.");
+  const reviewPath = gitStatus.result.changes[0]?.path;
+  if (!reviewPath) throw new Error("project.git.status did not report the disposable repository changes.");
+  const diff = await request("project.git.diff", { id: project.result.id, paths: [reviewPath] });
+  if (!diff.ok || typeof diff.result?.text !== "string" || diff.result.includedFiles !== 1) throw new Error("project.git.diff did not return the selected local diff.");
+  const committed = await request("project.git.commit", { id: project.result.id, paths: [reviewPath], message: "Review local Git smoke" });
+  if (!committed.ok || committed.result?.committed !== true) throw new Error("project.git.commit did not create the reviewed local commit.");
+  spawnSync("git", ["reset", "--hard", "--quiet", "HEAD"], { cwd: tempRoot, windowsHide: true });
+  const remoteRoot = path.join(tempRoot, "..", `${path.basename(tempRoot)}-remote.git`);
+  spawnSync("git", ["init", "--bare", "--quiet", remoteRoot], { cwd: tempRoot, windowsHide: true });
+  spawnSync("git", ["remote", "add", "origin", remoteRoot], { cwd: tempRoot, windowsHide: true });
+  spawnSync("git", ["push", "--quiet", "--set-upstream", "origin", "HEAD"], { cwd: tempRoot, windowsHide: true });
+  fs.writeFileSync(path.join(tempRoot, "push-smoke.txt"), "push through configured credential helper\n");
+  const pushStatus = await request("project.git.status", { id: project.result.id });
+  const pushPath = pushStatus.result?.changes?.find(change => change.path === "push-smoke.txt")?.path;
+  if (!pushStatus.ok || !pushPath) throw new Error("project.git.status did not expose the disposable push change.");
+  const pushCommit = await request("project.git.commit", { id: project.result.id, paths: [pushPath], message: "Prepare local push smoke" });
+  if (!pushCommit.ok || pushCommit.result?.committed !== true) throw new Error("project.git.commit did not prepare the disposable push.");
+  spawnSync("git", ["reset", "--hard", "--quiet", "HEAD"], { cwd: tempRoot, windowsHide: true });
+  const cleanPushStatus = await request("project.git.status", { id: project.result.id });
+  const pushed = await request("project.git.push", { id: project.result.id });
+  if (!pushed.ok || pushed.result?.pushed !== true) throw new Error(`project.git.push did not push to the disposable local remote: ${JSON.stringify({ pushed, cleanPushStatus })}`);
+  const corpusDocument = await request("corpus.upsert", { title: "Local retrieval smoke", source: "smoke://document", content: "Skai retrieves explicit local documents with bounded snippets.", tags: ["local", "retrieval"] });
+  if (!corpusDocument.ok || typeof corpusDocument.result?.id !== "string") throw new Error("corpus.upsert did not persist a local document.");
+  const corpusSearch = await request("corpus.search", { query: "bounded snippets" });
+  if (!corpusSearch.ok || corpusSearch.result?.[0]?.document?.id !== corpusDocument.result.id || !corpusSearch.result?.[0]?.snippet?.includes("bounded") || corpusSearch.result?.[0]?.retrievalMode !== "hybrid-token-vector" || typeof corpusSearch.result?.[0]?.hybridScore !== "number") throw new Error("corpus.search did not return a matching hybrid bounded snippet.");
+  const corpusRemoved = await request("corpus.remove", { id: corpusDocument.result.id });
+  if (!corpusRemoved.ok || corpusRemoved.result?.removed !== true) throw new Error("corpus.remove did not remove the local document.");
   const voices = await request("voice.models");
   if (!voices.ok || !Array.isArray(voices.result?.models) || !voices.result.models.some(model => model.id === "os-native" && model.installed))
     throw new Error("voice.models did not advertise the installed OS-native voice engine.");
   const invalidSpeech = await request("voice.speak", { text: "   " });
   if (invalidSpeech.ok) throw new Error("voice.speak accepted empty text.");
-  const invalidCloudSpeech = await request("voice.speak.cloud", { text: "   ", cloudVoiceEnabled: true });
-  if (invalidCloudSpeech.ok) throw new Error("voice.speak.cloud accepted empty text.");
   const stoppedVoice = await request("voice.stop");
   if (!stoppedVoice.ok || stoppedVoice.result?.stopped !== true) throw new Error("voice.stop did not acknowledge the idle interruption request.");
   const before = await request("conversations.list");
@@ -116,26 +155,38 @@ async function run() {
   if (!settings.ok || typeof settings.result?.endpoint !== "string") throw new Error("settings.get did not return bounded settings.");
   const savedSettings = await request("settings.save", { endpoint: settings.result.endpoint, model: settings.result.model });
   if (!savedSettings.ok) throw new Error("settings.save failed in the disposable profile.");
-  const remoteSettings = await request("settings.save", { endpoint: "https://api.example.invalid/v1", model: "remote-model", provider: "Hosted compatible", cloudRouteEnabled: true });
-  if (!remoteSettings.ok || remoteSettings.result?.cloudRouteEnabled !== true) throw new Error("settings.save did not preserve an explicitly enabled HTTPS cloud route.");
+  const remoteSettings = await request("settings.save", { endpoint: "https://api.example.invalid/v1", model: "remote-model", provider: "Hosted compatible" });
+  if (remoteSettings.ok || !remoteSettings.error?.message.includes("local loopback")) throw new Error("settings.save accepted a non-local model endpoint.");
   const restoredSettings = await request("settings.save", { endpoint: settings.result.endpoint, model: settings.result.model, provider: "Ollama" });
   if (!restoredSettings.ok) throw new Error("settings.save could not restore the disposable local profile.");
-  const project = await request("project.save", { name: "Task context fixture", instructions: "Use the fixture only as read-only reference.", folderPaths: [tempRoot] });
-  if (!project.ok || typeof project.result?.id !== "string") throw new Error("project.save did not return a disposable project identity.");
-  const gitStatus = await request("project.git.status", { id: project.result.id });
-  if (!gitStatus.ok || !Array.isArray(gitStatus.result?.changes) || !gitStatus.result.changes.some(change => change.path === "task-context.md")) throw new Error("project.git.status did not return the disposable repository state.");
-  const planned = await request("tasks.plan", { title: "Protocol smoke task", instruction: "Review the local task workflow.", environment: "local", projectId: project.result.id });
-  if (!planned.ok || planned.result?.status !== "awaiting_approval") throw new Error("tasks.plan did not create an approval-gated local task.");
+  const planned = await request("tasks.plan", { title: "Protocol smoke task", instruction: "Review the local task workflow.", environment: "local" });
+  if (!planned.ok || planned.result?.status !== "proposed") throw new Error("tasks.plan did not create a proposed local task.");
+  const approvalTask = await request("tasks.plan", { title: "Approval smoke task", instruction: "Wait for explicit approval.", environment: "local", requiresApproval: true });
+  if (!approvalTask.ok || approvalTask.result?.status !== "proposed" || approvalTask.result?.requiresApproval !== true) throw new Error("tasks.plan did not persist the approval requirement.");
+  const queuedApproval = await request("tasks.queue", { id: approvalTask.result.id });
+  if (!queuedApproval.ok || queuedApproval.result?.status !== "awaiting_approval") throw new Error("tasks.queue did not stop at the approval gate.");
+  const approved = await request("tasks.approve", { id: approvalTask.result.id });
+  if (!approved.ok || approved.result?.status !== "queued") throw new Error("tasks.approve did not release the task to the local queue.");
   const tasks = await request("tasks.list");
-  if (!tasks.ok || tasks.result.length !== 1 || tasks.result[0].status !== "awaiting_approval" || tasks.result[0].title !== "Protocol smoke task" || tasks.result[0].instruction !== "Review the local task workflow." || tasks.result[0].projectId !== project.result.id) throw new Error("tasks.plan persistence round-trip failed.");
-  const approved = await request("tasks.approve", { id: planned.result.id, approvalId: "smoke-user" });
-  if (!approved.ok || approved.result?.status !== "queued") throw new Error("tasks.approve did not release the task to the explicit queue.");
-  const worktreePlan = await request("tasks.plan", { title: "Worktree review", instruction: "Prepare an isolated review.", environment: "worktree", projectId: project.result.id });
-  if (!worktreePlan.ok || worktreePlan.result?.status !== "awaiting_approval" || worktreePlan.result?.environment !== "worktree") throw new Error("tasks.plan did not persist the approved worktree environment.");
-  const missingWorktreeProject = await request("tasks.plan", { title: "Missing worktree project", instruction: "Must be rejected.", environment: "worktree" });
-  if (missingWorktreeProject.ok || !missingWorktreeProject.error?.message.includes("requires a selected Git project")) throw new Error("tasks.plan accepted a worktree task without a project.");
-  const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "sandbox" });
-  if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("environment is unsupported")) throw new Error("tasks.plan accepted an unsupported environment.");
+  const plannedTask = tasks.result?.find(task => task.id === planned.result.id);
+  if (!tasks.ok || plannedTask?.title !== "Protocol smoke task" || plannedTask.instruction !== "Review the local task workflow." || !Array.isArray(plannedTask.artifactLabels)) throw new Error("tasks.plan persistence round-trip failed.");
+  const queued = await request("tasks.queue", { id: planned.result.id });
+  if (!queued.ok || queued.result?.status !== "queued") throw new Error("tasks.queue did not queue the local task.");
+  const isolatedModelSettings = await request("settings.save", { endpoint: "http://127.0.0.1:1/v1", model: "protocol-smoke-model", provider: "Ollama" });
+  if (!isolatedModelSettings.ok) throw new Error("settings.save could not prepare the isolated task execution endpoint.");
+  const execution = await request("tasks.execute", { id: planned.result.id });
+  if (!execution.ok || execution.result?.status !== "running") throw new Error("tasks.execute did not start a background local execution.");
+  let terminalTask = null;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error("tasks.list failed while observing local execution.");
+    terminalTask = snapshot.result.find(item => item.id === planned.result.id) ?? null;
+    if (terminalTask && ["completed", "failed", "cancelled", "blocked"].includes(terminalTask.status)) break;
+  }
+  if (!terminalTask || terminalTask.status !== "failed" || !terminalTask.resultSummary) throw new Error("tasks.execute did not persist a terminal local-model failure.");
+  const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
+  if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Only the Local environment")) throw new Error("tasks.plan accepted an unsupported environment.");
   const scheduled = await request("scheduled.create", { prompt: "Run the local review", dueAt: new Date(Date.now() + 60_000).toISOString(), repeatEveryMinutes: 60 });
   if (!scheduled.ok || scheduled.result?.status !== "scheduled") throw new Error("scheduled.create did not persist a scheduled run.");
   const runNow = await request("scheduled.runNow", { id: scheduled.result.id });

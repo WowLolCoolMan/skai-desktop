@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-environment_path="${1:-${XDG_DATA_HOME:-$HOME/.local/share}/skai/airllm}"
+# Must match AirLlmProvider.ResolvePythonPath: <LocalApplicationData>/Skai/AirLLM/venv (paths are case-sensitive on Linux).
+environment_path="${1:-${XDG_DATA_HOME:-$HOME/.local/share}/Skai/AirLLM}"
 python_bin="$(command -v python3 || command -v python)"
 mkdir -p "$environment_path"
 venv="$environment_path/venv"

@@ -1,5 +1,5 @@
 // Extracts bounded, page-ordered text from a PDF on-device (PdfPig).
-// Used by: MainPage attachments.
+// Used by: the Agent Host attachment extraction protocol.
 
 using System.Text;
 using UglyToad.PdfPig;

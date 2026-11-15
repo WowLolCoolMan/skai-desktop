@@ -1,5 +1,5 @@
 // Loads/saves AppSettings as settings.json in the user's app-data folder.
-// Depends on: AppSettings, BoundedFileReader, AtomicFileWriter. Used by: MainPage (SaveSettings and startup).
+// Depends on: AppSettings, BoundedFileReader, AtomicFileWriter. Used by: the Agent Host settings protocol.
 
 using System.Text.Json;
 using SkaiDesktop.Core.Models;
@@ -15,7 +15,7 @@ public sealed class JsonSettingsStore
     public JsonSettingsStore(string? path = null)
     {
         _path = path ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
             "ServerRock", "AI", "settings.json");
     }
 
@@ -40,17 +40,11 @@ public sealed class JsonSettingsStore
         settings.Endpoint ??= defaults.Endpoint;
         settings.Model ??= defaults.Model;
         settings.ModelProvider ??= defaults.ModelProvider;
-        settings.ModelProvider = NormalizeProviderName(settings.ModelProvider);
-        if (!ProviderRoutePolicy.IsAllowed(settings.Endpoint) || (ProviderRoutePolicy.IsRemote(settings.Endpoint) && !settings.CloudRouteEnabled))
+        if (!LocalEndpoint.IsLocal(settings.Endpoint))
         {
             settings.Endpoint = defaults.Endpoint;
-            settings.CloudRouteEnabled = false;
             if (!settings.ModelProvider.Equals("AirLLM", StringComparison.OrdinalIgnoreCase))
                 settings.ModelProvider = defaults.ModelProvider;
-        }
-        else if (LocalEndpoint.IsLocal(settings.Endpoint))
-        {
-            settings.CloudRouteEnabled = false;
         }
         settings.RequireLocalModelEndpoints = true;
         settings.VisionApiFormat ??= defaults.VisionApiFormat;
@@ -67,17 +61,6 @@ public sealed class JsonSettingsStore
         settings.VoicePrimaryModelId = VoiceModelCatalog.Resolve(settings.VoicePrimaryModelId).Id;
         settings.VoiceLowResourceModelId = VoiceModelCatalog.Resolve(settings.VoiceLowResourceModelId).Id;
         settings.VoiceProfileId = VoiceProfileCatalog.Resolve(settings.VoiceProfiles, settings.VoiceProfileId).Id;
-        settings.ElevenLabsVoiceId = NormalizeRequired(settings.ElevenLabsVoiceId, defaults.ElevenLabsVoiceId, 128);
-        settings.ElevenLabsModelId = NormalizeRequired(settings.ElevenLabsModelId, defaults.ElevenLabsModelId, 128);
-        settings.PetId = settings.PetId?.Trim().ToLowerInvariant() switch
-        {
-            "byte" or "percy" or "rocky" or "sprout" or "nova" or "ember" or "custom" => settings.PetId.Trim().ToLowerInvariant(),
-            _ => defaults.PetId,
-        };
-        settings.PetSpritePath = NormalizeOptional(settings.PetSpritePath, 1_024) ?? defaults.PetSpritePath;
-        settings.PetManifestPath = NormalizeOptional(settings.PetManifestPath, 1_024) ?? defaults.PetManifestPath;
-        settings.PetPositionX = settings.PetPositionX is < -1 or > 100_000 ? defaults.PetPositionX : settings.PetPositionX;
-        settings.PetPositionY = settings.PetPositionY is < -1 or > 100_000 ? defaults.PetPositionY : settings.PetPositionY;
         settings.VoiceProfiles ??= [];
         settings.VoiceProfiles = settings.VoiceProfiles
             .Where(profile => profile is not null)
@@ -152,26 +135,11 @@ public sealed class JsonSettingsStore
         return settings;
     }
 
-    private static string NormalizeProviderName(string provider)
-    {
-        var trimmed = provider.Trim();
-        if (trimmed.Equals("OpenAI", StringComparison.OrdinalIgnoreCase)) return "OpenAI API";
-        if (trimmed.Equals("Another cloud service", StringComparison.OrdinalIgnoreCase) ||
-            trimmed.Equals("Custom endpoint", StringComparison.OrdinalIgnoreCase) ||
-            trimmed.Equals("Hosted compatible", StringComparison.OrdinalIgnoreCase)) return "Custom";
-        return trimmed;
-    }
-
     private static string? NormalizeOptional(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > maxLength || value.Any(char.IsControl)) return null;
         return value.Trim();
     }
-
-    private static string NormalizeRequired(string? value, string fallback, int maxLength) =>
-        string.IsNullOrWhiteSpace(value) || value.Length > maxLength || value.Any(char.IsControl)
-            ? fallback
-            : value.Trim();
 
     public void Save(AppSettings settings)
     {

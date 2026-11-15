@@ -1,7 +1,7 @@
 // Fixed instruction text the app puts in the system message of every model request.
-// MainPage.Chat.cs (BuildProviderMessages) adds the parts that apply: one workspace prompt, plus the
+// The Agent Host chat protocol adds the parts that apply: one workspace prompt, plus the
 // "untrusted" warnings when attachments or project file excerpts are included.
-// Depends on: nothing. Used by: MainPage.Chat.cs.
+// Depends on: nothing. Used by the Agent Host chat protocol.
 
 namespace SkaiDesktop.Core.Infrastructure;
 

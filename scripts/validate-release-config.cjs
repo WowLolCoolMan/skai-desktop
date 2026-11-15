@@ -9,50 +9,18 @@ const requiredWhenSigning = [
 ];
 
 const root = path.resolve(__dirname, "..");
-const manifestPath = path.join(root, "packaging", "native", "release-manifest.json");
-const propsPath = path.join(root, "native", "Directory.Build.props");
 const errors = [];
+const semver = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 
-let manifest;
-try {
-  manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-} catch (error) {
-  errors.push(`Unable to read packaging/native/release-manifest.json: ${error.message}`);
-}
-
-const requireText = (value, field, maximum = 256) => {
-  if (typeof value !== "string" || value.trim().length === 0 || value.length > maximum || /[\u0000-\u001f\u007f]/.test(value)) {
-    errors.push(`release manifest field ${field} must be a bounded non-empty text value`);
-    return false;
+// Release metadata now comes from the Electron package.
+for (const relative of ["package.json", path.join("apps", "desktop", "package.json")]) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
+    if (typeof pkg.name !== "string" || !pkg.name.trim()) errors.push(`${relative} must declare a package name`);
+    if (typeof pkg.version !== "string" || !semver.test(pkg.version)) errors.push(`${relative} must declare a semantic version (found ${JSON.stringify(pkg.version)})`);
+  } catch (error) {
+    errors.push(`Unable to read ${relative}: ${error.message}`);
   }
-  return true;
-};
-
-if (manifest) {
-  for (const field of ["version", "displayName", "installFolder", "launcherName", "artifact", "profilePath", "installBehavior"]) {
-    requireText(manifest[field], field);
-  }
-  if (typeof manifest.artifact === "string" && (path.isAbsolute(manifest.artifact) || manifest.artifact.includes("/") || manifest.artifact.includes("\\"))) {
-    errors.push("release manifest artifact must be a filename, not a path");
-  }
-  if (typeof manifest.installFolder === "string" && !/^[a-z0-9][a-z0-9.-]{0,63}$/.test(manifest.installFolder)) {
-    errors.push("release manifest installFolder must be a stable lowercase package identifier");
-  }
-  if (typeof manifest.launcherName === "string" && !/^[a-z0-9][a-z0-9.-]{0,63}$/.test(manifest.launcherName)) {
-    errors.push("release manifest launcherName must be a stable lowercase package identifier");
-  }
-  if (typeof manifest.version === "string" && manifest.version !== "0.0.0" && !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(manifest.version.replace(/^v/, ""))) {
-    errors.push(`Invalid release manifest version: ${manifest.version}`);
-  }
-}
-
-try {
-  const props = fs.readFileSync(propsPath, "utf8");
-  const match = props.match(/<ProductDisplayName>([^<]+)<\/ProductDisplayName>/);
-  if (!match) errors.push("native/Directory.Build.props is missing ProductDisplayName");
-  else if (manifest && manifest.displayName !== match[1].trim()) errors.push("release manifest displayName must match native ProductDisplayName");
-} catch (error) {
-  errors.push(`Unable to read native/Directory.Build.props: ${error.message}`);
 }
 
 if (process.env.RELEASE_SIGNING_READY === 'true') {
@@ -64,7 +32,7 @@ if (process.env.RELEASE_SIGNING_READY === 'true') {
 }
 
 const version = String(process.env.RELEASE_VERSION || '').replace(/^v/, '');
-if (version && !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+if (version && !semver.test(version)) {
   console.error(`Invalid release version: ${version}`);
   process.exit(1);
 }

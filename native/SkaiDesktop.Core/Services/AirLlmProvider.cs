@@ -21,6 +21,20 @@ public sealed class AirLlmProvider
 
     public bool IsInstalled => ResolveScriptPath() is not null;
 
+    public AirLlmRuntimeStatus GetRuntimeStatus(AppSettings settings)
+    {
+        var script = ResolveScriptPath();
+        if (script is null)
+            return new(false, false, ResolvePythonPath(settings.AirLlmPythonPath), "worker-missing", "The packaged AirLLM worker is unavailable.");
+
+        var dependenciesAvailable = IsRuntimeAvailable(settings);
+        return dependenciesAvailable
+            ? new(true, true, ResolvePythonPath(settings.AirLlmPythonPath), "ready", "AirLLM is ready for local Hugging Face model execution.")
+            : new(true, false, ResolvePythonPath(settings.AirLlmPythonPath), "dependencies-missing", OperatingSystem.IsWindows()
+                ? "Install the local AirLLM runtime with airllm\\install.ps1 (in the Agent Host folder, or services/airllm in a source checkout), then retry the readiness check."
+                : "Install the local AirLLM runtime with airllm/install.sh (in the Agent Host folder, or services/airllm in a source checkout), then retry the readiness check.");
+    }
+
     public bool IsRuntimeAvailable(AppSettings settings)
     {
         var script = ResolveScriptPath();
@@ -183,11 +197,21 @@ public sealed class AirLlmProvider
     {
         if (!string.IsNullOrWhiteSpace(configured) && !configured.Equals("python", StringComparison.OrdinalIgnoreCase) && !configured.Equals("python3", StringComparison.OrdinalIgnoreCase))
             return configured;
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Skai", "AirLLM", "venv");
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "AirLLM", "venv");
         var managed = OperatingSystem.IsWindows() ? Path.Combine(root, "Scripts", "python.exe") : Path.Combine(root, "bin", "python");
-        return File.Exists(managed) ? managed : (string.IsNullOrWhiteSpace(configured) ? "python" : configured);
+        if (File.Exists(managed)) return managed;
+        // Debian/Ubuntu ship only python3; "python" is not guaranteed outside Windows.
+        if (!OperatingSystem.IsWindows() && (string.IsNullOrWhiteSpace(configured) || configured.Equals("python", StringComparison.OrdinalIgnoreCase))) return "python3";
+        return string.IsNullOrWhiteSpace(configured) ? "python" : configured;
     }
 
     private static string NormalizeCompression(string? value) => value?.ToLowerInvariant() switch { "4bit" => "4bit", "8bit" => "8bit", _ => "none" };
     private static string NormalizeDevice(string? value) => value?.ToLowerInvariant() switch { "cpu" => "cpu", "cuda" => "cuda", "mps" => "mps", _ => "auto" };
 }
+
+public sealed record AirLlmRuntimeStatus(
+    bool WorkerAvailable,
+    bool DependenciesAvailable,
+    string PythonCommand,
+    string Status,
+    string Message);

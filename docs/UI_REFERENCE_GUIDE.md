@@ -4,7 +4,11 @@ This guide records the product direction supplied by the project owner and keeps
 
 ## Product direction from the owner
 
-Skai Desktop is an independent desktop AI app. It is not connected to hosted web or Core services. GitHub is a user-authorized workspace connection for browsing repositories, opening a repository as a project, and reviewing/committing/pushing project changes.
+Skai Desktop is an independent desktop AI app. It is not connected to hosted
+Skai web services; it uses the local Electron bridge, persistent Agent Host,
+and headless Core library described in `docs/ARCHITECTURE.md`. GitHub is a
+user-authorized workspace connection for browsing repositories, opening a
+repository as a project, and reviewing/committing/pushing project changes.
 
 The app should feel approachable for everyday chat while giving advanced users direct access to project work and configuration. The primary surfaces must make the mode clear:
 
@@ -44,7 +48,7 @@ The numbered files in [`ui-references/`](ui-references/) are the original user-p
 | `reference-17.png` | Mini & Pets settings | Provide pet selection, preview, customization, and one-click show/hide controls. |
 | `reference-18.png` | Plugins and integrations | Integrations should be grouped, searchable, and clearly enabled/disabled, with setup details one level deeper. |
 | `reference-19.png` | Git settings | Expose branch, merge, push, review, and commit guidance in focused Git settings. |
-| `reference-20.png` | Worktrees settings | Show worktree location, cleanup policy, and managed worktrees with safe defaults and visible safeguards. |
+| `reference-20.png` | Worktrees settings reference | If Worktree execution is enabled in a future release, show its location, cleanup policy, and managed worktrees with safe defaults and visible safeguards. The current Electron build keeps Worktree visibly unavailable because the host does not yet connect that environment. |
 | `reference-21.png` | Comparison table of Open WebUI, LobeChat, LibreChat, Jan, GPT4All, AnythingLLM, Khoj, text-generation-webui, LocalAI, NextChat, and HuggingChat | Use the categories as a landscape map: full-featured chat, offline desktop, document/knowledge workflows, developer tooling, and lightweight clients. Compare capabilities and usability patterns against the live products before choosing architecture. The star counts and short descriptions are snapshot claims from the supplied image, not current measurements or verified product facts. |
 
 ## How to use these references

@@ -1,6 +1,6 @@
 // GitHub App OAuth device flow (begin, poll with back-off, refresh) and the
 // redirect-free GitHub HttpClient factory. Holds no credentials itself.
-// Depends on: BoundedHttpContent. Used by: MainPage.GitHub.cs sign-in.
+// Depends on: BoundedHttpContent. Used by the Electron GitHub sign-in flow through the Agent Host.
 
 using System.Net;
 using System.Text.Json;

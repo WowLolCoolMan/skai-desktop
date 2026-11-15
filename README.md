@@ -1,60 +1,52 @@
 # Skai Desktop
 
 <div align="center">
-  <img src="assets/branding/skaiwolficon.png" width="128" alt="Skai Desktop icon" />
+  <img src="assets/branding/skaiwolficon.png" width="128" alt="Skai Desktop wolf icon" />
   <h1>Skai Desktop</h1>
-<p><strong>A local-first desktop workspace for chat, coding, models, projects, and media.</strong></p>
+  <p><strong>A local-first desktop workspace for chat, coding, projects, and local AI models.</strong></p>
+  <p>Private by default. Built to keep useful work on your own computer.</p>
 </div>
 
-Skai Desktop brings your models, code, files, tools, and conversations into one Windows desktop app. Local inference is the default: choose a model server already running locally, or use AirLLM for very large models that exceed ordinary local capacity. Cloud services are also first-class when explicitly connected, including OpenAI/ChatGPT, ElevenLabs voice, and other supported provider adapters.
+<p align="center">
+  <img src="assets/branding/skai-desktop-hero.png" alt="Skai Desktop workspace illustration" />
+</p>
+
+Skai Desktop is an Electron + React desktop application with a persistent .NET Agent Host. It brings local model chat, project files, guarded terminal work, task review, GitHub workflows, settings, memory, and creative tools into one focused workspace—not a hosted chat wrapper or a collection of disconnected mock screens.
+
+> **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe the current synchronized `main` branch; unfinished ideas remain in the [future feature backlog](docs/FUTURE_FEATURES.md).
+
+## The product boundary
+
+Skai Desktop is **local-only** for AI runtime and application data:
+
+- No cloud model execution, hosted provider routing, cloud sync, or remote fallback.
+- Prompts and attachments stay on this computer and are sent only to a local runtime selected by the user.
+- GitHub is an explicit project integration for repository context and guarded Git workflows; it is not an AI model provider.
+- Local services such as Ollama, LM Studio, LocalAI, llama.cpp, vLLM, OpenAI-compatible loopback servers, and ComfyUI can be connected by the user.
+
+## What Skai is today
+
+| Surface | Current state |
+| --- | --- |
+| **Chat** | Persistent conversations, attachments, queued follow-ups, Markdown/code rendering, retry, fork, pin, archive, rename, folders, tags, split view, search, and local memory controls. |
+| **Coding Workspace** | Project-scoped browsing, bounded previews, editing, reviewable diffs, guarded terminal commands, undo, task planning, and focused project context. |
+| **Agent Workbench** | Durable local task plans, dependency-aware readiness, activity filters, cancellation, approvals, and reviewable task state. Autonomous dispatch is still in progress. |
+| **Scheduled work** | Local one-time and repeating schedules with pause/resume/cancel and reviewed Run now controls. No unattended provider request is implied. |
+| **Models** | Local provider discovery, model library, pinned models, capability checks, comparison, explicit unavailable-model recovery, and no silent model switching. |
+| **Workspace shell** | Resizable sidebar, persistent navigation state, command palette, settings search, responsive layouts, in-app documentation, and Deep Sea/Deep Space appearance presets. |
+| **Local integrations** | Guarded GitHub repository workflows, local ComfyUI-compatible image workflows, local attachments, and Percy, the optional Skai wolf companion. |
+
+The [capability matrix](docs/CAPABILITY_MATRIX.md) is the source of truth for working, partial, unverified, and planned areas. The project favors small, tested vertical slices over static mock screens, with screenshots and interaction evidence recorded in [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md).
 
 ## Why Skai
 
-Most AI apps are built around a chat box. Skai is built around the work around the chat.
-
 | Skai Desktop | Typical AI chat app |
 | --- | --- |
-| Local models and compatible providers in one model library | One provider or a long list of disconnected integrations |
-| Project-scoped context, terminal work, Git review, approvals, and undo | Copy and paste between chat, editor, and terminal |
-| Local persistence with no background telemetry | Account-first history and opaque data flows |
-| Bounded file access and explicit write approval | Broad tool access with limited review |
-| Image workflows and coding work beside normal chat | Separate apps for separate tasks |
-
-## What it can do
-
-- Chat with Ollama, LM Studio, LocalAI, llama.cpp, vLLM, and other OpenAI-compatible local servers.
-- Discover and manage local models without leaving the app.
-- Work inside a project with bounded context, a guarded terminal, reviewable file edits, undo history, and GitHub workflows.
-- Attach text, PDFs, and images with local safety checks and size limits.
-- Keep model prompts on this device; optional external integrations are separate from model inference and must be explicitly enabled.
-- Generate images through ComfyUI-compatible workflows.
-- Use voice dictation and optional spoken replies on supported Windows systems.
-- Keep conversations, projects, drafts, personas, and settings on the device.
-
-## Current status
-
-The Electron + React + TypeScript desktop surface is now the approved replacement
-target for the Uno/.NET shell. Migration is staged behind a persistent .NET
-agent host and shared Core services; the Uno app remains a legacy compatibility
-surface until each required journey has equivalent host-backed acceptance. It
-must not be described as the finished replacement yet.
-
-## Run it
-
-Prerequisites: .NET 10 SDK and Node.js.
-
-```sh
-# Legacy Uno compatibility surface
-dotnet build native/ServerRock.Native/ServerRock.Native.csproj -f net10.0-desktop
-dotnet run --project native/ServerRock.Native/ServerRock.Native.csproj -f net10.0-desktop
-
-# Tests
-dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj
-
-# Replacement desktop shell
-npm run desktop:install
-npm run desktop:dev
-```
+| Local models in one discoverable library | One provider and disconnected tools |
+| Project-scoped context, files, terminal, and task review | Copy and paste between chat, editor, and terminal |
+| Persistent local conversations and drafts | Account-first history with opaque data flows |
+| Bounded reads and explicit write approval | Broad tool access with limited review |
+| Chat, coding, models, images, memory, and settings in one shell | Separate apps for separate steps |
 
 ## Architecture
 
@@ -62,59 +54,89 @@ npm run desktop:dev
 Electron + React + TypeScript
         │ typed, sandboxed local IPC
         ▼
-.NET agent host
+.NET Agent Host
         │ sessions · local providers · tools · persistence
         ▼
-Ollama · LM Studio · AirLLM · OpenAI-compatible local APIs · ComfyUI · GitHub
+Ollama · LM Studio · AirLLM · local OpenAI-compatible APIs · ComfyUI
 ```
 
-See [`docs/ELECTRON_MIGRATION_CUTOVER.md`](docs/ELECTRON_MIGRATION_CUTOVER.md)
-for the approved replacement boundary and [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md)
-for support details. The Uno surface is retained only until parity gates pass.
+The Electron renderer is the only product UI. The isolated preload bridge exposes only typed desktop operations. The persistent .NET Agent Host and shared Core services own local model requests, project boundaries, persistence, approvals, and guarded file/terminal operations. Closing the main window keeps the local host and Percy companion resident in the system tray, where users can reopen Skai, open recent chats, toggle Percy, or quit explicitly.
 
-### Resident desktop behavior
+## Run locally
 
-Electron keeps Skai resident on Windows and Linux. Closing the main window hides it to the system tray; the tray menu can restore Skai, start a new chat, open host-backed recent chats, open Marketplace, show or hide Percy, or quit the process. The portable Electron packaging workflow emits `dist/electron/win-x64` on Windows and `dist/electron/linux-x64` on Linux, with the tray icon bundled into each artifact.
+Prerequisites:
 
-## Privacy and guardrails
+- Windows 10/11
+- .NET 10 SDK
+- Node.js 20+
+- A local model runtime such as Ollama or LM Studio (optional for UI work)
 
-- No background analytics or telemetry.
-- Local inference is the default and stays on this computer.
-- Cloud services run only through an explicit provider route and user authorization; they are never selected silently or used as an automatic fallback.
-- Project reads are bounded and exclude common secret/dependency paths.
-- File writes require approval and retain guarded undo history.
-- Credentials use platform storage where supported; they are not kept in normal settings files.
+```sh
+# Install desktop dependencies
+npm run desktop:install
 
-## Repository map
+# Start the Electron + React desktop app
+npm run desktop:dev
 
-```text
-apps/desktop/             Electron + React desktop surface
-services/agent-host/      Persistent .NET host and protocol boundary
-native/SkaiDesktop.Core    Provider, persistence, workflow, and safety logic
-native/ServerRock.Native  Legacy Uno/XAML compatibility application during cutover
-docs/                     Architecture, capability, release, and feature docs
-assets/                   Product visuals and Percy mascot assets
+# Or build the renderer and open the desktop shell
+npm run desktop:build
+npm run open:desktop
+
+# Run the shared Core checks
+dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj
 ```
 
-Useful docs:
+### Linux window managers
 
-- [`docs/FUTURE_FEATURES.md`](docs/FUTURE_FEATURES.md) — product backlog.
-- [`docs/MODEL_LIBRARY.md`](docs/MODEL_LIBRARY.md) — model discovery and runtime notes.
-- [`docs/LOCAL_IMAGE_GENERATION.md`](docs/LOCAL_IMAGE_GENERATION.md) — ComfyUI setup.
-- [`docs/GITHUB_INTEGRATION.md`](docs/GITHUB_INTEGRATION.md) — project GitHub workflows.
-- [`services/agent-host/README.md`](services/agent-host/README.md) — host protocol.
-- [`docs/ELECTRON_MIGRATION_CUTOVER.md`](docs/ELECTRON_MIGRATION_CUTOVER.md) — replacement and retirement gates.
+- **Installing a Linux build:** extract the `Skai-Desktop-electron-linux-x64` archive and run `./install.sh`. It installs for your user (no root needed) and adds Skai to your app launcher and a `skai-desktop` command. On distributions that restrict unprivileged user namespaces (such as Ubuntu 24.04+), it offers the one `sudo` step Chromium's sandbox needs. `./uninstall.sh` removes the app and keeps your data.
+- **Wayland (Hyprland, Sway, GNOME, KDE):** Skai runs under XWayland by default, because native Wayland does not let apps position their own windows and Percy needs that to walk and be dragged. Set `SKAI_OZONE_PLATFORM=wayland` (or pass `--ozone-platform=wayland`) for native Wayland. Percy then stays where the compositor puts it and is moved by dragging.
+- **Tiling WMs (i3, bspwm, Hyprland, Sway):** Percy asks to float. Your WM decides borders, stickiness and always-on-top, so you can add rules for it, for example:
+  - i3: `for_window [class="skai-desktop" title="^Percy"] floating enable, sticky enable, border none`
+  - Hyprland: `windowrule = float, pin, noborder, noshadow, title:^(Percy)`
+- **X11 without a compositor** (plain i3, bspwm): transparent windows render with a black background. Run a compositor such as `picom`, or hide Percy from the tray or Settings.
+- **System tray:** closing the window keeps Skai in the tray only when a tray host is running (Waybar `tray`, KDE, the GNOME AppIndicator extension, or an X11 tray such as i3bar). Without one, closing the window quits Skai.
 
-## Contributing
+## Verification
 
-Keep changes incremental and testable. Before opening a pull request:
+Before opening a pull request, run the checks that match your change:
 
 ```sh
 npm run check:syntax
 npm run check:hygiene
+npm run audit:electron-runtime
+npm run audit:local-only
 npm test
 npm run desktop:typecheck
 npm run desktop:build
 ```
+
+The local-only audit is intentional: it rejects hosted/cloud model routes from the shipped Electron and Agent Host runtime.
+
+## Repository map
+
+```text
+apps/desktop/              Electron + React desktop surface
+services/agent-host/       Persistent .NET host and protocol boundary
+native/SkaiDesktop.Core/   Headless provider, persistence, workflow, and safety logic
+assets/                    Skai branding and Percy mascot assets
+docs/                      Architecture, capability, release, and feature documentation
+```
+
+Useful docs:
+
+- [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md) — visual migration ledger and evidence.
+- [`docs/FUTURE_FEATURES.md`](docs/FUTURE_FEATURES.md) — future product backlog.
+- [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — implemented, partial, and planned capabilities.
+- [`docs/ELECTRON_MIGRATION_CUTOVER.md`](docs/ELECTRON_MIGRATION_CUTOVER.md) — Electron replacement boundary and retirement gates.
+- [`docs/GITHUB_INTEGRATION.md`](docs/GITHUB_INTEGRATION.md) — repository project workflows.
+- [`services/agent-host/README.md`](services/agent-host/README.md) — Agent Host protocol notes.
+
+## What is next
+
+The next work is deliberately visible rather than implied: complete the local task execution path, deepen editor and diff workflows, finish remaining keyboard/focus and packaged acceptance checks, validate Linux support with a supported .NET environment, improve retrieval, and add more local integrations. See the capability matrix for evidence-backed status instead of assuming every item in the product backlog is shipped.
+
+## Contributing
+
+Keep changes incremental, local-first, and testable. Preserve the Electron → isolated IPC → .NET Agent Host boundary, avoid exposing secrets to the renderer, do not add cloud model routes, and include validation evidence for user-facing changes.
 
 MIT licensed. Third-party notices are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

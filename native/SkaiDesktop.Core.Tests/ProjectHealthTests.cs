@@ -1,6 +1,6 @@
 // Offline project health scan and architecture map (LocalProjectHealthAnalyzer): finds
 // manifests, entry points, and risk markers from bounded samples, and never follows links
-// out of the project. Added on main; moved here when main was merged into native/polish.
+// out of the project. This behavior is covered by the headless Core test suite.
 // Uses TestSupport (Check). Run by Program.cs.
 
 using SkaiDesktop.Core.Services;

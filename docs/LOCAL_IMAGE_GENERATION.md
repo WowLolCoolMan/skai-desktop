@@ -2,11 +2,11 @@
 
 ## Current gap
 
-The native desktop client currently supports a user-configured local ComfyUI
+The Electron desktop client currently supports a user-configured local ComfyUI
 workflow for image generation. It does not yet bundle a Stable Diffusion
 runtime or provide a built-in local image-model downloader. Hosted inference is
-kept separate and clearly labeled. The delivery plan below describes the native
-runtime boundary that should replace the current workflow.
+kept separate and clearly labeled. The delivery plan below describes a future
+local runtime boundary that can replace the current workflow.
 
 ## Recommended approach
 

@@ -10,28 +10,38 @@
   --skai-space-6: 24px;
   --skai-space-8: 32px;
   --skai-space-10: 40px;
-  --skai-radius-sm: 7px;
-  --skai-radius-md: 9px;
-  --skai-radius-lg: 11px;
-  --skai-radius-xl: 14px;
+  --skai-radius-sm: 8px;
+  --skai-radius-md: 12px;
+  --skai-radius-lg: 18px;
+  --skai-radius-xl: 24px;
   --skai-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --skai-duration-fast: 140ms;
   --skai-duration-standard: 220ms;
-  /* Reference pack v4: graphite surfaces with a restrained amethyst accent. */
-  --skai-color-canvas: #191a1c;
-  --skai-color-surface: #222326;
-  --skai-color-surface-raised: #292a2e;
-  --skai-color-surface-soft: rgba(255, 255, 255, 0.045);
-  --skai-color-border: #34363a;
-  --skai-color-border-strong: #4a4c52;
-  --skai-color-text: #f0efef;
-  --skai-color-text-muted: #a0a2a8;
-  --skai-color-accent: #b6a5f5;
-  --skai-color-accent-strong: #9e8ce9;
-  --skai-color-success: #8dd4b0;
-  --skai-color-warning: #e6b36a;
-  --skai-color-danger: #ff9da9;
-  --skai-shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.18);
+  --skai-color-canvas: #0b0d20;
+  --skai-color-surface: #13162c;
+  --skai-color-surface-raised: #1a1f3a;
+  --skai-color-surface-soft: rgba(255, 255, 255, 0.06);
+  --skai-color-border: rgba(255, 255, 255, 0.12);
+  --skai-color-border-strong: rgba(255, 255, 255, 0.2);
+  --skai-color-text: #f4f6ff;
+  --skai-color-code-surface: #080b18;
+  --skai-color-code-text: #c9d6f0;
+  --skai-color-text-muted: #a9b0ca;
+  --skai-color-accent: #63d9e9;
+  --skai-color-accent-strong: #26b8d1;
+  --skai-color-danger: #ff8d9c;
+  --skai-color-sidebar: #111629;
+  --skai-color-sidebar-text: #c5ccdc;
+  --skai-color-sidebar-strong: #f1f4fb;
+  --skai-color-sidebar-muted: #74809c;
+  --skai-color-sidebar-subtle: #8692ad;
+  --skai-color-sidebar-icon: #8290ae;
+  --skai-color-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --skai-color-sidebar-history-hover: rgba(255, 255, 255, 0.05);
+  --skai-color-sidebar-active: rgba(99, 217, 233, 0.12);
+  --skai-color-sidebar-active-border: rgba(113, 217, 223, 0.25);
+  --skai-color-sidebar-border: rgba(255, 255, 255, 0.09);
+  --skai-shadow-panel: 0 24px 80px rgba(0, 0, 0, 0.24);
 }
 
 [data-theme="light"] {
@@ -44,6 +54,17 @@
   --skai-color-border-strong: rgba(24, 35, 60, 0.22);
   --skai-color-text: #18213a;
   --skai-color-text-muted: #5b6680;
+  --skai-color-sidebar: #eef1f6;
+  --skai-color-sidebar-text: #263044;
+  --skai-color-sidebar-strong: #18213a;
+  --skai-color-sidebar-muted: #66748b;
+  --skai-color-sidebar-subtle: #61708a;
+  --skai-color-sidebar-icon: #61718b;
+  --skai-color-sidebar-hover: rgba(24, 33, 58, 0.06);
+  --skai-color-sidebar-history-hover: rgba(24, 33, 58, 0.05);
+  --skai-color-sidebar-active: rgba(39, 145, 154, 0.12);
+  --skai-color-sidebar-active-border: rgba(39, 145, 154, 0.28);
+  --skai-color-sidebar-border: rgba(24, 33, 58, 0.12);
   --skai-shadow-panel: 0 24px 80px rgba(28, 42, 72, 0.12);
 }
 
@@ -57,38 +78,27 @@
     --skai-color-border: rgba(24, 35, 60, 0.14);
     --skai-color-text: #18213a;
     --skai-color-text-muted: #5b6680;
+    --skai-color-sidebar: #eef1f6;
+    --skai-color-sidebar-text: #263044;
+    --skai-color-sidebar-strong: #18213a;
+    --skai-color-sidebar-muted: #66748b;
+    --skai-color-sidebar-subtle: #61708a;
+    --skai-color-sidebar-icon: #61718b;
+    --skai-color-sidebar-hover: rgba(24, 33, 58, 0.06);
+    --skai-color-sidebar-history-hover: rgba(24, 33, 58, 0.05);
+    --skai-color-sidebar-active: rgba(39, 145, 154, 0.12);
+    --skai-color-sidebar-active-border: rgba(39, 145, 154, 0.28);
+    --skai-color-sidebar-border: rgba(24, 33, 58, 0.12);
     --skai-shadow-panel: 0 24px 80px rgba(28, 42, 72, 0.12);
   }
 }
 
 [data-backdrop="deep-sea"] {
   --skai-color-accent: #67e8f9;
-  --skai-color-accent-strong: #29bfd6;
 }
 
 [data-backdrop="deep-space"] {
   --skai-color-accent: #b5a5ff;
-  --skai-color-accent-strong: #9684e8;
-}
-
-[data-accent="cyan"] {
-  --skai-color-accent: #67d7e5;
-  --skai-color-accent-strong: #2ab6c9;
-}
-
-[data-accent="violet"] {
-  --skai-color-accent: #b6a5f5;
-  --skai-color-accent-strong: #9e8ce9;
-}
-
-[data-accent="amber"] {
-  --skai-color-accent: #e6b36a;
-  --skai-color-accent-strong: #c68c43;
-}
-
-[data-accent="rose"] {
-  --skai-color-accent: #f0a0bd;
-  --skai-color-accent-strong: #d9789d;
 }
 
 [data-density="compact"] {

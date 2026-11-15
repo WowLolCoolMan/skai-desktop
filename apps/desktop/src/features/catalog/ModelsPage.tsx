@@ -1,0 +1,48 @@
+import { useMemo, useState } from "react";
+import type { Model } from "../../app/types";
+import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
+import { NavIcon } from "../../components/ui/NavIcon";
+
+function modelProvider(model: string) {
+  const separator = model.indexOf("/");
+  return separator > 0 ? model.slice(0, separator) : "Local runtime";
+}
+
+function modelVisionLabel(vision: string) {
+  return vision.toLowerCase() === "supported" ? "Vision" : "Text";
+}
+
+export function ModelsPage({ models, onDiscover, onPull, onCancelPull, onSelect }: { models: Model[]; onDiscover: () => void | Promise<boolean>; onPull: (model: string, onProgress: (message: string) => void) => Promise<boolean>; onCancelPull: () => Promise<boolean>; onSelect: (model: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveryState, setDiscoveryState] = useState<"idle" | "success" | "error">("idle");
+  const [pullName, setPullName] = useState("");
+  const [pulling, setPulling] = useState(false);
+  const [pullProgress, setPullProgress] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [reviewPullName, setReviewPullName] = useState<string | null>(null);
+  const filtered = useMemo(() => models.filter((model) => `${model.model} ${model.capabilities.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase())), [models, query]);
+  const selected = models.find((model) => model.model === selectedModel) ?? null;
+  const discover = async () => {
+    if (discovering) return;
+    setDiscovering(true);
+    try { const result = await onDiscover(); setDiscoveryState(result === false ? "error" : "success"); }
+    catch { setDiscoveryState("error"); }
+    finally { setDiscovering(false); }
+  };
+  const registryStatus = discovering ? { tone: "warning" as const, label: "Discovering" } : discoveryState === "error" ? { tone: "danger" as const, label: "Needs attention" } : models.length ? { tone: "success" as const, label: "Registry ready" } : { tone: "neutral" as const, label: "No models loaded" };
+  const pull = async (requestedName = pullName.trim()) => {
+    const name = requestedName.trim();
+    if (!name || pulling) return;
+    setPulling(true); setPullProgress([`Preparing local download for ${name}…`]);
+    try { const completed = await onPull(name, (message) => setPullProgress((current) => [...current.slice(-3), message])); if (!completed) setPullProgress((current) => [...current.slice(-3), "Local download did not complete. Check the runtime message."]); else setPullProgress((current) => [...current.slice(-3), "Model download completed locally."]); }
+    catch { setPullProgress(["Local download failed. Review the local runtime message."]); }
+    finally { setPulling(false); }
+  };
+  const cancelPull = async () => { if (!pulling) return; await onCancelPull(); setPullProgress((current) => [...current.slice(-3), "Cancellation requested for the local download."]); };
+  return <div className="feature-page models-page">
+    <PageHeader eyebrow="MODEL LIBRARY" title="Choose your model" description="Choose models already running on this computer, or prepare a very large local model through AirLLM." actions={<><span role="status" aria-live="polite" aria-atomic="true"><StatusBadge tone={registryStatus.tone}>{registryStatus.label}</StatusBadge></span><Button variant="primary" disabled={discovering} aria-busy={discovering} onClick={() => void discover()}><NavIcon name="refresh" />{discovering ? "Discovering…" : "Discover local models"}</Button></>} />
+    <Card className="catalog-card model-install-card"><div className="panel-heading"><div><p className="section-kicker">LOCAL OLLAMA</p><h3>Download a model</h3><p className="panel-subtitle">Review the model name before pulling it into the local Ollama runtime. Progress stays on this computer.</p></div><StatusBadge tone={pulling ? "warning" : "neutral"}>{pulling ? "Downloading" : reviewPullName ? "Review required" : "Local only"}</StatusBadge></div><div className="model-install-form"><input value={pullName} onChange={(event) => setPullName(event.target.value)} placeholder="e.g. llama3.2:latest" aria-label="Ollama model name" /><Button variant="secondary" disabled={pulling || !pullName.trim()} aria-busy={pulling} onClick={() => setReviewPullName(pullName.trim())}>{pulling ? "Downloading…" : "Review download"}</Button>{pulling && <Button variant="ghost" onClick={() => void cancelPull()}>Cancel</Button>}</div>{reviewPullName && <div className="model-install-review" role="dialog" aria-label="Review local model download"><p className="section-kicker">DOWNLOAD REVIEW</p><strong>{reviewPullName}</strong><span>This will ask the local Ollama runtime to download the named model. No remote package verification is performed by this free-form path.</span><div className="model-install-review-actions"><Button variant="ghost" type="button" onClick={() => setReviewPullName(null)}>Cancel</Button><Button variant="primary" type="button" disabled={pulling} onClick={() => { const name = reviewPullName; setReviewPullName(null); void pull(name); }}>Confirm local download</Button></div></div>}{pullProgress.length > 0 && <div className="model-install-progress" role="status" aria-live="polite">{pullProgress.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}</div>}</Card>
+    <Card className="catalog-card model-library-card"><div className="catalog-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search local models…" aria-label="Search local models" /><span>{filtered.length} available</span>{discoveryState === "error" && <span className="catalog-discovery-status" role="status" aria-live="polite">Last inventory shown; refresh failed.</span>}</div>{models.length === 0 ? <EmptyState title="No local models discovered" description="Start Ollama, LM Studio, or another compatible server on this computer, then discover its models. For a very large model, choose AirLLM in the local runtime settings." action={<Button variant="secondary" disabled={discovering} aria-busy={discovering} onClick={() => void discover()}><NavIcon name="refresh" />{discovering ? "Discovering…" : "Discover local models"}</Button>} /> : filtered.length === 0 ? <EmptyState title="No matching local models" description="Try a different model name or capability." action={<Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>} /> : <div className="models-library-layout"><div className="catalog-list" aria-label="Available local models">{filtered.map((model) => <button className={`catalog-row${selected?.model === model.model ? " is-selected" : ""}`} key={model.model} onClick={() => setSelectedModel(model.model)} type="button" aria-pressed={selected?.model === model.model}><span className="catalog-icon"><NavIcon name="model" /></span><span className="catalog-row-copy"><strong>{model.model}</strong><small>{modelProvider(model.model)} · {modelVisionLabel(model.vision)} · {model.capabilities.join(" · ") || "Text generation"}</small></span><span className="catalog-row-meta"><StatusBadge tone="success">On this computer</StatusBadge><span className="catalog-action">Inspect <NavIcon name="arrow-right" /></span></span></button>)}</div>{selected ? <aside className="model-inspector" aria-label="Selected model details"><div className="model-inspector-heading"><div><p className="section-kicker">SELECTED MODEL</p><h3>{selected.model}</h3></div><StatusBadge tone="success">Available locally</StatusBadge></div><dl className="model-detail-list"><div><dt>Runtime</dt><dd>{modelProvider(selected.model)}</dd></div><div><dt>Input</dt><dd>{modelVisionLabel(selected.vision)}</dd></div><div><dt>Capabilities</dt><dd>{selected.capabilities.join(" · ") || "Text generation"}</dd></div></dl><p className="model-inspector-note">This model was reported by a local runtime. Selecting it changes the chat model without downloading or changing provider settings.</p><Button variant="primary" onClick={() => onSelect(selected.model)}>Use in chat</Button></aside> : <aside className="model-inspector model-inspector-empty" aria-label="Model details"><EmptyState title="Inspect a model" description="Select a model to review its local runtime and capabilities before using it in Chat." /></aside>}</div>}</Card>
+  </div>;
+}

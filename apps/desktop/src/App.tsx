@@ -1,17 +1,23 @@
+import type { CSSProperties } from "react";
 import { AppRouteView } from "./app/AppRouteView";
 import { useDesktopWorkspace } from "./app/useDesktopWorkspace";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Toolbar } from "./components/layout/Toolbar";
 import { CommandPalette } from "./components/overlays/CommandPalette";
+import { CloseChoiceDialog } from "./components/overlays/CloseChoiceDialog";
+import { GlobalRail } from "./components/layout/GlobalRail";
 
 export default function App() {
   const workspace = useDesktopWorkspace();
-  return <div className={`app-shell ${workspace.sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-    <Sidebar route={workspace.route} onNavigate={workspace.onNavigate} conversations={workspace.conversations} projects={workspace.routeState.projects} selectedProject={workspace.routeState.selectedProject} tasks={workspace.routeState.tasks} taskBusy={workspace.routeState.taskBusy} query={workspace.conversationQuery} collapsed={workspace.sidebarCollapsed} onQueryChange={workspace.setConversationQuery} onToggleSidebar={workspace.toggleSidebar} onNewChat={workspace.startNewChat} onSelectConversation={workspace.selectConversation} onOpenProject={workspace.routeActions.onOpenProject} onConversationMetadata={workspace.updateConversationMetadata} onOpenCommandPalette={workspace.openCommandPalette} />
+  const shellStyle = { "--skai-sidebar-width": `${workspace.sidebarWidth}px` } as CSSProperties;
+  return <div className={`app-shell ${workspace.sidebarCollapsed ? "sidebar-collapsed" : ""}`} style={shellStyle}>
+    <GlobalRail route={workspace.route} onNavigate={workspace.onNavigate} onOpenLauncher={workspace.openCommandPalette} />
+      <Sidebar className="thread-sidebar" route={workspace.route} onNavigate={workspace.onNavigate} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} collapsed={workspace.sidebarCollapsed} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onToggleCollapsed={workspace.toggleSidebar} onNewChat={workspace.startNewChat} onOpenProject={workspace.routeActions.onOpenProject} onSelectConversation={workspace.selectConversation} onConversationMetadata={workspace.updateConversationMetadata} />
     <main className="app-main">
-      <Toolbar route={workspace.route} connection={workspace.connection} onBack={() => window.history.back()} onForward={() => window.history.forward()} />
-      <div className="app-content"><AppRouteView state={workspace.routeState} actions={workspace.routeActions} />{workspace.error && <p className="global-error" role="alert">{workspace.error}</p>}{workspace.health && <span className="sr-only">{workspace.health.service} protocol {workspace.health.protocolVersion}</span>}</div>
+      <Toolbar route={workspace.route} connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onSettings={() => workspace.onNavigate("settings")} />
+      <div className={`app-content ${workspace.route === "chat" ? "app-content-chat" : ""} ${workspace.route === "coding" ? "app-content-coding" : ""} ${workspace.route === "settings" ? "app-content-settings" : ""} ${workspace.route === "images" ? "app-content-images" : ""} ${workspace.route === "marketplace" ? "app-content-marketplace" : ""} ${workspace.route === "workbench" ? "app-content-workbench" : ""} ${workspace.route === "terminal" ? "app-content-terminal" : ""}`}><AppRouteView state={workspace.routeState} actions={workspace.routeActions} />{workspace.error && <p className="global-error" role="alert">{workspace.error}</p>}{workspace.health && <span className="sr-only">{workspace.health.service} protocol {workspace.health.protocolVersion}</span>}</div>
     </main>
     <CommandPalette open={workspace.commandOpen} onClose={workspace.closeCommandPalette} onNavigate={workspace.onNavigate} />
+    <CloseChoiceDialog />
   </div>;
 }

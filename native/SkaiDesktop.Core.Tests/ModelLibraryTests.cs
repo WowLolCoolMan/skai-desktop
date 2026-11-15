@@ -37,17 +37,6 @@ internal static class ModelLibraryTests
         Check(hubModels.Count == 1 && hubModels[0].Id == "org/model-gguf" && hubModels[0].Downloads == 1234, "model library parses Hub IDs and popularity metadata");
         var uncensoredHubModels = await hfSearch.SearchHuggingFaceAsync("small instruct", uncensored: true);
         Check(uncensoredHubModels.Count >= 1 && uncensoredHubModels.All(model => model.IsUncensored), "uncensored catalog includes only explicitly labeled repositories");
-        var marketplaceCalls = 0;
-        var hfMarketplace = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
-        {
-            marketplaceCalls++;
-            var pipeline = request.RequestUri?.Query.Contains("text-to-speech", StringComparison.OrdinalIgnoreCase) == true ? "text-to-speech" : "text-to-image";
-            var data = $"[{{\"id\":\"org/{pipeline}\",\"downloads\":42,\"likes\":7,\"pipeline_tag\":\"{pipeline}\",\"siblings\":[{{\"rfilename\":\"model-Q4_K_M.gguf\",\"size\":4294967296}}]}}]";
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(data) });
-        })));
-        var marketplaceAssets = await hfMarketplace.SearchHuggingFaceMarketplaceAsync("", "voice", uncensored: false, size: "medium", quantization: "ANY", limit: 20);
-        Check(marketplaceCalls == 2 && marketplaceAssets.Count == 2 && marketplaceAssets.All(asset => asset.Task is "text-to-speech" or "automatic-speech-recognition"), "marketplace polls parallel Hugging Face task lanes and returns typed assets");
-        Check(marketplaceAssets.Any(asset => asset.Quantizations.Contains("Q4_K_M") && asset.SizeBytes == 4294967296), "marketplace preserves GGUF quantization and size metadata for filters");
         var boundedCatalog = new ModelLibraryService(new HttpClient(new StubHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("[{\"id\":\"" + new string('x', 513) + "\"}]") }))));
         try
@@ -90,7 +79,7 @@ internal static class ModelLibraryTests
         })));
         var resilientModels = await resilientInventory.DiscoverLocalModelsAsync("http://localhost:1234/v1");
         Check(resilientModels.Count == 1 && resilientModels[0].Model == "healthy-local-model" && resilientModels[0].Provider == "LM Studio",
-            "one malformed local runtime response does not block AI SuperMarket inventory from healthy runtimes");
+            "one malformed local runtime response does not block Model Library inventory from healthy runtimes");
 
         var ollamaProgress = new List<string>();
         var ollamaPull = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
@@ -200,7 +189,7 @@ internal static class ModelLibraryTests
         }
         catch (InvalidOperationException) { Check(true, "ModelScope GGUF import rejects path traversal before network access"); }
 
-        // Local speed averaging (moved from MainPage into Core).
+        // Local speed averaging (moved from the former desktop shell into Core).
         Check(LocalModelPerformance.Key(" HTTP://LocalHost:1234/v1/ ", "Qwen3") == "http://localhost:1234/v1\nQwen3",
             "local speed key normalizes the endpoint but keeps the model ID");
         var measuredAt = DateTimeOffset.Parse("2026-11-07T00:00:00Z");

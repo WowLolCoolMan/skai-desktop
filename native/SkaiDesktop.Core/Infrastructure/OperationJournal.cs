@@ -18,7 +18,7 @@ public sealed class OperationJournal
     public OperationJournal(string? path = null)
     {
         _path = path ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
             "ServerRock", "AI", "operations.json");
     }
 

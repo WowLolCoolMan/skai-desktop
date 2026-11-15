@@ -1,6 +1,6 @@
 // One saved conversation plus the project context and mode it was created in.
 // Depends on: ChatMessage.
-// Used by: ConversationStore / ConversationArchive (persistence) and MainPage recents, folders, and branches.
+// Used by: ConversationStore / ConversationArchive (persistence) and the Electron recents, folders, and branches surfaces.
 
 namespace SkaiDesktop.Core.Models;
 

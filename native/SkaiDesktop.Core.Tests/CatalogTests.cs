@@ -29,12 +29,6 @@ internal static class CatalogTests
             "built-in skills expose explicit read-only permissions");
         Check(SkillCatalogService.Find("missing-skill") is null && SkillCatalogService.Find("RELEASE-READINESS")?.Category == "Delivery",
             "skill catalog lookup is case-insensitive and rejects unknown skills");
-        Check(AuthoredSkillCatalog.Entries.Count >= 250 &&
-              AuthoredSkillCatalog.Entries.Select(item => item.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == AuthoredSkillCatalog.Entries.Count &&
-              AuthoredSkillCatalog.Entries.All(item => item.Url.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase)),
-            "authored GitHub skill catalog ships 250 unique reviewed entries");
-        Check(AuthoredSkillCatalog.LaneFor(AuthoredSkillCatalog.Entries.First(item => item.Name.Contains("Security", StringComparison.OrdinalIgnoreCase))) == "Security",
-            "authored skill catalog assigns a visible workflow lane");
         var releasePrompt = SkillCatalogService.Find("release-readiness")!.Prompt;
         var expandedReleasePrompt = PromptVariableExpander.Expand(
             releasePrompt,
@@ -46,7 +40,7 @@ internal static class CatalogTests
               !expandedReleasePrompt.Contains("{{DATE}}", StringComparison.Ordinal),
             "release-readiness skill expands explicit user-name and date variables before review");
 
-        // Slash command catalog and suggestion filter (moved from MainPage into Core).
+        // Slash command catalog and suggestion filter (moved from the former desktop shell into Core).
         Check(SlashCommandCatalog.Commands.Select(item => item.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == SlashCommandCatalog.Commands.Length
             && SlashCommandCatalog.Commands.All(item => item.Name.StartsWith('/') && item.Description.Length > 0),
             "slash command catalog has unique, described commands");

@@ -1,5 +1,5 @@
 // A named project: instructions plus the folders the user explicitly selected.
-// Used by: ProjectStore (projects.json) and MainPage projects / Coding Agent.
+// Used by: ProjectStore (projects.json) and the Electron projects / Coding Agent surfaces.
 
 namespace SkaiDesktop.Core.Models;
 

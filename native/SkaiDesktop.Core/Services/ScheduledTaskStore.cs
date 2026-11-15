@@ -15,7 +15,7 @@ public sealed class ScheduledTaskStore
 
     public ScheduledTaskStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "scheduled-tasks.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "scheduled-tasks.json");
     }
 
     public IReadOnlyList<ScheduledTask> Load()

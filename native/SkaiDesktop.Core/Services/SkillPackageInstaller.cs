@@ -19,7 +19,7 @@ public sealed class SkillPackageInstaller
 
     public SkillPackageInstaller(string? root = null)
     {
-        _root = Path.GetFullPath(root ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "skills"));
+        _root = Path.GetFullPath(root ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "skills"));
     }
 
     public IReadOnlyList<InstalledSkill> ListInstalled()
@@ -35,13 +35,6 @@ public sealed class SkillPackageInstaller
             result.Add(ToInstalled(manifest, directory));
         }
         return result.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
-    }
-
-    public bool CanRollback(string id)
-    {
-        ValidateId(id);
-        var backups = Path.Combine(_root, "backups", id);
-        return Directory.Exists(backups) && Directory.EnumerateDirectories(backups).Any();
     }
 
     public string ReadInstructions(string id)
@@ -145,16 +138,6 @@ public sealed class SkillPackageInstaller
             Directory.Move(displaced, active);
             throw;
         }
-    }
-
-    public void Uninstall(string id)
-    {
-        ValidateId(id);
-        var active = Path.Combine(_root, "active", id);
-        if (!Directory.Exists(active)) throw new InvalidOperationException("The installed skill is no longer available.");
-        Directory.Delete(active, recursive: true);
-        var backups = Path.Combine(_root, "backups", id);
-        if (Directory.Exists(backups)) Directory.Delete(backups, recursive: true);
     }
 
     private static List<PackageFile> ReadPackageFiles(string source)

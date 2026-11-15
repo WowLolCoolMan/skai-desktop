@@ -1,6 +1,6 @@
 // GitHub REST calls: signed-in account, repository list, repository lookup, and safe
 // parsing of `owner/name` or GitHub URLs.
-// Depends on: GitHubHttpClientFactory, BoundedHttpContent. Used by: MainPage.GitHub.cs, GitHubWorkspaceService.
+// Depends on: GitHubHttpClientFactory, BoundedHttpContent. Used by the Agent Host GitHub protocol and GitHubWorkspaceService.
 
 using System.Net;
 using System.Net.Http.Headers;

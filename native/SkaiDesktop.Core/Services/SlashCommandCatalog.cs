@@ -1,7 +1,7 @@
 // Slash commands offered in the composer (/help, /model, /mode, …) and the suggestion filter
 // behind the popup: typing "/mo" lists matching commands; typing "/mode " lists that command's
-// arguments. Running a command is UI work and stays in MainPage.SlashCommands.cs.
-// Depends on: nothing. Used by: MainPage.SlashCommands.cs.
+// arguments. Running a command is renderer work and is dispatched through the Agent Host.
+// Depends on: nothing. Used by the Electron slash-command surface.
 
 namespace SkaiDesktop.Core.Services;
 

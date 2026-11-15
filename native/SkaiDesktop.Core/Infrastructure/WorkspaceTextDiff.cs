@@ -1,5 +1,5 @@
 // Bounded line diff used to preview a proposed file replacement.
-// Used by: MainPage Coding Agent change review.
+// Used by: the Electron Coding Agent change-review surface through the Agent Host.
 
 namespace SkaiDesktop.Core.Infrastructure;
 
