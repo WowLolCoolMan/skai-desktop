@@ -77,6 +77,7 @@ const animationByPose: Record<PetPose, PetAnimationId> = {
   idle: "idle", walk: "walking", thinking: "thinking", coding: "working", coding_malicious: "malicious-coding",
   stuck: "stuck", success: "success", error: "fail", "needs-attention": "needs-attention",
 };
+const BUILTIN_NAMES: Record<string, string> = { percy: "Percy", byte: "Byte", ember: "Ember", nova: "Nova", rocky: "Rocky", sprout: "Sprout", "skai-rig": "Skai" };
 
 type PetDragHandlers = Partial<Record<"onPointerDown" | "onPointerMove" | "onPointerUp" | "onPointerCancel", (event: PointerEvent<any>) => void>>;
 
@@ -198,6 +199,7 @@ export function PetWindow() {
   const motionRef = useRef(motion);
   const bubbleTimer = useRef<number | undefined>(undefined);
   const poseTimer = useRef<number | undefined>(undefined);
+  const companionName = customProfile?.name ?? BUILTIN_NAMES[character] ?? "Companion";
 
   useEffect(() => {
     motionRef.current = motion;
@@ -233,7 +235,7 @@ export function PetWindow() {
   }, []);
 
   useEffect(() => {
-    document.title = "Percy · Skai companion";
+    document.title = `${companionName} · Skai companion`;
     document.documentElement.dataset.petWindow = "true";
     document.body.dataset.petWindow = "true";
     if (OPAQUE_SURFACE) document.documentElement.dataset.petSurface = "opaque";
@@ -268,7 +270,7 @@ export function PetWindow() {
       delete document.documentElement.dataset.petWindow;
       delete document.body.dataset.petWindow;
     };
-  }, []);
+  }, [companionName]);
 
   const rigDemo = new URLSearchParams(window.location.search).get("rig") === "1";
   const activePose = rigDemo ? demoPose : pose === "success" || pose === "error" || pose === "needs-attention" ? pose : COMPOSITOR_DRAG ? "idle" : activity.state;
@@ -302,10 +304,10 @@ export function PetWindow() {
     window.serverRockAgent?.pet?.endDrag();
   };
   const dragHandlers = COMPOSITOR_DRAG ? {} : { onPointerDown: beginDrag, onPointerMove: moveDrag, onPointerUp: endDrag, onPointerCancel: endDrag };
-  return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}`} aria-label={`${customProfile?.name ?? character} desktop companion. Drag to move.`} data-pose={activePose}>
+  return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}`} aria-label={`${companionName} desktop companion. Drag to move.`} data-pose={activePose}>
     {bubble && <div className={`pet-window-bubble pet-window-bubble-${bubbleKind}`} role="status" aria-live="polite">{bubble}</div>}
     {isRig && <StickRigPet pose={activePose} facing={activity.facing} dragHandlers={dragHandlers} />}
-    <button className="pet-window-hide" type="button" onClick={() => window.serverRockAgent?.pet?.hide()} aria-label="Hide Percy companion"><NavIcon name="close" /></button>
-    <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}${activity.facing === -1 ? " is-facing-left" : ""}`} style={spriteStyle} role="img" aria-label={`Animated ${customProfile?.name ?? character} companion`} {...dragHandlers} />
+    <button className="pet-window-hide" type="button" title={`Hide ${companionName}`} onClick={() => window.serverRockAgent?.pet?.hide()} aria-label={`Hide ${companionName} companion`}><NavIcon name="close" /></button>
+    <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}${activity.facing === -1 ? " is-facing-left" : ""}`} style={spriteStyle} role="img" aria-label={`Animated ${companionName} companion`} {...dragHandlers} />
   </main>;
 }
