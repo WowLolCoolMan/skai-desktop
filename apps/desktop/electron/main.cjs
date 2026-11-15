@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, session, Tray } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -63,6 +63,9 @@ const PET_WINDOW_HEIGHT = 190;
 const PET_WINDOW_MARGIN = 16;
 const attachmentTextExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".json", ".xml", ".yaml", ".yml", ".toml", ".html", ".htm", ".css", ".js", ".ts", ".jsx", ".tsx", ".cs", ".py", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".log"]);
 const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets"]);
+const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+let updateCheckTimer;
 
 const hasSingleInstanceLock = !relaunchingForDisplayBackend && app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -513,6 +516,71 @@ function createTray() {
   void refreshTrayMenu();
   return tray;
 }
+
+function parseReleaseVersion(value) {
+  const match = String(value ?? "").replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/);
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+}
+
+function isNewerRelease(candidate, current) {
+  const next = parseReleaseVersion(candidate);
+  const installed = parseReleaseVersion(current);
+  if (!next || !installed) return false;
+  for (let index = 0; index < next.length; index += 1) {
+    if (next[index] !== installed[index]) return next[index] > installed[index];
+  }
+  return false;
+}
+
+function updateAssetForPlatform(assets = []) {
+  const name = process.platform === "win32" ? "win-x64.zip" : process.platform === "linux" ? "linux-x64.tar.gz" : null;
+  if (!name) return null;
+  return assets.find((asset) => String(asset?.name ?? "").toLowerCase().endsWith(name)) ?? null;
+}
+
+async function checkForUpdates() {
+  const currentVersion = app.getVersion();
+  const releaseUrl = `https://github.com/${UPDATE_REPOSITORY}/releases/latest`;
+  try {
+    const response = await fetch(`https://api.github.com/repos/${UPDATE_REPOSITORY}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "Skai-Desktop-Update-Checker" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (response.status === 404) return { available: false, currentVersion, channel: "stable", releaseUrl, checkedAt: new Date().toISOString(), message: "No stable release has been published yet." };
+    if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}.`);
+    const release = await response.json();
+    const version = String(release.tag_name ?? "");
+    const asset = updateAssetForPlatform(release.assets);
+    const available = isNewerRelease(version, currentVersion);
+    return {
+      available,
+      currentVersion,
+      version: version.replace(/^v/i, ""),
+      channel: release.prerelease ? "preview" : "stable",
+      releaseUrl: String(release.html_url || releaseUrl),
+      downloadUrl: asset?.browser_download_url ?? String(release.html_url || releaseUrl),
+      assetName: asset?.name ?? null,
+      publishedAt: release.published_at ?? null,
+      checkedAt: new Date().toISOString(),
+      message: available ? `Skai Desktop ${version} is ready.` : "You are running the latest stable version.",
+    };
+  } catch (error) {
+    return { available: false, currentVersion, channel: "stable", releaseUrl, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : "Update check failed.", message: "Update check could not reach GitHub." };
+  }
+}
+
+function scheduleUpdateCheck() {
+  if (updateCheckTimer) clearInterval(updateCheckTimer);
+  void checkForUpdates().then((result) => {
+    if (result.available && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", result);
+  });
+  updateCheckTimer = setInterval(() => {
+    void checkForUpdates().then((result) => {
+      if (result.available && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", result);
+    });
+  }, UPDATE_CHECK_INTERVAL_MS);
+}
+
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
   "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
@@ -838,6 +906,18 @@ app.whenReady().then(() => {
     if (!mainWindow || event.sender !== mainWindow.webContents) return readCloseBehavior();
     return writeCloseBehavior(behavior);
   });
+  ipcMain.handle("updates:check", async (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return { available: false, message: "Update checks are unavailable." };
+    return checkForUpdates();
+  });
+  ipcMain.handle("updates:open", async (event, url) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || typeof url !== "string") return false;
+    let parsed;
+    try { parsed = new URL(url); } catch { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") return false;
+    await shell.openExternal(parsed.toString());
+    return true;
+  });
   ipcMain.on("pet:set-visible", (event, visible) => {
     if (BrowserWindow.fromWebContents(event.sender)) setPetVisible(Boolean(visible));
   });
@@ -870,6 +950,7 @@ app.whenReady().then(() => {
   createWindow();
   void resolvePetSurface().finally(createPetWindow);
   createTray();
+  scheduleUpdateCheck();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

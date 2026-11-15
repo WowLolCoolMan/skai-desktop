@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
     getCloseBehavior: () => ipcRenderer.invoke("window:get-close-behavior"),
     setCloseBehavior: (behavior) => ipcRenderer.invoke("window:set-close-behavior", String(behavior)),
   },
+  updates: {
+    check: () => ipcRenderer.invoke("updates:check"),
+    open: (url) => ipcRenderer.invoke("updates:open", String(url)),
+    onAvailable: (handler) => {
+      const listener = (_event, result) => handler(result);
+      ipcRenderer.on("updates:available", listener);
+      return () => ipcRenderer.removeListener("updates:available", listener);
+    },
+  },
   pet: {
     setVisible: (visible) => ipcRenderer.send("pet:set-visible", Boolean(visible)),
     setMotion: (settings) => ipcRenderer.send("pet:set-motion", settings),

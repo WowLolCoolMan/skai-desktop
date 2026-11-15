@@ -159,12 +159,33 @@ export interface WindowBridge {
   setCloseBehavior(behavior: CloseBehavior): Promise<CloseBehavior>;
 }
 
+export type UpdateCheckResult = {
+  available: boolean;
+  currentVersion: string;
+  version?: string;
+  channel?: string;
+  releaseUrl?: string;
+  downloadUrl?: string;
+  assetName?: string | null;
+  publishedAt?: string | null;
+  checkedAt?: string;
+  message: string;
+  error?: string;
+};
+
+export interface UpdatesBridge {
+  check(): Promise<UpdateCheckResult>;
+  open(url: string): Promise<boolean>;
+  onAvailable(handler: (result: UpdateCheckResult) => void): () => void;
+}
+
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
   onTrayOpenConversation?(handler: (id: string) => void): () => void;
   onTrayNewChat?(handler: () => void): () => void;
   pet?: PetBridge;
   window?: WindowBridge;
+  updates?: UpdatesBridge;
 }
 
 declare global {

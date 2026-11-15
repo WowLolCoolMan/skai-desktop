@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { Model, ThemeMode } from "../../app/types";
-import type { AgentResponse, CloseBehavior } from "../../../shared/contracts";
+import type { AgentResponse, CloseBehavior, UpdateCheckResult } from "../../../shared/contracts";
 import { saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceModels, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
 import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
@@ -87,6 +87,8 @@ export function SettingsPage(props: SettingsProps) {
   const [airLlmStatus, setAirLlmStatus] = useState<AirLlmRuntimeStatus | null>(null);
   const [checkingAirLlm, setCheckingAirLlm] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
+  const [updateState, setUpdateState] = useState<UpdateCheckResult | null>(null);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
   const visibleCategories = useMemo(() => categories.filter((category) => !normalizedQuery || `${category} ${categoryDescription(category)} ${categorySearchText[category]}`.toLowerCase().includes(normalizedQuery)), [normalizedQuery]);
   useEffect(() => {
@@ -94,6 +96,12 @@ export function SettingsPage(props: SettingsProps) {
     const nextCategory = visibleCategories[0];
     if (nextCategory) setActiveCategory(nextCategory);
   }, [activeCategory, normalizedQuery, visibleCategories]);
+  useEffect(() => {
+    const updates = window.serverRockAgent?.updates;
+    if (!updates) return;
+    void updates.check().then(setUpdateState);
+    return updates.onAvailable(setUpdateState);
+  }, []);
   const change = (key: string, value: string | boolean) => { setSaveState("idle"); props.onChange(key, value); };
   const save = async () => { if (saveState === "saving") return; setSaveState("saving"); setSaveState(await props.onSave() ? "saved" : "idle"); };
   const discoverModels = async () => { if (discoveringModels) return; setDiscoveringModels(true); await props.onDiscoverModels(); setDiscoveringModels(false); };
@@ -105,6 +113,12 @@ export function SettingsPage(props: SettingsProps) {
     setCheckingAirLlm(false);
   };
   const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled", value: string | boolean) => { saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
+  const checkUpdates = async () => {
+    if (checkingUpdates || !window.serverRockAgent?.updates) return;
+    setCheckingUpdates(true);
+    setUpdateState(await window.serverRockAgent.updates.check());
+    setCheckingUpdates(false);
+  };
   const selectedProviderId = localProviderOrFallback(props.provider);
   const selectedProvider = providerChoices.find((choice) => choice.id === selectedProviderId) ?? providerChoices[0];
   const localRoute = isLocalProvider(selectedProviderId);
@@ -136,7 +150,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Storage" && <><div className="settings-callout"><strong>Workspace data is local</strong><span>Conversations, task plans, memory, and preferences are stored in the local Skai data directory.</span></div><div className="settings-model-actions"><Button variant="secondary" onClick={props.onExportMemory}>Export memory backup</Button><span>Exports a portable JSON backup without deleting anything.</span></div><p className="settings-help">There is no destructive “clear everything” button in the release candidate.</p></>}
 
-        {activeCategory === "Updates" && <><div className="settings-callout"><strong>Release candidate checks</strong><span>Skai is checked with renderer typecheck, production build, Agent Host build, packaged smoke tests, and hygiene audits before release.</span></div><div className="settings-provider-list"><div className="settings-provider-row"><span><strong>Current channel</strong><small>First major release preparation</small></span><StatusBadge tone="warning">Review required</StatusBadge></div><div className="settings-provider-row"><span><strong>Automatic updates</strong><small>Update delivery is not connected yet.</small></span><StatusBadge tone="warning">Planned</StatusBadge></div></div></>}
+        {activeCategory === "Updates" && <><div className="settings-callout"><strong>Automatic update checks</strong><span>Skai checks the official GitHub release channel when it starts and every six hours. Downloads always open from the verified project release page so you can review the version before replacing the portable app.</span></div><div className="settings-provider-list"><div className="settings-provider-row"><span><strong>Installed version</strong><small>{updateState?.currentVersion ?? "Checking…"}</small></span><StatusBadge tone="neutral">Electron</StatusBadge></div><div className="settings-provider-row"><span><strong>Update status</strong><small>{updateState?.error ?? updateState?.message ?? "Checking the stable release channel…"}</small></span><StatusBadge tone={updateState?.available ? "success" : updateState?.error ? "warning" : "neutral"}>{updateState?.available ? `v${updateState.version} ready` : updateState ? "Up to date" : "Checking"}</StatusBadge></div></div><div className="settings-model-actions"><Button variant="secondary" disabled={checkingUpdates} onClick={() => void checkUpdates()}>{checkingUpdates ? "Checking…" : "Check for updates"}</Button>{updateState?.available && updateState.downloadUrl && <Button variant="primary" onClick={() => void window.serverRockAgent?.updates?.open(updateState.downloadUrl!)}>Review download</Button>}</div><p className="settings-help">Portable Windows and Linux builds are delivered as signed release archives. Skai never installs an unverified artifact or runs a downloaded executable in the background.</p></>}
 
         {activeCategory === "Advanced" && <><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Reduced motion" detail="Also controls pet wandering defaults and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /><p className="settings-help">Provider routing remains local-only. Diagnostics and motion settings apply across the workspace.</p></>}
 
