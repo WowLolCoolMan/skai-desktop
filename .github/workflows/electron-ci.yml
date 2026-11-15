@@ -107,3 +107,30 @@ jobs:
 
       - name: Smoke durable chat queue
         run: npm run smoke:chat-queue
+
+  windows-smoke:
+    name: Windows Electron smoke
+    runs-on: windows-2022
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Electron dependencies
+        run: npm ci --prefix apps/desktop
+
+      - name: Ensure Electron runtime payload
+        run: node apps/desktop/node_modules/electron/install.js
+
+      - name: Smoke the Windows package and runtime
+        run: npm run smoke:windows
