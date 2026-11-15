@@ -580,3 +580,23 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .update-progress-copy span { color: var(--skai-color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .update-safety-note { margin-top: 18px !important; font-size: 11px !important; }
 .update-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* Short windows (horizontal tiling splits, small laptop windows): keep the conversation readable by
+   compacting the chrome around it instead of letting the toolbar, header and composer fill the height. */
+@media (max-height: 640px) {
+  .app-toolbar { min-height: 0; padding-top: 8px; padding-bottom: 8px; }
+  .toolbar-title h1 { margin-top: 0; font-size: 17px; }
+  .app-content-chat { padding-top: 12px; padding-bottom: 8px; }
+  .app-content-chat .chat-context-bar { margin-bottom: 8px; padding-bottom: 8px; gap: 10px; }
+  .app-content-chat .chat-context-bar .section-kicker,
+  .app-content-chat .chat-context-bar > div:first-child > span { display: none; }
+  .app-content-chat .chat-context-bar strong { font-size: 15px; }
+  .chat-page .composer-card { padding-top: 8px; padding-bottom: 8px; }
+  .chat-page .composer-card textarea { min-height: 44px; height: 44px; }
+  .chat-page .composer-hint { display: none; }
+  .app-content-chat .conversation-surface .message-list { padding-top: 10px; padding-bottom: 12px; }
+}
+
+/* #main-content receives programmatic focus on every route change so screen readers land on the page;
+   it is not an interactive control, so it must not paint a focus ring around the whole page. */
+#main-content:focus, #main-content:focus-visible { outline: none; }
