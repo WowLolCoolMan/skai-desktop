@@ -12,10 +12,10 @@ new history, not the existing `.git` pack (127 MiB at the start).
 - [x] 4. Remove `assets/pets/archive/legacy-sheets/`, if nothing references it. — 30,703,586 bytes (13 sheets; only the pets README and the archived legacy tools mentioned them; restore from the parent of this step's commit)
 - [x] 5. Remove unreferenced `generated/*-walk-source.png` files and walk frames replaced by `-v2` versions. — 0 bytes (all of them are still referenced; see Needs review)
 - [x] 6. Remove unreferenced PNGs in `assets/branding/` (check README, docs and site HTML first). — 0 bytes (all 4 PNGs are referenced)
-- [ ] 7. Compress the remaining PNGs losslessly with oxipng, keeping filenames and dimensions.
+- [x] 7. Compress the remaining PNGs losslessly with oxipng, keeping filenames and dimensions. — 17,555,947 bytes (418 PNGs, 67,652,804 → 50,096,857 bytes, using `oxipng 10.2.1 -o 4 --strip safe`; all 418 decode to identical pixels at the same dimensions through Electron `nativeImage`)
 - [x] 8. Make sure `.gitignore` covers `bin/`, `obj/`, `.tmp/`, `dist/`, `release/` and `node_modules/`, and add a check that flags new files over 1 MB. — 0 bytes (`.gitignore` now ignores `bin/`, `obj/` and `.tmp/` everywhere; `npm run check:hygiene`, which runs in both CI workflows, now fails on tracked files over 1 MiB that aren't on its allowlist, and also rejects tracked `release/`, `node_modules/` and `.tmp/` paths)
 
-**Total saved so far:** 49,405,902 bytes
+**Total saved:** 66,961,849 bytes
 
 ## Verification gate
 
@@ -93,12 +93,11 @@ for the 6 pets × 7 non-walk states. There are no other duplicates under `assets
 - **`skai-desktop-mark.png` and `skai-desktop-architecture.png` (3,356,954 bytes):** mentioned only in
   `assets/branding/SKAI_UI_ASSET_PACK.md`. Nothing in the app or site loads them (the site uses `docs/site-assets/*.webp`).
   Removable if that asset-pack guide is updated too.
+- **Branding PNGs are still over 1 MiB after compression** (1.28–1.62 MB each), so they stay on the `check:hygiene`
+  allowlist. Shrinking them further would need lossy compression or smaller dimensions, which is a design decision.
 
 ## Failures
 
-- **Step 7 blocked (2026-11-15):** no PNG optimiser is installed (`oxipng`, `pngquant`, `optipng` and `zopflipng` are all
-  missing), installing from the `extra` repo needs sudo, and downloading the release binary was blocked by the permission
-  check. Nothing was changed. To unblock it, run `sudo pacman -S oxipng`; the next run will then do step 7.
-  Step 8 was done first because it doesn't depend on step 7.
+- **Step 7 (2026-11-15):** blocked at first because no PNG optimiser was installed. Done once the owner installed `oxipng`.
 - **Push (2026-11-15):** blocked at first because there were no HTTPS credentials. Steps 1–6 and 8 were rebased onto
   `a633b42`, re-verified, and pushed to `main` over SSH once the owner approved it.
