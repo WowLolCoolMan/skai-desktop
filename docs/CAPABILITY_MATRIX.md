@@ -47,4 +47,5 @@ npm run package:electron
 npm run smoke:electron:artifact
 npm run smoke:electron:themes
 npm run smoke:electron:overflow
+npm run smoke:windows
 ```
