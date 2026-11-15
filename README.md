@@ -116,7 +116,7 @@ The local-only audit is intentional: it rejects hosted/cloud model routes from t
 ```text
 apps/desktop/              Electron + React desktop surface
 services/agent-host/       Persistent .NET host and protocol boundary
-native/SkaiDesktop.Core/   Local provider, persistence, workflow, and safety logic
+native/SkaiDesktop.Core/   Headless provider, persistence, workflow, and safety logic
 assets/                    Skai branding and Percy mascot assets
 docs/                      Architecture, capability, release, and feature documentation
 ```

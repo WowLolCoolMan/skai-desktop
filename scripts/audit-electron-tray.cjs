@@ -23,12 +23,12 @@ expect(main.includes("Recent chats") && main.includes("conversations.list") && m
 expect(main.includes("Show Percy") && main.includes("Hide Percy") && main.includes("setPetVisible"), "tray must expose Percy visibility control");
 expect(main.includes("Quit Skai Desktop") && main.includes("app.quit()"), "tray must expose an explicit quit action");
 expect(main.includes('process.platform === "win32" ? source.resize({ width: 16, height: 16 }) : source'), "tray icon sizing must use the Windows-specific size while preserving the native Linux icon");
+expect(releaseWorkflow.includes("rid: linux-x64") && releaseWorkflow.includes("runner.os == 'Linux'"), "release workflow must build and smoke-test the Linux Electron artifact");
+expect(releaseWorkflow.includes("Skai-Desktop-electron-linux-x64.tar.gz") && releaseWorkflow.includes("SHA256SUMS-electron-linux-x64.txt"), "Linux Electron releases must be archived and checksummed");
 expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "preload must expose tray navigation events");
 expect(contracts.includes("onTrayOpenConversation?") && contracts.includes("onTrayNewChat?"), "tray events must remain typed in the renderer contract");
 expect(workspace.includes("onTrayOpenConversation") && workspace.includes("onTrayNewChat"), "renderer must handle tray recent-chat and new-chat actions");
 expect(packageScript.includes('process.platform === "linux" ? "linux-x64"') && packageScript.includes('const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"'), "Electron packaging must publish a Linux x64 artifact with the native executable name");
-expect(releaseWorkflow.includes("rid: linux-x64") && releaseWorkflow.includes("runner.os == 'Linux'"), "release workflow must build and smoke-test the Linux Electron artifact");
-expect(releaseWorkflow.includes("Skai-Desktop-electron-linux-x64.tar.gz") && releaseWorkflow.includes("SHA256SUMS-electron-linux-x64.txt"), "Linux Electron releases must be archived and checksummed");
 
 if (failures.length > 0) {
   console.error("Electron tray audit failed:");
