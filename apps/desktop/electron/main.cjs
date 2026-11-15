@@ -8,6 +8,7 @@ const { randomUUID } = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
+const { augmentUserPath } = require("./user-path.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -669,7 +670,8 @@ function startAgentHost() {
   const args = packagedRuntime ? ["--stdio"] : ["run", "--project", hostProject, "--no-launch-profile", "--", "--stdio"];
   host = spawn(command, args, {
     cwd: packagedRuntime ? path.dirname(packagedHost) : repoRoot,
-    env: { ...process.env, SKAI_PLUGIN_DOWNLOADS: path.join(app.getPath("downloads"), "Skai Plugins") },
+    // Launcher-started Linux sessions lack ~/.bashrc PATH additions (nvm, pyenv, ~/.local/bin).
+    env: { ...process.env, PATH: augmentUserPath(), SKAI_PLUGIN_DOWNLOADS: path.join(app.getPath("downloads"), "Skai Plugins") },
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
