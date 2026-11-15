@@ -38,7 +38,7 @@
 ## Reliability boundary
 
 - Requests have bounds, cancellation, and timeout handling in several adapters.
-- There is no uniform retry, backoff, circuit-breaker, provider health, or resumable-download contract across all integrations. Marketplace model installs expose bounded status and cancellation, but do not yet provide resumable downloads. [TODO]
+- Remaining boundary: there is no uniform retry, backoff, circuit-breaker, provider health, or resumable-download contract across all integrations. Marketplace model installs expose bounded status and cancellation, but do not yet provide resumable downloads.
 
 ## Evidence
 
