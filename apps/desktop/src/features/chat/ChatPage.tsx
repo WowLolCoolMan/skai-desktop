@@ -64,7 +64,7 @@ type ChatPageProps = {
   conversationTitle: string;
   pinned: boolean;
   archived: boolean;
-  onSend: (text: string, attachments: ChatAttachment[], documentsOnly: boolean) => void;
+  onSend: (text: string, attachments: ChatAttachment[], documentsOnly: boolean, speakReply?: boolean) => void;
   onQueue: (text: string, attachments: ChatAttachment[]) => void;
   onRemoveQueued: (index: number) => void;
   onAttach: () => void;
@@ -165,7 +165,7 @@ export function ChatPage({ provider, model, models, messages, busy, taskBusy, at
     const currentDraft = draft.trim();
     const text = `${currentDraft}${currentDraft ? " " : ""}${transcript}`.trim();
     if (busy || !text || (documentsOnly && attachments.length === 0)) return false;
-    onSend(text, attachments, documentsOnly);
+    onSend(text, attachments, documentsOnly, true);
     setDraft("");
     setDocumentsOnly(false);
     return true;
