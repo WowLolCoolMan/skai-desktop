@@ -888,3 +888,5 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .plugins-customize-nav button { flex: 0 0 auto; }
   .plugins-main { overflow: visible; }
 }
+/* Image Studio workflow buttons share a two-column row; let long labels wrap instead of spilling out at mid widths. */
+.workflow-source-row .ui-button { min-width: 0; white-space: normal; text-align: center; line-height: 1.25; }
