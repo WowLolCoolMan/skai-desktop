@@ -11,7 +11,7 @@ new history, not the existing `.git` pack (127 MiB at the start).
 - [x] 3. Remove the root-level `assets/pets/*.png` files that duplicate `generated/`. — 18,702,316 bytes (42 strips; `normalize-pet-animations.ps1` now reads them from `generated/`)
 - [x] 4. Remove `assets/pets/archive/legacy-sheets/`, if nothing references it. — 30,703,586 bytes (13 sheets; only the pets README and the archived legacy tools mentioned them; restore from the parent of this step's commit)
 - [x] 5. Remove unreferenced `generated/*-walk-source.png` files and walk frames replaced by `-v2` versions. — 0 bytes (all of them are still referenced; see Needs review)
-- [ ] 6. Remove unreferenced PNGs in `assets/branding/` (check README, docs and site HTML first).
+- [x] 6. Remove unreferenced PNGs in `assets/branding/` (check README, docs and site HTML first). — 0 bytes (all 4 PNGs are referenced)
 - [ ] 7. Compress the remaining PNGs losslessly with oxipng, keeping filenames and dimensions.
 - [ ] 8. Make sure `.gitignore` covers `bin/`, `obj/`, `.tmp/`, `dist/`, `release/` and `node_modules/`, and add a check that flags new files over 1 MB.
 
@@ -90,6 +90,9 @@ for the 6 pets × 7 non-walk states. There are no other duplicates under `assets
   PowerShell (`pwsh`) isn't installed here.
 - **`archive/legacy-tools/`** (11 KB) still reads and writes the removed `*-sprite-sheet.png` files, so those scripts
   no longer have inputs. Kept, because no step covers them.
+- **`skai-desktop-mark.png` and `skai-desktop-architecture.png` (3,356,954 bytes):** mentioned only in
+  `assets/branding/SKAI_UI_ASSET_PACK.md`. Nothing in the app or site loads them (the site uses `docs/site-assets/*.webp`).
+  Removable if that asset-pack guide is updated too.
 
 ## Failures
 
