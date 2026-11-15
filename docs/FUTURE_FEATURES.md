@@ -36,7 +36,7 @@ cancellation, permission review, and local credential handling.
 
 - [x] Multi-model picker supporting any compatible provider.
 - [x] Side-by-side model comparison.
-- [ ] File, image, and PDF upload with retrieval-augmented generation (RAG).
+- [x] File, image, and PDF upload with bounded local retrieval-augmented context. (Selectable-text PDFs, supported images, and text attachments are policy-checked; broader extraction and semantic retrieval remain open.)
 - [x] Web search with citations.
 - [x] Persistent memory with a view/edit management UI.
 - [x] Message queueing while the AI is responding.
@@ -59,9 +59,9 @@ cancellation, permission review, and local credential handling.
 - [ ] Parallel sub-agent delegation.
 - [ ] Scheduled automations.
 - [x] Structured task lists. (Persisted local agent task plans with dependency-aware readiness, queue, search, and cancellation; autonomous dispatch remains open.)
-- [ ] MCP tools over Streamable HTTP and stdio.
-- [ ] OpenAPI tool auto-discovery.
-- [ ] Git panel for stage, commit, push, and pull requests.
+- [x] MCP tools over Streamable HTTP and stdio. (Explicit grants, revocation, read-only defaults, and protocol smoke coverage are implemented; richer lifecycle UI remains open.)
+- [x] OpenAPI tool auto-discovery. (Bounded local discovery is implemented; authenticated retrieval and broader schema coverage remain open.)
+- [x] Git panel for stage, commit, push, and pull requests. (Guarded local project workflow is implemented; richer selective staging and live permission/error acceptance remain open.)
 - [ ] Coding-agent model integrations, including Claude Code and Codex.
 - [ ] AI planning mode: plan, execute, verify, iterate, retry, and pause for human decisions.
 - [ ] Auto mode for unattended agent execution.
@@ -90,10 +90,10 @@ cancellation, permission review, and local credential handling.
 - [ ] Nested file browser with preview. (Bounded local project-folder browser with relative paths, filtering, text/image/PDF preview exists; full tree, mutation, and packaged acceptance remain open.)
 - [ ] Projects that group chats, shared knowledge, and context.
 - [ ] Saved environments for reusable folders, SSH hosts, and cloud contexts.
-- [ ] File connectors that open, edit, and save files directly.
-- [ ] Integrated file editor that writes approved changes back to disk.
-- [ ] Visual diff review.
-- [ ] Memory management UI for viewing and editing remembered information.
+- [x] File connectors that open, edit, and save files directly. (Bounded local project browser and approved file operations are implemented.)
+- [x] Integrated file editor that writes approved changes back to disk. (Review, save, undo, and bounded path checks are implemented.)
+- [x] Visual diff review. (Project Git diff inspection is implemented; selective staging remains open.)
+- [x] Memory management UI for viewing and editing remembered information. (Local search, edit, enable/disable, export, and safe import are implemented.)
 
 ## Workspace and desktop experience
 
@@ -133,7 +133,7 @@ cancellation, permission review, and local credential handling.
 - [x] Presets bundling prompts, tools, and knowledge. (Bounded local AI presets can bundle user-authored instructions, explicitly marked reference knowledge, and descriptive tool guidance; activation is explicit and tool guidance never grants permissions.)
 - [x] Dynamic variables such as `{{USER_NAME}}` and `{{DATE}}`.
 - [ ] Lazy-loaded Markdown instruction-pack skills with `$` mentions.
-- [ ] Local model runner support for Ollama and LM Studio.
+- [x] Local model runner support for Ollama and LM Studio. (Loopback discovery, selection, model-library inventory, and bounded install/load paths are implemented.)
 - [ ] Offline-capable operation.
 - [ ] OpenAI-compatible API and personal API keys (local servers plus explicit cloud provider routes).
 - [ ] Plugin and pipeline framework.
