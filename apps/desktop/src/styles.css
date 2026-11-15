@@ -742,3 +742,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .plugins-tool-list { display: grid; gap: 3px; margin-top: 7px; }
 .plugins-connection-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 720px) { .plugins-mcp-form { grid-template-columns: 1fr; } .plugins-connection { flex-direction: column; } .plugins-connection-actions { justify-content: flex-start; } }
+
+/* Short windows: give the sidebar's projects and chats room. The active-session card only repeats the current page. */
+@media (max-height: 640px) {
+  .sidebar-active-session { display: none; }
+  .sidebar-brand { padding-top: 4px; padding-bottom: 4px; }
+}
