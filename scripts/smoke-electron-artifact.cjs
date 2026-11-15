@@ -2,6 +2,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
+// Pick the Linux display backend up front; otherwise the app relaunches itself and the spawned PID is not the app.
+const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
 
 const defaultName = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop";
 const defaultRoot = path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`);
@@ -15,7 +18,7 @@ if (!fs.existsSync(executable)) {
 }
 
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });

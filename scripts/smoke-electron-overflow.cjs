@@ -1,11 +1,14 @@
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
+// Pick the Linux display backend up front; otherwise the app relaunches itself and the spawned PID is not the app.
+const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
 
 const executable = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist", "electron", "win-x64", process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"));
 const port = 19324;
 const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory"];
 const widths = [1920, 1440, 1280, 960, 640];
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu"], { cwd: path.dirname(executable), windowsHide: true, stdio: "ignore" });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), windowsHide: true, stdio: "ignore" });
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 async function fetchJson(url) { const response = await fetch(url); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }
 function connect(target) {
