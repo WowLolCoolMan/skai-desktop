@@ -5,6 +5,10 @@ const root = path.resolve(__dirname, "..");
 const npmCommand = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "npm";
 const steps = [
   "check:syntax",
+  "check:hygiene",
+  "audit:electron-runtime",
+  "audit:bridge-methods",
+  "audit:local-only",
   "desktop:typecheck",
   "desktop:build",
   "package:electron",
