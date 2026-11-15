@@ -36,11 +36,19 @@ Official APIs used by this slice:
 - [Ollama blob API](https://github.com/ollama/ollama/blob/main/docs/api.md#push-a-blob)
 - [ModelScope Hub SDK](https://github.com/modelscope/modelscope_hub) and [official ModelScope API guide](https://github.com/modelscope/modelscope-skills/blob/main/skills/ms-hub/SKILL.md)
 
-## ModelScope catalog and UI follow-up (2026-11-04)
+## ModelScope catalog
 
-ModelScope search and GGUF manifest routes were checked against the public service using `Qwen3-0.6B-GGUF`; the live search returned repository IDs and download counts, and the repository manifest returned GGUF paths, byte sizes, and SHA-256 values. A Windows app UI search surfaced embedding, ASR, projector, reranker, and guard-model repositories among regular chat models, and confirmed installed-model rows clear when switching sources. The reranker and guard repositories advertised text-generation tasks, so explicit non-chat name exclusions now take precedence over conflicting task metadata. The catalog also filters by task metadata (with conservative name-based exclusions when tasks are absent), removes MMProj/projector sidecars, cancels superseded catalog queries, and shows a searching state. Automated checks cover regular/uncensored filtering, conflicting reranker and guard task tags, chat-task exclusions, split-shard grouping, Ollama blob/create calls, digest mismatch, invalid GGUF signatures, and path traversal. `dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj` passed after the latest filtering and identifier-validation changes. The `net10.0-desktop` target built with zero warnings. The Windows App SDK target built with the existing missing `win-AnyCPU.pubxml` (`NETSDK1198`) warning. The latest build's catalog result filtering and cancellation behavior still need a successful fresh UI runtime recheck. No real multi-gigabyte download/import was attempted; Ollama blob/create behavior is covered by stubbed HTTP tests.
+ModelScope search and GGUF manifest routes return repository IDs, download
+counts, GGUF paths, byte sizes, and SHA-256 values. The catalog filters by
+task metadata and conservative non-chat name exclusions, removes MMProj and
+projector sidecars, cancels superseded queries, and exposes a searching state.
+Core tests cover regular/uncensored filtering, conflicting reranker and guard
+task tags, chat-task exclusions, split-shard grouping, Ollama blob/create
+calls, digest mismatch, invalid GGUF signatures, and path traversal. Packaged
+Electron smoke covers the current Model Library/Marketplace surfaces; no
+multi-gigabyte download is performed in CI.
 
-## Model Library opens on installed models (2026-11-07)
+## Model Library opens on installed models
 
 The Models action opens the **Model Library** on **Installed models**, so
 nothing is sent to Hugging Face until the user switches to the Marketplace
