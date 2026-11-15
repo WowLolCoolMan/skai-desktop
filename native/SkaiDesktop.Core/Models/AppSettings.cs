@@ -1,7 +1,7 @@
 // Every non-secret user preference, saved as settings.json.
 // Depends on: nothing (plain data).
 // Used by: JsonSettingsStore (load/save), OpenAiCompatibleProvider (endpoint, model, temperature),
-// and MainPage everywhere settings are read or changed. Secrets (API keys, tokens) never go here.
+// and the Agent Host settings protocol. Secrets (API keys, tokens) never go here.
 
 namespace SkaiDesktop.Core.Models;
 

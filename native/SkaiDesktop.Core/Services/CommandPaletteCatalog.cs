@@ -1,6 +1,6 @@
 // UI-independent command-palette metadata and deterministic search.
-// Execution stays in the native shell because actions may open dialogs or
-// mutate page state; the catalog itself belongs in Core for testability.
+// The Electron renderer owns presentation and dispatches approved actions
+// through the Agent Host; the catalog stays in Core for testability.
 
 namespace SkaiDesktop.Core.Services;
 
