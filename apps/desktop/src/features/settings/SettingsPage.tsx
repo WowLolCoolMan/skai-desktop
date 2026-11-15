@@ -103,14 +103,17 @@ export function SettingsPage(props: SettingsProps) {
     return updates.onAvailable(setUpdateState);
   }, []);
   const change = (key: string, value: string | boolean) => { setSaveState("idle"); props.onChange(key, value); };
-  const save = async () => { if (saveState === "saving") return; setSaveState("saving"); setSaveState(await props.onSave() ? "saved" : "idle"); };
+  const save = async () => { if (saveState === "saving") return; setSaveState("saving"); try { setSaveState(await props.onSave() ? "saved" : "idle"); } catch { setSaveState("idle"); } };
   const discoverModels = async () => { if (discoveringModels) return; setDiscoveringModels(true); await props.onDiscoverModels(); setDiscoveringModels(false); };
   const checkAirLlm = async () => {
     if (checkingAirLlm) return;
     setCheckingAirLlm(true);
-    const response: AgentResponse | undefined = await window.serverRockAgent?.request("airllm.status");
-    setAirLlmStatus(response?.ok ? response.result as AirLlmRuntimeStatus : { workerAvailable: false, dependenciesAvailable: false, pythonCommand: "", status: "unavailable", message: response?.error?.message ?? "The local Agent Host is unavailable." });
-    setCheckingAirLlm(false);
+    try {
+      const response: AgentResponse | undefined = await window.serverRockAgent?.request("airllm.status");
+      setAirLlmStatus(response?.ok ? response.result as AirLlmRuntimeStatus : { workerAvailable: false, dependenciesAvailable: false, pythonCommand: "", status: "unavailable", message: response?.error?.message ?? "The local Agent Host is unavailable." });
+    } catch (error) {
+      setAirLlmStatus({ workerAvailable: false, dependenciesAvailable: false, pythonCommand: "", status: "unavailable", message: error instanceof Error ? error.message : "AirLLM status could not be checked." });
+    } finally { setCheckingAirLlm(false); }
   };
   const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled", value: string | boolean) => { saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
   const checkUpdates = async () => {

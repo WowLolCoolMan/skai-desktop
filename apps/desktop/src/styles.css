@@ -557,3 +557,14 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 /* Percy on X11 without a compositor: the window is opaque, so paint a deliberate card instead of black. */
 html[data-pet-surface="opaque"], html[data-pet-surface="opaque"] body, html[data-pet-surface="opaque"] #root { background: #10141d !important; }
 html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(circle at 50% 70%, rgba(99,217,233,.16), transparent 62%), #10141d; }
+
+/* Recovery and keyboard-access affordances stay visible in every theme. */
+.skip-link { position: fixed; z-index: 100; top: 8px; left: 8px; padding: 8px 12px; border-radius: 7px; color: var(--skai-color-canvas); background: var(--skai-color-accent); transform: translateY(-150%); transition: transform .15s ease; }
+.skip-link:focus { transform: translateY(0); }
+.global-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.global-error button { flex: 0 0 auto; padding: 5px 8px; border: 1px solid rgba(255,141,156,.42); border-radius: 6px; color: #ffd0d6; background: transparent; cursor: pointer; }
+.app-crash-state { display: grid; place-content: center; gap: 12px; min-height: 100vh; max-width: 620px; margin: auto; padding: 32px; color: var(--skai-color-text); background: var(--skai-color-canvas); }
+.app-crash-state h1 { margin: 0; font-size: 28px; }
+.app-crash-state p { margin: 0; color: var(--skai-color-text-muted); line-height: 1.5; }
+.app-crash-state small { color: var(--skai-color-text-muted); overflow-wrap: anywhere; }
+.app-crash-actions { display: flex; gap: 8px; flex-wrap: wrap; }
