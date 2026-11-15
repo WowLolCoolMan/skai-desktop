@@ -1,6 +1,6 @@
 # Skai Desktop capability matrix
 
-Snapshot: synchronized `main` checkout, 2026-11-14.
+Snapshot: repository audit, 2026-11-15.
 
 This is the current product-facing capability map for the Electron desktop
 application. It is intentionally conservative: `working` means an implemented
@@ -13,16 +13,15 @@ means it is not yet implemented. A build alone never upgrades a feature to
 | --- | --- | --- | --- |
 | Electron shell and navigation | working | Electron main/preload, React renderer, narrow global rail, project/conversation sidebar, launcher, route smoke, responsive overflow matrix | More packaged accessibility coverage on Linux |
 | Chat and persistence | working | Agent Host `chat.complete`, local conversation storage, streaming/error states, attachments, retry, export/import, chat smoke | Broader provider and multi-pane acceptance |
-| Local models | working | Ollama/OpenAI-compatible discovery, model selection, model library, benchmark metadata, local-only recovery | More runtime adapters and resource scheduling |
-| Cloud providers | partial | Provider contracts and explicit route selection exist | Complete credential storage, OAuth/account sign-in, data-route consent, and remote acceptance |
+| Local models | working | Ollama/OpenAI-compatible discovery, model selection, model library, benchmark metadata, Ollama context metadata discovery, local-only recovery | More runtime adapters and resource scheduling; 1M-token execution is unverified on compatible hardware/models |
 | AirLLM | partial | Core provider strategy, Agent Host route, packaged `airllm/skai_airllm.py` worker, and artifact smoke assertion exist | Managed Python dependency/runtime setup, model compatibility acceptance, and hardware-aware scheduling |
 | Marketplace | working | Host-backed catalog/provider search, installed model routes, verified install review, packaged artifact smoke | More catalogs and download recovery UX |
 | Projects and GitHub | partial | Local projects, Git review/push, GitHub integration docs and guarded operations | Full live GitHub permission/error matrix and richer worktree UX |
-| Coding Agent / workbench | partial | Task artifacts, approvals, durable activity events, guarded worktree leases | Actual model/tool dispatch and background execution |
+| Coding Agent / workbench | partial | Task artifacts, approvals, durable activity events, guarded worktree leases, Monaco-based project editor | Actual model/tool dispatch and background execution |
 | Terminal and tools | partial | Host-backed terminal sessions, cancellation, secret-shaped environment filtering | Stronger OS sandboxing and cross-platform PTY acceptance |
 | Settings and appearance | working | Persisted settings, themes, density, reduced motion, model/voice/host controls | Broader live accessibility matrix |
 | Companion / Percy | partial | Separate transparent always-on-top Electron window, state-driven animation, placement guard, artifact smoke | Cross-platform packaged positioning and collision matrix |
-| Images and media | partial | ComfyUI queue/poll flow and local vision attachment paths | Resumable jobs, richer artifact storage, capability gating |
+| Images and media | partial | ComfyUI queue/poll flow, checkpoint discovery, built-in text-to-image and image-edit workflow templates, workflow import/save, and local vision attachment paths | Live generation acceptance, resumable jobs, richer artifact storage, capability gating |
 | Memory and retrieval | partial | Local memory editor, approval/provenance, bounded injection and export | More retrieval sources and freshness evaluation |
 | Skills, MCP, integrations | partial | Local skill catalog/install review, stdio/HTTP discovery, GitHub connection | Authenticated retrieval, notifications/resources, lifecycle health UI |
 | Updates and release | partial | RSA manifest verification, monotonic channel checks, artifact hashes, Electron packaging | Signing, notarization, installer/upgrade/rollback acceptance |
@@ -34,6 +33,13 @@ the persistent .NET Agent Host. `native/SkaiDesktop.Core` is a headless domain
 library used by the host and tests; it is not an alternate desktop shell. Uno,
 XAML, native launchers, native packaging, and legacy fallback commands are not
 supported project surfaces.
+
+## Product boundary
+
+Skai is local-only for model execution. It does not route prompts to hosted
+providers or fall back to cloud inference. GitHub and public model catalogs are
+separate, explicit integrations and do not receive chat prompts as model
+providers.
 
 ## Evidence commands
 

@@ -1,5 +1,9 @@
 # Skai Desktop super-app research
 
+> Historical product research, not a statement of current Skai capabilities or
+> roadmap commitments. Skai currently keeps model execution local-only; hosted
+> provider examples below are background research and remain out of scope.
+
 Research date: 2026-11-03
 
 The goal is to combine the strongest user-facing workflows from the listed projects behind one clean desktop interface. This means integrating local model servers and cloud APIs, then adding first-party workspace features (projects, knowledge, prompts, image/audio tools, and agents). It does not mean embedding every upstream app or promising that every model format runs in one runtime.

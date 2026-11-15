@@ -13,7 +13,7 @@
 
 Skai Desktop is an Electron + React desktop application with a persistent .NET Agent Host. It brings local model chat, project files, guarded terminal work, task review, GitHub workflows, settings, memory, and creative tools into one focused workspace—not a hosted chat wrapper or a collection of disconnected mock screens.
 
-> **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe the current synchronized `main` branch; unfinished ideas remain in the [future feature backlog](docs/FUTURE_FEATURES.md).
+> **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe this project snapshot; unfinished ideas remain in the [future feature backlog](docs/FUTURE_FEATURES.md). See the [Skai Desktop project site](https://wowlolcoolman.github.io/skai-desktop/) for the public overview and documentation index.
 
 ## The product boundary
 
@@ -29,7 +29,7 @@ Skai Desktop is **local-only** for AI runtime and application data:
 | Surface | Current state |
 | --- | --- |
 | **Chat** | Persistent conversations, attachments, queued follow-ups, Markdown/code rendering, retry, fork, pin, archive, rename, folders, tags, split view, search, and local memory controls. |
-| **Coding Workspace** | Project-scoped browsing, bounded previews, editing, reviewable diffs, guarded terminal commands, undo, task planning, and focused project context. |
+| **Coding Workspace** | Monaco editor, project-scoped browsing, bounded previews, editing, reviewable diffs, guarded terminal commands, undo, task planning, and focused project context. |
 | **Agent Workbench** | Durable local task plans, dependency-aware readiness, activity filters, cancellation, approvals, and reviewable task state. Autonomous dispatch is still in progress. |
 | **Scheduled work** | Local one-time and repeating schedules with pause/resume/cancel and reviewed Run now controls. No unattended provider request is implied. |
 | **Models** | Local provider discovery, model library, pinned models, capability checks, comparison, explicit unavailable-model recovery, and no silent model switching. |
@@ -122,7 +122,16 @@ assets/                    Skai branding and Percy mascot assets
 docs/                      Architecture, capability, release, and feature documentation
 ```
 
-Useful docs:
+Project documentation:
+
+- [Project site and documentation index](https://wowlolcoolman.github.io/skai-desktop/)
+- [`docs/INDEX.md`](docs/INDEX.md) — curated index of all project documentation.
+- [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — evidence-backed feature status.
+- [`docs/GITHUB_PAGES.md`](docs/GITHUB_PAGES.md) — project site and deployment notes.
+- [`docs/LOCAL_IMAGE_GENERATION.md`](docs/LOCAL_IMAGE_GENERATION.md) — current ComfyUI workflows and the separate built-in runtime proposal.
+- [`CHANGELOG.md`](CHANGELOG.md) — version history.
+
+Engineering references:
 
 - [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md) — visual migration ledger and evidence.
 - [`docs/FUTURE_FEATURES.md`](docs/FUTURE_FEATURES.md) — future product backlog.

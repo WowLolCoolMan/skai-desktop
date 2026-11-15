@@ -17,6 +17,34 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
     private const int MaxPromptCharacters = 8_000;
     private readonly HttpClient _http = httpClient ?? new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
+    public async Task<IReadOnlyList<string>> DiscoverCheckpointsAsync(string endpoint, CancellationToken cancellationToken = default)
+    {
+        var root = ValidateEndpoint(endpoint);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        var uri = new Uri(root, "object_info/CheckpointLoaderSimple");
+        using var response = await _http.GetAsync(uri, timeout.Token).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Local ComfyUI could not list checkpoints ({(int)response.StatusCode}).");
+        using var json = await BoundedHttpContent.ReadJsonAsync(response.Content, timeout.Token, "ComfyUI checkpoint list").ConfigureAwait(false);
+        if (!json.RootElement.TryGetProperty("CheckpointLoaderSimple", out var node)
+            || !node.TryGetProperty("input", out var input)
+            || !input.TryGetProperty("required", out var required)
+            || !required.TryGetProperty("ckpt_name", out var field)
+            || field.ValueKind != JsonValueKind.Array
+            || field.GetArrayLength() == 0
+            || field[0].ValueKind != JsonValueKind.Array)
+            return [];
+        return field[0].EnumerateArray()
+            .Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => value.GetString())
+            .Where(value => !string.IsNullOrWhiteSpace(value) && value!.Length <= 512 && !value.Any(char.IsControl))
+            .Select(value => value!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(256)
+            .ToArray();
+    }
+
     public async Task<IReadOnlyList<ComfyGeneratedImage>> GenerateAsync(string endpoint, string workflowTemplate, string prompt, Action<string>? progress = null, CancellationToken cancellationToken = default, string? sourceImageName = null, byte[]? sourceImage = null)
     {
         var root = ValidateEndpoint(endpoint);
@@ -31,12 +59,13 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
         if (sourceImage is null && workflowTemplate.Contains("{{image}}", StringComparison.Ordinal))
             throw new ArgumentException("Choose a source image for this workflow because it contains {{image}}.", nameof(workflowTemplate));
         var escapedPrompt = JsonSerializer.Serialize(prompt.Trim())[1..^1];
-        var validationWorkflow = workflowTemplate
+        var workflowWithSeed = workflowTemplate.Replace("{{seed}}", Random.Shared.Next(0, int.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        var validationWorkflow = workflowWithSeed
             .Replace("{{image}}", "source.png", StringComparison.Ordinal)
             .Replace("{{prompt}}", escapedPrompt, StringComparison.Ordinal);
         try { using var validationDocument = JsonDocument.Parse(validationWorkflow); }
         catch (JsonException error) { throw new ArgumentException("The ComfyUI workflow is not valid JSON after its inputs were inserted.", nameof(workflowTemplate), error); }
-        var workflowSource = workflowTemplate;
+        var workflowSource = workflowWithSeed;
         if (sourceImage is not null)
         {
             if (sourceImage.Length is < 8 or > 6 * 1024 * 1024 || !sourceImageName!.Equals("source.png", StringComparison.OrdinalIgnoreCase) && !sourceImageName.Equals("source.jpg", StringComparison.OrdinalIgnoreCase))

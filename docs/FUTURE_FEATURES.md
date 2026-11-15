@@ -44,7 +44,7 @@ cancellation, permission review, and local credential handling.
 - [x] Search within the current chat and jump to a matching message.
 - [x] Fork a chat from any message.
 - [ ] Voice input/output, hands-free calls, and advanced voice mode. (OS-native speech output and one-shot dictation forced to on-device recognition are implemented; users can explicitly install an on-device language pack, while runtime acceptance, hands-free calls, and advanced voice mode remain open.)
-- [ ] Image generation and editing. (Local ComfyUI workflow import/save, generation, and source-image editing through `{{image}}` and `{{prompt}}` are implemented; live ComfyUI acceptance remains open.)
+- [ ] Image generation and editing. (Local ComfyUI checkpoint discovery, built-in text-to-image and image-edit workflow creation, workflow import/save, and source-image upload are implemented; live generation acceptance remains open.)
 - [x] Context compaction. (Deterministic bounded provider-side compaction with omitted-history markers; semantic summarization remains open.)
 - [ ] 1M+ token context support. (Opt-in Ollama context windows up to 1M tokens, bounded 32 MB request payloads, and Ollama model-context discovery are implemented; this computer's installed models currently advertise up to 262,144 tokens, so 1M execution with a compatible local model remains unverified.)
 - [ ] Omni-modal input for text, images, audio, and video.
@@ -74,9 +74,9 @@ cancellation, permission review, and local credential handling.
 - [ ] Containerized parallel agents with Docker and IDE synchronization.
 - [ ] Background computer use while the user works elsewhere.
 - [ ] Autonomous open-weight model agent.
-- [ ] Headless/daemon mode for CI and cloud deployment.
+- [ ] Headless/daemon mode for local CI integration (cloud deployment remains outside the local-only product boundary).
 - [ ] Portable local harness with orchestrator, models, tools, and queue.
-- [ ] Hybrid cloud/local compute split (explicit route selection only; never an automatic fallback).
+- [ ] Hybrid cloud/local compute split (outside the current local-only product boundary; retained as historical research only).
 - [ ] Fully offline local-first agent mode.
 - [ ] Remote device access for controlling a desktop elsewhere.
 
@@ -118,7 +118,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Detachable chats in their own windows.
 - [ ] Drag-and-drop pane layouts.
 - [x] Custom themes. (Light/dark palettes plus persisted Deep Sea and Deep Space ambient presets with reduced-motion support.)
-- [ ] Cloud sync across devices (separate from model routing; requires a future privacy and account decision).
+- [ ] Cloud sync across devices (outside the current local-only product boundary; requires a future product/privacy decision).
 - [x] Built-in translator. (Review-first translation through the selected model with explicit composer insertion.)
 - [x] Text snippets with AI expansion. (Bounded local save/insert plus review-first model expansion.)
 - [ ] Window management.
@@ -135,13 +135,13 @@ cancellation, permission review, and local credential handling.
 - [x] Lazy-loaded Markdown instruction-pack skills with `$` mentions. (Built-in and enabled local Markdown skills resolve only when explicitly mentioned in a chat request; instructions are bounded and never grant permissions.)
 - [x] Local model runner support for Ollama and LM Studio. (Loopback discovery, selection, model-library inventory, and bounded install/load paths are implemented.)
 - [ ] Offline-capable operation.
-- [ ] OpenAI-compatible API and personal API keys (local servers plus explicit cloud provider routes).
+- [x] OpenAI-compatible API for local servers. (Loopback-compatible local endpoints are supported; cloud endpoints and hosted API keys are intentionally unsupported.)
 - [ ] Plugin and pipeline framework.
 - [ ] Community tool library.
 - [ ] Third-party extensions that provide their own AI models.
 - [ ] NPU/GPU/CPU auto-routing through Windows AI Foundry.
 - [ ] On-device LoRA fine-tuning.
-- [ ] Bring-your-own-key with credit-based pricing.
+- [ ] Bring-your-own-key with credit-based pricing (hosted execution is outside the current product boundary).
 - [ ] React/TypeScript extension SDK.
 - [ ] Team-shared commands, snippets, and private extension store.
 - [ ] One-time purchase/no-subscription option.
@@ -153,7 +153,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Continuous batching and parallel requests.
 - [ ] KV-cache checkpointing for agentic workflows.
 - [ ] Specialized inference engines such as Splash.
-- [ ] Per-token cloud pricing and usage visibility for explicit cloud routes.
+- [ ] Per-token cloud pricing and usage visibility (hosted execution is outside the current product boundary).
 - [ ] Open-weight Decisions API for classification and routing.
 
 ## Administration and teams

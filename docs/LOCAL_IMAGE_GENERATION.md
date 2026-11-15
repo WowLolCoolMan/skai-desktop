@@ -1,12 +1,16 @@
 # Built-in local image generation
 
-## Current gap
+## Current implementation and future direction
 
-The Electron desktop client currently supports a user-configured local ComfyUI
-workflow for image generation. It does not yet bundle a Stable Diffusion
-runtime or provide a built-in local image-model downloader. Hosted inference is
-kept separate and clearly labeled. The delivery plan below describes a future
-local runtime boundary that can replace the current workflow.
+The Electron desktop client connects to a user-configured local ComfyUI server.
+It can discover installed checkpoints, create built-in text-to-image and
+image-edit workflows, import/save workflows, upload a source image, and queue
+and poll local jobs. Live generation acceptance against a running ComfyUI
+instance is still open. Skai does not bundle a Stable Diffusion runtime or
+provide a built-in image-model downloader. The proposal below describes a
+possible future local runtime that could complement or replace the ComfyUI
+integration; it is not implemented product behavior. Hosted inference is out
+of product scope.
 
 ## Recommended approach
 

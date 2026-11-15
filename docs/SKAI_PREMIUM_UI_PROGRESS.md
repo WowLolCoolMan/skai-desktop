@@ -54,7 +54,7 @@ Additional evidence commands:
 
 ## Known boundaries
 
-Cloud provider routing, signed installer lifecycle evidence, background model
+Hosted model routing is outside the local-only product scope. Signed installer lifecycle evidence, background model
 dispatch, resumable downloads, and Worktree task execution remain explicitly
 partial or planned in `docs/CAPABILITY_MATRIX.md` and
 `docs/PRODUCTION_READINESS_GAPS.md`. They must not be represented as working

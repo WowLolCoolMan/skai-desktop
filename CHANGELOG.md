@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added a responsive GitHub Pages project site, automated Pages deployment, and
+  a curated documentation index.
+- Added checkpoint discovery and built-in ComfyUI text-to-image and image-edit
+  workflow templates to the Images workspace.
+
+### Updated
+
+- Refreshed capability and release-readiness docs to reflect the local-only
+  model boundary, Monaco project editor, and current image workflow support.
+
 ## [0.1.3] - 2026-11-14
 
 ### Fixed

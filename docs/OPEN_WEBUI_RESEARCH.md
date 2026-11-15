@@ -1,5 +1,9 @@
 # Open-source research and design inspiration
 
+> Historical product research, not a statement of current Skai capabilities or
+> roadmap commitments. Skai currently keeps model execution local-only; hosted
+> provider examples below are background research and remain out of scope.
+
 Research date: 2026-11-03
 
 Reference: [open-webui/open-webui](https://github.com/open-webui/open-webui)
