@@ -22,7 +22,7 @@ Skai Desktop is **local-only** for AI runtime and application data:
 - No cloud model execution, hosted provider routing, cloud sync, or remote fallback.
 - Prompts and attachments stay on this computer and are sent only to a local runtime selected by the user.
 - GitHub is an explicit project integration for repository context and guarded Git workflows; it is not an AI model provider.
-- Local services such as Ollama, LM Studio, LocalAI, llama.cpp, vLLM, OpenAI-compatible loopback servers, and ComfyUI can be connected by the user.
+- Local services such as Ollama, LM Studio, LocalAI, llama.cpp, vLLM, OpenAI-compatible loopback servers, and ComfyUI can be connected by the user. An optional managed Diffusers runtime can generate Stable Diffusion Turbo images locally.
 
 ## What Skai is today
 
@@ -34,7 +34,7 @@ Skai Desktop is **local-only** for AI runtime and application data:
 | **Scheduled work** | Local one-time and repeating schedules with pause/resume/cancel and reviewed Run now controls. No unattended provider request is implied. |
 | **Models** | Local provider discovery, model library, pinned models, capability checks, comparison, explicit unavailable-model recovery, and no silent model switching. |
 | **Workspace shell** | Resizable sidebar, persistent navigation state, command palette, settings search, responsive layouts, in-app documentation, and Deep Sea/Deep Space appearance presets. |
-| **Local integrations** | Guarded GitHub repository workflows, local ComfyUI-compatible image workflows, local attachments, and Percy, the optional Skai wolf companion. |
+| **Local integrations** | Guarded GitHub repository workflows, local ComfyUI-compatible image workflows, optional Diffusers image generation, local attachments, and Percy, the optional Skai wolf companion. |
 
 The [capability matrix](docs/CAPABILITY_MATRIX.md) is the source of truth for working, partial, unverified, and planned areas. The project favors small, tested vertical slices over static mock screens, with screenshots and interaction evidence recorded in [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md).
 
@@ -128,7 +128,7 @@ Project documentation:
 - [`docs/INDEX.md`](docs/INDEX.md) — curated index of all project documentation.
 - [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — evidence-backed feature status.
 - [`docs/GITHUB_PAGES.md`](docs/GITHUB_PAGES.md) — project site and deployment notes.
-- [`docs/LOCAL_IMAGE_GENERATION.md`](docs/LOCAL_IMAGE_GENERATION.md) — current ComfyUI workflows and the separate built-in runtime proposal.
+- [`docs/LOCAL_IMAGE_GENERATION.md`](docs/LOCAL_IMAGE_GENERATION.md) — managed Diffusers runtime, ComfyUI workflows, and remaining acceptance gaps.
 - [`CHANGELOG.md`](CHANGELOG.md) — version history.
 
 Engineering references:

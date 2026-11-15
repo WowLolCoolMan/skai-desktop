@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, safeStorage, screen, session, shell, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -8,7 +8,6 @@ const { randomUUID } = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
-const { createChatGptAuth } = require("./chatgpt-auth.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -41,6 +40,9 @@ let hostReader;
 let nextRequestId = 1;
 const pending = new Map();
 const standardRequestTimeoutMs = 30_000;
+// Local image generation includes a multi-gigabyte first-run model download and
+// CPU inference. Keep the Agent Host alive long enough for that operation.
+const imageGenerationRequestTimeoutMs = 60 * 60_000;
 const chatRequestTimeoutMs = 5 * 60_000;
 const chatHostDeadlineSeconds = 285;
 const globalLauncherAccelerator = "CommandOrControl+Alt+Space";
@@ -71,7 +73,6 @@ const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production",
 const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let updateCheckTimer;
-let chatGptAuth;
 
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
@@ -87,6 +88,11 @@ const isPng = (bytes) => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer
 const isJpeg = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 const isMp4 = (bytes) => bytes.length >= 8 && bytes.toString("ascii", 4, 8) === "ftyp";
 const isWebm = (bytes) => bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+const isAudioSignature = (bytes, mediaType) => mediaType === "audio/wav" ? bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WAVE"
+  : mediaType === "audio/mpeg" ? bytes.length >= 3 && (bytes.subarray(0, 3).toString("ascii") === "ID3" || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0))
+  : mediaType === "audio/ogg" ? bytes.length >= 4 && bytes.toString("ascii", 0, 4) === "OggS"
+  : mediaType === "audio/mp4" ? isMp4(bytes)
+  : mediaType === "audio/webm" ? isWebm(bytes) : false;
 
 function decodeDroppedAttachment(attachment) {
   if (!attachment || typeof attachment.fileName !== "string" || typeof attachment.content !== "string") throw new Error("Dropped files must include a name and content.");
@@ -469,9 +475,7 @@ function createPetWindow() {
   }
   // On native Wayland, dragging is handed to the compositor (app-region drag →
   // xdg_toplevel.move) because the app can neither read nor set its position.
-  // The renderer selects the pet from its persisted character setting. Do not
-  // force rig mode here: doing so makes every selected sprite appear as Skai.
-  const petQuery = { pet: "1", ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
+  const petQuery = { pet: "1", ...(process.env.SKAI_RIG_PET === "1" ? { rig: "1" } : {}), ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
   const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
   if (devUrl) {
     const url = new URL(devUrl);
@@ -739,18 +743,12 @@ function restartAgentHost() {
   });
 }
 
-async function requestAgent(method, params) {
+function requestAgent(method, params) {
   if (typeof method !== "string" || !allowedMethods.has(method)) {
     return Promise.resolve({ v: 1, ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "That desktop operation is not exposed by the renderer bridge." } });
   }
   if (params !== undefined && (params === null || typeof params !== "object" || Array.isArray(params))) {
     return Promise.resolve({ v: 1, ok: false, error: { code: "INVALID_PARAMS", message: "Agent parameters must be an object." } });
-  }
-  let authenticatedParams = params;
-  if (method === "chat.complete" && params?.provider === "ChatGPT plan") {
-    const accessToken = await chatGptAuth?.token();
-    if (!accessToken) return { v: 1, ok: false, error: { code: "CHATGPT_AUTH_REQUIRED", message: "Sign in with ChatGPT before using the ChatGPT plan provider." } };
-    authenticatedParams = { ...params, apiKey: accessToken };
   }
   if (!host || host.stdin.destroyed) {
     const response = { v: 1, ok: false, error: { code: "HOST_UNAVAILABLE", message: "Agent host is not running." } };
@@ -760,10 +758,14 @@ async function requestAgent(method, params) {
   }
   const id = `desktop-${nextRequestId++}`;
   const requestParams = method === "chat.complete"
-    ? { ...(authenticatedParams || {}), timeoutSeconds: chatHostDeadlineSeconds }
-    : authenticatedParams;
+    ? { ...params, timeoutSeconds: chatHostDeadlineSeconds }
+    : params;
   return new Promise((resolve) => {
-    const timeoutMs = method === "chat.complete" ? chatRequestTimeoutMs : standardRequestTimeoutMs;
+    const timeoutMs = method === "chat.complete"
+      ? chatRequestTimeoutMs
+      : method === "image.generate"
+        ? imageGenerationRequestTimeoutMs
+        : standardRequestTimeoutMs;
     const timer = setTimeout(() => {
       if (!pending.has(id)) return;
       pending.delete(id);
@@ -915,37 +917,35 @@ function applyProductionContentSecurityPolicy() {
 app.whenReady().then(() => {
   if (relaunchingForDisplayBackend || !hasSingleInstanceLock) return;
   startAgentHost();
-  chatGptAuth = createChatGptAuth({ userDataPath: app.getPath("userData"), openExternal: (url) => shell.openExternal(url), safeStorage });
-  const localVideos = new Map();
-  ipcMain.handle("video:create-local-url", (event, payload) => {
-    if (!payload || !["video/mp4", "video/webm"].includes(payload.mediaType) || typeof payload.content !== "string" || payload.content.length > 28_000_000 || payload.content.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(payload.content))
-      throw new Error("The local video payload is invalid or too large.");
+  const localMedia = new Map();
+  ipcMain.handle("media:create-local-url", (event, payload) => {
+    const mediaTypes = ["video/mp4", "video/webm", "audio/mp4", "audio/webm", "audio/mpeg", "audio/wav", "audio/ogg"];
+    if (!payload || !mediaTypes.includes(payload.mediaType) || typeof payload.content !== "string" || payload.content.length > 28_000_000 || payload.content.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(payload.content))
+      throw new Error("The local media payload is invalid or too large.");
     const bytes = Buffer.from(payload.content, "base64");
-    if (!bytes.length || bytes.length > 20 * 1024 * 1024 || !(payload.mediaType === "video/mp4" ? isMp4(bytes) : isWebm(bytes)))
-      throw new Error("The local video payload failed its size or signature check.");
-    const extension = payload.mediaType === "video/mp4" ? ".mp4" : ".webm";
-    const directory = path.join(app.getPath("userData"), "video-samples");
+    const validSignature = payload.mediaType === "video/mp4" ? isMp4(bytes) : payload.mediaType === "video/webm" ? isWebm(bytes) : isAudioSignature(bytes, payload.mediaType);
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024 || !validSignature)
+      throw new Error("The local media payload failed its size or signature check.");
+    const extension = { "video/mp4": ".mp4", "video/webm": ".webm", "audio/mp4": ".m4a", "audio/webm": ".webm", "audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/ogg": ".ogg" }[payload.mediaType];
+    const directory = path.join(app.getPath("userData"), "media-samples");
     fsSync.mkdirSync(directory, { recursive: true });
     const filePath = path.join(directory, `${randomUUID()}${extension}`);
     fsSync.writeFileSync(filePath, bytes, { mode: 0o600, flag: "wx" });
     const url = pathToFileURL(filePath).href;
-    localVideos.set(url, { filePath, webContentsId: event.sender.id });
+    localMedia.set(url, { filePath, webContentsId: event.sender.id });
     return url;
   });
-  ipcMain.handle("video:revoke-local-url", (event, url) => {
+  ipcMain.handle("media:revoke-local-url", (event, url) => {
     try {
-      const entry = localVideos.get(String(url));
+      const entry = localMedia.get(String(url));
       if (entry?.webContentsId === event.sender.id) {
-        localVideos.delete(String(url));
+        localMedia.delete(String(url));
         void fs.unlink(entry.filePath).catch(() => {});
       }
     } catch { /* Ignore malformed cleanup requests. */ }
     return true;
   });
   if (!process.env.SERVER_ROCK_RENDERER_URL) applyProductionContentSecurityPolicy();
-  ipcMain.handle("chatgpt:status", (event) => BrowserWindow.fromWebContents(event.sender) ? chatGptAuth.status() : { signedIn: false, email: null, scopes: [] });
-  ipcMain.handle("chatgpt:sign-in", async (event) => { if (!BrowserWindow.fromWebContents(event.sender)) return { signedIn: false, email: null, scopes: [] }; return chatGptAuth.signIn(); });
-  ipcMain.handle("chatgpt:sign-out", (event) => BrowserWindow.fromWebContents(event.sender) ? chatGptAuth.signOut() : { signedIn: false, email: null, scopes: [] });
   ipcMain.handle("agent:request", async (event, method, params) => {
     if (method === "workspace.pickFolder") {
       const window = BrowserWindow.fromWebContents(event.sender);

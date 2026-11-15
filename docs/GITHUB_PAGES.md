@@ -12,18 +12,15 @@ when files under `docs/`, the workflow, or branding assets change on `main`. A
 manual run is also available from the Actions tab. The deployment uses the
 `github-pages` environment and GitHub's Pages artifact workflow.
 
-For the first deployment, open the repository's **Settings → Pages** and set
-the publishing source to **GitHub Actions**. This owner-level repository
-setting cannot be changed by the workflow token. Successful workflow runs
-publish the site at
-`https://wowlolcoolman.github.io/skai-desktop/`.
-
-As of 2026-11-15, this setup has not been completed: the Pages workflow fails
-in **Configure Pages** because GitHub returns `404 Not Found` when it looks up
-the repository's Pages site. After setting the source to **GitHub Actions**,
-rerun **Deploy project site** from the Actions tab; future pushes to `main`
-that change `docs/`, branding assets, or this workflow will deploy
-automatically.
+The repository's **Settings → Pages** publishing source is **GitHub Actions**.
+This owner-level repository setting cannot be changed by the workflow token.
+The public site is
+`https://wowlolcoolman.github.io/skai-desktop/`; on 2026-11-15, a live check
+returned HTTP 200 and the custom title **Skai Desktop — Your local AI
+workspace**, confirming that `docs/index.html` is being served. A manually
+requested **Deploy project site** run for commit `101cd2bf` is also in progress
+after the source was corrected. Pushes to `main` that change `docs/`, branding
+assets, or this workflow should deploy automatically.
 
 ## Content maintenance
 
@@ -31,7 +28,7 @@ automatically.
 - Keep the [README](../README.md), [changelog](../CHANGELOG.md), and
   [documentation index](INDEX.md) aligned when project-facing docs change.
 - State current behavior separately from proposals. In particular,
-  [local image generation](LOCAL_IMAGE_GENERATION.md) distinguishes the current
-  ComfyUI integration from the unimplemented bundled-runtime proposal.
+  [local image generation](LOCAL_IMAGE_GENERATION.md) distinguishes the managed
+  Diffusers runtime and ComfyUI integration from their remaining live acceptance.
 - Optimize and place public images in `site-assets/`; Pages publishes this
   directory as-is and does not copy files from elsewhere in the repository.

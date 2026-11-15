@@ -11,6 +11,7 @@ const modelPicker = fs.readFileSync(path.join(root, "apps", "desktop", "src", "c
 const overflowMenu = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "ui", "OverflowMenu.tsx"), "utf8");
 const sidebar = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "layout", "Sidebar.tsx"), "utf8");
 const chatComposer = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "ChatComposer.tsx"), "utf8");
+const localAudioTranscription = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "localAudioTranscription.ts"), "utf8");
 const chatWorkspace = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "useChatWorkspace.ts"), "utf8");
 const navigation = fs.readFileSync(path.join(root, "apps", "desktop", "src", "app", "navigation.ts"), "utf8");
 const packageScript = fs.readFileSync(path.join(root, "scripts", "package-electron.cjs"), "utf8");
@@ -45,14 +46,18 @@ expect(main.includes("contextIsolation: true"), "context isolation must remain e
 expect(main.includes("nodeIntegration: false"), "Node integration must remain disabled");
 expect(main.includes("sandbox: true"), "renderer sandbox must remain enabled");
 expect(main.includes("media-src 'self' file:"), "local video decoding must permit only local file media sources");
-expect(main.includes('path.join(app.getPath("userData"), "video-samples")'), "local video samples must be written only to the private app data folder");
+expect(main.includes('path.join(app.getPath("userData"), "media-samples")'), "local media samples must be written only to the private app data folder");
+expect(main.includes('ipcMain.handle("media:create-local-url"') && main.includes('"audio/mpeg"') && main.includes('"audio/wav"'), "audio input must be signature-checked and staged in private local media storage");
 expect(preload.includes("contextBridge.exposeInMainWorld"), "renderer communication must use preload");
+expect(preload.includes('"media:create-local-url"') && preload.includes('"media:revoke-local-url"'), "audio and video media access must use the scoped preload bridge");
 expect(!preload.includes("require(\"node:fs\")"), "preload must not expose filesystem access");
 expect(main.includes('"tasks.plan"'), "Electron bridge must expose the review-first local task planning method");
 expect(main.includes('"project.git.status"'), "Electron bridge must expose the read-only local Git status method");
 expect(main.includes('"workspace.importDroppedFiles"') && main.includes("decodeDroppedAttachment"), "Electron bridge must validate dropped chat files at the local boundary");
 expect(chatComposer.includes("onDrop={handleDrop}") && chatComposer.includes("Drop files to attach"), "Chat composer must expose a visible drag-and-drop attachment state");
 expect(chatComposer.includes("SpeechRecognition") && chatComposer.includes("aria-pressed={voiceListening}"), "Chat composer must expose explicit system voice input with a visible listening state");
+expect(chatComposer.includes("transcribeLocalAudioFile") && chatComposer.includes("Transcribe MP3, M4A, OGG, or WAV locally"), "Chat composer must provide local audio transcription with an explicit user action");
+expect(localAudioTranscription.includes("processLocally = true") && localAudioTranscription.includes("recognition.start(track)") && localAudioTranscription.includes("Audio was not sent to a remote service"), "Audio file transcription must consume only a local media track with on-device recognition");
 expect(chatComposer.includes("stopNativeSpeech();") && chatComposer.includes("setHandsFreeActive(false);"), "Disabling hands-free mode must interrupt local speech output");
 expect(chatComposer.includes("aria-activedescendant={commandQuery !== null ? activeCommandId : undefined}") && chatComposer.includes("(index + 1) % commandMatches.length"), "Chat composer commands must expose the active option and wrap keyboard navigation");
 expect(modelPicker.includes("const onPopoverKeyDown") && modelPicker.includes("aria-activedescendant={filtered[activeIndex]"), "Model picker must keep keyboard focus inside the popover and expose the active option");
@@ -89,7 +94,7 @@ expect(main.includes("packagedRuntime") && main.includes("process.resourcesPath"
 expect(main.includes("packagedHost") && main.includes("ServerRock.AgentHost"), "Electron must launch a bundled Agent Host when packaged");
 expect(packageScript.includes("dotnet\", [\"publish\"") && packageScript.includes("PublishSingleFile=true"), "Electron packaging must publish a self-contained Agent Host");
 expect(packageScript.includes("electronDist") && packageScript.includes("const appRoot = path.join(outputRoot, \"resources\", \"app\")"), "Electron packaging must stage the renderer and runtime files");
-expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("mainTarget") && smokeScript.includes("petTarget") && smokeScript.includes("Primary navigation") && smokeScript.includes("Percy desktop companion") && smokeScript.includes("pet-window-sprite"), "Electron packaged smoke must inspect the main navigation, Settings, and separate Percy surfaces");
+expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("mainTarget") && smokeScript.includes("petTarget") && smokeScript.includes("Primary navigation") && smokeScript.includes(".pet-window-root") && smokeScript.includes("pet-window-sprite") && smokeScript.includes("smoke-silence.wav"), "Electron packaged smoke must inspect the main navigation, local audio, and separate Percy surfaces");
 expect(packageJson.scripts["smoke:electron:themes"] === "node scripts/smoke-electron-themes.cjs" && themeSmokeScript.includes("Emulation.setDeviceMetricsOverride") && themeSmokeScript.includes("Page.captureScreenshot") && themeSmokeScript.includes("deep-space"), "Packaged Electron theme acceptance must exercise constrained rendering and capture appearance states");
 expect(packageJson.scripts["smoke:electron:overflow"] === "node scripts/smoke-electron-overflow.cjs" && overflowSmokeScript.includes("1920") && overflowSmokeScript.includes("routes") && overflowSmokeScript.includes("getBoundingClientRect"), "Packaged Electron overflow acceptance must exercise every route across supported viewport widths");
 expect(workspace.includes("const hasActiveTasks") && workspace.includes("loadWorkbench(false)") && workspace.includes("window.setInterval"), "Workbench must refresh background task state while local execution is active");

@@ -2,9 +2,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("serverRockAgent", {
   request: (method, params) => ipcRenderer.invoke("agent:request", method, params),
-  video: {
-    createLocalUrl: (mediaType, content) => ipcRenderer.invoke("video:create-local-url", { mediaType: String(mediaType), content: String(content) }),
-    revokeLocalUrl: (url) => ipcRenderer.invoke("video:revoke-local-url", String(url)),
+  media: {
+    createLocalUrl: (mediaType, content) => ipcRenderer.invoke("media:create-local-url", { mediaType: String(mediaType), content: String(content) }),
+    revokeLocalUrl: (url) => ipcRenderer.invoke("media:revoke-local-url", String(url)),
   },
   onTrayOpenConversation: (handler) => {
     const listener = (_event, id) => handler(String(id));
