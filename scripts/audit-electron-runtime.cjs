@@ -23,8 +23,8 @@ const expect = (condition, message) => { if (!condition) failures.push(message);
 expect(packageJson.scripts.start === "node scripts/start-desktop.cjs", "root start must launch Electron");
 expect(packageJson.scripts.build === "npm run desktop:build", "root build must build Electron");
 expect(packageJson.scripts.open === "node scripts/open-desktop.cjs", "root open must launch Electron");
-expect(packageJson.scripts["start:legacy-native"] === "node scripts/start-native.cjs", "legacy start alias must remain explicit");
-expect(packageJson.scripts["open:legacy-native"] === "node scripts/open-native.cjs", "legacy open alias must remain explicit");
+expect(!packageJson.scripts["start:native"] && !packageJson.scripts["start:legacy-native"], "legacy native start commands must not be shipped");
+expect(!packageJson.scripts["build:native"] && !packageJson.scripts["open:native"] && !packageJson.scripts["open:legacy-native"], "legacy native build/open commands must not be shipped");
 expect(desktopPackage.main === "electron/main.cjs", "desktop package must use Electron main");
 expect(main.includes("contextIsolation: true"), "context isolation must remain enabled");
 expect(main.includes("nodeIntegration: false"), "Node integration must remain disabled");
@@ -75,5 +75,5 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log("Electron replacement audit passed: default commands, secure boundary, and rollback aliases are present.");
+  console.log("Electron runtime audit passed: Electron is the only shipped desktop architecture and its secure boundary is present.");
 }

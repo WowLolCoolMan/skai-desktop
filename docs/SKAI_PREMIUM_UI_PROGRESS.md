@@ -1,5 +1,44 @@
 # Skai Premium UI Transformation
 
+## Slice 325 — Universal destination rail and honest Usage surface
+
+The Electron shell now presents a compact global destination rail for Home,
+Image Gen, Usage, and Settings, with additional tools available from the same
+rail. The existing sidebar is visually scoped to threads, projects, search,
+and workspace continuity instead of duplicating the full application route
+list. A dedicated Usage route now reports the actual telemetry boundary rather
+than inventing token, cost, latency, or GPU measurements.
+
+Evidence: desktop typecheck and production build passed. Packaged theme
+acceptance passed for dark/light/system states, and packaged overflow
+acceptance passed across 10 routes × 5 viewport widths.
+
+## Slice 326 — Conversation-scoped drafts and open message canvas
+
+Chat drafts now persist under the active conversation identity, with a bounded
+one-time migration from the legacy shared draft key. Switching threads no
+longer leaks a draft into another conversation or new-chat context. The chat
+message surface no longer uses the obsolete bordered conversation-card shell;
+the message column is an open readable canvas while the composer remains a
+bottom-anchored, keyboard-accessible surface with attachments, queueing, slash
+commands, and drag-and-drop intact.
+
+Evidence: desktop typecheck/build, packaged Electron build, overflow acceptance
+across 10 routes × 5 viewport widths, and diff validation passed.
+
+## Slice 327 — Prompt-first Image Studio workflow
+
+Image Studio now leads with the prompt composer and keeps endpoint/workflow
+configuration inside a collapsible local setup inspector. Users can save up to
+12 named ComfyUI API workflows locally and select them for reuse, so ordinary
+generation no longer requires repasting JSON after the first setup. Generated
+outputs are actionable gallery items with a full-size modal inspector and
+download action; empty and readiness states remain truthful when ComfyUI or a
+workflow is unavailable.
+
+Evidence: desktop typecheck/build, packaged Electron build, overflow acceptance
+across 10 routes × 5 viewport widths, and diff validation passed.
+
 ## Slice 316 — Packaged Electron overflow acceptance matrix
 
 The packaged Electron smoke suite now checks every primary route at five
@@ -500,6 +539,21 @@ final audit pass.
 - Local model acquisition: Models now exposes the bounded Ollama pull adapter through Agent Host with local-only validation and streamed status feedback, plus responsive download controls and honest non-Ollama/unavailable states.
 - Model pull lifecycle: Ollama downloads now run as non-blocking Agent Host operations with start/status/cancel capability contracts, live renderer polling, duplicate prevention, and disposable failed-endpoint recovery smoke coverage.
 - Local retrieval: the durable corpus now exposes an injectable vector-index boundary and combines lexical matching with a deterministic local sparse-token cosine score, reporting the hybrid retrieval mode without claiming semantic/cloud embeddings.
+- Marketplace architecture regression check: restored the narrow Home / Image Gen / Usage / Settings rail and moved secondary workspaces into the searchable command launcher; the adjacent sidebar now stays dedicated to projects and conversations. Rebuilt Marketplace as a full-width two-pane local discovery workspace with consolidated sections (Discover, Models, Skills, Tools, Installed, Updates), searchable/filterable results, model-row hierarchy, selected-item inspector, and honest verified-installation gating. Preserved host-backed catalog/provider/voice behavior and kept unavailable package sources explicit. Packaged Electron visual inspection passed on the live Marketplace route, including selecting Voice profiles, while Percy remained in a separate always-on-top companion window without obstructing results. Packaged overflow acceptance passed across 10 routes and 1920/1440/1280/960/640px widths.
+- CSS foundation cleanup: removed the obsolete pre-premium sidebar/conversation/form/route block (including the unused conversation-card rules), restored the required shell and branded-mark primitives inside the unified premium foundation, and retained the current rail/sidebar/responsive geometry. Rebuilt and visually inspected the packaged Electron Chat and Marketplace surfaces after the cleanup. Screenshot: `C:\Users\basic\AppData\Local\Temp\codex-shot-2026-11-14_17-41-13.png`. Typecheck, syntax, hygiene, Electron runtime/local-only audits, package build, and the 10-route × 5-width overflow matrix passed.
+- Thread sidebar composition check: removed the legacy workspace, utilities, and Settings navigation nodes from `Sidebar.tsx` instead of relying on CSS hiding. The sidebar DOM now contains workspace identity, New Chat, projects, conversation search/history, and resize behavior; GlobalRail owns Home/Image Gen/Usage/Settings and the command palette owns secondary tools. Packaged Electron accessibility and screenshot inspection confirmed the resulting shell. Screenshot: `C:\Users\basic\AppData\Local\Temp\codex-shot-2026-11-14_17-45-33.png`. Typecheck, build, packaging, and the 10-route × 5-width overflow matrix passed.
+- Active-session sidebar check: added a route-backed `ACTIVE SESSION` status beneath projects and conversations so the adjacent sidebar exposes the current workspace context without becoming a second application rail. The status is derived from the live route, remains local-only, is hidden in collapsed mode, and does not claim a running task. CDP captured the actual packaged Electron chat surface at `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-active-session-chat.png`; the screenshot shows the narrow global rail, dedicated thread/project sidebar, readable chat canvas, and active-session row. Typecheck, build, packaging, and the 10-route × 5-width overflow matrix passed.
+- Settings title hierarchy check: renamed the internal Settings page heading to `Workspace settings` so it no longer duplicates the universal route header while preserving the settings category navigation and controls. Live packaged Electron inspection confirmed the shell header reads `Settings` and the content heading reads `Workspace settings`; screenshot: `C:\Users\basic\AppData\Local\Temp\codex-shot-2026-11-14_17-49-00.png`. Typecheck, build, packaging, and the 10-route × 5-width overflow matrix passed.
+- Settings surface hierarchy check: removed the generic outer `Card` wrapper from the settings category workspace and made the settings surface transparent/flat while retaining the internal category sidebar, grouped controls, save state, and provider persistence. Packaged Electron CDP capture: `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-settings-flat.png`. The screenshot now shows the settings category navigation and comfortable main column without a redundant nested outer panel.
+- Models workflow check: changed local model rows from immediate navigation into an inspect-first workflow with a selected-model details inspector and an explicit `Use in chat` action. The existing host-backed discovery, Ollama pull progress, cancellation, and local-only messaging remain intact; no model inventory is fabricated. The packaged empty-state capture is `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-models-inspector.png`; it verifies the no-model state and discover controls, while populated inspector interaction remains dependent on a connected local runtime. Typecheck, build, packaging, and the 10-route × 5-width overflow matrix passed.
+- Memory view separation check: split the Memory route into explicit `Saved memory` and `Document corpus` tabs so the common approved-memory editor/list is no longer pushed below a document-ingestion form. The corpus tab retains import, bounded search, provenance, removal, and the honest unavailable-bridge state. Packaged Electron captures: `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-memory-saved-view.png` and `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-memory-corpus-view.png`. Typecheck, build, packaging, and the 10-route × 5-width overflow matrix passed.
+- Workbench viewport correction: fixed the flex-height contract that collapsed Task Activity and the Context inspector to a single clipped row while Scheduled Runs consumed the viewport. Task Activity and Context now retain a usable minimum surface, and Scheduled Runs is an explicit collapsed-by-default management section; opening it enables an intentional Workbench scroll surface rather than clipping its form. Packaged Electron captures: `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-workbench-final.png` and `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-workbench-scheduler-open.png`. The attached regression screenshot is resolved: task rows and inspector content are legible and interactive. Typecheck, build, packaging, and the 10-route × 5-width overflow matrix passed.
+- Image Studio workflow access check: added a real local workflow import path through the existing host-backed file picker, accepting validated `.json`/`.json5` ComfyUI API objects and saving the imported workflow to the local profile for reuse. The raw JSON editor remains available for advanced edits, but first-time users no longer have to paste a payload when they already have a local workflow file. The packaged Electron capture `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-images-import.png` verifies the corrected no-scroll desktop composition: prompt, recipes, setup disclosure, readiness, and Generate action remain visible without an inner editor scrollbar. Typecheck, build, packaging, and visual inspection passed.
+- Terminal workspace composition check: promoted Terminal into the universal full-width workspace contract with an explicit `app-content-terminal` surface, preserved project-bound command and persistent PTY behavior, and constrained the no-project empty state so it no longer consumes the entire viewport. Packaged Electron capture: `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-terminal.png`; the shell header, project-terminal surface, local-only boundary, and Coding Workspace handoff are all visible and readable.
+- Image Studio CSS foundation cleanup: moved the desktop no-scroll contract out of late corrective overrides and into the primary Image Studio layout block. The editor and history surfaces now size from their content at desktop widths, while the existing narrow-window media rule retains intentional page scrolling for stacked layouts. The packaged Electron capture `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-images-css-foundation.png` matches the prior visual result with the correction in its owning foundation block.
+- Packaged shell accessibility correction: the release smoke harness was correctly detecting a missing `Primary navigation` landmark after the rail/sidebar refactor. Renamed the GlobalRail destination nav landmark to the canonical smoke/accessibility label while preserving the visible four-destination rail. Packaged Percy remained separate, transparent, always-on-top, and animated; the artifact smoke now validates both surfaces against the corrected landmark.
+- Pet settings regression correction: the Pet settings tab now resolves every built-in companion preview through the bundled sprite atlas assets instead of stale `/assets/pets/*` URLs that rendered broken images in the packaged app. The separate always-on-top Percy architecture and custom local sprite import remain unchanged. Packaged Electron capture: `C:\Users\basic\.codex\worktrees\fix-codeql-smoke-harness\Server Rock Ai\.tmp\skai-electron-settings-pet-preview.png`; the Pet tab visibly shows the selected built-in sprite set, companion toggles, and custom sprite entry point.
+- Electron architecture cutover: removed the usable Uno/XAML desktop project, native launch/build/open scripts, native packaging helpers, native CI/release workflows, and native UI smoke/audit entry points. Shared `SkaiDesktop.Core` remains headless and is consumed by the persistent Agent Host. Electron-only syntax, hygiene, runtime audit, typecheck, renderer build, Core tests, packaging, and separate Percy smoke all passed.
 
 ## Current task
 
@@ -520,7 +574,7 @@ The following working-tree paths are intentionally not part of the premium UI ch
 
 - `native/SkaiDesktop.Core.Tests/Program.cs`
 - `native/SkaiDesktop.Core/Models/AppSettings.cs`
-- `native/ServerRock.Native/**`
+- `native/SkaiDesktop.Core/**`
 - `native/SkaiDesktop.Core.Tests/AirLlmProviderTests.cs`
 - `native/SkaiDesktop.Core/Services/AirLlmProvider.cs`
 - `services/airllm/**`

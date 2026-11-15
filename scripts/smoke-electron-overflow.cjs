@@ -6,7 +6,7 @@ const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platf
 
 const executable = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist", "electron", "win-x64", process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"));
 const port = 19324;
-const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory"];
+const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory", "usage"];
 const widths = [1920, 1440, 1280, 960, 640];
 const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), windowsHide: true, stdio: "ignore" });
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -15,7 +15,7 @@ function connect(target) {
   const socket = new WebSocket(target.webSocketDebuggerUrl);
   const pending = new Map();
   let nextId = 1;
-  socket.addEventListener("message", (event) => { const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data)); const resolve = pending.get(message.id); if (!resolve) return; pending.delete(message.id); resolve(message); });
+  socket.addEventListener("message", (event) => { const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data)); const resolve = pending.get(message.id); if (typeof resolve !== "function") return; pending.delete(message.id); resolve(message); });
   const send = (method, params = {}) => new Promise((resolve, reject) => { const id = nextId++; pending.set(id, (message) => message.error ? reject(new Error(message.error.message)) : resolve(message.result)); socket.send(JSON.stringify({ id, method, params })); setTimeout(() => { if (pending.delete(id)) reject(new Error(`Timed out: ${method}`)); }, 8000); });
   return { open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }), send, evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }); return result?.result?.value; }, close: () => socket.close() };
 }
