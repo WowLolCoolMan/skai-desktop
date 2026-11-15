@@ -21,6 +21,10 @@ const overflowSmokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-el
 function findAlternateDesktopFiles(directory, results = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if ([".git", ".tmp", "node_modules", "dist", "bin", "obj"].includes(entry.name)) continue;
+    // Visual Studio and other IDEs create per-user project settings beside
+    // the source tree. They are not a desktop surface and must not make the
+    // Electron-only architecture audit fail on a developer checkout.
+    if (entry.name.endsWith(".csproj.user") || entry.name.endsWith(".sln.user")) continue;
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) findAlternateDesktopFiles(fullPath, results);
     else if (/\.(xaml|xaml\.cs)$/i.test(entry.name) || /(?:^|\.)?(?:uno|winui|native)\.(?:csproj|sln)$/i.test(entry.name) || /ServerRock\.Native/i.test(entry.name)) results.push(path.relative(root, fullPath));
