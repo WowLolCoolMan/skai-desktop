@@ -4,6 +4,8 @@ const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const readline = require("node:readline");
+const { randomUUID } = require("node:crypto");
+const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
 
@@ -81,6 +83,8 @@ if (!hasSingleInstanceLock) {
 const isBlockedAttachmentName = (name) => blockedAttachmentNames.has(name.toLowerCase()) || name.toLowerCase().includes(".env.");
 const isPng = (bytes) => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 const isJpeg = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+const isMp4 = (bytes) => bytes.length >= 8 && bytes.toString("ascii", 4, 8) === "ftyp";
+const isWebm = (bytes) => bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
 
 function decodeDroppedAttachment(attachment) {
   if (!attachment || typeof attachment.fileName !== "string" || typeof attachment.content !== "string") throw new Error("Dropped files must include a name and content.");
@@ -875,7 +879,7 @@ function applyProductionContentSecurityPolicy() {
       responseHeaders: {
         ...details.responseHeaders,
         "Content-Security-Policy": [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8188 http://localhost:8188; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8188 http://localhost:8188; media-src 'self' file:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
         ],
       },
     });
@@ -885,6 +889,32 @@ function applyProductionContentSecurityPolicy() {
 app.whenReady().then(() => {
   if (relaunchingForDisplayBackend || !hasSingleInstanceLock) return;
   startAgentHost();
+  const localVideos = new Map();
+  ipcMain.handle("video:create-local-url", (event, payload) => {
+    if (!payload || !["video/mp4", "video/webm"].includes(payload.mediaType) || typeof payload.content !== "string" || payload.content.length > 28_000_000 || payload.content.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(payload.content))
+      throw new Error("The local video payload is invalid or too large.");
+    const bytes = Buffer.from(payload.content, "base64");
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024 || !(payload.mediaType === "video/mp4" ? isMp4(bytes) : isWebm(bytes)))
+      throw new Error("The local video payload failed its size or signature check.");
+    const extension = payload.mediaType === "video/mp4" ? ".mp4" : ".webm";
+    const directory = path.join(app.getPath("userData"), "video-samples");
+    fsSync.mkdirSync(directory, { recursive: true });
+    const filePath = path.join(directory, `${randomUUID()}${extension}`);
+    fsSync.writeFileSync(filePath, bytes, { mode: 0o600, flag: "wx" });
+    const url = pathToFileURL(filePath).href;
+    localVideos.set(url, { filePath, webContentsId: event.sender.id });
+    return url;
+  });
+  ipcMain.handle("video:revoke-local-url", (event, url) => {
+    try {
+      const entry = localVideos.get(String(url));
+      if (entry?.webContentsId === event.sender.id) {
+        localVideos.delete(String(url));
+        void fs.unlink(entry.filePath).catch(() => {});
+      }
+    } catch { /* Ignore malformed cleanup requests. */ }
+    return true;
+  });
   if (!process.env.SERVER_ROCK_RENDERER_URL) applyProductionContentSecurityPolicy();
   ipcMain.handle("agent:request", async (event, method, params) => {
     if (method === "workspace.pickFolder") {
@@ -894,20 +924,22 @@ app.whenReady().then(() => {
     }
     if (method === "workspace.pickFiles") {
       const window = BrowserWindow.fromWebContents(event.sender);
-      const result = await dialog.showOpenDialog(window, { properties: ["openFile", "multiSelections"], filters: [{ name: "Chat files", extensions: ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "toml", "html", "css", "js", "ts", "jsx", "tsx", "cs", "py", "java", "go", "rs", "c", "h", "cpp", "hpp", "sh", "sql", "log", "pdf", "png", "jpg", "jpeg"] }] });
+      const result = await dialog.showOpenDialog(window, { properties: ["openFile", "multiSelections"], filters: [{ name: "Chat files", extensions: ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "toml", "html", "css", "js", "ts", "jsx", "tsx", "cs", "py", "java", "go", "rs", "c", "h", "cpp", "hpp", "sh", "sql", "log", "pdf", "png", "jpg", "jpeg", "mp4", "webm"] }] });
       if (result.canceled) return { v: 1, ok: true, result: { attachments: [] } };
       const attachments = [];
       let textCharacters = 0;
       let imageBytes = 0;
+      let videoBytes = 0;
       for (const filePath of result.filePaths.slice(0, 5)) {
         const fileName = path.basename(filePath);
         const extension = path.extname(fileName).toLowerCase();
         if (isBlockedAttachmentName(fileName)) throw new Error(`That file name cannot be attached: ${fileName}`);
         const imageType = extension === ".png" ? "image/png" : [".jpg", ".jpeg"].includes(extension) ? "image/jpeg" : null;
         const isPdf = extension === ".pdf";
-        if (!imageType && !isPdf && !attachmentTextExtensions.has(extension)) throw new Error(`That file type cannot be attached: ${fileName}`);
+        const videoType = extension === ".mp4" ? "video/mp4" : extension === ".webm" ? "video/webm" : null;
+        if (!imageType && !isPdf && !videoType && !attachmentTextExtensions.has(extension)) throw new Error(`That file type cannot be attached: ${fileName}`);
         const bytes = await fs.readFile(filePath);
-        if (bytes.length > (isPdf ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The selected file is too large: ${fileName}`);
+        if (bytes.length > (isPdf || videoType ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The selected file is too large: ${fileName}`);
         if (imageType) {
           if (!(imageType === "image/png" ? isPng(bytes) : isJpeg(bytes))) throw new Error(`The selected image is not valid: ${fileName}`);
           imageBytes += bytes.length;
@@ -915,6 +947,11 @@ app.whenReady().then(() => {
           attachments.push({ fileName, mediaType: imageType, content: bytes.toString("base64") });
         } else if (isPdf) {
           attachments.push({ fileName, mediaType: null, content: bytes.toString("base64") });
+        } else if (videoType) {
+          if (!(videoType === "video/mp4" ? isMp4(bytes) : isWebm(bytes))) throw new Error(`The selected video is not a valid ${videoType} file: ${fileName}`);
+          videoBytes += bytes.length;
+          if (videoBytes > 40 * 1024 * 1024) throw new Error("Selected videos exceed the combined 40 MB limit.");
+          attachments.push({ fileName, mediaType: videoType, content: bytes.toString("base64") });
         } else {
           const content = bytes.toString("utf8").slice(0, 16000);
           textCharacters += content.length;

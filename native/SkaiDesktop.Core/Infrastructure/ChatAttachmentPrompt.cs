@@ -39,6 +39,12 @@ public static class ChatAttachmentPrompt
             var content = attachments.Any(attachment => !attachment.IsImage)
                 ? AppendWithBoundedRetrieval(message.Content, attachments)
                 : message.Content;
+            var imageNames = attachments.Where(attachment => attachment.IsImage)
+                .Select(attachment => SafeImageName(attachment.FileName))
+                .Where(name => name.Length > 0)
+                .ToArray();
+            if (imageNames.Length > 0)
+                content += "\n\nAttached image filenames (untrusted metadata):\n" + string.Join("\n", imageNames);
             return message.ForModel(content);
         }).ToList();
 
@@ -53,6 +59,9 @@ public static class ChatAttachmentPrompt
 
         return prepared;
     }
+
+    private static string SafeImageName(string fileName) =>
+        new string(fileName.Select(character => char.IsControl(character) ? ' ' : character).Take(120).ToArray()).Trim();
 
     private static string AppendCore(string userText, IReadOnlyList<ChatAttachment> attachments, bool retrieveLargeContent)
     {

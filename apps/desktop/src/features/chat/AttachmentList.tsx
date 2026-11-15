@@ -7,6 +7,8 @@ function isImage(attachment: ChatAttachment) {
 }
 
 function attachmentKind(attachment: ChatAttachment) {
+  const videoTime = attachment.fileName.match(/\.frame-\d+-at-(\d{2})-(\d{2})\.jpg$/i);
+  if (videoTime) return `Video frame · ${videoTime[1]}:${videoTime[2]}`;
   if (isImage(attachment)) return "Image";
   if (attachment.fileName.toLowerCase().endsWith(".pdf")) return "PDF · text extracted locally";
   return attachment.mediaType || "Local file";

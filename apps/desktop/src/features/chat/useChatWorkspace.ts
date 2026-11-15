@@ -4,6 +4,7 @@ import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage } from "
 import type { Message } from "../../app/types";
 import { speakNativeResponse, stopNativeSpeech } from "../../services/nativeTts";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR } from "../../services/localOnly";
+import { extractVideoFrameAttachments, isVideoAttachment, videoMediaType } from "./videoFrameExtractor";
 
 type ChatWorkspaceOptions = {
   request: AgentRequest;
@@ -25,6 +26,13 @@ function readFileAsBase64(file: File) {
     reader.onerror = () => reject(reader.error ?? new Error(`Could not read ${file.name}.`));
     reader.readAsDataURL(file);
   });
+}
+
+function base64ToBlob(content: string, mediaType: string) {
+  const binary = atob(content);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes.buffer], { type: mediaType });
 }
 
 function skillMentions(messages: Array<{ content: string }>) {
@@ -124,21 +132,34 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (!response.ok) { onError(response.error?.message ?? "File selection failed."); return; }
     const selected = (response.result as { attachments: ChatAttachment[] }).attachments ?? [];
     const extracted: ChatAttachment[] = [];
-    for (const attachment of selected) {
-      if (attachment.fileName.toLowerCase().endsWith(".pdf")) {
-        const extraction = await request("workspace.attachment.extract", { fileName: attachment.fileName, content: attachment.content });
-        if (!extraction.ok) { onError(extraction.error?.message ?? `Could not read ${attachment.fileName}.`); return; }
-        extracted.push(extraction.result as ChatAttachment);
-      } else extracted.push(attachment);
+    try {
+      for (const attachment of selected) {
+        if (isVideoAttachment(attachment)) {
+          extracted.push(...await extractVideoFrameAttachments(base64ToBlob(attachment.content, attachment.mediaType!), attachment.fileName));
+        } else if (attachment.fileName.toLowerCase().endsWith(".pdf")) {
+          const extraction = await request("workspace.attachment.extract", { fileName: attachment.fileName, content: attachment.content });
+          if (!extraction.ok) { onError(extraction.error?.message ?? `Could not read ${attachment.fileName}.`); return; }
+          extracted.push(extraction.result as ChatAttachment);
+        } else extracted.push(attachment);
+        if (extracted.length >= 5) break;
+      }
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "The selected video could not be sampled locally.");
+      return;
     }
     setAttachments((current) => [...current, ...extracted].slice(0, 5));
   };
 
   const importDroppedFiles = async (files: File[]) => {
-    const selected = files.slice(0, 5);
-    if (selected.length === 0) return;
+    if (files.length === 0) return;
     try {
-      const attachments = await Promise.all(selected.map(async (file) => ({ fileName: file.name, mediaType: file.type || null, content: await readFileAsBase64(file) })));
+      const attachments: ChatAttachment[] = [];
+      for (const file of files.slice(0, 5)) {
+        const mediaType = videoMediaType(file.name, file.type);
+        if (mediaType) attachments.push(...await extractVideoFrameAttachments(file, file.name));
+        else attachments.push({ fileName: file.name, mediaType: file.type || null, content: await readFileAsBase64(file) });
+        if (attachments.length >= 5) break;
+      }
       const response = await request("workspace.importDroppedFiles", { attachments });
       if (!response.ok) { onError(response.error?.message ?? "Dropped files could not be attached."); return; }
       const imported = (response.result as { attachments: ChatAttachment[] }).attachments ?? [];
@@ -152,8 +173,8 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       }
       setAttachments((current) => [...current, ...extracted].slice(0, 5));
       onError(null);
-    } catch {
-      onError("Dropped files could not be read locally.");
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Dropped files could not be processed locally.");
     }
   };
 

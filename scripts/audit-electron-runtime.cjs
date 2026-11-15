@@ -44,6 +44,8 @@ expect(desktopPackage.main === "electron/main.cjs", "desktop package must use El
 expect(main.includes("contextIsolation: true"), "context isolation must remain enabled");
 expect(main.includes("nodeIntegration: false"), "Node integration must remain disabled");
 expect(main.includes("sandbox: true"), "renderer sandbox must remain enabled");
+expect(main.includes("media-src 'self' file:"), "local video decoding must permit only local file media sources");
+expect(main.includes('path.join(app.getPath("userData"), "video-samples")'), "local video samples must be written only to the private app data folder");
 expect(preload.includes("contextBridge.exposeInMainWorld"), "renderer communication must use preload");
 expect(!preload.includes("require(\"node:fs\")"), "preload must not expose filesystem access");
 expect(main.includes('"tasks.plan"'), "Electron bridge must expose the review-first local task planning method");
