@@ -35,6 +35,7 @@ expect(packageScript.includes('process.platform === "linux" ? "linux-x64"') && p
 const linuxInstaller = read("packaging/linux/install.sh");
 expect(packageScript.includes('"install.sh"') && packageScript.includes('"uninstall.sh"') && packageScript.includes("skai-desktop.png"), "Linux artifacts must ship install.sh, uninstall.sh and the launcher icon");
 expect(linuxInstaller.includes("StartupWMClass=skai-desktop") && JSON.parse(read("apps/desktop/package.json")).name === "skai-desktop", "Linux launcher StartupWMClass must match the Electron window class (package name skai-desktop)");
+expect(main.includes('app.setDesktopName("skai-desktop.desktop")') && linuxInstaller.includes('DESKTOP_FILE="$DATA_HOME/applications/skai-desktop.desktop"'), "Electron desktop name must match the installed Linux launcher entry");
 expect(!/--no-sandbox/.test(linuxInstaller.replace(/^\s*#.*$/gm, "")), "Linux installer must not disable Chromium's sandbox");
 
 if (failures.length > 0) {

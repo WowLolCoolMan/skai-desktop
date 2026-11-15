@@ -69,6 +69,9 @@ const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let updateCheckTimer;
 
+// Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
+// docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
+if (process.platform === "linux") app.setDesktopName("skai-desktop.desktop");
 const hasSingleInstanceLock = !relaunchingForDisplayBackend && app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
