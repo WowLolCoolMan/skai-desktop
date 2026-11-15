@@ -28,7 +28,7 @@ Skai Desktop is **local-only** for AI runtime and application data:
 
 | Surface | Current state |
 | --- | --- |
-| **Chat** | Persistent conversations, attachments, per-turn documents-only grounding, local hands-free voice turns, queued follow-ups, Markdown/code rendering, retry, fork, pin, archive, rename, folders, tags, split view, search, and local memory controls. |
+| **Chat** | Persistent conversations, attachments, strict per-turn document grounding, on-device voice input and spoken hands-free turns where the desktop runtime supports them, queued follow-ups, Markdown/code rendering, retry, fork, pin, archive, rename, folders, tags, split view, search, and local memory controls. |
 | **Coding Workspace** | Monaco editor, project-scoped browsing, bounded previews, editing, reviewable diffs, guarded terminal commands, undo, task planning, and focused project context. |
 | **Agent Workbench** | Durable local task plans, dependency-aware readiness, activity filters, cancellation, approvals, and reviewable task state. Autonomous dispatch is still in progress. |
 | **Scheduled work** | Local one-time and repeating schedules with pause/resume/cancel and reviewed Run now controls. No unattended provider request is implied. |
@@ -142,7 +142,7 @@ Engineering references:
 
 ## What is next
 
-The next work is deliberately visible rather than implied: complete the local task execution path, deepen editor and diff workflows, finish remaining keyboard/focus and packaged acceptance checks, validate Linux support with a supported .NET environment, improve retrieval, and add more local integrations. See the capability matrix for evidence-backed status instead of assuming every item in the product backlog is shipped.
+The remaining work is tracked in the [Core Chat backlog](docs/FUTURE_FEATURES.md#core-chat) and the [capability matrix](docs/CAPABILITY_MATRIX.md): voice runtime acceptance and advanced voice, live image-generation acceptance, semantic context summarization, verified 1M-token execution, and audio/video input remain open. Agent dispatch, packaged platform/accessibility acceptance, retrieval, and additional local integrations are also in progress. These pages distinguish tested behavior from work that still needs compatible runtimes or hardware.
 
 ## Contributing
 

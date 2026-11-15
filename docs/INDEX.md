@@ -19,6 +19,8 @@ site](https://wowlolcoolman.github.io/skai-desktop/).
 
 - [Architecture](ARCHITECTURE.md) — Electron, the .NET Agent Host, Core, and
   trust boundaries.
+- [Electron + C# voice boundary](ELECTRON_CSHARP_VOICE_ARCHITECTURE.md) — local
+  dictation, OS-native speech output, and the hands-free turn lifecycle.
 - [GitHub Pages](GITHUB_PAGES.md) — public site structure and deployment setup.
 - [Model library](MODEL_LIBRARY.md) — local model discovery and installation
   sources.

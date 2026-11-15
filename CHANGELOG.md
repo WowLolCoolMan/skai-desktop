@@ -18,6 +18,8 @@
 
 - Refreshed capability and release-readiness docs to reflect the local-only
   model boundary, Monaco project editor, and current image workflow support.
+- Synced the capability matrix, project site, voice architecture notes, and
+  release docs with hands-free chat behavior and the Pages setup blocker.
 
 ## [0.1.3] - 2026-11-14
 

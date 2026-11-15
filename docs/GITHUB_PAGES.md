@@ -18,6 +18,13 @@ setting cannot be changed by the workflow token. Successful workflow runs
 publish the site at
 `https://wowlolcoolman.github.io/skai-desktop/`.
 
+As of 2026-11-15, this setup has not been completed: the Pages workflow fails
+in **Configure Pages** because GitHub returns `404 Not Found` when it looks up
+the repository's Pages site. After setting the source to **GitHub Actions**,
+rerun **Deploy project site** from the Actions tab; future pushes to `main`
+that change `docs/`, branding assets, or this workflow will deploy
+automatically.
+
 ## Content maintenance
 
 - Keep public feature claims aligned with [the capability matrix](CAPABILITY_MATRIX.md).
