@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, systemPreferences, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -64,6 +64,11 @@ let petWanderNextAt = 0;
 let petWanderLayoutSignature = "";
 const petWanderPlanner = new PetWanderPlanner();
 let petMotion = { wander: true, reduceMotion: false };
+// The OS "reduce motion" / "show animations: off" preference also stills Percy: the renderer's
+// prefers-reduced-motion CSS stops the sprite, so wandering would slide a frozen sprite around.
+function osPrefersReducedMotion() {
+  try { return Boolean(systemPreferences.getAnimationSettings?.().prefersReducedMotion); } catch { return false; }
+}
 let petActivity = { state: "idle", facing: 1 };
 const pendingPetMessages = [];
 const PET_WINDOW_WIDTH = 220;
@@ -212,18 +217,18 @@ function petWanderLayout() {
 
 function schedulePetWander() {
   if (!windowPositioningAvailable) return;
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
   if (petWanderPauseTimer || petWanderStepTimer) return;
   const delay = Math.max(0, petWanderNextAt - Date.now()) || 1800 + Math.round(Math.random() * 2600);
   petWanderPauseTimer = setTimeout(() => {
     petWanderPauseTimer = undefined;
-    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
     startPetWander();
   }, delay);
 }
 
 function startPetWander() {
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
   const { area, bounds, grid, blocked, signature } = petWanderLayout();
   const relative = grid.clampPetPosition({ x: bounds.x - area.x, y: bounds.y - area.y });
   const plan = petWanderPlanner.tryPlanWalk(grid.cellForPetPosition(relative), blocked);
@@ -249,7 +254,7 @@ function startPetWander() {
 }
 
 function movePetTowardTarget() {
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petWanderWalk || !petMotion.wander || petMotion.reduceMotion || petDragOffset) {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petWanderWalk || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) {
     petWanderStepTimer = undefined;
     petWanderMoving = false;
     return;
