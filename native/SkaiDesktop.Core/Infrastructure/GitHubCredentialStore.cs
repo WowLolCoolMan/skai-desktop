@@ -26,7 +26,7 @@ public sealed class GitHubCredentialStore(string? windowsCredentialPath = null, 
     {
         if (OperatingSystem.IsWindows())
             return new(true, "Windows Data Protection API", "GitHub credentials are encrypted for this Windows user.");
-        if (OperatingSystem.IsLinux() && _secretToolPath is not null && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS")))
+        if (OperatingSystem.IsLinux() && _secretToolPath is not null && HasLinuxSessionBus())
             return new(true, "Linux Secret Service", "GitHub credentials will be stored in the unlocked desktop keyring.");
         if (OperatingSystem.IsLinux())
             return new(false, "", "A running Secret Service and the secret-tool utility are required to store GitHub credentials securely.");
@@ -188,6 +188,13 @@ public sealed class GitHubCredentialStore(string? windowsCredentialPath = null, 
             if (File.Exists(candidate)) return candidate;
         }
         return null;
+    }
+
+    private static bool HasLinuxSessionBus()
+    {
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS"))) return true;
+        var runtimeDirectory = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        return !string.IsNullOrWhiteSpace(runtimeDirectory) && File.Exists(Path.Combine(runtimeDirectory, "bus"));
     }
 
     private static async Task<byte[]> ReadBytesBoundedAsync(string path, int maxBytes, CancellationToken cancellationToken)
