@@ -127,8 +127,12 @@ internal sealed class OsNativeTtsService : IDisposable
         if (IsAvailableOnPath("spd-say"))
         {
             var startInfo = CreateBaseStartInfo("spd-say");
+            // --wait keeps spd-say alive until the utterance finishes, so IsSpeaking stays true
+            // (hands-free chat waits on it before listening again) and Stop() can interrupt it.
+            startInfo.ArgumentList.Add("--wait");
             startInfo.ArgumentList.Add("-r");
             startInfo.ArgumentList.Add(Math.Clamp((int)Math.Round((rate - 1) * 100), -100, 100).ToString(CultureInfo.InvariantCulture));
+            startInfo.ArgumentList.Add("--"); // a reply that starts with "-" must not be parsed as an option
             startInfo.ArgumentList.Add(text);
             return startInfo;
         }
