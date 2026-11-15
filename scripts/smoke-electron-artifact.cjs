@@ -110,8 +110,16 @@ async function main() {
 
 async function cleanup() {
   if (child.exitCode === null && child.signalCode === null) {
-    child.kill();
-    await new Promise((resolve) => child.once("close", resolve));
+    if (process.platform === "win32") {
+      await new Promise((resolve) => {
+        const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+        killer.once("close", resolve);
+        killer.once("error", resolve);
+      });
+    } else {
+      child.kill("SIGTERM");
+      await new Promise((resolve) => child.once("close", resolve));
+    }
   }
   for (let attempt = 0; attempt < 10; attempt += 1) {
     try {

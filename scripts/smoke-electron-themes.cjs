@@ -77,6 +77,19 @@ function connect(target) {
   const close = () => socket.close();
   return { open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }), send, evaluate, callFunction, close };
 }
+async function terminateChild() {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  await new Promise((resolve) => {
+    if (process.platform === "win32") {
+      const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+      killer.once("close", resolve);
+      killer.once("error", resolve);
+      return;
+    }
+    child.once("close", resolve);
+    child.kill("SIGTERM");
+  });
+}
 
 async function waitFor(evaluate, expression, predicate, label) {
   const deadline = Date.now() + timeoutMs;
@@ -129,7 +142,7 @@ async function main() {
   console.log(`Packaged theme acceptance passed: ${JSON.stringify({ states, constrained })}`);
 }
 
-main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(() => {
-  if (!child.killed) child.kill();
+main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
+  await terminateChild();
   setTimeout(() => { try { fs.rmSync(smokeUserDataDir, { recursive: true, force: true }); } catch { /* best effort */ } }, 1500);
 });

@@ -23,6 +23,19 @@ function connect(target) {
   const send = (method, params = {}) => new Promise((resolve, reject) => { const id = nextId++; pending.set(id, (message) => message.error ? reject(new Error(message.error.message)) : resolve(message.result)); socket.send(JSON.stringify({ id, method, params })); setTimeout(() => { if (pending.delete(id)) reject(new Error(`Timed out: ${method}`)); }, 8000); });
   return { open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }), send, evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }); return result?.result?.value; }, close: () => socket.close() };
 }
+async function terminateChild() {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  await new Promise((resolve) => {
+    if (process.platform === "win32") {
+      const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+      killer.once("close", resolve);
+      killer.once("error", resolve);
+      return;
+    }
+    child.once("close", resolve);
+    child.kill("SIGTERM");
+  });
+}
 async function main() {
   let target;
   for (let attempt = 0; attempt < 100 && !target; attempt += 1) { try { target = (await fetchJson(`http://127.0.0.1:${port}/json/list`)).find((item) => item.type === "page" && item.title?.includes("Skai Desktop")); } catch {} if (!target) await sleep(100); }
@@ -42,5 +55,5 @@ async function main() {
   if (failures.length) throw new Error(`Overflow acceptance failed: ${JSON.stringify(failures.slice(0, 12))}`);
   console.log(`Packaged overflow acceptance passed: ${routes.length} routes × ${widths.length} viewport widths.`);
 }
-main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(() => { if (!child.killed) child.kill();
+main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => { await terminateChild();
   setTimeout(() => { try { fs.rmSync(smokeUserDataDir, { recursive: true, force: true }); } catch { /* best effort */ } }, 1500); });
