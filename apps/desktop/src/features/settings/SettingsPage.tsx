@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { Model, ThemeMode } from "../../app/types";
+import type { AgentResponse } from "../../../shared/contracts";
 import { saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceModels, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
 import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
@@ -7,6 +8,7 @@ import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 
 const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Updates", "Advanced"] as const;
 type Category = typeof categories[number];
+type AirLlmRuntimeStatus = { workerAvailable: boolean; dependenciesAvailable: boolean; pythonCommand: string; status: string; message: string };
 const categoryIcons: Record<Category, NavIconName> = {
   General: "settings",
   Appearance: "sparkle",
@@ -82,6 +84,8 @@ export function SettingsPage(props: SettingsProps) {
   const [query, setQuery] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [discoveringModels, setDiscoveringModels] = useState(false);
+  const [airLlmStatus, setAirLlmStatus] = useState<AirLlmRuntimeStatus | null>(null);
+  const [checkingAirLlm, setCheckingAirLlm] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
   const normalizedQuery = query.trim().toLowerCase();
   const visibleCategories = useMemo(() => categories.filter((category) => !normalizedQuery || `${category} ${categoryDescription(category)} ${categorySearchText[category]}`.toLowerCase().includes(normalizedQuery)), [normalizedQuery]);
@@ -93,6 +97,13 @@ export function SettingsPage(props: SettingsProps) {
   const change = (key: string, value: string | boolean) => { setSaveState("idle"); props.onChange(key, value); };
   const save = async () => { if (saveState === "saving") return; setSaveState("saving"); setSaveState(await props.onSave() ? "saved" : "idle"); };
   const discoverModels = async () => { if (discoveringModels) return; setDiscoveringModels(true); await props.onDiscoverModels(); setDiscoveringModels(false); };
+  const checkAirLlm = async () => {
+    if (checkingAirLlm) return;
+    setCheckingAirLlm(true);
+    const response: AgentResponse | undefined = await window.serverRockAgent?.request("airllm.status");
+    setAirLlmStatus(response?.ok ? response.result as AirLlmRuntimeStatus : { workerAvailable: false, dependenciesAvailable: false, pythonCommand: "", status: "unavailable", message: response?.error?.message ?? "The local Agent Host is unavailable." });
+    setCheckingAirLlm(false);
+  };
   const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled", value: string | boolean) => { saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
   const selectedProviderId = localProviderOrFallback(props.provider);
   const selectedProvider = providerChoices.find((choice) => choice.id === selectedProviderId) ?? providerChoices[0];
@@ -111,7 +122,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Pet" && <PetSettings props={props} change={change} />}
 
-        {activeCategory === "Models & Providers" && <><div className="settings-field"><label>Provider<select value={selectedProviderId} onChange={(event) => change("provider", event.target.value)}>{providerChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><label>Model endpoint<input value={props.endpoint} onChange={(event) => change("endpoint", event.target.value)} placeholder="http://localhost:11434/v1" /></label></div><div className="settings-model-actions"><Button variant="secondary" disabled={discoveringModels} onClick={() => void discoverModels()}>{discoveringModels ? "Discovering…" : "Discover local models"}</Button><span>AirLLM can take over when a selected model exceeds available memory.</span></div><div className="settings-provider-list">{providerChoices.map((choice) => <div className="settings-provider-row" key={choice.id}><span><strong>{choice.label}</strong><small>{choice.detail}</small></span><StatusBadge tone="neutral">Supported locally</StatusBadge></div>)}</div></>}
+        {activeCategory === "Models & Providers" && <><div className="settings-field"><label>Provider<select value={selectedProviderId} onChange={(event) => change("provider", event.target.value)}>{providerChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><label>Model endpoint<input value={props.endpoint} onChange={(event) => change("endpoint", event.target.value)} placeholder="http://localhost:11434/v1" /></label></div><div className="settings-model-actions"><Button variant="secondary" disabled={discoveringModels} onClick={() => void discoverModels()}>{discoveringModels ? "Discovering…" : "Discover local models"}</Button><span>AirLLM can take over when a selected model exceeds available memory.</span></div><div className="settings-callout"><strong>AirLLM runtime</strong><span>{airLlmStatus ? `${airLlmStatus.message} ${airLlmStatus.pythonCommand ? `Python: ${airLlmStatus.pythonCommand}` : ""}` : "Check whether the packaged worker and local Python dependencies are ready before selecting a large Hugging Face model."}</span><div className="settings-model-actions"><StatusBadge tone={airLlmStatus?.status === "ready" ? "success" : airLlmStatus ? "warning" : "neutral"}>{airLlmStatus?.status ?? "Not checked"}</StatusBadge><Button variant="secondary" disabled={checkingAirLlm} onClick={() => void checkAirLlm()}>{checkingAirLlm ? "Checking…" : "Check AirLLM"}</Button></div></div><div className="settings-provider-list">{providerChoices.map((choice) => <div className="settings-provider-row" key={choice.id}><span><strong>{choice.label}</strong><small>{choice.detail}</small></span><StatusBadge tone="neutral">Supported locally</StatusBadge></div>)}</div></>}
 
         {activeCategory === "Voice & Audio" && <><div className="settings-field"><label>Primary voice runtime<select value={voiceSettings.primaryModelId} onChange={(event) => updateVoice("primaryModelId", event.target.value)}>{voiceModels.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label><label>Low-resource runtime<select value={voiceSettings.lowResourceModelId} onChange={(event) => updateVoice("lowResourceModelId", event.target.value)}>{voiceModels.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label></div><div className="settings-field"><label>Voice profile<select value={voiceSettings.profileId} onChange={(event) => updateVoice("profileId", event.target.value)}>{voiceProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="settings-inline-action"><span>Preview the current system voice.</span><Button variant="secondary" onClick={() => void speakNativeResponse("Skai voice preview. Your voice settings are working.", true)}>Preview</Button><Button variant="ghost" onClick={stopNativeSpeech}>Stop</Button></div></div><Toggle label="Speak completed replies" detail="Voice output stays off until you turn it on." checked={voiceSettings.voiceOutputEnabled} onChange={(value) => updateVoice("voiceOutputEnabled", value)} /><Toggle label="Use low-resource mode" detail="Prefer the smaller CPU-first voice runtime." checked={voiceSettings.lowResourceMode} onChange={(value) => updateVoice("lowResourceMode", value)} /></>}
 
