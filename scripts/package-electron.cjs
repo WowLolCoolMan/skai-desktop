@@ -21,6 +21,16 @@ function run(command, args) {
 
 if (!fs.existsSync(electronDist)) throw new Error("Electron dependencies are not installed. Run npm run desktop:install first.");
 if (!fs.existsSync(path.join(desktopRoot, "dist", "index.html"))) throw new Error("Electron renderer is not built. Run npm run desktop:build first.");
+// Refuse to package a renderer build that is older than its sources (e.g. after a pull without rebuilding).
+{
+  const newestMtime = (dir) => fs.readdirSync(dir, { withFileTypes: true }).reduce((latest, entry) => {
+    const full = path.join(dir, entry.name);
+    return Math.max(latest, entry.isDirectory() ? newestMtime(full) : fs.statSync(full).mtimeMs);
+  }, 0);
+  const sourceMtime = Math.max(...["src", "shared"].map((dir) => newestMtime(path.join(desktopRoot, dir))), fs.statSync(path.join(desktopRoot, "index.html")).mtimeMs);
+  const builtMtime = fs.statSync(path.join(desktopRoot, "dist", "index.html")).mtimeMs;
+  if (builtMtime < sourceMtime) throw new Error("The Electron renderer build is older than apps/desktop/src. Run npm run desktop:build first so the package matches the sources.");
+}
 
 fs.rmSync(outputRoot, { recursive: true, force: true });
 fs.mkdirSync(appRoot, { recursive: true });
