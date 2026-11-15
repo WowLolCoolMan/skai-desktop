@@ -42,22 +42,24 @@ ModelScope search and GGUF manifest routes were checked against the public servi
 
 ## Model Library opens on installed models (2026-11-07)
 
-Owner decision: the Models action opens the **Model Library** (previously titled "AI SuperMarket") on **Installed models**, so nothing is sent to Hugging Face until the user switches the source to the Hugging Face GGUF catalog. That keeps the README promise that Hugging Face is contacted only when you choose to browse or search it, or download a model. The catalog, Ollama, and ModelScope sources work as described below.
+The Models action opens the **Model Library** on **Installed models**, so
+nothing is sent to Hugging Face until the user switches to the Marketplace
+catalog and chooses to browse, search, or download a model. Ollama and
+ModelScope remain explicit local model sources.
 
-## Electron model discovery surface (2026-11-04)
+## Electron model library surface
 
-The Electron Models surface now opens **AI SuperMarket** directly instead of an
-empty, query-first library. Its default source is a populated Hugging Face
-GGUF catalog of chat-ready repositories; the user can refine it by model name
-or capability, switch between regular and explicitly labelled
-uncensored/abliterated results, download through the configured local LM Studio
-runtime, then switch to Installed models to select, pin, or benchmark the
-download. Ollama and ModelScope remain distinct sources so their installation
-behavior stays accurate. The action controls deliberately enable model
-selection, pinning, and benchmarking only for installed local models. Shared
-Core tests and the packaged Electron artifact are the release evidence for
-this workflow.
+The Electron Models surface opens a local installed-model inventory with
+inspect-first rows, runtime/capability metadata, model selection, pinning, and
+benchmarking. Remote model discovery and verified local installation live in
+Marketplace, where provider provenance and install state remain explicit.
+Shared Core tests and the packaged Electron artifact are the release evidence
+for this workflow.
 
-## Hotswapper follow-up (2026-11-03)
+## Hotswapper behavior
 
-The composer dropdown is the quick switch control. It lists pinned profiles only, marks the active pinned profile, shows local speed measurements for each pinned model, and offers **Pin current model** when the active profile is not pinned. The model button has a screen-reader name and help text. A previous runtime inspection of the composer confirmed the active unpinned model was excluded; the new one-click pin action still needs a runtime pass with a disposable app-data profile.
+The composer dropdown is the quick switch control. It lists pinned profiles
+only, marks the active pinned profile, shows local speed measurements, and
+offers **Pin current model** when the active profile is not pinned. The model
+button has a screen-reader name and help text. Pinned profiles are stored in
+the local settings file and only installed local models can be pinned.

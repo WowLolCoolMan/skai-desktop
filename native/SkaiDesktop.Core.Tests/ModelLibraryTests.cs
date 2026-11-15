@@ -79,7 +79,7 @@ internal static class ModelLibraryTests
         })));
         var resilientModels = await resilientInventory.DiscoverLocalModelsAsync("http://localhost:1234/v1");
         Check(resilientModels.Count == 1 && resilientModels[0].Model == "healthy-local-model" && resilientModels[0].Provider == "LM Studio",
-            "one malformed local runtime response does not block AI SuperMarket inventory from healthy runtimes");
+            "one malformed local runtime response does not block Model Library inventory from healthy runtimes");
 
         var ollamaProgress = new List<string>();
         var ollamaPull = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
