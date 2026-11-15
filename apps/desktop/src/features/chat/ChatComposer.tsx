@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import type { ChatAttachment, DesktopQueuedMessage } from "../../../shared/contracts";
 import type { Route } from "../../app/types";
 import { Button } from "../../components/ui/Primitives";
@@ -21,9 +21,25 @@ type ChatComposerProps = {
   onOpenTaskPlanner: () => void;
 };
 
+type SpeechRecognitionResultEvent = Event & { results: { [index: number]: { [index: number]: { transcript: string }; isFinal: boolean }; length: number } };
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onend: (() => void) | null;
+  onerror: ((event: Event & { error?: string }) => void) | null;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechWindow = Window & { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+
 export function ChatComposer({ draft, busy, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onOpenTaskPlanner }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const commandQuery = draft.match(/^\/([^\s]*)$/)?.[1] ?? null;
   const commandMatches = useMemo(() => commandQuery === null ? [] : composerCommands.filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery]);
   const activeCommandId = commandMatches[commandIndex] ? `composer-command-${commandMatches[commandIndex].id}` : undefined;
@@ -33,6 +49,32 @@ export function ChatComposer({ draft, busy, attachments, queuedMessages, onDraft
     if (commandQuery === null || commandMatches.length === 0) return;
     window.requestAnimationFrame(() => document.getElementById(activeCommandId ?? "")?.scrollIntoView({ block: "nearest" }));
   }, [activeCommandId, commandMatches.length, commandQuery]);
+  useEffect(() => () => { recognitionRef.current?.stop(); recognitionRef.current = null; }, []);
+
+  const toggleVoiceInput = () => {
+    if (voiceListening) { recognitionRef.current?.stop(); return; }
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) { setVoiceError("System speech input is not available in this desktop runtime."); return; }
+    setVoiceError(null);
+    const recognition = new Recognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = navigator.language || "en-US";
+    recognition.onresult = (event) => {
+      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index]?.[0]?.transcript ?? "").join(" ").trim();
+      if (transcript) onDraftChange(`${draft.trim()}${draft.trim() ? " " : ""}${transcript}`);
+    };
+    recognition.onerror = (event) => {
+      setVoiceError(event.error === "not-allowed" ? "Microphone access was denied. Allow it in the desktop app permissions and try again." : "System speech input could not be completed.");
+      setVoiceListening(false);
+      recognitionRef.current = null;
+    };
+    recognition.onend = () => { setVoiceListening(false); recognitionRef.current = null; };
+    recognitionRef.current = recognition;
+    setVoiceListening(true);
+    try { recognition.start(); } catch { setVoiceListening(false); recognitionRef.current = null; setVoiceError("System speech input could not start."); }
+  };
 
   const selectComposerCommand = (command: ComposerCommand) => {
     onDraftChange("");
@@ -79,6 +121,7 @@ export function ChatComposer({ draft, busy, attachments, queuedMessages, onDraft
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}><span>{queued.text}</span>{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`}>×</button></div>)}</div>}
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
     <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={busy ? "Type a follow-up while the model responds…" : "Message your model…"} aria-label="Message your model" aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />
-    <div className="composer-actions"><Button variant="ghost" type="button" onClick={onAttach} disabled={attachments.length >= 5} aria-describedby="attachment-help">Attach</Button><div><span id="attachment-help" className="composer-hint">{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · drop files here</span><Button variant={busy ? "secondary" : "primary"} disabled={!draft.trim() && attachments.length === 0} onClick={onSubmit}>{busy ? "Queue ↗" : "Send ↗"}</Button></div></div>
+    {voiceError && <p className="composer-voice-error" role="alert">{voiceError}</p>}
+    <div className="composer-actions"><Button variant="ghost" type="button" onClick={onAttach} disabled={attachments.length >= 5} aria-describedby="attachment-help">Attach</Button><Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"}>{voiceListening ? "Stop mic" : "Voice"}</Button><div><span id="attachment-help" className="composer-hint">{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span><Button variant={busy ? "secondary" : "primary"} disabled={!draft.trim() && attachments.length === 0} onClick={onSubmit}>{busy ? "Queue ↗" : "Send ↗"}</Button></div></div>
   </section>;
 }

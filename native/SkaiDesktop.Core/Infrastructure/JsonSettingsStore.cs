@@ -54,6 +54,7 @@ public sealed class JsonSettingsStore
             _ => defaults.VisionCapabilityOverride
         };
         settings.EffortMode = SkaiDesktop.Core.Services.EffortModePolicy.Normalize(settings.EffortMode);
+        settings.OllamaContextWindowTokens = settings.OllamaContextWindowTokens is 32_768 or 131_072 or 1_048_576 ? settings.OllamaContextWindowTokens : 0;
         settings.ComfyEndpoint ??= defaults.ComfyEndpoint;
         settings.ImageWorkflow ??= defaults.ImageWorkflow;
         settings.GitHubAppClientId ??= defaults.GitHubAppClientId;

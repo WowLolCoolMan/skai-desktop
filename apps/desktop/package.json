@@ -11,9 +11,11 @@
     "start": "node scripts/launch-electron.cjs"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@vitejs/plugin-react": "latest",
     "concurrently": "latest",
     "electron": "latest",
+    "monaco-editor": "^0.57.0",
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest",

@@ -27,6 +27,14 @@ function readFileAsBase64(file: File) {
   });
 }
 
+function skillMentions(messages: Array<{ content: string }>) {
+  const ids = new Set<string>();
+  for (const message of messages) {
+    for (const match of message.content.matchAll(/\$([A-Za-z0-9._-]{1,80})\b/g)) ids.add(match[1]);
+  }
+  return [...ids].slice(0, 4);
+}
+
 export function useChatWorkspace({ request, connection, provider, endpoint, model, onError }: ChatWorkspaceOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -68,7 +76,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const next = [...messages, { role: "user" as const, content: text || "Attached files", attachments: messageAttachments.length ? messageAttachments : undefined }];
     setMessages(next); setAttachments([]); setBusy(true); onError(null);
     const savedId = await saveConversation(next);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: next });
+    const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next) });
     setBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
@@ -84,7 +92,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (messages[messageIndex]?.role !== "assistant" || !prefix.some((message) => message.role === "user")) return;
     stopNativeSpeech();
     setMessages(prefix); setBusy(true); onError(null);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: prefix });
+    const response = await request("chat.complete", { provider, endpoint, model, messages: prefix, skills: skillMentions(prefix) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content }];
@@ -102,7 +110,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const next = [...prefix, edited];
     stopNativeSpeech();
     setMessages(next); setBusy(true); onError(null);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: next });
+    const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The edited message could not be completed."); return false; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];

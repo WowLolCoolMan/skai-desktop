@@ -31,6 +31,8 @@ public sealed class AppSettings
     public double Temperature { get; set; } = 0.7;
     /// <summary>Bounded response-budget preference: adaptive, light, standard, high, or ultra.</summary>
     public string EffortMode { get; set; } = "standard";
+    /// <summary>Optional Ollama context window override. Zero leaves the runtime default unchanged.</summary>
+    public int OllamaContextWindowTokens { get; set; }
     /// <summary>When enabled, sends bounded full text for text/PDF attachments instead of ranked chunks.</summary>
     public bool FullTextContextInjectionEnabled { get; set; }
     public bool WebSearchEnabled { get; set; }

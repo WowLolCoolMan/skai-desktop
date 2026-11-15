@@ -12,7 +12,7 @@ public static class ConversationContextPlanner
     public static ContextPlan Plan(IReadOnlyList<ChatMessage> messages, int maxCharacters)
     {
         ArgumentNullException.ThrowIfNull(messages);
-        if (maxCharacters < 512 || maxCharacters > 8_000_000) throw new ArgumentOutOfRangeException(nameof(maxCharacters));
+        if (maxCharacters < 512 || maxCharacters > 32_000_000) throw new ArgumentOutOfRangeException(nameof(maxCharacters));
         if (messages.Count == 0) return new([], 0, 0, 0);
         var systems = messages.Where(message => string.Equals(message.Role, "system", StringComparison.OrdinalIgnoreCase)).ToArray();
         var turns = messages.Where(message => !string.Equals(message.Role, "system", StringComparison.OrdinalIgnoreCase)).ToArray();

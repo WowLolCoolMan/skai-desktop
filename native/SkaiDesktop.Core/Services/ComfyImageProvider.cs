@@ -17,7 +17,7 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
     private const int MaxPromptCharacters = 8_000;
     private readonly HttpClient _http = httpClient ?? new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
-    public async Task<IReadOnlyList<ComfyGeneratedImage>> GenerateAsync(string endpoint, string workflowTemplate, string prompt, Action<string>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ComfyGeneratedImage>> GenerateAsync(string endpoint, string workflowTemplate, string prompt, Action<string>? progress = null, CancellationToken cancellationToken = default, string? sourceImageName = null, byte[]? sourceImage = null)
     {
         var root = ValidateEndpoint(endpoint);
         if (string.IsNullOrWhiteSpace(prompt) || prompt.Length > MaxPromptCharacters)
@@ -25,9 +25,36 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
         if (string.IsNullOrWhiteSpace(workflowTemplate) || workflowTemplate.Length > MaxWorkflowCharacters || !workflowTemplate.Contains("{{prompt}}", StringComparison.Ordinal))
             throw new ArgumentException("Add a ComfyUI API workflow up to 1 MB and put {{prompt}} inside its prompt text value.", nameof(workflowTemplate));
 
+        if ((sourceImageName is null) != (sourceImage is null)) throw new ArgumentException("The source image name and content must be supplied together.");
+        if (sourceImage is not null && !workflowTemplate.Contains("{{image}}", StringComparison.Ordinal))
+            throw new ArgumentException("The selected workflow must contain {{image}} for its source image input.", nameof(workflowTemplate));
+        if (sourceImage is null && workflowTemplate.Contains("{{image}}", StringComparison.Ordinal))
+            throw new ArgumentException("Choose a source image for this workflow because it contains {{image}}.", nameof(workflowTemplate));
         var escapedPrompt = JsonSerializer.Serialize(prompt.Trim())[1..^1];
+        var validationWorkflow = workflowTemplate
+            .Replace("{{image}}", "source.png", StringComparison.Ordinal)
+            .Replace("{{prompt}}", escapedPrompt, StringComparison.Ordinal);
+        try { using var validationDocument = JsonDocument.Parse(validationWorkflow); }
+        catch (JsonException error) { throw new ArgumentException("The ComfyUI workflow is not valid JSON after its inputs were inserted.", nameof(workflowTemplate), error); }
+        var workflowSource = workflowTemplate;
+        if (sourceImage is not null)
+        {
+            if (sourceImage.Length is < 8 or > 6 * 1024 * 1024 || !sourceImageName!.Equals("source.png", StringComparison.OrdinalIgnoreCase) && !sourceImageName.Equals("source.jpg", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("The source image is invalid or exceeds the 6 MB limit.", nameof(sourceImage));
+            if (sourceImageName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) && !ChatAttachmentPolicy.HasValidImageSignature("image/png", sourceImage) || sourceImageName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) && !ChatAttachmentPolicy.HasValidImageSignature("image/jpeg", sourceImage))
+                throw new ArgumentException("The source image signature is invalid.", nameof(sourceImage));
+            using var upload = new MultipartFormDataContent();
+            var imageContent = new ByteArrayContent(sourceImage);
+            imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(sourceImageName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg");
+            upload.Add(imageContent, "image", sourceImageName);
+            using var uploadResponse = await _http.PostAsync(new Uri(root, "upload/image"), upload, cancellationToken).ConfigureAwait(false);
+            using var uploadJson = await BoundedHttpContent.ReadJsonAsync(uploadResponse.Content, cancellationToken, "ComfyUI image upload").ConfigureAwait(false);
+            if (!uploadResponse.IsSuccessStatusCode || !uploadJson.RootElement.TryGetProperty("name", out var uploadedName) || uploadedName.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(uploadedName.GetString()))
+                throw new InvalidOperationException("ComfyUI could not accept the source image.");
+            workflowSource = workflowSource.Replace("{{image}}", JsonSerializer.Serialize(uploadedName.GetString())[1..^1], StringComparison.Ordinal);
+        }
         JsonElement workflow;
-        try { using var document = JsonDocument.Parse(workflowTemplate.Replace("{{prompt}}", escapedPrompt, StringComparison.Ordinal)); workflow = document.RootElement.Clone(); }
+        try { using var document = JsonDocument.Parse(workflowSource.Replace("{{prompt}}", escapedPrompt, StringComparison.Ordinal)); workflow = document.RootElement.Clone(); }
         catch (JsonException error) { throw new ArgumentException("The ComfyUI workflow is not valid JSON after the prompt was inserted.", nameof(workflowTemplate), error); }
 
         progress?.Invoke("Queueing image with local ComfyUI…");

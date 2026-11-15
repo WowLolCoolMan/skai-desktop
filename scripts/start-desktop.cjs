@@ -1,7 +1,12 @@
 const { spawn } = require("node:child_process");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const child = spawn(npmCommand, ["--prefix", "apps/desktop", "run", "dev"], {
+// Windows can reject spawning a .cmd shim directly from some Node hosts with
+// EINVAL. Invoke the platform command interpreter explicitly instead of using
+// Node's shell option, which also avoids its argument-escaping warning.
+const command = `${npmCommand} --prefix apps/desktop run dev`;
+const child = spawn(process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : npmCommand,
+  process.platform === "win32" ? ["/d", "/s", "/c", command] : ["--prefix", "apps/desktop", "run", "dev"], {
   cwd: process.cwd(),
   env: process.env,
   stdio: "inherit",

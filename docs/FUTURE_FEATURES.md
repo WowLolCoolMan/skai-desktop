@@ -43,10 +43,10 @@ cancellation, permission review, and local credential handling.
 - [x] Folders, tags, and pinned chats.
 - [x] Search within the current chat and jump to a matching message.
 - [x] Fork a chat from any message.
-- [ ] Voice input/output, hands-free calls, and advanced voice mode.
-- [ ] Image generation and editing.
+- [ ] Voice input/output, hands-free calls, and advanced voice mode. (Local OS speech output and explicit one-shot system dictation are implemented; hands-free calls and advanced voice mode remain open.)
+- [ ] Image generation and editing. (Local ComfyUI workflow import/save, generation, and source-image editing through `{{image}}` and `{{prompt}}` are implemented; live ComfyUI acceptance remains open.)
 - [x] Context compaction. (Deterministic bounded provider-side compaction with omitted-history markers; semantic summarization remains open.)
-- [ ] 1M+ token context support.
+- [ ] 1M+ token context support. (Opt-in Ollama context windows up to 1M tokens and bounded 32 MB request payloads are implemented; supported-model discovery and live large-context acceptance remain open.)
 - [ ] Omni-modal input for text, images, audio, and video.
 - [x] Chat export and split view.
 - [x] NotebookLM-style mode grounded only in uploaded documents. (Bounded session-only mode is available from the composer, More actions, and command palette; durable corpus management remains open.)
@@ -103,7 +103,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Rich Markdown editor with in-place AI enhancement.
 - [ ] Notes with context injection.
 - [ ] Channels with model tagging and threads.
-- [ ] System-wide hotkey and launcher integration.
+  - [x] System-wide hotkey and launcher integration. (The resident Electron app can be brought to the foreground with `Ctrl+Alt+Space` on Windows/Linux or `Cmd+Alt+Space` on macOS; the existing tray and second-instance paths remain available.)
 - [ ] Screen capture and screen awareness.
 - [ ] Live presence.
 - [ ] End-to-end encrypted direct messages.
@@ -132,7 +132,7 @@ cancellation, permission review, and local credential handling.
 
 - [x] Presets bundling prompts, tools, and knowledge. (Bounded local AI presets can bundle user-authored instructions, explicitly marked reference knowledge, and descriptive tool guidance; activation is explicit and tool guidance never grants permissions.)
 - [x] Dynamic variables such as `{{USER_NAME}}` and `{{DATE}}`.
-- [ ] Lazy-loaded Markdown instruction-pack skills with `$` mentions.
+- [x] Lazy-loaded Markdown instruction-pack skills with `$` mentions. (Built-in and enabled local Markdown skills resolve only when explicitly mentioned in a chat request; instructions are bounded and never grant permissions.)
 - [x] Local model runner support for Ollama and LM Studio. (Loopback discovery, selection, model-library inventory, and bounded install/load paths are implemented.)
 - [ ] Offline-capable operation.
 - [ ] OpenAI-compatible API and personal API keys (local servers plus explicit cloud provider routes).

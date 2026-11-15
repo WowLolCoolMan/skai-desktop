@@ -10,11 +10,13 @@ import { SettingsPage } from "../features/settings/SettingsPage";
 import { TerminalPage } from "../features/terminal/TerminalPage";
 import { WorkbenchPage } from "../features/agents/WorkbenchPage";
 import { UsagePage } from "../features/usage/UsagePage";
+import { PluginsPage } from "../features/catalog/PluginsPage";
 
 export type AppRouteState = {
   route: Route;
   provider: string;
   model: string;
+  ollamaContextWindowTokens?: number;
   models: Model[];
   messages: Message[];
   busy: boolean;
@@ -121,7 +123,8 @@ export type AppRouteActions = {
   onImageChange: (key: "endpoint" | "prompt" | "workflow", value: string) => void;
   onImportWorkflow?: () => Promise<{ name: string; workflow: string } | null>;
   onSelectModel: (model: string) => void;
-  onGenerateImage: () => void;
+  onGenerateImage: (source?: ChatAttachment) => void;
+  onPickImageSource?: () => Promise<ChatAttachment | null>;
   onRetryWorkbench: () => void;
   onTransitionTask: (id: string, operation: "queue" | "approve" | "deny" | "cancel" | "retry") => void;
   onExecuteTask: (id: string) => void;
@@ -144,10 +147,11 @@ export function AppRouteView({ state, actions }: { state: AppRouteState; actions
   const { route } = state;
   if (route === "chat") return <ChatPage provider={state.provider} model={state.model} models={state.models} messages={state.messages} busy={state.busy} taskBusy={state.taskBusy} attachments={state.attachments} queuedMessages={state.queuedMessages} conversationId={state.conversationId} conversationTitle={state.conversationTitle} pinned={state.pinned} archived={state.archived} onSend={actions.onSend} onQueue={actions.onQueue} onRemoveQueued={actions.onRemoveQueued} onAttach={actions.onAttach} onFilesDropped={actions.onFilesDropped} onRemoveAttachment={actions.onRemoveAttachment} onModelChange={actions.onModelChange} onNavigate={actions.onNavigate} onPlanTask={actions.onPlanTask} onExport={actions.onExportConversations} onFork={actions.onFork} onForkFromMessage={actions.onForkFromMessage} onRetryMessage={actions.onRetryMessage} onEditMessage={actions.onEditMessage} onTogglePinned={actions.onTogglePinned} onArchive={actions.onArchive} onRenameConversation={actions.onRenameConversation} />;
   if (route === "coding") return <CodingPage projects={state.projects} selectedProject={state.selectedProject} tasks={state.tasks} projectFiles={state.projectFiles} selectedFile={state.selectedFile} fileDraft={state.fileDraft} fileOriginal={state.fileOriginal} fileSummary={state.fileSummary} fileBusy={state.fileBusy} fileUndoAvailable={state.fileUndoAvailable} terminalBusy={state.terminalBusy} terminalOutput={state.terminalOutput} terminalExitCode={state.terminalExitCode} gitStatus={state.gitStatus} gitBusy={state.gitBusy} gitDiff={state.gitDiff} gitDiffBusy={state.gitDiffBusy} gitCommitBusy={state.gitCommitBusy} gitPushBusy={state.gitPushBusy ?? false} gitPullRequestBusy={state.gitPullRequestBusy ?? false} onRefreshGitStatus={actions.onRefreshGitStatus} onLoadGitDiff={actions.onLoadGitDiff} onCommitGitChanges={actions.onCommitGitChanges} onPushGitChanges={actions.onPushGitChanges ?? (async () => false)} onCreateGitPullRequest={actions.onCreateGitPullRequest ?? (async () => false)} onPickFolder={actions.onPickFolder} onSaveProject={actions.onSaveProject} onOpenProject={actions.onOpenProject} onOpenFile={actions.onOpenFile} onCloseFile={actions.onCloseFile} onDraftChange={actions.onDraftChange} onSaveFile={actions.onSaveFile} onUndoFile={actions.onUndoFile} onRunTerminal={actions.onRunTerminal} onPlanTask={actions.onPlanTask} onNavigate={actions.onNavigate} />;
-  if (route === "settings") return <SettingsPage provider={state.provider} endpoint={state.endpoint} model={state.model} models={state.models} themeMode={state.themeMode} accentColor={state.accentColor} density={state.density} backdrop={state.backdrop} reduceMotion={state.reduceMotion} petVisible={state.petVisible} petWander={state.petWander} petCharacter={state.petCharacter} petSpriteDataUrl={state.petSpriteDataUrl} developerMode={state.developerMode} memoryInjectionEnabled={state.memoryInjectionEnabled} imageEndpoint={state.imageEndpoint} imageWorkflow={state.imageWorkflow} onChange={actions.onSettingsChange} onSave={actions.onSaveSettings} onDiscoverModels={actions.onDiscoverModels} onImageChange={actions.onImageChange} onExportMemory={actions.onExportMemory} />;
+  if (route === "settings") return <SettingsPage provider={state.provider} endpoint={state.endpoint} model={state.model} models={state.models} ollamaContextWindowTokens={state.ollamaContextWindowTokens ?? 0} themeMode={state.themeMode} accentColor={state.accentColor} density={state.density} backdrop={state.backdrop} reduceMotion={state.reduceMotion} petVisible={state.petVisible} petWander={state.petWander} petCharacter={state.petCharacter} petSpriteDataUrl={state.petSpriteDataUrl} developerMode={state.developerMode} memoryInjectionEnabled={state.memoryInjectionEnabled} imageEndpoint={state.imageEndpoint} imageWorkflow={state.imageWorkflow} onChange={actions.onSettingsChange} onSave={actions.onSaveSettings} onDiscoverModels={actions.onDiscoverModels} onImageChange={actions.onImageChange} onExportMemory={actions.onExportMemory} />;
   if (route === "models") return <ModelsPage models={state.models} onDiscover={actions.onDiscoverModels} onPull={actions.onPullModel} onCancelPull={actions.onCancelModelPull ?? (async () => false)} onSelect={actions.onSelectModel} />;
-  if (route === "images") return <ImagesPage endpoint={state.imageEndpoint} prompt={state.imagePrompt} workflow={state.imageWorkflow} busy={state.imageBusy} images={state.generatedImages} onChange={actions.onImageChange} onGenerate={actions.onGenerateImage} onImportWorkflow={actions.onImportWorkflow ?? (async () => null)} />;
+  if (route === "images") return <ImagesPage endpoint={state.imageEndpoint} prompt={state.imagePrompt} workflow={state.imageWorkflow} busy={state.imageBusy} images={state.generatedImages} onChange={actions.onImageChange} onGenerate={actions.onGenerateImage} onImportWorkflow={actions.onImportWorkflow ?? (async () => null)} onPickSourceImage={actions.onPickImageSource ?? (async () => null)} />;
   if (route === "marketplace") return <MarketplacePage />;
+  if (route === "plugins") return <PluginsPage />;
   if (route === "workbench") return <WorkbenchPage tasks={state.tasks} scheduled={state.scheduledTasks} busyTask={state.taskBusy} loading={state.tasksLoading} error={state.tasksError} onRetry={actions.onRetryWorkbench} onNavigate={(route) => actions.onNavigate(route)} onTransition={actions.onTransitionTask} onExecuteTask={actions.onExecuteTask} onSchedule={actions.onScheduleTask} onScheduledTransition={actions.onTransitionScheduledTask} />;
   if (route === "memory") return <MemoryPage entries={state.memoryEntries} busy={state.memoryBusy} loading={state.memoryLoading} error={state.memoryError} onRetry={actions.onRetryMemory} onSearch={actions.onSearchMemory} onSave={actions.onSaveMemory} onToggle={actions.onToggleMemory} onRemove={actions.onRemoveMemory} onExport={actions.onExportMemory} corpusDocuments={state.corpusDocuments} corpusLoading={state.corpusLoading} corpusError={state.corpusError} onSearchCorpus={actions.onSearchCorpus ?? (() => undefined)} onSaveCorpus={actions.onSaveCorpus ?? (async () => false)} onRemoveCorpus={actions.onRemoveCorpus ?? (async () => false)} onImportCorpus={actions.onImportCorpus ?? (() => undefined)} />;
   if (route === "usage") return <UsagePage />;

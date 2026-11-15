@@ -50,6 +50,7 @@ expect(main.includes('"tasks.plan"'), "Electron bridge must expose the review-fi
 expect(main.includes('"project.git.status"'), "Electron bridge must expose the read-only local Git status method");
 expect(main.includes('"workspace.importDroppedFiles"') && main.includes("decodeDroppedAttachment"), "Electron bridge must validate dropped chat files at the local boundary");
 expect(chatComposer.includes("onDrop={handleDrop}") && chatComposer.includes("Drop files to attach"), "Chat composer must expose a visible drag-and-drop attachment state");
+expect(chatComposer.includes("SpeechRecognition") && chatComposer.includes("aria-pressed={voiceListening}"), "Chat composer must expose explicit system voice input with a visible listening state");
 expect(chatComposer.includes("aria-activedescendant={commandQuery !== null ? activeCommandId : undefined}") && chatComposer.includes("(index + 1) % commandMatches.length"), "Chat composer commands must expose the active option and wrap keyboard navigation");
 expect(modelPicker.includes("const onPopoverKeyDown") && modelPicker.includes("aria-activedescendant={filtered[activeIndex]"), "Model picker must keep keyboard focus inside the popover and expose the active option");
 expect(overflowMenu.includes('event.key === "Tab"') && sidebar.includes('event.key === "Tab"'), "Overflow and recent-chat menus must close when keyboard focus leaves with Tab");
@@ -63,6 +64,7 @@ for (const method of ["scheduled.create", "scheduled.pause", "scheduled.resume",
 expect(main.includes("HOST_TIMEOUT"), "Electron bridge must bound pending host requests");
 expect(main.includes("new Tray") && main.includes("event.preventDefault()") && main.includes("mainWindow.hide()"), "Closing the main Electron window must hide it to the system tray instead of quitting");
 expect(main.includes("requestSingleInstanceLock") && main.includes('app.on("second-instance"'), "Electron must reopen the resident instance instead of creating duplicate desktop processes");
+expect(main.includes("globalShortcut.register") && main.includes("CommandOrControl+Alt+Space") && main.includes("globalShortcut.unregister"), "Electron must expose and clean up the system-wide launcher shortcut");
 expect(main.includes("Recent chats") && main.includes("tray:open-conversation") && main.includes("Quit Skai Desktop"), "The system tray menu must expose recent chats, reopen, and explicit quit actions");
 expect(main.includes("Hide Percy") && main.includes("Show Percy"), "The system tray menu must expose Percy visibility control");
 expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "The preload bridge must expose typed tray navigation events");
@@ -78,7 +80,7 @@ expect(main.includes("setVisibleOnAllWorkspaces(true") && percyTransparent && ma
 expect(main.includes('"tasks.retry": "Retried the local task."'), "Percy must summarize successful task retries");
 expect(main.includes('kind = "success"') && main.includes('kind: "error"'), "Percy completion events must distinguish successful and failed local work");
 expect(main.includes("if (!task) return null"), "Percy completion bubbles must stay scoped to tracked agent work");
-expect(petWindow.includes("percy-error-frames.png") && petWindow.includes("event.kind"), "Percy must render a matching error sprite and completion state");
+expect(petWindow.includes("BUILTIN_STRIPS") && petWindow.includes("percy-error-frames.png") && petWindow.includes("event.kind"), "Percy must render independent six-frame state strips and completion states");
 expect(petWindow.includes("window.addEventListener(\"blur\", cancelDrag)") && petWindow.includes("event.target instanceof Element"), "Percy renderer must cancel lost drags and protect its hide control from drag initiation");
 expect(main.includes("packagedRuntime") && main.includes("process.resourcesPath"), "Electron must resolve packaged runtime paths");
 expect(main.includes("packagedHost") && main.includes("ServerRock.AgentHost"), "Electron must launch a bundled Agent Host when packaged");

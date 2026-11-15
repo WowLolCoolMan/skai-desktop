@@ -8,7 +8,7 @@ const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platf
 
 const executable = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : "linux"}-x64`, process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"));
 const port = 19324;
-const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory", "usage"];
+const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "plugins", "workbench", "terminal", "memory", "usage"];
 const widths = [1920, 1440, 1280, 960, 640];
 // Isolated profile: a running Skai instance would otherwise take the single-instance lock and the smoke launch would exit.
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));

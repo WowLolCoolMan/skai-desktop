@@ -20,6 +20,7 @@ const env = {
   SRAI_SCHEDULED_TASKS_PATH: path.join(profileRoot, "scheduled-tasks.json"),
   SRAI_PROJECTS_PATH: path.join(profileRoot, "projects.json"),
   SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
+  SRAI_MCP_CONNECTIONS_PATH: path.join(profileRoot, "mcp-connections.json"),
 };
 spawnSync("git", ["init", "--quiet", tempRoot], { cwd: tempRoot, windowsHide: true });
 spawnSync("git", ["config", "user.email", "smoke@example.invalid"], { cwd: tempRoot, windowsHide: true });
@@ -82,8 +83,17 @@ function request(method, params) {
 
 async function run() {
   const health = await request("runtime.health");
-  if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel"))
+  if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
+  const mcpConnections = await request("mcp.connections.list");
+  if (!mcpConnections.ok || !Array.isArray(mcpConnections.result?.connections) || mcpConnections.result.connections.length !== 0)
+    throw new Error("mcp.connections.list did not return the isolated empty registry.");
+  const skills = await request("skills.list");
+  if (!skills.ok || !skills.result?.some(skill => skill.id === "reverse-engineer" && skill.enabled === true))
+    throw new Error(`skills.list did not expose the built-in local skill catalog: ${JSON.stringify(skills)}`);
+  const skill = await request("skills.read", { id: "reverse-engineer" });
+  if (!skill.ok || !String(skill.result?.content ?? "").includes("Reverse-engineer this project"))
+    throw new Error(`skills.read did not lazily load the selected skill: ${JSON.stringify(skill)}`);
   const airLlm = await request("airllm.status");
   if (!airLlm.ok || airLlm.result?.workerAvailable !== true || typeof airLlm.result?.message !== "string")
     throw new Error(`airllm.status did not report the packaged worker: ${JSON.stringify(airLlm)}`);

@@ -1,13 +1,14 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "./Primitives";
 
 export type OverflowMenuItem = {
   label: string;
+  icon?: ReactNode;
   onSelect: () => void;
   disabled?: boolean;
 };
 
-export function OverflowMenu({ items, label = "More" }: { items: OverflowMenuItem[]; label?: string }) {
+export function OverflowMenu({ items, label = "More", icon, className = "" }: { items: OverflowMenuItem[]; label?: string; icon?: ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -50,8 +51,8 @@ export function OverflowMenu({ items, label = "More" }: { items: OverflowMenuIte
     actions[nextIndex]?.focus();
   };
 
-  return <div className="overflow-menu" ref={rootRef}>
-    <button ref={triggerRef} className="ui-button ui-button-ghost overflow-menu-trigger" type="button" aria-haspopup="menu" aria-expanded={open} aria-controls={menuId} onMouseDown={(event) => { if (!open) event.preventDefault(); }} onClick={() => open ? close(false) : setOpen(true)}>{label}</button>
-    {open && <div ref={menuRef} id={menuId} className="overflow-menu-panel" role="menu" aria-label={label} onKeyDown={onMenuKeyDown}>{items.map((item) => <button className="overflow-menu-item" key={item.label} type="button" role="menuitem" disabled={item.disabled} onClick={() => { if (item.disabled) return; item.onSelect(); close(false); }}>{item.label}</button>)}</div>}
+  return <div className={`overflow-menu ${className}`.trim()} ref={rootRef}>
+    <button ref={triggerRef} className={`ui-button ui-button-ghost overflow-menu-trigger ${icon ? "overflow-menu-trigger-icon" : ""}`} type="button" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={menuId} onMouseDown={(event) => { if (!open) event.preventDefault(); }} onClick={() => open ? close(false) : setOpen(true)}>{icon ?? label}</button>
+    {open && <div ref={menuRef} id={menuId} className="overflow-menu-panel" role="menu" aria-label={label} onKeyDown={onMenuKeyDown}>{items.map((item) => <button className="overflow-menu-item" key={item.label} type="button" role="menuitem" disabled={item.disabled} onClick={() => { if (item.disabled) return; item.onSelect(); close(false); }}>{item.icon}{item.label}</button>)}</div>}
   </div>;
 }

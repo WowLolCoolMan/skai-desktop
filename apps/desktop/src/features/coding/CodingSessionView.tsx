@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import Editor, { DiffEditor } from "@monaco-editor/react";
 import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopTask, TaskEnvironment } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
@@ -6,8 +7,6 @@ import { EnvironmentPicker } from "../../components/ui/EnvironmentPicker";
 import { NavIcon } from "../../components/ui/NavIcon";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { CodingActivityPanel } from "./CodingActivityPanel";
-
-type DiffRow = { kind: "removed" | "added" | "unchanged"; line: string };
 
 function terminalStorageKey(projectId: string) {
   return `skai.coding.terminalOpen.${projectId}`;
@@ -21,16 +20,12 @@ function openTabsStorageKey(projectId: string) {
   return `skai.coding.openTabs.${projectId}`;
 }
 
-function createDiff(before: string, after: string): DiffRow[] {
-  const beforeLines = before.split("\n");
-  const afterLines = after.split("\n");
-  let prefix = 0;
-  while (prefix < beforeLines.length && prefix < afterLines.length && beforeLines[prefix] === afterLines[prefix]) prefix += 1;
-  let suffix = 0;
-  while (suffix < beforeLines.length - prefix && suffix < afterLines.length - prefix && beforeLines[beforeLines.length - 1 - suffix] === afterLines[afterLines.length - 1 - suffix]) suffix += 1;
-  const rows: DiffRow[] = beforeLines.slice(prefix, beforeLines.length - suffix).map((line) => ({ kind: "removed", line }));
-  rows.push(...afterLines.slice(prefix, afterLines.length - suffix).map((line) => ({ kind: "added" as const, line })));
-  return rows.length ? rows : [{ kind: "unchanged", line: "No text changes" }];
+function languageForPath(path: string | null) {
+  const extension = path?.split(".").pop()?.toLowerCase();
+  const languages: Record<string, string> = {
+    cjs: "javascript", css: "css", cs: "csharp", h: "cpp", hpp: "cpp", html: "html", java: "java", js: "javascript", json: "json", jsx: "javascript", md: "markdown", mjs: "javascript", py: "python", sh: "shell", sql: "sql", ts: "typescript", tsx: "typescript", txt: "plaintext", yml: "yaml", yaml: "yaml"
+  };
+  return languages[extension ?? ""] ?? "plaintext";
 }
 
 type CodingSessionViewProps = {
@@ -87,7 +82,6 @@ export function CodingSessionView({ projects, selectedProject, tasks, projectFil
   const loadedTabsProjectRef = useRef<string | null>(null);
   const skipTabPersistenceRef = useRef(false);
   const hasChanges = Boolean(selectedFile && fileDraft !== fileOriginal);
-  const diffRows = useMemo(() => createDiff(fileOriginal, fileDraft), [fileDraft, fileOriginal]);
   const filteredFiles = useMemo(() => {
     const query = fileQuery.trim().toLowerCase();
     return query ? projectFiles.filter((file) => file.relativePath.toLowerCase().includes(query)) : projectFiles;
@@ -202,7 +196,7 @@ export function CodingSessionView({ projects, selectedProject, tasks, projectFil
         <div className="project-file-explorer"><div className="file-list-toolbar"><input ref={fileSearchRef} value={fileQuery} onChange={(event) => setFileQuery(event.target.value)} placeholder="Filter files…" aria-label="Filter project files" /><kbd>Ctrl P</kbd></div><div className="project-file-list">{projectFiles.length === 0 ? <EmptyState title="No readable files" description="Protected names and unsupported files are hidden." /> : filteredFiles.length === 0 ? <EmptyState title="No matching files" description="Try a shorter path or filename." /> : filteredFiles.map((file) => <button className={selectedFile === file.relativePath ? "is-selected" : ""} key={file.relativePath} onClick={() => openFile(file.relativePath)} type="button"><span>{file.relativePath}</span><small>{file.bytes.toLocaleString()} bytes</small></button>)}</div></div>
         <div className="file-editor-panel">
           {openTabs.length > 0 && <div className="file-tabs" role="tablist" aria-orientation="horizontal" aria-label="Open project files">{openTabs.map((path, index) => <div className={`file-tab ${selectedFile === path ? "is-active" : ""}`} key={path}><button id={`coding-file-tab-${index}`} type="button" role="tab" tabIndex={selectedFile === path || (!selectedFile && index === 0) ? 0 : -1} aria-selected={selectedFile === path} aria-controls="coding-file-editor" onClick={() => openFile(path)} onKeyDown={(event) => onTabKeyDown(event, index)}><span>{path}</span>{selectedFile === path && hasChanges ? <i aria-label="Unsaved changes">•</i> : null}</button><button className="file-tab-close" type="button" onClick={() => closeTab(path)} disabled={selectedFile === path && hasChanges} aria-label={`Close ${path}`}>×</button></div>)}</div>}
-          {selectedFile ? <><div id="coding-file-editor" className="file-editor-heading"><span>{selectedFile}</span><div><Button variant={panelMode === "editor" ? "secondary" : "ghost"} onClick={() => setPanelMode("editor")}>Editor</Button><Button variant={panelMode === "diff" ? "secondary" : "ghost"} disabled={!hasChanges} onClick={() => setPanelMode("diff")}>Review diff</Button><Button variant="ghost" disabled={fileBusy || !fileUndoAvailable} title={fileUndoAvailable ? "Undo the last saved edit" : "No saved edit to undo"} onClick={onUndoFile}>Undo</Button><Button variant="primary" disabled={fileBusy || !hasChanges} onClick={onSaveFile}>{fileBusy ? "Saving…" : "Save edit"}</Button></div></div>{panelMode === "diff" ? <div className="diff-preview" aria-label="Local diff preview">{diffRows.map((row, index) => <div className={`diff-row diff-${row.kind}`} key={`${row.kind}-${index}`}><span aria-hidden="true">{row.kind === "removed" ? "−" : row.kind === "added" ? "+" : "·"}</span><code>{row.line || " "}</code></div>)}</div> : <textarea value={fileDraft} onChange={(event) => onDraftChange(event.target.value)} aria-label={`Edit ${selectedFile}`} rows={16} />}</> : <EmptyState title="Select a file" description="Choose a readable file to preview or edit it with guarded write-back." />}
+          {selectedFile ? <><div id="coding-file-editor" className="file-editor-heading"><span>{selectedFile} · {languageForPath(selectedFile)}</span><div><Button variant={panelMode === "editor" ? "secondary" : "ghost"} onClick={() => setPanelMode("editor")}>Editor</Button><Button variant={panelMode === "diff" ? "secondary" : "ghost"} disabled={!hasChanges} onClick={() => setPanelMode("diff")}>Review diff</Button><Button variant="ghost" disabled={fileBusy || !fileUndoAvailable} title={fileUndoAvailable ? "Undo the last saved edit" : "No saved edit to undo"} onClick={onUndoFile}>Undo</Button><Button variant="primary" disabled={fileBusy || !hasChanges} onClick={onSaveFile}>{fileBusy ? "Saving…" : "Save edit"}</Button></div></div>{panelMode === "diff" ? <div className="monaco-diff-shell" aria-label="Local diff preview"><DiffEditor original={fileOriginal} modified={fileDraft} language={languageForPath(selectedFile)} theme="vs-dark" options={{ automaticLayout: true, minimap: { enabled: false }, readOnly: true, renderSideBySide: true, scrollBeyondLastLine: false, wordWrap: "on" }} /></div> : <div className="monaco-editor-shell" aria-label={`Edit ${selectedFile}`}><Editor value={fileDraft} language={languageForPath(selectedFile)} theme="vs-dark" onChange={(value) => onDraftChange(value ?? "")} options={{ automaticLayout: true, fontSize: 13, folding: true, lineNumbers: "on", minimap: { enabled: true }, padding: { top: 12, bottom: 12 }, scrollBeyondLastLine: false, tabSize: 2, wordWrap: "off" }} /></div>}</> : <EmptyState title="Select a file" description="Choose a readable file to preview or edit it with guarded write-back." />}
         </div>
       </div>
       {terminalOpen && <div className="project-dock"><TerminalPanel projects={projects} initialProjectId={selectedProject.id} busy={terminalBusy} output={terminalOutput} exitCode={terminalExitCode} compact onRun={onRunTerminal} /></div>}

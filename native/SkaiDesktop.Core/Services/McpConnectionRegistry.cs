@@ -50,6 +50,11 @@ public sealed class McpConnectionRegistry
         lock (_sync) return Copy(GetInternal(connectionId));
     }
 
+    public IReadOnlyList<McpConnection> List()
+    {
+        lock (_sync) return _connections.Values.Select(Copy).OrderBy(connection => connection.ServerId, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
     public void Authorize(McpToolDescriptor descriptor, McpToolGrant grant)
     {
         ArgumentNullException.ThrowIfNull(descriptor);

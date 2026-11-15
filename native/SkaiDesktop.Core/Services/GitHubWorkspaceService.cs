@@ -192,6 +192,7 @@ public sealed class GitHubWorkspaceService
         return (result.StandardOutput + result.StandardError).Trim();
     }
 
+
     private async Task<string> CommitSelectedCoreAsync(string repositoryPath, IReadOnlyCollection<GitWorkspaceFileChange> selectedChanges, string message,
         string? accessToken, CancellationToken cancellationToken)
     {
@@ -518,6 +519,7 @@ public sealed class GitHubWorkspaceService
         if (detail.Contains("AUTHORIZATION: basic", StringComparison.OrdinalIgnoreCase)) detail = "GitHub rejected the saved authorization. Reconnect GitHub and try again.";
         throw new InvalidOperationException(detail.Length == 0 ? fallback : $"{fallback} {detail}");
     }
+
 
     private static void ValidateAccessToken(string? accessToken)
     {

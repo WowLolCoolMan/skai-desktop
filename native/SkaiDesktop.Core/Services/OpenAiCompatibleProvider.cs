@@ -17,7 +17,7 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
     private const int MaxMessages = 500;
     private const int MaxMessageCharacters = 1_000_000;
     private const int MaxStreamedResponseCharacters = 1_000_000;
-    private const int MaxRequestCharacters = 8_000_000;
+    private const int MaxRequestBytes = 32_000_000;
     private const int MaxPlanningCharacters = 32_000_000;
     private const int MaxModelCharacters = 512;
     private static readonly HttpClient SharedHttp = new() { Timeout = Timeout.InfiniteTimeSpan };
@@ -33,16 +33,21 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         string? apiKey = null)
     {
         ValidateRequest(settings, messages);
+        if (settings.ModelProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) && settings.OllamaContextWindowTokens > 0)
+        {
+            await StreamOllamaNativeChatAsync(settings, messages, onText, cancellationToken, maxTokens, apiKey).ConfigureAwait(false);
+            return;
+        }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(5));
         var requestMessages = messages;
         var requestJson = SerializeRequest(settings, requestMessages, maxTokens);
-        if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestCharacters)
+        if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
         {
-            requestMessages = ConversationContextPlanner.Plan(messages, MaxRequestCharacters - 256 * 1024).Messages;
+            requestMessages = ConversationContextPlanner.Plan(messages, MaxRequestBytes - 1_000_000).Messages;
             requestJson = SerializeRequest(settings, requestMessages, maxTokens);
-            if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestCharacters)
-                throw new InvalidOperationException("The model request exceeds the 8 MB payload limit after bounded context compaction.");
+            if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
+                throw new InvalidOperationException("The model request exceeds the 32 MB payload limit after bounded context compaction.");
         }
         using var request = new HttpRequestMessage(HttpMethod.Post, BuildChatUri(settings.Endpoint))
         {
@@ -140,6 +145,81 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         };
         if (maxTokens is > 0) requestBody["max_tokens"] = Math.Clamp(maxTokens.Value, 1, 4096);
         return JsonSerializer.Serialize(requestBody, JsonOptions);
+    }
+
+    private async Task StreamOllamaNativeChatAsync(AppSettings settings, IReadOnlyList<ChatMessage> messages, Action<string> onText, CancellationToken cancellationToken, int? maxTokens, string? apiKey)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(5));
+        var requestMessages = messages;
+        var requestJson = SerializeOllamaNativeRequest(settings, requestMessages, maxTokens);
+        if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
+        {
+            requestMessages = ConversationContextPlanner.Plan(messages, MaxRequestBytes - 1_000_000).Messages;
+            requestJson = SerializeOllamaNativeRequest(settings, requestMessages, maxTokens);
+            if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
+                throw new InvalidOperationException("The model request exceeds the 32 MB payload limit after bounded context compaction.");
+        }
+        var endpoint = new Uri(settings.Endpoint.TrimEnd('/') + "/");
+        var chatUri = new UriBuilder(endpoint) { Path = "/api/chat", Query = "", Fragment = "" }.Uri;
+        using var request = new HttpRequestMessage(HttpMethod.Post, chatUri) { Content = new StringContent(requestJson, Encoding.UTF8, "application/json") };
+        AddApiKey(request, apiKey);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await BoundedHttpContent.ReadTextAsync(response.Content, timeout.Token, "Ollama error", BoundedHttpContent.MaxTextBytes).ConfigureAwait(false);
+            throw new HttpRequestException($"Ollama returned {(int)response.StatusCode} {response.ReasonPhrase}. {body}", null, response.StatusCode);
+        }
+        await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
+        using var reader = new StreamReader(stream);
+        var lineReader = BoundedHttpContent.CreateLineReader(reader);
+        var receivedCharacters = 0;
+        var receivedContent = false;
+        while (await lineReader.ReadLineAsync(timeout.Token).ConfigureAwait(false) is { } line)
+        {
+            timeout.Token.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            using var chunk = JsonDocument.Parse(line);
+            if (chunk.RootElement.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String)
+                throw new InvalidOperationException($"Ollama could not run this context window: {error.GetString()}");
+            if (!chunk.RootElement.TryGetProperty("message", out var message) || !message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.String) continue;
+            var text = content.GetString();
+            if (string.IsNullOrEmpty(text)) continue;
+            if (text.Length > MaxStreamedResponseCharacters - receivedCharacters)
+                throw new InvalidDataException($"The model response exceeds the {MaxStreamedResponseCharacters:N0}-character limit.");
+            receivedCharacters += text.Length;
+            receivedContent = true;
+            onText(text);
+        }
+        if (!receivedContent) throw new InvalidOperationException("Ollama closed the stream without returning a response.");
+    }
+
+    private static string SerializeOllamaNativeRequest(AppSettings settings, IReadOnlyList<ChatMessage> messages, int? maxTokens)
+    {
+        var options = new Dictionary<string, object?> { ["num_ctx"] = settings.OllamaContextWindowTokens, ["temperature"] = settings.Temperature };
+        if (maxTokens is > 0) options["num_predict"] = Math.Clamp(maxTokens.Value, 1, 4096);
+        return JsonSerializer.Serialize(new { model = settings.Model, messages = messages.Select(BuildOllamaNativeMessage).ToArray(), stream = true, options }, JsonOptions);
+    }
+
+    private static object BuildOllamaNativeMessage(ChatMessage message)
+    {
+        var images = message.Attachments?.Where(attachment => attachment.IsImage).ToArray() ?? [];
+        if (images.Length == 0) return new { message.Role, message.Content };
+        long totalImageBytes = 0;
+        foreach (var image in images)
+        {
+            if (!ChatAttachmentPolicy.IsAllowedImageMediaType(image.MediaType) || ChatAttachmentPolicy.GetImageMediaType(image.FileName) != image.MediaType)
+                throw new InvalidOperationException("An attached image has an unsupported media type. Add a PNG or JPEG image and try again.");
+            byte[] bytes;
+            try { bytes = Convert.FromBase64String(image.Content); }
+            catch (FormatException error) { throw new InvalidOperationException("An attached image is not valid base64 data. Remove it and attach it again.", error); }
+            if (bytes.Length > ChatAttachmentPolicy.MaxFileBytes || !ChatAttachmentPolicy.HasValidImageSignature(image.MediaType, bytes))
+                throw new InvalidOperationException($"{image.FileName} is invalid or exceeds the per-image size limit.");
+            totalImageBytes += bytes.Length;
+        }
+        if (totalImageBytes > ChatAttachmentPolicy.MaxTotalImageBytes)
+            throw new InvalidOperationException("Attached images exceed the 6 MB total limit. Remove one or more images and try again.");
+        return new { message.Role, message.Content, images = images.Select(image => image.Content).ToArray() };
     }
 
     private static void ValidateRequest(AppSettings settings, IReadOnlyList<ChatMessage> messages)

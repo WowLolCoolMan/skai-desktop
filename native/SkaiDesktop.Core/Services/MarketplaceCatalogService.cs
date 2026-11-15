@@ -44,7 +44,18 @@ public static class MarketplaceCatalogService
             installed = true,
             enabled = true,
             installable = false,
-        }).ToArray(),
+        }).Concat(new SkillPackageInstaller().ListInstalled().Select(skill => new
+        {
+            id = skill.Id,
+            name = skill.Name,
+            description = $"Local Markdown skill by {skill.Publisher}.",
+            category = "Installed",
+            permissions = skill.RequiredPermissions,
+            source = skill.SourceRef,
+            installed = true,
+            enabled = skill.Enabled,
+            installable = false,
+        })).ToArray(),
         tools = PluginCatalogService.Search().Select(tool => new
         {
             id = tool.Id,

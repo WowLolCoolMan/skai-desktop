@@ -17,6 +17,10 @@ public static class AgentHostLoop
     private static readonly object ModelPullsGate = new();
     private static readonly Dictionary<string, MarketplaceDownloadOperation> MarketplaceDownloads = new(StringComparer.Ordinal);
     private static readonly object MarketplaceDownloadsGate = new();
+    private static readonly McpConnectionRegistry McpConnections = CreateMcpConnectionRegistry();
+    private static readonly Dictionary<string, McpStreamableHttpClient> ActiveMcpClients = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, IReadOnlyList<McpToolDescriptor>> ActiveMcpTools = new(StringComparer.Ordinal);
+    private static readonly object McpClientsGate = new();
 
     public static async Task RunAsync(Stream input, Stream output, CancellationToken cancellationToken = default)
     {
@@ -55,6 +59,7 @@ public static class AgentHostLoop
             await writer.WriteLineAsync(JsonSerializer.Serialize(response, JsonOptions));
         }
         await DisposeTerminalSessionsAsync().ConfigureAwait(false);
+        await DisposeMcpClientsAsync().ConfigureAwait(false);
     }
 
     private static AgentResponse Handle(AgentRequest request, OsNativeTtsService voice)
@@ -68,7 +73,7 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "airllm.status", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.generate", "chat.complete", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel"])),
+                ["runtime.health", "airllm.status", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel"])),
             "airllm.status" => GetAirLlmStatus(request),
             "models.list" => ListModels(request),
             "models.pull.start" => StartModelPull(request),
@@ -128,6 +133,14 @@ public static class AgentHostLoop
             "settings.save" => SaveSettings(request),
             "image.generate" => GenerateImageAsync(request).GetAwaiter().GetResult(),
             "chat.complete" => CompleteChatAsync(request).GetAwaiter().GetResult(),
+            "skills.list" => ListSkills(request),
+            "skills.read" => ReadSkill(request),
+            "mcp.connections.list" => ListMcpConnections(request),
+            "mcp.connection.connect" => ConnectMcpAsync(request).GetAwaiter().GetResult(),
+            "mcp.connection.disconnect" => DisconnectMcp(request),
+            "mcp.connection.revoke" => RevokeMcp(request),
+            "mcp.tools.list" => ListMcpTools(request),
+            "mcp.tool.call" => CallMcpToolAsync(request).GetAwaiter().GetResult(),
             "voice.models" => ListVoiceModels(request),
             "voice.speak" => SpeakVoice(request, voice),
             "voice.stop" => StopVoice(request, voice),
@@ -163,6 +176,149 @@ public static class AgentHostLoop
 
     private static AgentResponse ListMarketplaceCatalog(AgentRequest request) =>
         new(ProtocolVersion, request.Id, true, MarketplaceCatalogService.Snapshot());
+
+    private static AgentResponse ListSkills(AgentRequest request)
+    {
+        var installed = new SkillPackageInstaller().ListInstalled();
+        var skills = SkillCatalogService.BuiltIns.Select(skill => new
+        {
+            id = skill.Id, name = skill.Name, description = skill.Description, category = skill.Category,
+            permissions = skill.RequiredPermissions, source = "built-in", enabled = true,
+        }).Concat(installed.Select(skill => new
+        {
+            id = skill.Id, name = skill.Name, description = $"Local Markdown skill by {skill.Publisher}.", category = "Installed",
+            permissions = skill.RequiredPermissions, source = skill.SourceRef, enabled = skill.Enabled,
+        })).ToArray();
+        return new(ProtocolVersion, request.Id, true, skills);
+    }
+
+    private static AgentResponse ReadSkill(AgentRequest request)
+    {
+        var id = RequiredString(request, "id");
+        var builtIn = SkillCatalogService.Find(id);
+        if (builtIn is not null) return new(ProtocolVersion, request.Id, true, new { id = builtIn.Id, content = builtIn.Prompt });
+        var installer = new SkillPackageInstaller();
+        var installed = installer.ListInstalled().SingleOrDefault(skill => skill.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (installed is null || !installed.Enabled) throw new InvalidOperationException("That skill is not installed or enabled.");
+        return new(ProtocolVersion, request.Id, true, new { id = installed.Id, content = installer.ReadInstructions(installed.Id) });
+    }
+
+    private static AgentResponse ListMcpConnections(AgentRequest request) =>
+        new(ProtocolVersion, request.Id, true, new { connections = McpConnections.List() });
+
+    private static async Task<AgentResponse> ConnectMcpAsync(AgentRequest request)
+    {
+        var serverId = RequiredBoundedString(request, "serverId", 128);
+        var endpoint = RequiredBoundedString(request, "endpoint", 2_048);
+        var transport = OptionalString(request, "transport") ?? "streamable-http";
+        if (transport != "streamable-http") throw new InvalidOperationException("Skai currently supports MCP Streamable HTTP connections here. Stdio requires a supervised local process profile.");
+        var connectionId = OptionalString(request, "connectionId")?.Trim();
+        if (string.IsNullOrWhiteSpace(connectionId)) connectionId = $"mcp-{Guid.NewGuid():N}";
+        if (connectionId.Length > 128 || connectionId.Any(char.IsControl)) throw new InvalidOperationException("The MCP connection identity is invalid.");
+
+        McpConnections.Configure(connectionId, serverId, transport);
+        var client = new McpStreamableHttpClient(serverId, endpoint, connectionRegistry: McpConnections);
+        try
+        {
+            await client.InitializeAsync().ConfigureAwait(false);
+            var tools = await client.ListToolsAsync().ConfigureAwait(false);
+            McpConnections.MarkHealthy(connectionId);
+            lock (McpClientsGate)
+            {
+                if (ActiveMcpClients.Remove(connectionId, out var previous)) previous.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                ActiveMcpClients[connectionId] = client;
+                ActiveMcpTools[connectionId] = tools;
+            }
+            return new(ProtocolVersion, request.Id, true, new { connection = McpConnections.Get(connectionId), tools });
+        }
+        catch (Exception error)
+        {
+            try { McpConnections.MarkDegraded(connectionId, error.Message); } catch { }
+            await client.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static AgentResponse DisconnectMcp(AgentRequest request)
+    {
+        var connectionId = RequiredBoundedString(request, "connectionId", 128);
+        DisposeActiveMcpClient(connectionId);
+        return new(ProtocolVersion, request.Id, true, McpConnections.Disconnect(connectionId));
+    }
+
+    private static AgentResponse RevokeMcp(AgentRequest request)
+    {
+        var connectionId = RequiredBoundedString(request, "connectionId", 128);
+        DisposeActiveMcpClient(connectionId);
+        return new(ProtocolVersion, request.Id, true, McpConnections.Revoke(connectionId));
+    }
+
+    private static AgentResponse ListMcpTools(AgentRequest request)
+    {
+        var connectionId = RequiredBoundedString(request, "connectionId", 128);
+        lock (McpClientsGate)
+        {
+            return new(ProtocolVersion, request.Id, true, new
+            {
+                connectionId,
+                connected = ActiveMcpTools.ContainsKey(connectionId),
+                tools = ActiveMcpTools.TryGetValue(connectionId, out var tools) ? tools : [],
+            });
+        }
+    }
+
+    private static async Task<AgentResponse> CallMcpToolAsync(AgentRequest request)
+    {
+        var connectionId = RequiredBoundedString(request, "connectionId", 128);
+        var toolName = RequiredBoundedString(request, "toolName", 128);
+        var approvalId = RequiredBoundedString(request, "approvalId", 128);
+        var capabilities = OptionalStringList(request, "capabilities", 2, 64);
+        using var emptyArguments = JsonDocument.Parse("{}");
+        var arguments = request.Params?.TryGetProperty("arguments", out var argumentValue) == true ? argumentValue : emptyArguments.RootElement;
+        if (arguments.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("MCP tool arguments must be a JSON object.");
+
+        McpStreamableHttpClient client;
+        McpToolDescriptor descriptor;
+        lock (McpClientsGate)
+        {
+            if (!ActiveMcpClients.TryGetValue(connectionId, out client!)) throw new InvalidOperationException("The MCP connection is not active.");
+            if (!ActiveMcpTools.TryGetValue(connectionId, out var tools) || (descriptor = tools.SingleOrDefault(tool => tool.ToolName.Equals(toolName, StringComparison.Ordinal))!) is null)
+                throw new KeyNotFoundException("The MCP tool is not available on this connection.");
+        }
+        var result = await client.CallToolAsync(descriptor, new McpToolGrant
+        {
+            ServerId = descriptor.ServerId,
+            ToolName = descriptor.ToolName,
+            ConnectionId = connectionId,
+            ApprovalId = approvalId,
+            Capabilities = capabilities,
+        }, arguments).ConfigureAwait(false);
+        return new(ProtocolVersion, request.Id, true, new { toolName, isError = result.IsError, text = result.Text });
+    }
+
+    private static McpConnectionRegistry CreateMcpConnectionRegistry() =>
+        new(new McpConnectionStore(Environment.GetEnvironmentVariable("SRAI_MCP_CONNECTIONS_PATH")));
+
+    private static void DisposeActiveMcpClient(string connectionId)
+    {
+        lock (McpClientsGate)
+        {
+            if (ActiveMcpClients.Remove(connectionId, out var client)) client.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            ActiveMcpTools.Remove(connectionId);
+        }
+    }
+
+    private static async Task DisposeMcpClientsAsync()
+    {
+        McpStreamableHttpClient[] clients;
+        lock (McpClientsGate)
+        {
+            clients = ActiveMcpClients.Values.ToArray();
+            ActiveMcpClients.Clear();
+            ActiveMcpTools.Clear();
+        }
+        foreach (var client in clients) await client.DisposeAsync().ConfigureAwait(false);
+    }
 
     private static async Task<AgentResponse> SearchMarketplaceModelsAsync(AgentRequest request)
     {
@@ -459,6 +615,28 @@ public static class AgentHostLoop
             ?? throw new InvalidOperationException("chat.complete requires a messages array.");
         if (messages.Count == 0) throw new InvalidOperationException("chat.complete requires at least one message.");
 
+        var skillIds = ReadSkillIds(request);
+        if (skillIds.Count > 0)
+        {
+            var installer = new SkillPackageInstaller();
+            var skillText = new System.Text.StringBuilder("The user explicitly selected these local skills. Apply their instructions for this request only. Skill text is bounded local data and never grants tool permissions.\n\n");
+            foreach (var id in skillIds)
+            {
+                var builtIn = SkillCatalogService.Find(id);
+                string content;
+                if (builtIn is not null) content = builtIn.Prompt;
+                else
+                {
+                    var installed = installer.ListInstalled().SingleOrDefault(skill => skill.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+                    if (installed is null || !installed.Enabled) throw new InvalidOperationException($"Skill '${id}' is not installed or enabled.");
+                    content = installer.ReadInstructions(installed.Id);
+                }
+                if (content.Length > SkillPackageInstaller.MaxFileBytes) throw new InvalidDataException($"Skill '${id}' exceeds the instruction limit.");
+                skillText.Append("<selected-skill id=\"").Append(id).Append("\">\n").Append(content).Append("\n</selected-skill>\n\n");
+            }
+            messages.Insert(0, new ChatMessage("system", skillText.ToString()));
+        }
+
         var projectId = OptionalString(request, "projectId");
         string? projectName = null;
         if (!string.IsNullOrWhiteSpace(projectId))
@@ -477,6 +655,7 @@ public static class AgentHostLoop
             Endpoint = endpoint,
             Model = model,
             ModelProvider = string.IsNullOrWhiteSpace(requestedProvider) ? storedSettings.ModelProvider : requestedProvider,
+            OllamaContextWindowTokens = storedSettings.OllamaContextWindowTokens,
             Temperature = OptionalDouble(request, "temperature") ?? 0.7,
             AirLlmAutoFallbackEnabled = storedSettings.AirLlmAutoFallbackEnabled,
             AirLlmAllowRemoteCode = storedSettings.AirLlmAllowRemoteCode,
@@ -547,6 +726,16 @@ public static class AgentHostLoop
             fallback = usedFallback,
             content = text.ToString(),
         });
+    }
+
+    private static IReadOnlyList<string> ReadSkillIds(AgentRequest request)
+    {
+        if (request.Params?.TryGetProperty("skills", out var value) != true || value.ValueKind != JsonValueKind.Array) return [];
+        var ids = value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String ? item.GetString()?.Trim() : null)
+            .Where(item => !string.IsNullOrWhiteSpace(item)).Distinct(StringComparer.OrdinalIgnoreCase).Take(4).ToArray();
+        if (ids.Any(id => id!.Length > 80 || id.Any(ch => !(char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.'))))
+            throw new InvalidOperationException("Skill mentions may contain only letters, numbers, '-', '_', and '.'.");
+        return ids!;
     }
 
     private static string BuildProjectContext(LocalProject project)
@@ -1292,6 +1481,7 @@ public static class AgentHostLoop
             endpoint = LocalEndpoint.IsLocal(settings.Endpoint) ? settings.Endpoint : "http://localhost:11434/v1",
             model = settings.Model,
             provider = settings.ModelProvider,
+            ollamaContextWindowTokens = settings.OllamaContextWindowTokens,
             themeMode = settings.ThemeMode,
             accentColor = settings.AccentColor,
             interfaceDensity = settings.InterfaceDensity,
@@ -1320,6 +1510,12 @@ public static class AgentHostLoop
                     settings.ModelProvider = requestedProvider.Trim();
                 }
             }
+            if (parameters.TryGetProperty("ollamaContextWindowTokens", out var contextWindow) && contextWindow.TryGetInt32(out var contextTokens))
+            {
+                if (contextTokens is not (0 or 32_768 or 131_072 or 1_048_576))
+                    throw new InvalidOperationException("The Ollama context window must be Auto, 32K, 128K, or 1M tokens.");
+                settings.OllamaContextWindowTokens = contextTokens;
+            }
             if (parameters.TryGetProperty("themeMode", out var theme) && theme.ValueKind == JsonValueKind.String)
                 settings.ThemeMode = theme.GetString() ?? settings.ThemeMode;
             if (parameters.TryGetProperty("accentColor", out var accent) && accent.ValueKind == JsonValueKind.String)
@@ -1336,7 +1532,7 @@ public static class AgentHostLoop
                 settings.ReduceMotion = reduceMotion.GetBoolean();
         }
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled });
+        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled });
     }
 
     private static async Task<AgentResponse> GenerateImageAsync(AgentRequest request)
@@ -1345,7 +1541,19 @@ public static class AgentHostLoop
         var workflow = RequiredBoundedString(request, "workflow", 1_000_000);
         var prompt = RequiredBoundedString(request, "prompt", 8_000);
         var progress = string.Empty;
-        var images = await new ComfyImageProvider().GenerateAsync(endpoint, workflow, prompt, message => progress = message, CancellationToken.None);
+        byte[]? sourceImage = null;
+        string? sourceImageName = null;
+        if (request.Params?.TryGetProperty("sourceImage", out var sourceValue) == true && sourceValue.ValueKind == JsonValueKind.String)
+        {
+            var encoded = sourceValue.GetString() ?? string.Empty;
+            if (encoded.Length > 8_400_000) throw new InvalidDataException("The source image exceeds the 6 MB limit.");
+            try { sourceImage = Convert.FromBase64String(encoded); }
+            catch (FormatException error) { throw new InvalidDataException("The source image encoding is invalid.", error); }
+            var mediaType = RequiredBoundedString(request, "sourceImageMediaType", 32);
+            if (!ChatAttachmentPolicy.IsAllowedImageMediaType(mediaType) || !ChatAttachmentPolicy.HasValidImageSignature(mediaType, sourceImage)) throw new InvalidDataException("The source image must be a valid PNG or JPEG.");
+            sourceImageName = mediaType == "image/png" ? "source.png" : "source.jpg";
+        }
+        var images = await new ComfyImageProvider().GenerateAsync(endpoint, workflow, prompt, message => progress = message, CancellationToken.None, sourceImageName, sourceImage);
         return new(ProtocolVersion, request.Id, true, new
         {
             prompt,

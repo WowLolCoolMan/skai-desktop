@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type NavIconName = "chat" | "code" | "activity" | "model" | "image" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "plus" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
+export type NavIconName = "chat" | "code" | "activity" | "model" | "image" | "marketplace" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "plus" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
 
 export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVGSVGElement>) {
   const common = { fill: "none", stroke: "currentColor", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, strokeWidth: 1.65 };
@@ -11,6 +11,7 @@ export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVG
     case "activity": content = <path {...common} d="M3 12h3l2.3-5.5L12 18l2.7-7 1.8 3H21" />; break;
     case "model": content = <><circle {...common} cx="12" cy="12" r="7.5" /><path {...common} d="M12 4.5v15M4.5 12h15" /><circle {...common} cx="12" cy="12" r="2" /></> ; break;
     case "image": content = <><rect {...common} x="3" y="4" width="18" height="16" rx="2" /><circle {...common} cx="8" cy="9" r="1.5" /><path {...common} d="m4 17 5-5 3 3 2-2 6 5" /></> ; break;
+    case "marketplace": content = <><path {...common} d="M4 9 5.5 4h13L20 9" /><path {...common} d="M5 9v11h14V9M9 20v-6h6v6" /><path {...common} d="M4 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0" /></> ; break;
     case "sparkle": content = <><path {...common} d="m12 3 1.4 5.6L19 10l-5.6 1.4L12 17l-1.4-5.6L5 10l5.6-1.4z" /><path {...common} d="m19 16 .6 2.4L22 19l-2.4.6L19 22l-.6-2.4L16 19l2.4-.6z" /></> ; break;
     case "terminal": content = <><path {...common} d="m4 6 6 6-6 6M13 18h7" /></> ; break;
     case "memory": content = <><ellipse {...common} cx="12" cy="6" rx="7" ry="3" /><path {...common} d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></> ; break;
