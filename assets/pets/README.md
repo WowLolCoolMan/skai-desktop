@@ -19,6 +19,9 @@ replacement strips in from somewhere else.
 Users can still assign local SVG/PNG/JPEG/WebP frames from the pet customization dialog; custom
 files stay on the device.
 
-Percy is the official Skai Desktop mascot and the default companion for new profiles. The six
-walk source strips in `generated/` are kept as the editable visual inputs; no atlas is required
-or loaded by the renderer.
+Byte, Nova and Rocky use hand-tuned walk strips that weren't made from their walk sources, so the rebuild
+script leaves their `walk` strip alone. Edit those strips directly.
+
+Percy is the official Skai Desktop mascot and the default companion for new profiles. The walk
+source strips in `generated/` are the editable inputs for Percy, Ember and Sprout (Byte, Nova and Rocky's
+are kept for reference). No atlas is required or loaded by the renderer.

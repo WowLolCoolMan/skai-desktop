@@ -11,6 +11,9 @@ Add-Type -AssemblyName System.Drawing.Common
 $frameSize = 256
 $frameCount = 6
 $pets = @("percy", "rocky", "byte", "sprout", "nova", "ember")
+# These pets ship hand-tuned walk strips that were not produced from their walk sources.
+# Regenerating them here would replace the newer art, so their walk strip is left as is.
+$handTunedWalkPets = @("byte", "nova", "rocky")
 $states = @("idle", "walk", "thinking", "coding", "coding_malicious", "stuck", "success", "error")
 $pixelFormat = [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
 
@@ -61,7 +64,7 @@ function Normalize-WalkStrip([string]$pet) {
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 foreach ($pet in $pets) {
-    Normalize-WalkStrip $pet
+    if ($handTunedWalkPets -notcontains $pet) { Normalize-WalkStrip $pet }
     foreach ($state in $states) {
         if ($state -eq "walk") { continue }
         $sourcePath = Join-Path $InputDirectory "$pet-$state-frames.png"
