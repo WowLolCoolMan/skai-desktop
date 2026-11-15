@@ -476,6 +476,9 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .marketplace-model-controls .settings-toggle { grid-column: 1 / -1; min-width: 0; }
 .marketplace-model-row { flex-wrap: wrap; }
 .marketplace-model-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.marketplace-installed-pane { display: grid; gap: 14px; min-height: min(620px, calc(100vh - 260px)); padding: 18px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.marketplace-installed-search input { width: 100%; padding: 10px 11px; border: 1px solid var(--skai-color-border); border-radius: 8px; color: var(--skai-color-text); background: var(--skai-color-surface); }
+.marketplace-installed-list { display: grid; align-content: start; gap: 0; overflow: auto; scrollbar-gutter: stable; }
 
 /* Image Studio: the page scrolls when the editor card is taller than the window, and the history card gets the same padding as the editor. */
 .app-content-images { overflow-y: auto; }
