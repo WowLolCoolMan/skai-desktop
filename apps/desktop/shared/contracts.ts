@@ -192,8 +192,8 @@ export interface PluginDownloadsBridge {
 
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
-  video?: {
-    createLocalUrl(mediaType: "video/mp4" | "video/webm", content: string): Promise<string>;
+  media?: {
+    createLocalUrl(mediaType: "video/mp4" | "video/webm" | "audio/mp4" | "audio/webm" | "audio/mpeg" | "audio/wav" | "audio/ogg", content: string): Promise<string>;
     revokeLocalUrl(url: string): Promise<boolean>;
   };
   onTrayOpenConversation?(handler: (id: string) => void): () => void;

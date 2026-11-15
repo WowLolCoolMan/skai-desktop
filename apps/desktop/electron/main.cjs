@@ -85,6 +85,11 @@ const isPng = (bytes) => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer
 const isJpeg = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 const isMp4 = (bytes) => bytes.length >= 8 && bytes.toString("ascii", 4, 8) === "ftyp";
 const isWebm = (bytes) => bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+const isAudioSignature = (bytes, mediaType) => mediaType === "audio/wav" ? bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WAVE"
+  : mediaType === "audio/mpeg" ? bytes.length >= 3 && (bytes.subarray(0, 3).toString("ascii") === "ID3" || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0))
+  : mediaType === "audio/ogg" ? bytes.length >= 4 && bytes.toString("ascii", 0, 4) === "OggS"
+  : mediaType === "audio/mp4" ? isMp4(bytes)
+  : mediaType === "audio/webm" ? isWebm(bytes) : false;
 
 function decodeDroppedAttachment(attachment) {
   if (!attachment || typeof attachment.fileName !== "string" || typeof attachment.content !== "string") throw new Error("Dropped files must include a name and content.");
@@ -905,27 +910,29 @@ function applyProductionContentSecurityPolicy() {
 app.whenReady().then(() => {
   if (relaunchingForDisplayBackend || !hasSingleInstanceLock) return;
   startAgentHost();
-  const localVideos = new Map();
-  ipcMain.handle("video:create-local-url", (event, payload) => {
-    if (!payload || !["video/mp4", "video/webm"].includes(payload.mediaType) || typeof payload.content !== "string" || payload.content.length > 28_000_000 || payload.content.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(payload.content))
-      throw new Error("The local video payload is invalid or too large.");
+  const localMedia = new Map();
+  ipcMain.handle("media:create-local-url", (event, payload) => {
+    const mediaTypes = ["video/mp4", "video/webm", "audio/mp4", "audio/webm", "audio/mpeg", "audio/wav", "audio/ogg"];
+    if (!payload || !mediaTypes.includes(payload.mediaType) || typeof payload.content !== "string" || payload.content.length > 28_000_000 || payload.content.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(payload.content))
+      throw new Error("The local media payload is invalid or too large.");
     const bytes = Buffer.from(payload.content, "base64");
-    if (!bytes.length || bytes.length > 20 * 1024 * 1024 || !(payload.mediaType === "video/mp4" ? isMp4(bytes) : isWebm(bytes)))
-      throw new Error("The local video payload failed its size or signature check.");
-    const extension = payload.mediaType === "video/mp4" ? ".mp4" : ".webm";
-    const directory = path.join(app.getPath("userData"), "video-samples");
+    const validSignature = payload.mediaType === "video/mp4" ? isMp4(bytes) : payload.mediaType === "video/webm" ? isWebm(bytes) : isAudioSignature(bytes, payload.mediaType);
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024 || !validSignature)
+      throw new Error("The local media payload failed its size or signature check.");
+    const extension = { "video/mp4": ".mp4", "video/webm": ".webm", "audio/mp4": ".m4a", "audio/webm": ".webm", "audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/ogg": ".ogg" }[payload.mediaType];
+    const directory = path.join(app.getPath("userData"), "media-samples");
     fsSync.mkdirSync(directory, { recursive: true });
     const filePath = path.join(directory, `${randomUUID()}${extension}`);
     fsSync.writeFileSync(filePath, bytes, { mode: 0o600, flag: "wx" });
     const url = pathToFileURL(filePath).href;
-    localVideos.set(url, { filePath, webContentsId: event.sender.id });
+    localMedia.set(url, { filePath, webContentsId: event.sender.id });
     return url;
   });
-  ipcMain.handle("video:revoke-local-url", (event, url) => {
+  ipcMain.handle("media:revoke-local-url", (event, url) => {
     try {
-      const entry = localVideos.get(String(url));
+      const entry = localMedia.get(String(url));
       if (entry?.webContentsId === event.sender.id) {
-        localVideos.delete(String(url));
+        localMedia.delete(String(url));
         void fs.unlink(entry.filePath).catch(() => {});
       }
     } catch { /* Ignore malformed cleanup requests. */ }

@@ -119,6 +119,18 @@ async function main() {
   const voiceResult = await evaluate(mainTarget, "(async () => { const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition; if (!Recognition) return JSON.stringify({ api: false, processLocally: false, install: false, availability: 'unsupported' }); const recognition = new Recognition(); let availability = 'not-reported'; if (typeof Recognition.available === 'function') { try { availability = await Recognition.available({ langs: [navigator.language || 'en-US'], processLocally: true, quality: 'dictation' }); } catch (error) { availability = `error: ${error instanceof Error ? error.message : String(error)}`; } } return JSON.stringify({ api: true, processLocally: 'processLocally' in recognition, install: typeof Recognition.install === 'function', availability, language: navigator.language }); })()");
   console.log(`Packaged local voice capability: ${voiceResult}`);
   const localVoiceState = JSON.parse(voiceResult);
+  const audioInputStarted = await evaluate(mainTarget, "(() => { const input = document.querySelector('input[accept^=\\\".mp3\\\"]'); if (!input) return 'missing'; const sampleRate = 16000; const buffer = new ArrayBuffer(44 + sampleRate * 2); const bytes = new Uint8Array(buffer); const view = new DataView(buffer); const write = (offset, value) => { for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index); }; write(0, 'RIFF'); view.setUint32(4, buffer.byteLength - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, sampleRate * 2, true); const data = new DataTransfer(); data.items.add(new File([buffer], 'smoke-silence.wav', { type: 'audio/wav' })); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); return 'selected'; })()");
+  let localAudioResult = JSON.stringify({ input: audioInputStarted === "selected", transcribing: false, transcript: false, error: "" });
+  if (audioInputStarted === "selected") {
+    const audioDeadline = Date.now() + 5_000;
+    while (Date.now() < audioDeadline) {
+      localAudioResult = await evaluate(mainTarget, "(() => JSON.stringify({ input: Boolean(document.querySelector('input[accept^=\\\".mp3\\\"]')), transcribing: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Transcribing the selected audio')), transcript: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Local transcript added')), error: document.querySelector('.composer-voice-error')?.textContent ?? '' }))()");
+      const audioState = JSON.parse(localAudioResult);
+      if (!audioState.transcribing && (audioState.transcript || audioState.error)) break;
+      await sleep(100);
+    }
+  }
+  console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}`);
   let dictationResult;
   if (localVoiceState.api && localVoiceState.processLocally && localVoiceState.availability === "available") {
     dictationResult = JSON.stringify({ button: true, error: "", listening: false, skipped: true });
@@ -144,6 +156,7 @@ async function main() {
   const videoState = JSON.parse(videoResult);
   const mp4VideoState = JSON.parse(mp4VideoResult);
   const voiceState = JSON.parse(voiceResult);
+  const localAudioState = JSON.parse(localAudioResult);
   const dictationState = JSON.parse(dictationResult);
   const settingsState = JSON.parse(settingsResult);
   const marketplaceState = JSON.parse(marketplaceResult);
@@ -154,8 +167,10 @@ async function main() {
   const dictationFailClosed = dictationState.skipped || (!voiceState.api && error.includes("system speech input is not available")) || (voiceState.api && !voiceState.processLocally && error.includes("cannot guarantee on-device")) || (voiceState.processLocally && voiceState.availability !== "available" && error.includes("remote recognition is disabled"));
   const videoSamplingWorked = (!videoFixture.supported || (videoFixture.recorded && videoFixture.dropped && videoState.frames.length === 4 && videoState.frames.every((frame) => frame.kind.startsWith("Video frame"))))
     && mp4DropResult === "dropped" && mp4VideoState.frames.length === 4 && mp4VideoState.frames.every((frame) => frame.kind.startsWith("Video frame"));
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !dictationState.button || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.modelsTab || !marketplaceState.reviewButton || !marketplaceState.reviewDialog || !marketplaceState.confirmButton || installedState.route !== "#/marketplace" || !installedState.installedTab || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Percy") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, videoFixture, videoState, mp4DropResult, mp4VideoState, voiceState, dictationState, settingsState, marketplaceState, installedState, modelsState, petState })}`);
+  const localAudioHandled = audioInputStarted === "selected" && localAudioState.input && !localAudioState.transcribing
+    && (localAudioState.transcript || localAudioState.error.toLowerCase().includes("on-device speech pack") || localAudioState.error.toLowerCase().includes("no speech was recognized"));
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !dictationState.button || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.modelsTab || !marketplaceState.reviewButton || !marketplaceState.reviewDialog || !marketplaceState.confirmButton || installedState.route !== "#/marketplace" || !installedState.installedTab || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Percy") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized) {
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, videoFixture, videoState, mp4DropResult, mp4VideoState, voiceState, localAudioResult, localAudioState, dictationState, settingsState, marketplaceState, installedState, modelsState, petState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }
