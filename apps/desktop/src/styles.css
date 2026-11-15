@@ -152,7 +152,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .pet-rig-error .rig-body, .pet-rig-stuck .rig-body, .pet-rig-needs-attention .rig-body { animation: skai-rig-sad 1300ms ease-in-out infinite; }
 .pet-rig { width: 184px; height: 176px; filter: drop-shadow(0 10px 12px rgba(1, 7, 22, .38)); }
 .pet-rig.is-facing-left { transform: scaleX(-1); }
-.pet-rig .rig-segments line { fill: none; stroke: #eff7ff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.pet-rig .rig-segments line, .pet-rig .rig-segments path { fill: none; stroke: #eff7ff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .pet-rig .rig-segments line:nth-child(-n + 4) { stroke: #d8e6ff; stroke-width: 9; }
 .pet-rig .rig-joints circle { fill: #ff625d; stroke: #25213d; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .pet-rig .rig-joints .rig-head { fill: #79dbe7; stroke: #f7fcff; stroke-width: 4; }

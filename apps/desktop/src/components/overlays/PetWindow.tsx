@@ -103,7 +103,8 @@ const RIG_POSES: Record<PetPose, Partial<RigPose>> = {
   "needs-attention": {},
 };
 
-const RIG_SEGMENTS: Array<[string, string]> = [["head", "neck"], ["neck", "shoulderL"], ["neck", "shoulderR"], ["neck", "root"], ["shoulderL", "elbowL"], ["elbowL", "handL"], ["shoulderR", "elbowR"], ["elbowR", "handR"], ["root", "hipL"], ["hipL", "kneeL"], ["kneeL", "footL"], ["root", "hipR"], ["hipR", "kneeR"], ["kneeR", "footR"]];
+const RIG_SEGMENTS: Array<[string, string]> = [["head", "neck"], ["neck", "shoulderL"], ["neck", "shoulderR"], ["neck", "root"], ["root", "hipL"], ["root", "hipR"]];
+const RIG_CURVES: Array<[string, string, string]> = [["shoulderL", "elbowL", "handL"], ["shoulderR", "elbowR", "handR"], ["hipL", "kneeL", "footL"], ["hipR", "kneeR", "footR"]];
 
 function solveTwoBoneIK(hip: RigPoint, foot: RigPoint, preferredKnee: RigPoint): RigPoint {
   const upper = Math.hypot(RIG_BASE.kneeL.x - RIG_BASE.hipL.x, RIG_BASE.kneeL.y - RIG_BASE.hipL.y);
@@ -172,10 +173,11 @@ function StickRigPet({ pose, facing, dragHandlers }: { pose: PetPose; facing: nu
   const success = pose === "success";
   const failure = pose === "error" || pose === "stuck" || pose === "needs-attention";
   const line = ({ x: x1, y: y1 }: RigPoint, { x: x2, y: y2 }: RigPoint) => <line x1={x1} y1={y1} x2={x2} y2={y2} />;
+  const curve = (from: RigPoint, control: RigPoint, to: RigPoint) => <path d={`M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`} />;
   return <svg className={"pet-rig" + (facing === -1 ? " is-facing-left" : "")} viewBox="0 0 220 190" role="img" aria-label="Animated original Skai stick companion" {...dragHandlers}>
     <ellipse className="rig-shadow" cx="110" cy="177" rx="39" ry="4" />
-    <g className="rig-segments">{RIG_SEGMENTS.map(([from, to]) => <g key={`${from}-${to}`}>{line(points[from], points[to])}</g>)}</g>
-    <g className="rig-joints">{Object.entries(points).filter(([key]) => key !== "root" && !key.startsWith("shoulder") && !key.startsWith("hip")).map(([key, point]) => <circle key={key} cx={point.x} cy={point.y} r={key === "head" ? 21 : 3.4} className={key === "head" ? "rig-head" : "rig-joint"} />)}</g>
+    <g className="rig-segments">{RIG_SEGMENTS.map(([from, to]) => <g key={`${from}-${to}`}>{line(points[from], points[to])}</g>)}{RIG_CURVES.map(([from, control, to]) => <g key={`${from}-${to}`}>{curve(points[from], points[control], points[to])}</g>)}</g>
+    <g className="rig-joints">{Object.entries(points).filter(([key]) => key !== "root" && !key.startsWith("shoulder") && !key.startsWith("hip")).map(([key, point]) => <circle key={key} cx={point.x} cy={point.y} r={key === "head" ? 21 : 2.5} className={key === "head" ? "rig-head" : "rig-joint"} />)}</g>
     {working && <g className="rig-laptop"><rect x="84" y="119" width="52" height="30" rx="3" /><path d="M79 149h62l-6 5H85z" /><path className="rig-screen" d="M91 126h38v17H91z" /></g>}
     <g className="rig-face">{failure ? <><circle cx="103" cy="43" r="2.4" /><circle cx="117" cy="43" r="2.4" /><path d="M102 54q8-6 16 0" /></> : success ? <><path d="M101 43l4 3M115 46l4-3M102 53q8 8 16 0" /></> : <><circle cx="103" cy="43" r="2.4" /><circle cx="117" cy="43" r="2.4" /><path d={working ? "M103 53h14" : "M103 52q7 5 14 0"} /></>}</g>
     {success && <g className="rig-confetti"><path d="M58 40l-8-9M162 40l8-9M53 76l-12-2M167 76l12-2" /></g>}
