@@ -23,6 +23,10 @@ const env = {
 const hostOutput = path.join(root, "services", "agent-host", "bin", "Debug", "net10.0");
 const hostProgram = process.platform === "win32" ? path.join(hostOutput, "ServerRock.AgentHost.exe") : "dotnet";
 const hostArgs = process.platform === "win32" ? ["--stdio"] : [path.join(hostOutput, "ServerRock.AgentHost.dll"), "--stdio"];
+if (!require("node:fs").existsSync(path.join(hostOutput, "ServerRock.AgentHost.dll"))) {
+  console.error("The Agent Host has not been built. Run npm run agent-host:build first.");
+  process.exit(1);
+}
 const child = spawn(hostProgram, hostArgs, { cwd: root, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
 const reader = readline.createInterface({ input: child.stdout });
 const pending = new Map();
