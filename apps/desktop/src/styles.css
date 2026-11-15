@@ -553,3 +553,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 /* Image Studio saved-workflow row: selects shrink with their grid column instead of keeping their intrinsic width. */
 .workflow-source-row > *, .workflow-source-row label { min-width: 0; }
 .workflow-source-row select { width: 100%; min-width: 0; }
+
+/* Percy on X11 without a compositor: the window is opaque, so paint a deliberate card instead of black. */
+html[data-pet-surface="opaque"], html[data-pet-surface="opaque"] body, html[data-pet-surface="opaque"] #root { background: #10141d !important; }
+html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(circle at 50% 70%, rgba(99,217,233,.16), transparent 62%), #10141d; }

@@ -20,6 +20,8 @@ type PetPose = "idle" | "walk" | "success" | "error";
 // Native Wayland: the app cannot move its own windows, so the compositor drags
 // Percy (CSS app-region) and Percy stays put instead of walking in place.
 const COMPOSITOR_DRAG = new URLSearchParams(window.location.search).get("drag") === "compositor";
+// X11 without a compositor cannot show transparency; draw Percy on a solid card instead of a black box.
+const OPAQUE_SURFACE = new URLSearchParams(window.location.search).get("surface") === "opaque";
 
 export function PetWindow() {
   const [pose, setPose] = useState<PetPose>("walk");
@@ -41,6 +43,7 @@ export function PetWindow() {
     document.title = "Percy · Skai companion";
     document.documentElement.dataset.petWindow = "true";
     document.body.dataset.petWindow = "true";
+    if (OPAQUE_SURFACE) document.documentElement.dataset.petSurface = "opaque";
     const syncSettings = () => { setCharacter(localStorage.getItem("skai.pet.character") ?? "percy"); setCustomSprite(localStorage.getItem("skai.pet.sprite") ?? ""); };
     window.addEventListener("storage", syncSettings);
     const pet = window.serverRockAgent?.pet;

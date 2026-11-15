@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { resolveDisplayBackend, canPositionWindows, isTrayLikelyVisible } = require("../apps/desktop/electron/linux-windowing.cjs");
+const { resolveDisplayBackend, canPositionWindows, isTrayLikelyVisible, x11HasCompositor } = require("../apps/desktop/electron/linux-windowing.cjs");
 
 const hyprland = { WAYLAND_DISPLAY: "wayland-1", XDG_SESSION_TYPE: "wayland", DISPLAY: ":1" };
 const waylandOnly = { WAYLAND_DISPLAY: "wayland-1", XDG_SESSION_TYPE: "wayland" };
@@ -42,4 +42,10 @@ assert.equal(isTrayLikelyVisible({ platform: "linux", env: hyprland, statusNotif
 assert.equal(isTrayLikelyVisible({ platform: "linux", env: hyprland, statusNotifierHost: null }), false);
 assert.equal(isTrayLikelyVisible({ platform: "linux", env: i3, statusNotifierHost: false }), true);
 
-console.log("Linux windowing checks passed.");
+// X11 compositor probe: unparsable or unreachable displays are "unknown" (null), never a false "no compositor".
+(async () => {
+  assert.equal(await x11HasCompositor({ env: { DISPLAY: "" } }), null);
+  assert.equal(await x11HasCompositor({ env: { DISPLAY: "wayland-1" } }), null);
+  assert.equal(await x11HasCompositor({ env: { DISPLAY: ":4242", HOME: "/nonexistent" }, timeoutMs: 500 }), null);
+  console.log("Linux windowing checks passed.");
+})().catch((error) => { console.error(error); process.exit(1); });

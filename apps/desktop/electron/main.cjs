@@ -5,7 +5,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const readline = require("node:readline");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
-const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible } = require("./linux-windowing.cjs");
+const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -344,6 +344,16 @@ function petCompletionText(method, response) {
   return text ? { text, kind: "success" } : null;
 }
 
+// X11 sessions without a compositor (plain i3/bspwm/Openbox) cannot show transparent
+// windows; Percy would be a black box there, so it gets an opaque card instead.
+let petOpaque = false;
+async function resolvePetSurface() {
+  if (process.platform !== "linux" || displayBackend.backend !== "x11" || isWaylandSession(process.env)) return;
+  const composited = await x11HasCompositor();
+  petOpaque = composited === false;
+  if (petOpaque) console.log("[windowing] no X11 compositor detected; Percy uses an opaque window.");
+}
+
 function createPetWindow() {
   if (petWindow && !petWindow.isDestroyed()) return petWindow;
   const savedState = readPetState();
@@ -356,7 +366,7 @@ function createPetWindow() {
     // tiling it into the layout.
     ...(process.platform === "linux" ? { type: "toolbar" } : {}),
     title: "Percy · Skai companion",
-    transparent: true,
+    transparent: !petOpaque,
     frame: false,
     resizable: false,
     movable: true,
@@ -366,7 +376,7 @@ function createPetWindow() {
     skipTaskbar: true,
     alwaysOnTop: true,
     hasShadow: false,
-    backgroundColor: "#00000000",
+    backgroundColor: petOpaque ? "#10141d" : "#00000000",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -394,7 +404,7 @@ function createPetWindow() {
   }
   // On native Wayland, dragging is handed to the compositor (app-region drag →
   // xdg_toplevel.move) because the app can neither read nor set its position.
-  const petQuery = windowPositioningAvailable ? { pet: "1" } : { pet: "1", drag: "compositor" };
+  const petQuery = { pet: "1", ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
   const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
   if (devUrl) {
     const url = new URL(devUrl);
@@ -858,7 +868,7 @@ app.whenReady().then(() => {
     schedulePetWander();
   });
   createWindow();
-  createPetWindow();
+  void resolvePetSurface().finally(createPetWindow);
   createTray();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
