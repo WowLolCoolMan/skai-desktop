@@ -15,7 +15,15 @@ new history, not the existing `.git` pack (127 MiB at the start).
 - [x] 7. Compress the remaining PNGs losslessly with oxipng, keeping filenames and dimensions. — 17,555,947 bytes (418 PNGs, 67,652,804 → 50,096,857 bytes, using `oxipng 10.2.1 -o 4 --strip safe`; all 418 decode to identical pixels at the same dimensions through Electron `nativeImage`)
 - [x] 8. Make sure `.gitignore` covers `bin/`, `obj/`, `.tmp/`, `dist/`, `release/` and `node_modules/`, and add a check that flags new files over 1 MB. — 0 bytes (`.gitignore` now ignores `bin/`, `obj/` and `.tmp/` everywhere; `npm run check:hygiene`, which runs in both CI workflows, now fails on tracked files over 1 MiB that aren't on its allowlist, and also rejects tracked `release/`, `node_modules/` and `.tmp/` paths)
 
-**Total saved:** 66,961,849 bytes
+**Total saved:** 85,769,311 bytes (steps 66,961,849 + follow-ups 18,807,462)
+
+## Follow-ups (owner-approved after step 8)
+
+- [x] F1. Remove the unreferenced root `assets/pets/<pet>-<state>-<1..6>.png` frames (288) and root `<pet>-walk-frames.png`
+  strips (6). — 18,807,462 bytes (measured after step 7 compression)
+- [ ] F2. Make the validator and rebuild script use the `-v2` walk strips, then remove the replaced ones.
+- [ ] F3. Shrink the 4 branding PNGs below 1 MiB (lossy, approved by the owner).
+- [ ] F4. Remove the `../skai-debloat` worktree.
 
 ## Verification gate
 
@@ -78,8 +86,8 @@ for the 6 pets × 7 non-walk states. There are no other duplicates under `assets
 
 ## Needs review
 
-- **Unlisted cleanup (≈30 MB):** the 288 individual frame PNGs, the 42 single-state PNGs and the 6 root walk strips
-  above are unreferenced, but no step covers them. They're kept until the owner decides.
+- **Single-state PNGs (`assets/pets/<pet>-<state>.png`, 42 files):** inputs to the archived
+  `legacy-tools/make-pet-frames.ps1`, so they're kept alongside it. (The step 1 audit wrongly listed them as unreferenced.)
 - **Walk sources (5,347,226 bytes, 6 files):** `normalize-pet-animations.ps1` reads `generated/$pet-walk-source.png`, and the
   pets README calls them the editable inputs. They're only removable if that rebuild path is retired.
 - **Walk strips replaced by `-v2` (1,475,957 bytes):** `generated/{byte,nova,rocky}-walk-frames.png` aren't loaded at runtime,
