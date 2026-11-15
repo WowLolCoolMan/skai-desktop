@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3] - 2026-11-14
+
+### Fixed
+
+- Accepted Percy’s intentional opaque-card fallback in packaged Linux smoke coverage when X11 has no compositor.
+- Aligned the Electron package metadata with the root release version so artifact manifests identify the published version correctly.
+
 ## [0.1.2] - 2026-11-14
 
 ### Added
@@ -22,3 +29,4 @@
 - Improved Percy presentation on X11 systems without a compositor.
 
 [0.1.2]: https://github.com/WowLolCoolMan/skai-desktop/compare/v0.1.1...v0.1.2
+[0.1.3]: https://github.com/WowLolCoolMan/skai-desktop/compare/v0.1.2...v0.1.3
