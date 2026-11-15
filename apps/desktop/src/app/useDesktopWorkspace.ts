@@ -8,6 +8,7 @@ import { createAgentClient } from "../services/agentClient";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR, localEndpointOrFallback, localProviderOrFallback } from "../services/localOnly";
 import { useChatWorkspace } from "../features/chat/useChatWorkspace";
 import { useCodingWorkspace } from "../features/coding/useCodingWorkspace";
+import { loadImageHistory, saveImageHistory, type ImageHistoryEntry } from "../features/catalog/imageHistory";
 
 export type DesktopWorkspace = {
   routeState: AppRouteState;
@@ -117,8 +118,16 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [imagePrompt, setImagePrompt] = useState("");
   const [imageWorkflow, setImageWorkflow] = useState(localStorage.getItem("skai.imageWorkflow") ?? "");
   const [imageBusy, setImageBusy] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState<Array<{ url: string; fileName: string }>>([]);
+  const [generatedImages, setGeneratedImages] = useState<ImageHistoryEntry[]>([]);
   const dismissError = useCallback(() => setError(null), []);
+
+  useEffect(() => {
+    let active = true;
+    void loadImageHistory().then((images) => {
+      if (active) setGeneratedImages(images);
+    });
+    return () => { active = false; };
+  }, []);
 
   const chat = useChatWorkspace({ request, connection, provider, endpoint, model, onError: setError });
 
@@ -210,7 +219,11 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       const response = await request("image.generate", { provider: imageProvider, ...(imageProvider === "comfyui" ? { endpoint: imageEndpoint, workflow: imageWorkflow, ...(source ? { sourceImage: source.content, sourceImageMediaType: source.mediaType } : {}) } : {}), prompt: imagePrompt });
       if (!response.ok) { setError(response.error?.message ?? "Image generation failed."); return; }
       const result = response.result as { images?: Array<{ url: string; fileName: string }> };
-      setGeneratedImages((current) => [...(result.images ?? []), ...current].slice(0, 24));
+      const createdAt = new Date().toISOString();
+      const imageSource = imageProvider === "comfyui" ? "comfyui" : "diffusers";
+      const images: ImageHistoryEntry[] = (result.images ?? []).map((image) => ({ ...image, createdAt, provider: imageSource, prompt: imagePrompt.trim() }));
+      setGeneratedImages((current) => [...images, ...current].slice(0, 24));
+      void saveImageHistory(images);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Image generation failed.");
     } finally {
