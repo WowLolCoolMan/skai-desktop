@@ -531,7 +531,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .global-rail-plugin-main { width: 40px !important; height: 40px !important; }
 .global-rail-plugin.is-active .global-rail-plugin-main { color: var(--skai-color-accent); background: color-mix(in srgb, var(--skai-color-accent) 12%, transparent); }
 .global-rail-plugin-menu { position: absolute; z-index: 21; top: 10px; right: -3px; }
-.global-rail-plugin-menu .overflow-menu-trigger-icon { display: grid; place-items: center; width: 16px; height: 20px; padding: 0; border: 0; border-radius: 4px; color: var(--skai-color-text-muted); background: var(--skai-color-surface); opacity: 0; }
+.global-rail-plugin-menu .overflow-menu-trigger-icon { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; color: var(--skai-color-text-muted); background: var(--skai-color-surface); opacity: 1; }
 .global-rail-plugin:hover .global-rail-plugin-menu .overflow-menu-trigger-icon, .global-rail-plugin:focus-within .global-rail-plugin-menu .overflow-menu-trigger-icon, .global-rail-plugin-menu .overflow-menu-trigger-icon[aria-expanded="true"] { opacity: 1; }
 .global-rail-plugin-menu .overflow-menu-trigger-icon .nav-icon { width: 13px; height: 13px; }
 .global-rail-plugin-menu .overflow-menu-panel { top: -10px; right: auto; left: calc(100% + 8px); min-width: 180px; }

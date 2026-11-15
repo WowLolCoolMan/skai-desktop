@@ -16,12 +16,11 @@ const pluginRoutes: Array<{ route: Route; label: string; icon: NavIconName }> = 
 ];
 
 export function GlobalRail({ route, onNavigate, onOpenLauncher }: { route: Route; onNavigate: (route: Route) => void; onOpenLauncher: () => void }) {
-  const pluginActive = route === "plugins" || pluginRoutes.some((item) => item.route === route);
+  const pluginActive = pluginRoutes.some((item) => item.route === route);
   return <aside className="global-rail" aria-label="Global navigation">
     <nav className="global-rail-destinations" aria-label="Primary navigation">
       {destinations.map((item) => <button key={item.route} className={route === item.route ? "is-active" : ""} type="button" aria-current={route === item.route ? "page" : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.route)}><NavIcon name={item.icon} /></button>)}
       <div className={`global-rail-plugin ${pluginActive ? "is-active" : ""}`}>
-        <button className={`global-rail-plugin-main ${route === "plugins" ? "is-active" : ""}`} type="button" aria-current={route === "plugins" ? "page" : undefined} aria-label="Plugins" title="Plugins" onClick={() => onNavigate("plugins")}><NavIcon name="sparkle" /></button>
         <OverflowMenu
           label="Extras"
           className="global-rail-plugin-menu"

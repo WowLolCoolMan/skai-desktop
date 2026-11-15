@@ -3,7 +3,6 @@ import type { CorpusDocument, MemoryEntry, Message, Model, Route, ThemeMode } fr
 import { ChatPage } from "../features/chat/ChatPage";
 import { CodingPage } from "../features/coding/CodingPage";
 import { ImagesPage } from "../features/catalog/ImagesPage";
-import { MarketplacePage } from "../features/catalog/MarketplacePage";
 import { ModelsPage } from "../features/catalog/ModelsPage";
 import { MemoryPage } from "../features/memory/MemoryPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
@@ -152,8 +151,10 @@ export function AppRouteView({ state, actions }: { state: AppRouteState; actions
   if (route === "settings") return <SettingsPage provider={state.provider} endpoint={state.endpoint} model={state.model} models={state.models} ollamaContextWindowTokens={state.ollamaContextWindowTokens ?? 0} themeMode={state.themeMode} accentColor={state.accentColor} density={state.density} backdrop={state.backdrop} reduceMotion={state.reduceMotion} petVisible={state.petVisible} petWander={state.petWander} petCharacter={state.petCharacter} petSpriteDataUrl={state.petSpriteDataUrl} developerMode={state.developerMode} memoryInjectionEnabled={state.memoryInjectionEnabled} imageEndpoint={state.imageEndpoint} imageWorkflow={state.imageWorkflow} onChange={actions.onSettingsChange} onSave={actions.onSaveSettings} onDiscoverModels={actions.onDiscoverModels} onImageChange={actions.onImageChange} onExportMemory={actions.onExportMemory} />;
   if (route === "models") return <ModelsPage models={state.models} onDiscover={actions.onDiscoverModels} onPull={actions.onPullModel} onCancelPull={actions.onCancelModelPull ?? (async () => false)} onSelect={actions.onSelectModel} />;
   if (route === "images") return <ImagesPage provider={state.imageProvider} endpoint={state.imageEndpoint} prompt={state.imagePrompt} workflow={state.imageWorkflow} busy={state.imageBusy} images={state.generatedImages} onChange={actions.onImageChange} onGenerate={actions.onGenerateImage} onImportWorkflow={actions.onImportWorkflow ?? (async () => null)} onPickSourceImage={actions.onPickImageSource ?? (async () => null)} />;
-  if (route === "marketplace") return <MarketplacePage onSelectAirLlmModel={actions.onSelectModel} onNavigate={actions.onNavigate} />;
-  if (route === "plugins") return <PluginsPage />;
+  // Marketplace is the unified capabilities catalog. Keep the legacy plugins
+  // route as an alias so existing deep links continue to work, but render the
+  // Plugins-style catalog as the single entry point.
+  if (route === "marketplace" || route === "plugins") return <PluginsPage onNavigate={(nextRoute) => actions.onNavigate(nextRoute)} />;
   if (route === "workbench") return <WorkbenchPage tasks={state.tasks} scheduled={state.scheduledTasks} busyTask={state.taskBusy} loading={state.tasksLoading} error={state.tasksError} onRetry={actions.onRetryWorkbench} onNavigate={(route) => actions.onNavigate(route)} onTransition={actions.onTransitionTask} onExecuteTask={actions.onExecuteTask} onSchedule={actions.onScheduleTask} onScheduledTransition={actions.onTransitionScheduledTask} />;
   if (route === "memory") return <MemoryPage entries={state.memoryEntries} busy={state.memoryBusy} loading={state.memoryLoading} error={state.memoryError} onRetry={actions.onRetryMemory} onSearch={actions.onSearchMemory} onSave={actions.onSaveMemory} onToggle={actions.onToggleMemory} onRemove={actions.onRemoveMemory} onExport={actions.onExportMemory} corpusDocuments={state.corpusDocuments} corpusLoading={state.corpusLoading} corpusError={state.corpusError} onSearchCorpus={actions.onSearchCorpus ?? (() => undefined)} onSaveCorpus={actions.onSaveCorpus ?? (async () => false)} onRemoveCorpus={actions.onRemoveCorpus ?? (async () => false)} onImportCorpus={actions.onImportCorpus ?? (() => undefined)} />;
   if (route === "usage") return <UsagePage />;
