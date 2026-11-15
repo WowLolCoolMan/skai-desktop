@@ -106,7 +106,10 @@ const PROBE = String.raw`(() => {
   return issues;
 })()`;
 
-const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory", "usage"];
+// Every route the app declares, so new pages are covered without editing this list.
+const routeType = fs.readFileSync(path.join(__dirname, "..", "apps", "desktop", "src", "app", "types.ts"), "utf8").match(/export type Route = ([^;]+);/);
+const routes = routeType ? [...routeType[1].matchAll(/"([a-z-]+)"/g)].map((match) => match[1]) : [];
+if (routes.length < 5) throw new Error("Could not read the Route union from apps/desktop/src/app/types.ts.");
 const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [945, 1033], [945, 515], [800, 600], [640, 900], [480, 700], [400, 500]];
 const variants = process.env.UI_MATRIX_QUICK === "1" ? [["dark", "false"]] : [["dark", "false"], ["light", "false"], ["dark", "true"], ["light", "true"]];
 
