@@ -106,8 +106,14 @@ async function run() {
   if (!terminal.ok || typeof terminal.result?.sessionId !== "string") throw new Error("project.terminal.start did not create a persistent PTY session.");
   const terminalWrite = await request("project.terminal.write", { sessionId: terminal.result.sessionId, text: "echo terminal-smoke\r\n" });
   if (!terminalWrite.ok) throw new Error(`project.terminal.write did not accept input: ${JSON.stringify(terminalWrite)}`);
-  await new Promise(resolve => setTimeout(resolve, 1_500));
-  const terminalRead = await request("project.terminal.read", { sessionId: terminal.result.sessionId });
+  // Shell start-up under a PTY can take several seconds on CI runners (PowerShell/ConPTY on Windows),
+  // so poll for the echoed output instead of reading once after a fixed delay.
+  let terminalRead;
+  for (let waited = 0; waited <= 20_000; waited += 500) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    terminalRead = await request("project.terminal.read", { sessionId: terminal.result.sessionId });
+    if (!terminalRead.ok || String(terminalRead.result?.screen ?? "").toLowerCase().includes("terminal-smoke")) break;
+  }
   if (!terminalRead.ok || !String(terminalRead.result?.screen ?? "").toLowerCase().includes("terminal-smoke")) throw new Error(`project.terminal.read did not render the PTY response: ${JSON.stringify(terminalRead)}`);
   const terminalClosed = await request("project.terminal.close", { sessionId: terminal.result.sessionId });
   if (!terminalClosed.ok || terminalClosed.result?.closed !== true) throw new Error("project.terminal.close did not close the persistent session.");
