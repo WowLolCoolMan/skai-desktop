@@ -31,7 +31,7 @@ automatically.
 - Keep the [README](../README.md), [changelog](../CHANGELOG.md), and
   [documentation index](INDEX.md) aligned when project-facing docs change.
 - State current behavior separately from proposals. In particular,
-  [local image generation](LOCAL_IMAGE_GENERATION.md) distinguishes the current
-  ComfyUI integration from the unimplemented bundled-runtime proposal.
+  [local image generation](LOCAL_IMAGE_GENERATION.md) distinguishes the managed
+  Diffusers runtime and ComfyUI integration from their remaining live acceptance.
 - Optimize and place public images in `site-assets/`; Pages publishes this
   directory as-is and does not copy files from elsewhere in the repository.

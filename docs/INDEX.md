@@ -26,8 +26,8 @@ site](https://wowlolcoolman.github.io/skai-desktop/).
   sources.
 - [GitHub integration](GITHUB_INTEGRATION.md) — device flow and guarded project
   operations.
-- [Local image generation](LOCAL_IMAGE_GENERATION.md) — current ComfyUI support
-  and future runtime research.
+- [Local image generation](LOCAL_IMAGE_GENERATION.md) — managed Diffusers runtime,
+  ComfyUI workflows, and remaining acceptance work.
 - [Electron default runtime](ELECTRON_DEFAULT_RUNTIME.md) — supported desktop
   runtime and migration evidence.
 - [UI reference progress](SKAI_PREMIUM_UI_PROGRESS.md) — visual work and

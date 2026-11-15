@@ -21,6 +21,8 @@
   a curated documentation index.
 - Added checkpoint discovery and built-in ComfyUI text-to-image and image-edit
   workflow templates to the Images workspace.
+- Added an optional managed Diffusers environment and local Stable Diffusion
+  Turbo worker, with runtime setup from the Images page and bounded JPEG results.
 
 ### Updated
 
@@ -28,6 +30,8 @@
   model boundary, Monaco project editor, and current image workflow support.
 - Synced the capability matrix, project site, voice architecture notes, and
   release docs with hands-free chat behavior and the Pages setup blocker.
+- Updated image-generation docs to describe the implemented Diffusers runtime
+  and clearly identify the real-model and packaged-runtime acceptance gaps.
 
 ### Fixed
 
