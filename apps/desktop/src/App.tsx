@@ -7,6 +7,7 @@ import { CommandPalette } from "./components/overlays/CommandPalette";
 import { CloseChoiceDialog } from "./components/overlays/CloseChoiceDialog";
 import { GlobalRail } from "./components/layout/GlobalRail";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { UpdateNotice } from "./components/overlays/UpdateNotice";
 
 export default function App() {
   const workspace = useDesktopWorkspace();
@@ -21,5 +22,6 @@ export default function App() {
     </main>
     <CommandPalette open={workspace.commandOpen} onClose={workspace.closeCommandPalette} onNavigate={workspace.onNavigate} />
     <CloseChoiceDialog />
+    <UpdateNotice />
   </div></ErrorBoundary>;
 }

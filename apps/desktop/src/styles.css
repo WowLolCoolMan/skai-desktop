@@ -568,3 +568,15 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .app-crash-state p { margin: 0; color: var(--skai-color-text-muted); line-height: 1.5; }
 .app-crash-state small { color: var(--skai-color-text-muted); overflow-wrap: anywhere; }
 .app-crash-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.update-overlay { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(5, 7, 15, .64); backdrop-filter: blur(4px); }
+.update-card { position: relative; width: min(430px, 100%); padding: 28px 24px 22px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; color: var(--skai-color-text); background: color-mix(in srgb, var(--skai-color-surface) 94%, #fff 6%); box-shadow: 0 24px 80px rgba(0,0,0,.42); }
+.update-card h2 { margin: 0 0 8px; font-size: 21px; letter-spacing: -.03em; }
+.update-card p { margin: 0; color: var(--skai-color-text-muted); font-size: 12px; line-height: 1.5; }
+.update-close { position: absolute; top: 10px; right: 12px; width: 28px; height: 28px; border: 0; border-radius: 50%; color: var(--skai-color-text-muted); background: transparent; font-size: 20px; cursor: pointer; }
+.update-close:hover, .update-close:focus-visible { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
+.update-progress { height: 8px; margin-top: 24px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
+.update-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #5a63d8, #7a7ff2); }
+.update-progress-copy { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 10px; }
+.update-progress-copy span { color: var(--skai-color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.update-safety-note { margin-top: 18px !important; font-size: 11px !important; }
+.update-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
