@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Primitives";
 import { ComposerCommandMenu } from "../../components/ui/ComposerCommandMenu";
 import { AttachmentList } from "./AttachmentList";
 import { composerCommands, type ComposerCommand } from "./composerCommands";
+import { waitForLocalSpeechToFinish } from "../../services/nativeTts";
 
 type ChatComposerProps = {
   draft: string;
@@ -21,9 +22,10 @@ type ChatComposerProps = {
   onNavigate: (route: Route) => void;
   onOpenTaskPlanner: () => void;
   onToggleDocumentsOnly: () => void;
+  onVoiceTranscript: (transcript: string) => boolean;
 };
 
-type SpeechRecognitionResultEvent = Event & { results: { [index: number]: { [index: number]: { transcript: string }; isFinal: boolean }; length: number } };
+type SpeechRecognitionResultEvent = Event & { resultIndex: number; results: { [index: number]: { [index: number]: { transcript: string }; isFinal: boolean }; length: number } };
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
@@ -41,14 +43,24 @@ type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
 };
 type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
 
-export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onOpenTaskPlanner, onToggleDocumentsOnly }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onOpenTaskPlanner, onToggleDocumentsOnly, onVoiceTranscript }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [handsFreeActive, setHandsFreeActive] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voicePackNeeded, setVoicePackNeeded] = useState(false);
   const [voicePackInstalling, setVoicePackInstalling] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const handsFreeRef = useRef(false);
+  const awaitingResponseRef = useRef(false);
+  const sawBusyRef = useRef(false);
+  const busyRef = useRef(busy);
+  const draftRef = useRef(draft);
+  const restartTimerRef = useRef<number | null>(null);
+  const resumingRef = useRef(false);
+  busyRef.current = busy;
+  draftRef.current = draft;
   const commandQuery = draft.match(/^\/([^\s]*)$/)?.[1] ?? null;
   const commandMatches = useMemo(() => commandQuery === null ? [] : composerCommands.filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery]);
   const activeCommandId = commandMatches[commandIndex] ? `composer-command-${commandMatches[commandIndex].id}` : undefined;
@@ -58,22 +70,31 @@ export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMe
     if (commandQuery === null || commandMatches.length === 0) return;
     window.requestAnimationFrame(() => document.getElementById(activeCommandId ?? "")?.scrollIntoView({ block: "nearest" }));
   }, [activeCommandId, commandMatches.length, commandQuery]);
-  useEffect(() => () => { recognitionRef.current?.stop(); recognitionRef.current = null; }, []);
+  useEffect(() => () => {
+    handsFreeRef.current = false;
+    if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+  }, []);
 
-  const toggleVoiceInput = async () => {
-    if (voiceListening) { recognitionRef.current?.stop(); return; }
+  const startVoiceRecognition = async (handsFree: boolean) => {
     const speechWindow = window as SpeechWindow;
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-    if (!Recognition) { setVoiceError("System speech input is not available in this desktop runtime."); return; }
+    if (!Recognition) {
+      setVoiceError("System speech input is not available in this desktop runtime.");
+      if (handsFree) { handsFreeRef.current = false; setHandsFreeActive(false); }
+      return;
+    }
     setVoiceError(null);
     setVoicePackNeeded(false);
     const recognition = new Recognition();
     if (!("processLocally" in recognition)) {
       setVoiceError("This desktop runtime cannot guarantee on-device speech recognition, so voice input is unavailable to keep dictation private.");
+      if (handsFree) { handsFreeRef.current = false; setHandsFreeActive(false); }
       return;
     }
     recognition.processLocally = true;
-    recognition.continuous = false;
+    recognition.continuous = handsFree;
     recognition.interimResults = false;
     recognition.lang = navigator.language || "en-US";
     if (Recognition.available) {
@@ -83,28 +104,118 @@ export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMe
           const canInstall = availability === "downloadable" || availability === "downloading";
           setVoicePackNeeded(canInstall);
           setVoiceError(canInstall ? "An on-device speech pack is required for this language." : "This desktop runtime has no on-device speech pack for this language. Remote recognition is disabled to keep dictation private.");
+          if (handsFree) { handsFreeRef.current = false; setHandsFreeActive(false); }
           return;
         }
       } catch {
         setVoiceError("On-device speech availability could not be checked. Remote recognition is disabled to keep dictation private.");
+        if (handsFree) { handsFreeRef.current = false; setHandsFreeActive(false); }
         return;
       }
     }
+    if (handsFree && (!handsFreeRef.current || busyRef.current)) return;
+    if (!handsFree && handsFreeRef.current) return;
     recognition.onresult = (event) => {
-      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index]?.[0]?.transcript ?? "").join(" ").trim();
-      if (transcript) onDraftChange(`${draft.trim()}${draft.trim() ? " " : ""}${transcript}`);
+      const finalSegments: string[] = [];
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        const result = event.results[index];
+        const transcript = result?.[0]?.transcript?.trim();
+        if (result?.isFinal && transcript) finalSegments.push(transcript);
+      }
+      const transcript = finalSegments.join(" ").trim();
+      if (!transcript) return;
+      if (handsFree) {
+        if (!handsFreeRef.current || busyRef.current || awaitingResponseRef.current) return;
+        awaitingResponseRef.current = true;
+        sawBusyRef.current = false;
+        recognition.stop();
+        if (!onVoiceTranscript(transcript)) {
+          awaitingResponseRef.current = false;
+          setVoiceError("Add a document before speaking a Documents-only request.");
+        } else {
+          restartTimerRef.current = window.setTimeout(() => {
+            if (awaitingResponseRef.current && !sawBusyRef.current && !busyRef.current && handsFreeRef.current) {
+              awaitingResponseRef.current = false;
+              void startVoiceRecognition(true);
+            }
+          }, 1200);
+        }
+      } else {
+        const currentDraft = draftRef.current.trim();
+        const nextDraft = `${currentDraft}${currentDraft ? " " : ""}${transcript}`;
+        draftRef.current = nextDraft;
+        onDraftChange(nextDraft);
+      }
     };
     recognition.onerror = (event) => {
+      if (handsFree && event.error === "no-speech") return;
       setVoicePackNeeded(event.error === "language-not-supported");
       setVoiceError(event.error === "not-allowed" ? "Microphone access was denied. Allow it in the desktop app permissions and try again." : event.error === "language-not-supported" ? "The local speech pack for this language is not installed. Install an on-device speech pack in this desktop runtime, then try again." : "On-device speech input could not be completed.");
       setVoiceListening(false);
       recognitionRef.current = null;
+      if (handsFree) { handsFreeRef.current = false; setHandsFreeActive(false); awaitingResponseRef.current = false; }
     };
-    recognition.onend = () => { setVoiceListening(false); recognitionRef.current = null; };
+    recognition.onend = () => {
+      setVoiceListening(false);
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+      if (handsFreeRef.current && !awaitingResponseRef.current && !busyRef.current) {
+        if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = window.setTimeout(() => void startVoiceRecognition(true), 350);
+      }
+    };
     recognitionRef.current = recognition;
     setVoiceListening(true);
-    try { recognition.start(); } catch { setVoiceListening(false); recognitionRef.current = null; setVoiceError("System speech input could not start."); }
+    try { recognition.start(); } catch {
+      setVoiceListening(false);
+      recognitionRef.current = null;
+      setVoiceError("System speech input could not start.");
+      if (handsFree) { handsFreeRef.current = false; setHandsFreeActive(false); }
+    }
   };
+
+  const toggleVoiceInput = () => {
+    if (voiceListening) { recognitionRef.current?.stop(); return; }
+    void startVoiceRecognition(false);
+  };
+
+  const toggleHandsFree = () => {
+    if (handsFreeRef.current) {
+      handsFreeRef.current = false;
+      awaitingResponseRef.current = false;
+      sawBusyRef.current = false;
+      setHandsFreeActive(false);
+      if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+      recognitionRef.current?.stop();
+      return;
+    }
+    if (busyRef.current || voiceListening) return;
+    handsFreeRef.current = true;
+    awaitingResponseRef.current = false;
+    setHandsFreeActive(true);
+    void startVoiceRecognition(true);
+  };
+
+  useEffect(() => {
+    if (busy && handsFreeRef.current && !awaitingResponseRef.current) {
+      awaitingResponseRef.current = true;
+      sawBusyRef.current = true;
+      recognitionRef.current?.stop();
+    } else if (busy) {
+      sawBusyRef.current = true;
+    }
+    if (busy || !handsFreeRef.current || !awaitingResponseRef.current || resumingRef.current) return;
+    let cancelled = false;
+    resumingRef.current = true;
+    void waitForLocalSpeechToFinish().finally(() => {
+      resumingRef.current = false;
+      if (cancelled || !handsFreeRef.current) return;
+      awaitingResponseRef.current = false;
+      sawBusyRef.current = false;
+      if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+      void startVoiceRecognition(true);
+    });
+    return () => { cancelled = true; };
+  }, [busy]);
 
   const installLocalSpeechPack = async () => {
     const speechWindow = window as SpeechWindow;
@@ -175,7 +286,8 @@ export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMe
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
     <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={busy ? "Type a follow-up while the model responds…" : "Message your model…"} aria-label="Message your model" aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
+    {handsFreeActive && <p className="composer-hint" role="status">{voiceListening ? "Hands-free is listening on this device. Pause after speaking to send." : busy ? "Waiting for the reply and local speech to finish…" : "Hands-free is reconnecting to on-device speech…"}</p>}
     {voiceError && <div className="composer-voice-status"><p className="composer-voice-error" role="status">{voiceError}</p>{voicePackNeeded && <div className="composer-voice-install"><Button variant="secondary" type="button" disabled={voicePackInstalling} onClick={() => void installLocalSpeechPack()}>{voicePackInstalling ? "Installing local pack…" : "Install local speech pack"}</Button><span>The pack downloads once; dictation is processed on this device.</span></div>}</div>}
-    <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy} aria-pressed={documentsOnly} title="Use only documents attached to this message as evidence">{documentsOnly ? "Docs only: on" : "Docs only"}</Button><Button variant="ghost" type="button" onClick={onAttach} disabled={attachments.length >= 5} aria-describedby="attachment-help">Attach</Button><Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"}>{voiceListening ? "Stop mic" : "Voice"}</Button><div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span><Button variant={busy ? "secondary" : "primary"} disabled={(!draft.trim() && attachments.length === 0) || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{busy ? "Queue ↗" : "Send ↗"}</Button></div></div>
+    <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy} aria-pressed={documentsOnly} title="Use only documents attached to this message as evidence">{documentsOnly ? "Docs only: on" : "Docs only"}</Button><Button variant="ghost" type="button" onClick={onAttach} disabled={attachments.length >= 5} aria-describedby="attachment-help">Attach</Button><Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={handsFreeActive} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"}>{voiceListening && !handsFreeActive ? "Stop mic" : "Voice"}</Button><Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={voiceListening && !handsFreeActive} aria-pressed={handsFreeActive} title="Keep on-device dictation active between your turns">{handsFreeActive ? "Hands-free: on" : "Hands-free"}</Button><div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span><Button variant={busy ? "secondary" : "primary"} disabled={(!draft.trim() && attachments.length === 0) || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{busy ? "Queue ↗" : "Send ↗"}</Button></div></div>
   </section>;
 }

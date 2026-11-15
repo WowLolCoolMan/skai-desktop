@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added hands-free local voice turns that submit final on-device dictation and
+  wait for local reply speech to finish before listening again.
 - Added per-turn documents-only chat grounding for currently attached files, with
   project, memory, and skill context excluded from those requests.
 - Added a responsive GitHub Pages project site, automated Pages deployment, and

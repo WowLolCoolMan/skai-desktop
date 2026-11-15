@@ -77,11 +77,11 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     setMessages(next); setAttachments([]); setBusy(true); onError(null);
     const savedId = await saveConversation(next);
     const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
-    setBusy(false);
-    if (!response.ok) { onError(response.error?.message ?? "The model request failed."); return; }
+    if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); await saveConversation(completed, savedId);
-    void speakNativeResponse(completed.at(-1)?.content ?? "");
+    await speakNativeResponse(completed.at(-1)?.content ?? "");
+    setBusy(false);
   };
 
   const retryMessage = async (messageIndex: number) => {

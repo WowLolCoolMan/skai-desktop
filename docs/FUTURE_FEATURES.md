@@ -43,7 +43,7 @@ cancellation, permission review, and local credential handling.
 - [x] Folders, tags, and pinned chats.
 - [x] Search within the current chat and jump to a matching message.
 - [x] Fork a chat from any message.
-- [ ] Voice input/output, hands-free calls, and advanced voice mode. (OS-native speech output and one-shot dictation forced to on-device recognition are implemented; users can explicitly install an on-device language pack, while runtime acceptance, hands-free calls, and advanced voice mode remain open.)
+- [ ] Voice input/output, hands-free calls, and advanced voice mode. (OS-native speech output, one-shot dictation, and a hands-free local turn loop that pauses listening until the reply finishes speaking are implemented; users can explicitly install an on-device language pack, while runtime acceptance and advanced barge-in/streaming voice remain open.)
 - [ ] Image generation and editing. (Local ComfyUI checkpoint discovery, built-in text-to-image and image-edit workflow creation, workflow import/save, and source-image upload are implemented; live generation acceptance remains open.)
 - [x] Context compaction. (Deterministic bounded provider-side compaction with omitted-history markers; semantic summarization remains open.)
 - [ ] 1M+ token context support. (Opt-in Ollama context windows up to 1M tokens, bounded 32 MB request payloads, and Ollama model-context discovery are implemented; this computer's installed models currently advertise up to 262,144 tokens, so 1M execution with a compatible local model remains unverified.)

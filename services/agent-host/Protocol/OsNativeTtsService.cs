@@ -16,6 +16,18 @@ internal sealed class OsNativeTtsService : IDisposable
     private readonly object gate = new();
     private Process? activeProcess;
 
+    public bool IsSpeaking
+    {
+        get
+        {
+            lock (gate)
+            {
+                try { return activeProcess is { HasExited: false }; }
+                catch (InvalidOperationException) { return false; }
+            }
+        }
+    }
+
     /// <summary>
     /// Starts speech for the supplied bounded text.
     /// </summary>

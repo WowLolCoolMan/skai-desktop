@@ -46,6 +46,23 @@ export function stopNativeSpeech() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
+export async function waitForLocalSpeechToFinish(maxWaitMs = 120_000) {
+  const deadline = Date.now() + maxWaitMs;
+  await new Promise((resolve) => window.setTimeout(resolve, 180));
+  while (Date.now() < deadline) {
+    let nativeSpeaking = false;
+    try {
+      const response = await window.serverRockAgent?.request("voice.status");
+      if (response?.ok) nativeSpeaking = Boolean((response.result as { speaking?: unknown } | undefined)?.speaking);
+    } catch {
+      // The system speech process may not be available in this runtime.
+    }
+    const browserSpeaking = "speechSynthesis" in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending);
+    if (!nativeSpeaking && !browserSpeaking) return;
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+  }
+}
+
 export async function speakNativeResponse(text: string, force = false) {
   if (!text.trim()) return false;
   const settings = selectedVoiceSettings();
