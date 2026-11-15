@@ -23,6 +23,11 @@
 - Synced the capability matrix, project site, voice architecture notes, and
   release docs with hands-free chat behavior and the Pages setup blocker.
 
+### Fixed
+
+- Preserved the built-in project reverse-engineering skill and allowed normal
+  line breaks in reviewed skill prompts after the plugin catalog update.
+
 ## [0.1.3] - 2026-11-14
 
 ### Fixed

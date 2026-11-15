@@ -15,14 +15,17 @@ public static class PromptVariableTests
         Check(PromptVariableExpander.Expand("Hello {{USER_NAME}}", now) == "Hello {{USER_NAME}}",
             "unset user-name variables remain visible for review");
 
+        Check(PromptVariableExpander.Expand("Line one\nLine two\twith spacing", now) == "Line one\nLine two\twith spacing",
+            "prompt variable expansion preserves normal multiline prompt formatting");
+
         try
         {
-            PromptVariableExpander.Expand("bad\ninput", now);
-            throw new Exception("Expected control characters to be rejected.");
+            PromptVariableExpander.Expand("bad\0input", now);
+            throw new Exception("Expected non-text control characters to be rejected.");
         }
         catch (ArgumentException)
         {
-            Check(true, "prompt variable expansion rejects control characters before use");
+            Check(true, "prompt variable expansion rejects non-text control characters before use");
         }
 
         try

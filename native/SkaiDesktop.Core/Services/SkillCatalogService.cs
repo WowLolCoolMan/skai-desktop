@@ -16,6 +16,13 @@ public static class SkillCatalogService
     public static IReadOnlyList<SkillDefinition> BuiltIns { get; } =
     [
         new(
+            "reverse-engineer",
+            "Reverse engineer a project",
+            "Produce a cited architecture, workflow, risk, and improvement report without modifying files.",
+            "Analysis",
+            "Reverse-engineer this project as a senior software archaeologist. Inspect the selected project files and produce a clear report with system purpose, architecture, runtime/data flow, persistence, integrations, testing posture, risks, and a prioritized improvement plan. Cite relevant file paths and distinguish observed facts from inferences. Do not modify files or run destructive commands.",
+            ["project.read"]),
+        new(
             "project-audit",
             "Audit project health",
             "Review project structure, reliability, maintainability, and test coverage using file-based evidence.",
@@ -27,7 +34,7 @@ public static class SkillCatalogService
             "Review release readiness",
             "Assess whether a specific release is supported by build, test, package, and rollback evidence.",
             "Delivery",
-            "Review release readiness for the selected project. Use the target version and release scope from the user or project context; if either is missing, mark it as not provided instead of guessing. Inspect available evidence for version consistency, build and test results, CI gates, dependency and package provenance, signing and packaging, release notes, diagnostics, update behavior, and rollback. Configuration that says a check should run is not proof that it passed; use actual recorded results where available and mark missing evidence as Unknown. Do not run commands, modify files, create a release, or publish artifacts.\n\nReturn a concise decision: Ready, Blocked, or Needs evidence. Follow it with a checklist where every item is Pass, Fail, or Unknown, its evidence with exact file paths and line numbers when available, and the impact of any gap. Treat any unresolved critical failure or unknown as a blocker. End with the smallest concrete actions needed to establish readiness. Do not claim a release is safe based only on an unexecuted workflow or undocumented assurance.",
+            "Prepare this review for {{USER_NAME}} on {{DATE}}. Use the target version and release scope from the user or project context; if either is missing, mark it as not provided instead of guessing. Inspect available evidence for version consistency, build and test results, CI gates, dependency and package provenance, signing and packaging, release notes, diagnostics, update behavior, and rollback. Configuration that says a check should run is not proof that it passed; use actual recorded results where available and mark missing evidence as Unknown. Do not run commands, modify files, create a release, or publish artifacts.\n\nReturn a concise decision: Ready, Blocked, or Needs evidence. Follow it with a checklist where every item is Pass, Fail, or Unknown, its evidence with exact file paths and line numbers when available, and the impact of any gap. Treat any unresolved critical failure or unknown as a blocker. End with the smallest concrete actions needed to establish readiness. Do not claim a release is safe based only on an unexecuted workflow or undocumented assurance.",
             ["project.read"])
     ];
 
