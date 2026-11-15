@@ -15,11 +15,14 @@ managed Python environment is installed on the local machine and is not bundled
 inside the desktop installer.
 
 The worker accepts one prompt per process and returns a bounded JPEG to the
-renderer, which can save the result locally. Runtime dependency installation is
-implemented. The model worker, actual first-run model download, successful local
-generation, saved-image reload, cancellation during inference, and packaged
-hardware matrix still need end-to-end acceptance. Runtime status or a successful
-build alone does not prove that generation works.
+renderer. The renderer keeps recent output history in IndexedDB on this device,
+including the Diffusers image bytes, prompt, provider, and timestamp. History is
+limited to 24 records and 32 MiB of URL data. Runtime dependency installation,
+the first model download, and local CPU generation were exercised in Skai on
+2026-11-15. The persistent IndexedDB database and image blob were present after
+closing and relaunching the app; visually reopening the gallery entry after that
+restart still needs acceptance. Cancellation during inference and the packaged
+hardware matrix also remain unverified.
 
 ## ComfyUI integration
 
@@ -38,8 +41,10 @@ built-in Diffusers path.
 - The worker selects CUDA when PyTorch reports it available and otherwise uses
   CPU. AMD GPU acceleration and backend selection are not implemented or
   verified; CPU may be slow.
-- Image editing, resumable downloads/jobs, progress during inference, cancellation
-  of an active generation, and durable image history remain open.
+- ComfyUI history retains local output URLs, so the local ComfyUI service must be
+  available to view those outputs later. Built-in Diffusers editing, resumable
+  downloads/jobs, inference progress, and cancellation of active generation
+  remain open.
 - Runtime setup and model download need clear disk/network requirements. Model
   weights and Python packages are separate downloads.
 - Prompts and model execution remain local. Model downloads contact Hugging Face
@@ -49,9 +54,10 @@ built-in Diffusers path.
 
 Do not call built-in generation complete until a real supported model has been
 downloaded, generated an image locally, and that image has been reopened from
-local storage. Record the Python, PyTorch, Diffusers, OS, and compute backend used.
-Mocked-worker tests verify plumbing only; they do not substitute for real model
-acceptance.
+local storage. The first two steps were verified on Windows with Python 3,
+PyTorch 2.15.0+cpu, Diffusers 0.43.0, and CPU inference on 2026-11-15; visual
+reopen after restart remains outstanding. Mocked-worker tests verify plumbing
+only; they do not substitute for real model acceptance.
 
 ## References
 
