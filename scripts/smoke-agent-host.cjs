@@ -78,8 +78,11 @@ function request(method, params) {
 
 async function run() {
   const health = await request("runtime.health");
-  if (!health.ok || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel"))
+  if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
+  const airLlm = await request("airllm.status");
+  if (!airLlm.ok || airLlm.result?.workerAvailable !== true || typeof airLlm.result?.message !== "string")
+    throw new Error(`airllm.status did not report the packaged worker: ${JSON.stringify(airLlm)}`);
   const pullStart = await request("models.pull.start", { endpoint: "http://127.0.0.1:1/v1", model: "smoke-model" });
   if (!pullStart.ok || typeof pullStart.result?.id !== "string") throw new Error("models.pull.start did not create a disposable local operation.");
   let pullStatus;

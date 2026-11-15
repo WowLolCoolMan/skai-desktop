@@ -21,6 +21,18 @@ public sealed class AirLlmProvider
 
     public bool IsInstalled => ResolveScriptPath() is not null;
 
+    public AirLlmRuntimeStatus GetRuntimeStatus(AppSettings settings)
+    {
+        var script = ResolveScriptPath();
+        if (script is null)
+            return new(false, false, ResolvePythonPath(settings.AirLlmPythonPath), "worker-missing", "The packaged AirLLM worker is unavailable.");
+
+        var dependenciesAvailable = IsRuntimeAvailable(settings);
+        return dependenciesAvailable
+            ? new(true, true, ResolvePythonPath(settings.AirLlmPythonPath), "ready", "AirLLM is ready for local Hugging Face model execution.")
+            : new(true, false, ResolvePythonPath(settings.AirLlmPythonPath), "dependencies-missing", "Install the local AirLLM runtime from services/airllm/install.ps1, then retry the readiness check.");
+    }
+
     public bool IsRuntimeAvailable(AppSettings settings)
     {
         var script = ResolveScriptPath();
@@ -191,3 +203,10 @@ public sealed class AirLlmProvider
     private static string NormalizeCompression(string? value) => value?.ToLowerInvariant() switch { "4bit" => "4bit", "8bit" => "8bit", _ => "none" };
     private static string NormalizeDevice(string? value) => value?.ToLowerInvariant() switch { "cpu" => "cpu", "cuda" => "cuda", "mps" => "mps", _ => "auto" };
 }
+
+public sealed record AirLlmRuntimeStatus(
+    bool WorkerAvailable,
+    bool DependenciesAvailable,
+    string PythonCommand,
+    string Status,
+    string Message);

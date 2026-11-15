@@ -10,6 +10,8 @@ internal static class AirLlmProviderTests
         Check(!AirLlmProvider.IsHuggingFaceModel("llama3.2") && !AirLlmProvider.IsHuggingFaceModel("https://example.test/model"), "AirLLM rejects endpoint and tag values as model IDs");
         Check(new AirLlmProvider().CanHandle(new AppSettings { Model = "Qwen/Qwen3-32B", AirLlmAutoFallbackEnabled = true }), "AirLLM auto fallback accepts a Hugging Face model");
         Check(!new AirLlmProvider().CanHandle(new AppSettings { Model = "llama3.2", AirLlmAutoFallbackEnabled = true }), "AirLLM auto fallback does not guess a mapping for an Ollama tag");
+        var status = new AirLlmProvider().GetRuntimeStatus(new AppSettings());
+        Check(status.Status is "worker-missing" or "dependencies-missing" or "ready" && status.Message.Length > 0, "AirLLM readiness status is bounded and actionable");
         Check(AirLlmProvider.IsCapacityFailure(new InvalidOperationException("CUDA out of memory while loading model")), "AirLLM identifies local capacity failures");
         Check(!AirLlmProvider.IsCapacityFailure(new InvalidOperationException("invalid API key")), "AirLLM does not classify unrelated provider failures as capacity failures");
         Check(AirLlmProvider.ShouldAutoFallback(new AppSettings { Model = "Qwen/Qwen3-32B", AirLlmAutoFallbackEnabled = true }, "http://localhost:11434/v1", new InvalidOperationException("model does not fit in memory"), true), "AirLLM fallback is allowed only for a local known-capacity failure");

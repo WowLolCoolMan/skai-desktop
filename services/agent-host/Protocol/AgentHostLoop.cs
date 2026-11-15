@@ -68,7 +68,8 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.generate", "chat.complete", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel"])),
+                ["runtime.health", "airllm.status", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.generate", "chat.complete", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel"])),
+            "airllm.status" => GetAirLlmStatus(request),
             "models.list" => ListModels(request),
             "models.pull.start" => StartModelPull(request),
             "models.pull.status" => GetModelPullStatus(request),
@@ -137,6 +138,13 @@ public static class AgentHostLoop
             "marketplace.models.install.cancel" => CancelMarketplaceModelInstall(request),
             _ => new(ProtocolVersion, request.Id, false, Error: new("METHOD_NOT_FOUND", $"Unknown method '{request.Method}'.")),
         };
+    }
+
+    private static AgentResponse GetAirLlmStatus(AgentRequest request)
+    {
+        var settings = CreateSettingsStore().Load();
+        var status = new AirLlmProvider().GetRuntimeStatus(settings);
+        return new(ProtocolVersion, request.Id, true, status);
     }
 
     private static AgentResponse ListVoiceModels(AgentRequest request) =>
