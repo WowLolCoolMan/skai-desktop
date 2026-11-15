@@ -13,7 +13,7 @@ new history, not the existing `.git` pack (127 MiB at the start).
 - [x] 5. Remove unreferenced `generated/*-walk-source.png` files and walk frames replaced by `-v2` versions. — 0 bytes (all of them are still referenced; see Needs review)
 - [x] 6. Remove unreferenced PNGs in `assets/branding/` (check README, docs and site HTML first). — 0 bytes (all 4 PNGs are referenced)
 - [ ] 7. Compress the remaining PNGs losslessly with oxipng, keeping filenames and dimensions.
-- [ ] 8. Make sure `.gitignore` covers `bin/`, `obj/`, `.tmp/`, `dist/`, `release/` and `node_modules/`, and add a check that flags new files over 1 MB.
+- [x] 8. Make sure `.gitignore` covers `bin/`, `obj/`, `.tmp/`, `dist/`, `release/` and `node_modules/`, and add a check that flags new files over 1 MB. — 0 bytes (`.gitignore` now ignores `bin/`, `obj/` and `.tmp/` everywhere; `npm run check:hygiene`, which runs in both CI workflows, now fails on tracked files over 1 MiB that aren't on its allowlist, and also rejects tracked `release/`, `node_modules/` and `.tmp/` paths)
 
 **Total saved so far:** 49,405,902 bytes
 
@@ -96,4 +96,10 @@ for the 6 pets × 7 non-walk states. There are no other duplicates under `assets
 
 ## Failures
 
-(none)
+- **Step 7 blocked (2026-11-15):** no PNG optimiser is installed (`oxipng`, `pngquant`, `optipng` and `zopflipng` are all
+  missing), installing from the `extra` repo needs sudo, and downloading the release binary was blocked by the permission
+  check. Nothing was changed. To unblock it, run `sudo pacman -S oxipng`; the next run will then do step 7.
+  Step 8 was done first because it doesn't depend on step 7.
+- **Push blocked (2026-11-15):** the HTTPS remote has no credentials here, and pushing with the local SSH key (which signs
+  in as a different GitHub account) was blocked by the permission check. Steps 1–6 and 8 are committed locally on
+  `debloat-work` in `../skai-debloat` and still need pushing to `main`.
