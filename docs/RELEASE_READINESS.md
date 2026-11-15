@@ -8,8 +8,8 @@ Status: **not ready to publish as the first major release**.
 
 - Electron renderer typecheck and production build pass.
 - The persistent Agent Host builds cleanly and its protocol smoke passes.
-- Native Core tests pass, including AirLLM fallback policy and the native pet wander planner.
-- The native Windows artifact builds and passes bounded startup smoke.
+- Core tests pass, including AirLLM fallback policy and the pet wander planner.
+- The packaged Windows Electron artifact builds and passes bounded startup smoke.
 - The portable Electron artifact now bundles the renderer, Electron runtime, and a self-contained Agent Host; its startup smoke verifies the rendered settings and pet surfaces.
 - Electron Settings now has a usable surface for general routing, appearance, model discovery, local voice, local image workflows, agent controls, privacy, storage, updates, and advanced controls.
 - The Electron pet uses the existing Byte asset pack, persists its position, supports pointer drag-and-drop, keyboard arrows, wandering, reduced-motion behavior, and a hide control.
@@ -18,7 +18,7 @@ Status: **not ready to publish as the first major release**.
 ## Hosted evidence
 
 - [Electron replacement CI run 43550157254](https://github.com/WowLolCoolMan/skai-desktop/actions/runs/43550157254) passed the packaged Linux Electron smoke under Xvfb.
-- [Native app CI run 43550157272](https://github.com/WowLolCoolMan/skai-desktop/actions/runs/43550157272) passed on both Ubuntu and Windows.
+- [Electron app CI run 43550157272](https://github.com/WowLolCoolMan/skai-desktop/actions/runs/43550157272) passed on both Ubuntu and Windows.
 
 ## Release blockers
 

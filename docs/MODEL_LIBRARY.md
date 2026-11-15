@@ -1,6 +1,12 @@
 # Model library and hotswapper
 
-The native app has one Model Library entry from the sidebar and the composer’s model hotswapper. The library scans standard loopback endpoints for Ollama, GPT4All, LM Studio, Jan, LocalAI/llama.cpp, vLLM, KoboldCpp, and Text Generation WebUI, plus a configured custom loopback endpoint. Models with the same ID in different runtimes remain separate choices. Selecting or pinning a model preserves its provider and endpoint; pinning stays a small quick-switch subset while every discovered model remains in the library.
+Skai Desktop has one Model Library entry from the launcher and the composer’s
+model hotswapper. The library scans standard loopback endpoints for Ollama,
+GPT4All, LM Studio, Jan, LocalAI/llama.cpp, vLLM, KoboldCpp, and Text
+Generation WebUI, plus a configured custom loopback endpoint. Models with the
+same ID in different runtimes remain separate choices. Selecting or pinning a
+model preserves its provider and endpoint; pinning stays a small quick-switch
+subset while every discovered model remains in the library.
 
 ## Currently integrated sources
 
@@ -38,9 +44,19 @@ ModelScope search and GGUF manifest routes were checked against the public servi
 
 Owner decision: the Models action opens the **Model Library** (previously titled "AI SuperMarket") on **Installed models**, so nothing is sent to Hugging Face until the user switches the source to the Hugging Face GGUF catalog. That keeps the README promise that Hugging Face is contacted only when you choose to browse or search it, or download a model. The catalog, Ollama, and ModelScope sources work as described below.
 
-## Native AI SuperMarket migration (2026-11-04)
+## Electron model discovery surface (2026-11-04)
 
-The Electron Models surface now opens **AI SuperMarket** directly instead of an empty, query-first library. Its default source is a populated Hugging Face GGUF catalog of chat-ready repositories; the user can refine it by model name or capability, switch between regular and explicitly labelled uncensored/abliterated results, download through the configured local LM Studio runtime, then switch to Installed models to select, pin, or benchmark the download. Ollama and ModelScope remain distinct sources so their installation behavior stays accurate. The action controls deliberately enable model selection, pinning, and benchmarking only for installed local models. Shared Core tests and the packaged Electron artifact are the release evidence for this workflow.
+The Electron Models surface now opens **AI SuperMarket** directly instead of an
+empty, query-first library. Its default source is a populated Hugging Face
+GGUF catalog of chat-ready repositories; the user can refine it by model name
+or capability, switch between regular and explicitly labelled
+uncensored/abliterated results, download through the configured local LM Studio
+runtime, then switch to Installed models to select, pin, or benchmark the
+download. Ollama and ModelScope remain distinct sources so their installation
+behavior stays accurate. The action controls deliberately enable model
+selection, pinning, and benchmarking only for installed local models. Shared
+Core tests and the packaged Electron artifact are the release evidence for
+this workflow.
 
 ## Hotswapper follow-up (2026-11-03)
 

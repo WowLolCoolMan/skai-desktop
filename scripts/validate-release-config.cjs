@@ -12,8 +12,7 @@ const root = path.resolve(__dirname, "..");
 const errors = [];
 const semver = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 
-// Release metadata now comes from the Electron package (the legacy Uno
-// installer manifest was removed with the Uno app).
+// Release metadata now comes from the Electron package.
 for (const relative of ["package.json", path.join("apps", "desktop", "package.json")]) {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));

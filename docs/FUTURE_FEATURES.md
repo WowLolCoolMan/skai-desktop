@@ -3,7 +3,7 @@
 This is the product backlog for future capabilities. It is intentionally broader
 than the current release roadmap. Features should be implemented one bounded
 vertical slice at a time, starting with the simplest useful item, and checked
-off only after the feature works in the native app with the appropriate tests
+off only after the feature works in the Electron app with the appropriate tests
 and acceptance evidence.
 
 ## How to use this list
