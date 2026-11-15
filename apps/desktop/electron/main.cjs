@@ -40,6 +40,9 @@ let hostReader;
 let nextRequestId = 1;
 const pending = new Map();
 const standardRequestTimeoutMs = 30_000;
+// Local image generation includes a multi-gigabyte first-run model download and
+// CPU inference. Keep the Agent Host alive long enough for that operation.
+const imageGenerationRequestTimeoutMs = 60 * 60_000;
 const chatRequestTimeoutMs = 5 * 60_000;
 const chatHostDeadlineSeconds = 285;
 const globalLauncherAccelerator = "CommandOrControl+Alt+Space";
@@ -758,7 +761,11 @@ function requestAgent(method, params) {
     ? { ...params, timeoutSeconds: chatHostDeadlineSeconds }
     : params;
   return new Promise((resolve) => {
-    const timeoutMs = method === "chat.complete" ? chatRequestTimeoutMs : standardRequestTimeoutMs;
+    const timeoutMs = method === "chat.complete"
+      ? chatRequestTimeoutMs
+      : method === "image.generate"
+        ? imageGenerationRequestTimeoutMs
+        : standardRequestTimeoutMs;
     const timer = setTimeout(() => {
       if (!pending.has(id)) return;
       pending.delete(id);
