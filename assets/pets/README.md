@@ -11,8 +11,9 @@ loaded by the production companion.
 
 To rebuild the canonical runtime assets, place six-frame walk source strips in `generated/` and
 run `pwsh -NoProfile -ExecutionPolicy Bypass -File assets/pets/normalize-pet-animations.ps1`.
-That pass crops by alpha, rejects missing/invalid frames, preserves aspect ratio, locks the
-baseline, and copies every other state into its own six-frame strip.
+That pass crops by alpha, rejects missing/invalid frames, preserves aspect ratio, and locks the
+baseline. The other states are read from `generated/` by default; pass `-InputDirectory` to copy
+replacement strips in from somewhere else.
 
 Users can still assign local SVG/PNG/JPEG/WebP frames from the pet customization dialog; custom
 files stay on the device.

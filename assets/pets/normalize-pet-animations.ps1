@@ -1,5 +1,5 @@
 param(
-    [string]$InputDirectory = $PSScriptRoot,
+    [string]$InputDirectory = (Join-Path $PSScriptRoot "generated"),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot "generated")
 )
 
@@ -67,7 +67,10 @@ foreach ($pet in $pets) {
         $sourcePath = Join-Path $InputDirectory "$pet-$state-frames.png"
         $targetPath = Join-Path $OutputDirectory "$pet-$state-frames.png"
         if (-not (Test-Path $sourcePath)) { throw "Missing strip: $sourcePath" }
-        Copy-Item $sourcePath $targetPath -Force
+        # By default the strips already live in generated/, so there is nothing to copy.
+        if ([System.IO.Path]::GetFullPath($sourcePath) -ne [System.IO.Path]::GetFullPath($targetPath)) {
+            Copy-Item $sourcePath $targetPath -Force
+        }
     }
 }
 Write-Output "Built $($pets.Count * $states.Count) independent six-frame pet strips in $OutputDirectory."
