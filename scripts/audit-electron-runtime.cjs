@@ -18,6 +18,16 @@ const smokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-a
 const themeSmokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-themes.cjs"), "utf8");
 const overflowSmokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-overflow.cjs"), "utf8");
 
+function findAlternateDesktopFiles(directory, results = []) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if ([".git", ".tmp", "node_modules", "dist", "bin", "obj"].includes(entry.name)) continue;
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) findAlternateDesktopFiles(fullPath, results);
+    else if (/\.(xaml|xaml\.cs)$/i.test(entry.name) || /(?:^|\.)?(?:uno|winui|native)\.(?:csproj|sln)$/i.test(entry.name) || /ServerRock\.Native/i.test(entry.name)) results.push(path.relative(root, fullPath));
+  }
+  return results;
+}
+
 const failures = [];
 const expect = (condition, message) => { if (!condition) failures.push(message); };
 expect(packageJson.scripts.start === "node scripts/start-desktop.cjs", "root start must launch Electron");
@@ -69,6 +79,8 @@ expect(packageScript.includes("electronDist") && packageScript.includes("const a
 expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("mainTarget") && smokeScript.includes("petTarget") && smokeScript.includes("Primary navigation") && smokeScript.includes("Percy desktop companion") && smokeScript.includes("pet-window-sprite"), "Electron packaged smoke must inspect the main navigation, Settings, and separate Percy surfaces");
 expect(packageJson.scripts["smoke:electron:themes"] === "node scripts/smoke-electron-themes.cjs" && themeSmokeScript.includes("Emulation.setDeviceMetricsOverride") && themeSmokeScript.includes("Page.captureScreenshot") && themeSmokeScript.includes("deep-space"), "Packaged Electron theme acceptance must exercise constrained rendering and capture appearance states");
 expect(packageJson.scripts["smoke:electron:overflow"] === "node scripts/smoke-electron-overflow.cjs" && overflowSmokeScript.includes("1920") && overflowSmokeScript.includes("routes") && overflowSmokeScript.includes("getBoundingClientRect"), "Packaged Electron overflow acceptance must exercise every route across supported viewport widths");
+const alternateDesktopFiles = findAlternateDesktopFiles(root);
+expect(alternateDesktopFiles.length === 0, `alternate desktop UI files must not return to the project: ${alternateDesktopFiles.join(", ")}`);
 
 if (failures.length) {
   console.error("Electron replacement audit failed:");
