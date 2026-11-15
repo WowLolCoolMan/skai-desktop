@@ -479,6 +479,10 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .marketplace-installed-pane { display: grid; gap: 14px; min-height: min(620px, calc(100vh - 260px)); padding: 18px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
 .marketplace-installed-search input { width: 100%; padding: 10px 11px; border: 1px solid var(--skai-color-border); border-radius: 8px; color: var(--skai-color-text); background: var(--skai-color-surface); }
 .marketplace-installed-list { display: grid; align-content: start; gap: 0; overflow: auto; scrollbar-gutter: stable; }
+.model-install-review { display: grid; gap: 7px; margin-top: 14px; padding: 14px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 42%, var(--skai-color-border)); border-radius: 10px; background: color-mix(in srgb, var(--skai-color-accent) 7%, var(--skai-color-surface-soft)); }
+.model-install-review strong { color: var(--skai-color-text); font-size: 12px; overflow-wrap: anywhere; }
+.model-install-review span { color: var(--skai-color-text-muted); font-size: 10px; line-height: 1.45; }
+.model-install-review-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 
 /* Image Studio: the page scrolls when the editor card is taller than the window, and the history card gets the same padding as the editor. */
 .app-content-images { overflow-y: auto; }
