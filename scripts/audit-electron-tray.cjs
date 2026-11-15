@@ -9,7 +9,7 @@ const preload = read("apps/desktop/electron/preload.cjs");
 const contracts = read("apps/desktop/shared/contracts.ts");
 const workspace = read("apps/desktop/src/app/useDesktopWorkspace.ts");
 const packageScript = read("scripts/package-electron.cjs");
-const releaseWorkflow = read(".github/workflows/native-release.yml");
+const releaseWorkflow = read(".github/workflows/release.yml");
 
 const failures = [];
 const expect = (condition, message) => {

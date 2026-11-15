@@ -13,7 +13,7 @@
 
 Skai Desktop is an Electron + React desktop application with a persistent .NET Agent Host. It brings local model chat, project files, guarded terminal work, task review, GitHub workflows, settings, memory, and creative tools into one focused workspace—not a hosted chat wrapper or a collection of disconnected mock screens.
 
-> **Status:** active development · current release line: `0.1.x` · Electron is the product surface under active development. Capability claims below describe the current synchronized `main` branch; unfinished ideas remain in the [future feature backlog](docs/FUTURE_FEATURES.md).
+> **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe the current synchronized `main` branch; unfinished ideas remain in the [future feature backlog](docs/FUTURE_FEATURES.md).
 
 ## The product boundary
 
@@ -60,7 +60,7 @@ Electron + React + TypeScript
 Ollama · LM Studio · AirLLM · local OpenAI-compatible APIs · ComfyUI
 ```
 
-The Electron renderer is the product UI and the only active desktop shell. The isolated preload bridge exposes only typed desktop operations. The persistent .NET Agent Host and shared Core services own local model requests, project boundaries, persistence, approvals, and guarded file/terminal operations. Closing the main window keeps the local host and Percy companion resident in the system tray, where users can reopen Skai, open recent chats, toggle Percy, or quit explicitly. The older Uno/XAML surface is frozen compatibility code: it remains buildable until parity and rollback evidence are complete, but new product behavior must land in Electron and shared Core.
+The Electron renderer is the only product UI. The isolated preload bridge exposes only typed desktop operations. The persistent .NET Agent Host and shared Core services own local model requests, project boundaries, persistence, approvals, and guarded file/terminal operations. Closing the main window keeps the local host and Percy companion resident in the system tray, where users can reopen Skai, open recent chats, toggle Percy, or quit explicitly.
 
 ## Run locally
 
@@ -82,7 +82,7 @@ npm run desktop:dev
 npm run desktop:build
 npm run open:desktop
 
-# Run the native Core checks
+# Run the shared Core checks
 dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj
 ```
 
@@ -117,7 +117,6 @@ The local-only audit is intentional: it rejects hosted/cloud model routes from t
 apps/desktop/              Electron + React desktop surface
 services/agent-host/       Persistent .NET host and protocol boundary
 native/SkaiDesktop.Core/   Local provider, persistence, workflow, and safety logic
-native/ServerRock.Native/  Legacy Uno/XAML compatibility surface during migration
 assets/                    Skai branding and Percy mascot assets
 docs/                      Architecture, capability, release, and feature documentation
 ```

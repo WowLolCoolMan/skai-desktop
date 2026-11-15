@@ -1,9 +1,8 @@
 # Electron default runtime
 
-Electron + React + the persistent .NET agent host are the default desktop
-runtime for this repository. The Uno/XAML application remains available only
-through explicitly named legacy commands while parity and retirement evidence
-are completed.
+Electron + React + the persistent .NET agent host are the only desktop
+runtime for this repository. Shared .NET Core services remain headless and are
+consumed by the Agent Host; there is no second desktop UI architecture.
 
 ## Commands
 
@@ -13,15 +12,11 @@ npm run build          # Electron renderer production build
 npm run open           # Open the built Electron runtime
 npm run package:electron        # Stage a portable Electron + Agent Host artifact
 npm run smoke:electron:artifact # Verify the staged artifact renders its core shell
-
-npm run start:legacy-native
-npm run build:native
-npm run open:legacy-native
 ```
 
-The default path keeps the renderer sandboxed and communicates with the .NET
-host through the context-isolated preload bridge. The legacy commands are a
-rollback and comparison surface; they are not the product direction.
+The renderer is sandboxed and communicates with the .NET host through the
+context-isolated preload bridge. Shared Core is not a desktop UI and cannot be
+launched as an alternate shell.
 
 The portable artifact bundles a self-contained Agent Host under
 `resources/agent-host`; it does not require a source checkout or a local .NET

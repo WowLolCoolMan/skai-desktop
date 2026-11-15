@@ -1,21 +1,25 @@
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
 // Pick the Linux display backend up front; otherwise the app relaunches itself and the spawned PID is not the app.
 const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
 
-const executable = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist", "electron", "win-x64", process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"));
+const executable = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : "linux"}-x64`, process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"));
 const port = 19324;
-const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory"];
+const routes = ["chat", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory", "usage"];
 const widths = [1920, 1440, 1280, 960, 640];
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), windowsHide: true, stdio: "ignore" });
+// Isolated profile: a running Skai instance would otherwise take the single-instance lock and the smoke launch would exit.
+const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), windowsHide: true, stdio: "ignore" });
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 async function fetchJson(url) { const response = await fetch(url); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }
 function connect(target) {
   const socket = new WebSocket(target.webSocketDebuggerUrl);
   const pending = new Map();
   let nextId = 1;
-  socket.addEventListener("message", (event) => { const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data)); const resolve = pending.get(message.id); if (!resolve) return; pending.delete(message.id); resolve(message); });
+  socket.addEventListener("message", (event) => { const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data)); const resolve = pending.get(message.id); if (typeof resolve !== "function") return; pending.delete(message.id); resolve(message); });
   const send = (method, params = {}) => new Promise((resolve, reject) => { const id = nextId++; pending.set(id, (message) => message.error ? reject(new Error(message.error.message)) : resolve(message.result)); socket.send(JSON.stringify({ id, method, params })); setTimeout(() => { if (pending.delete(id)) reject(new Error(`Timed out: ${method}`)); }, 8000); });
   return { open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }), send, evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }); return result?.result?.value; }, close: () => socket.close() };
 }
@@ -38,4 +42,5 @@ async function main() {
   if (failures.length) throw new Error(`Overflow acceptance failed: ${JSON.stringify(failures.slice(0, 12))}`);
   console.log(`Packaged overflow acceptance passed: ${routes.length} routes × ${widths.length} viewport widths.`);
 }
-main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(() => { if (!child.killed) child.kill(); });
+main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(() => { if (!child.killed) child.kill();
+  setTimeout(() => { try { fs.rmSync(smokeUserDataDir, { recursive: true, force: true }); } catch { /* best effort */ } }, 1500); });

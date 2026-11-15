@@ -39,8 +39,23 @@ jobs:
       - name: Typecheck Electron renderer
         run: npm run desktop:typecheck
 
+      - name: Repository and release checks
+        run: |
+          npm run check:syntax
+          npm run check:hygiene
+          npm run check:release-config
+          npm run audit:release-workflow
+
       - name: Audit Electron replacement boundary
-        run: npm run audit:electron-runtime
+        run: |
+          npm run audit:electron-runtime
+          npm run audit:electron-tray
+          npm run audit:local-only
+
+      - name: Electron main-process unit checks
+        run: |
+          npm run test:pet
+          npm run test:linux-windowing
 
       - name: Build Electron renderer
         run: npm run desktop:build
@@ -68,6 +83,9 @@ jobs:
 
       - name: Build persistent agent host
         run: npm run agent-host:build
+
+      - name: Core tests
+        run: npm test
 
       - name: Smoke replacement protocol
         run: npm run smoke:agent-host

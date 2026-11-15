@@ -1,6 +1,6 @@
 # Skai Desktop – native design system
 
-Design rules for the Uno/XAML app in `native/ServerRock.Native`. Follow them for every UI change so the app stays consistent. Product intent and reference screenshots are in `docs/UI_REFERENCE_GUIDE.md`.
+Design rules for the Electron + React app in `apps/desktop`. Follow them for every UI change so the app stays consistent. Product intent and reference screenshots are in `docs/UI_REFERENCE_GUIDE.md`.
 
 ## Where the tokens live
 - **`App.xaml`** holds every color, font size, font family, radius and shared style. It is the only place a hex color should appear.
