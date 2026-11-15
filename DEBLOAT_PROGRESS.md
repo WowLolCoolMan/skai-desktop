@@ -7,7 +7,7 @@ new history, not the existing `.git` pack (127 MiB at the start).
 ## Checklist
 
 - [x] 1. Audit: record folder sizes under `assets/`, duplicate files by hash, and unreferenced assets. — 0 bytes (audit only)
-- [ ] 2. Repoint references to `assets/pets/*-frames.png` (for example in `apps/desktop/src/features/settings/SettingsPage.tsx`) at the identical copies in `assets/pets/generated/`.
+- [x] 2. Repoint references to `assets/pets/*-frames.png` (for example in `apps/desktop/src/features/settings/SettingsPage.tsx`) at the identical copies in `assets/pets/generated/`. — 0 bytes (the 6 Settings previews now load from `generated/`; no other code referenced the root strips)
 - [ ] 3. Remove the root-level `assets/pets/*.png` files that duplicate `generated/`.
 - [ ] 4. Remove `assets/pets/archive/legacy-sheets/`, if nothing references it.
 - [ ] 5. Remove unreferenced `generated/*-walk-source.png` files and walk frames replaced by `-v2` versions.
