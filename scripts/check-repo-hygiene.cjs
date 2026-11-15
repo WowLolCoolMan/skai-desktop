@@ -1,15 +1,9 @@
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 
-// New tracked files must stay under 1 MiB. These existing files are allowed until they are
-// compressed or removed (see DEBLOAT_PROGRESS.md); take an entry out once its file shrinks.
+// Tracked files must stay under 1 MiB. Add a path here only with a reason in the commit message.
 const MAX_FILE_BYTES = 1024 * 1024;
-const LARGE_FILE_ALLOWLIST = new Set([
-  "assets/branding/skai-desktop-architecture.png",
-  "assets/branding/skai-desktop-hero.png",
-  "assets/branding/skai-desktop-mark.png",
-  "assets/branding/skaiwolficon.png",
-]);
+const LARGE_FILE_ALLOWLIST = new Set([]);
 
 const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
   .split("\0")

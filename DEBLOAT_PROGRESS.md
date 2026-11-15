@@ -15,7 +15,7 @@ new history, not the existing `.git` pack (127 MiB at the start).
 - [x] 7. Compress the remaining PNGs losslessly with oxipng, keeping filenames and dimensions. — 17,555,947 bytes (418 PNGs, 67,652,804 → 50,096,857 bytes, using `oxipng 10.2.1 -o 4 --strip safe`; all 418 decode to identical pixels at the same dimensions through Electron `nativeImage`)
 - [x] 8. Make sure `.gitignore` covers `bin/`, `obj/`, `.tmp/`, `dist/`, `release/` and `node_modules/`, and add a check that flags new files over 1 MB. — 0 bytes (`.gitignore` now ignores `bin/`, `obj/` and `.tmp/` everywhere; `npm run check:hygiene`, which runs in both CI workflows, now fails on tracked files over 1 MiB that aren't on its allowlist, and also rejects tracked `release/`, `node_modules/` and `.tmp/` paths)
 
-**Total saved:** 86,824,907 bytes (steps 66,961,849 + follow-ups 19,863,058)
+**Total saved:** 89,884,139 bytes (steps 66,961,849 + follow-ups 22,922,290)
 
 ## Follow-ups (owner-approved after step 8)
 
@@ -24,7 +24,10 @@ new history, not the existing `.git` pack (127 MiB at the start).
 - [x] F2. Make the validator and rebuild script use the `-v2` walk strips, then remove the replaced ones. — 1,055,596 bytes
   (byte/nova/rocky `-walk-frames-v2.png` replaced their `-walk-frames.png`; `PetWindow.tsx` uses one name for every pet,
   so `check:pet-assets` now validates the walk strips actually shown; the rebuild script skips those three pets' walk strips)
-- [ ] F3. Shrink the 4 branding PNGs below 1 MiB (lossy, approved by the owner).
+- [x] F3. Shrink the 4 branding PNGs below 1 MiB (lossy, approved by the owner). — 3,059,232 bytes (5,739,841 → 2,680,609;
+  libvips/libimagequant 256-colour palette at Q=100 with dithering, then oxipng; same filenames and dimensions; PSNR 41–59 dB
+  for the illustrations and 33.5 dB for the icon composited on the app background; checked by eye. Undithered output banded
+  visibly, so it wasn't used. The `check:hygiene` allowlist is now empty.)
 - [ ] F4. Remove the `../skai-debloat` worktree.
 
 ## Verification gate
@@ -90,18 +93,16 @@ for the 6 pets × 7 non-walk states. There are no other duplicates under `assets
 
 - **Single-state PNGs (`assets/pets/<pet>-<state>.png`, 42 files):** inputs to the archived
   `legacy-tools/make-pet-frames.ps1`, so they're kept alongside it. (The step 1 audit wrongly listed them as unreferenced.)
-- **Walk sources (5,347,226 bytes, 6 files):** `normalize-pet-animations.ps1` reads `generated/$pet-walk-source.png`, and the
+- **Walk sources (4,702,461 bytes, 6 files):** `normalize-pet-animations.ps1` reads `generated/$pet-walk-source.png`, and the
   pets README calls them the editable inputs. They're only removable if that rebuild path is retired.
   Byte, Nova and Rocky's sources no longer feed the runtime walk strips (F2) and are kept for reference only.
 - **`normalize-pet-animations.ps1`:** step 3 changed its default input to `generated/`. The change wasn't run, because
   PowerShell (`pwsh`) isn't installed here.
 - **`archive/legacy-tools/`** (11 KB) still reads and writes the removed `*-sprite-sheet.png` files, so those scripts
   no longer have inputs. Kept, because no step covers them.
-- **`skai-desktop-mark.png` and `skai-desktop-architecture.png` (3,356,954 bytes):** mentioned only in
+- **`skai-desktop-mark.png` and `skai-desktop-architecture.png` (1,692,619 bytes):** mentioned only in
   `assets/branding/SKAI_UI_ASSET_PACK.md`. Nothing in the app or site loads them (the site uses `docs/site-assets/*.webp`).
   Removable if that asset-pack guide is updated too.
-- **Branding PNGs are still over 1 MiB after compression** (1.28–1.62 MB each), so they stay on the `check:hygiene`
-  allowlist. Shrinking them further would need lossy compression or smaller dimensions, which is a design decision.
 
 ## Failures
 
