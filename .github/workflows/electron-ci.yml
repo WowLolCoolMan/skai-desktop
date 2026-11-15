@@ -82,6 +82,9 @@ jobs:
       - name: Smoke packaged Electron artifact
         run: xvfb-run -a npm run smoke:electron:artifact
 
+      - name: UI matrix smoke (routes x window sizes x themes)
+        run: xvfb-run -a npm run smoke:electron:ui-matrix
+
       - name: Build persistent agent host
         run: npm run agent-host:build
 
