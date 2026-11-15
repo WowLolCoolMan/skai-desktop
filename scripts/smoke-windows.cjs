@@ -15,6 +15,9 @@ const steps = [
   "desktop:typecheck",
   "desktop:build",
   "package:electron",
+  // The host smokes run the Debug build in services/agent-host/bin; build it explicitly
+  // (package:electron only publishes the Release host into dist/).
+  "agent-host:build",
   "smoke:agent-host",
   "smoke:marketplace-host",
   "test",
