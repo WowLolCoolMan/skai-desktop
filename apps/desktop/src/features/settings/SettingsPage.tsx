@@ -158,7 +158,7 @@ function CloseBehaviorSetting() {
   useEffect(() => { if (bridge?.platform === "linux") void bridge.getCloseBehavior().then(setBehavior); }, [bridge]);
   if (!bridge || bridge.platform !== "linux" || behavior === null) return null;
   const update = (event: ChangeEvent<HTMLSelectElement>) => { void bridge.setCloseBehavior(event.target.value as CloseBehavior).then(setBehavior); };
-  return <div className="settings-field"><label>When you close the window<select value={behavior} onChange={update}><option value="ask">Ask every time</option><option value="background">Run in background</option><option value="quit">Fully close</option></select></label><p className="settings-help">Applies to window-manager close shortcuts such as Super+C. Quit any time from the tray menu.</p></div>;
+  return <div className="settings-field settings-field-single"><label>When you close the window<select value={behavior} onChange={update}><option value="ask">Ask every time</option><option value="background">Run in background</option><option value="quit">Fully close</option></select><small className="settings-help">Applies to window-manager close shortcuts such as Super+C. Quit any time from the tray menu.</small></label></div>;
 }
 
 function Toggle({ label, detail, checked, onChange }: { label: string; detail: string; checked: boolean; onChange: (value: boolean) => void }) {

@@ -152,7 +152,9 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .sidebar-resize-handle:focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: -2px; }
 .app-sidebar.is-resizing { user-select: none; }
 .app-sidebar.is-collapsed .sidebar-resize-handle { display: none; }
-@media (max-width:900px) and (min-width:641px) { .app-shell:not(.sidebar-collapsed) { grid-template-columns: minmax(220px, var(--skai-sidebar-width, 220px)) minmax(0,1fr); } }
+/* The global rail is the first column; keep it in every grid between the mobile and desktop layouts. */
+@media (max-width:900px) and (min-width:641px) { .app-shell:not(.sidebar-collapsed) { grid-template-columns: 56px minmax(220px, var(--skai-sidebar-width, 220px)) minmax(0,1fr); } }
+@media (max-width:1100px) and (min-width:641px) { .app-shell { height: 100vh; overflow: hidden; }.app-main { height: 100vh; min-height: 0; } }
 .coding-project-context { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; margin: 0 0 14px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 28%, var(--skai-color-border)); border-radius: 10px; background: color-mix(in srgb, var(--skai-color-accent) 6%, var(--skai-color-surface-soft)); }
 .coding-project-context > div { display: grid; min-width: 0; gap: 4px; }
 .coding-project-context strong { overflow: hidden; color: var(--skai-color-text); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
@@ -462,3 +464,85 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .close-choice-remember { display: flex; align-items: center; gap: 8px; color: var(--skai-color-text-muted); font-size: 11px; }
 .close-choice-remember small { font-size: 10px; opacity: .8; }
 @media (max-width: 520px) { .close-choice-options { grid-template-columns: 1fr; } .close-choice-option { border-radius: 16px; } }
+
+/* Sidebar history: long titles ellipsize instead of widening the list (grid items default to min-width:auto). */
+.sidebar-history-list { grid-template-columns: minmax(0, 1fr); overflow-x: hidden; }
+.sidebar-history-list > *, .sidebar-history-row, .sidebar-history-item { min-width: 0; }
+
+/* Marketplace → Models: live provider search spans the full page width. */
+.marketplace-models-pane { min-width: 0; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+.app-content-marketplace .marketplace-models-pane { flex: 1 1 0; }
+.marketplace-model-controls { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.marketplace-model-controls .settings-toggle { grid-column: 1 / -1; min-width: 0; }
+.marketplace-model-row { flex-wrap: wrap; }
+.marketplace-model-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Image Studio: the page scrolls when the editor card is taller than the window, and the history card gets the same padding as the editor. */
+.app-content-images { overflow-y: auto; }
+.app-content-images .image-studio-page { height: auto; min-height: 100%; }
+.app-content-images .image-editor-card, .app-content-images .image-history { overflow: visible; }
+.app-content-images .image-history { padding: 16px; }
+
+/* Terminal: the card fills the page and scrolls instead of spilling past its border on short or narrow windows. */
+.app-content-terminal .terminal-page > .terminal-card { overflow: auto; scrollbar-gutter: stable; }
+
+/* Coding overview: long project names clamp to two lines, the panel scrolls, and the overview stacks on narrow windows. */
+.project-card > span:nth-child(2) { min-width: 0; }
+.project-card strong { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.app-content-coding .coding-projects-panel { overflow: auto; scrollbar-gutter: stable; }
+@media (max-width: 900px) {
+  .coding-overview-grid { grid-template-columns: minmax(0, 1fr); }
+  .app-content-coding .coding-overview-grid { flex: none; min-height: 0; }
+  .app-content-coding .coding-overview-grid > .ui-card { height: auto; }
+}
+.panel-heading { min-width: 0; }
+.panel-count { flex: 0 0 auto; white-space: nowrap; }
+
+/* The toolbar must never be squeezed by tall page content: its explicit min-height
+   replaces the flex automatic minimum, so without this its wrapped title spills over the page on narrow windows. */
+.app-toolbar { flex-shrink: 0; }
+
+/* Narrow tiles (half/third-screen tiling): keep the toolbar to one compact row and let the chat header wrap. */
+@media (max-width: 900px) {
+  .app-toolbar { flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .toolbar-title { flex: 1 1 140px; min-width: 0; }
+  .toolbar-title h1, .toolbar-title p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toolbar-actions { flex: 0 0 auto; justify-content: flex-end; }
+  .toolbar-actions .ui-button { flex: 0 0 auto; }
+}
+@media (max-width: 640px) {
+  .toolbar-title { flex-basis: 0; }
+  .chat-context-bar { flex-wrap: wrap; align-items: flex-start; gap: 10px; }
+  .chat-context-bar > div:first-child { flex: 1 1 100%; }
+  .chat-header-actions { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+  .chat-header-actions .model-picker-trigger { min-width: 0; max-width: 100%; }
+}
+
+.settings-field-single { grid-template-columns: minmax(0, 1fr); }
+.settings-field-single .settings-help { font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+/* Sidebar: many projects must not squeeze Recent chats to nothing. */
+.sidebar-projects { max-height: min(30vh, 240px); overflow-y: auto; scrollbar-gutter: stable; }
+.sidebar-history { min-height: 150px; }
+
+/* Marketplace: constrain the results/detail row to the layout height so the results list scrolls instead of being clipped. */
+.app-content-marketplace .marketplace-layout { grid-template-rows: minmax(0, 1fr); }
+.app-content-marketplace .marketplace-results { min-height: 0; overflow-y: auto; }
+
+/* Short windows (tiling WMs, laptops): fill-height pages still scroll when their fixed content does not fit,
+   instead of clipping it. Flexible panels keep shrinking first, so tall windows are unchanged. */
+.app-content-coding, .app-content-workbench, .app-content-settings, .app-content-terminal, .app-content-marketplace { overflow: auto; }
+@media (max-width: 640px) { .app-content-chat { min-height: 0; flex: 1 1 0; } }
+
+/* Pages are centred with auto margins, which disables flex stretching; without an explicit width a page grows
+   to its widest child instead of the window and pushes content off-screen on narrow windows. */
+.app-content > .feature-page { width: 100%; }
+@media (max-width: 640px) { .app-content-settings .settings-nav { overflow-x: auto; overflow-y: hidden; } }
+/* ≤640px the thread sidebar is hidden in both states, so the collapsed layout must use the same two columns. */
+@media (max-width: 640px) { .app-shell.sidebar-collapsed { grid-template-columns: 52px minmax(0, 1fr); } }
+/* Marketplace on short windows: the catalog keeps its minimum height and the page scrolls, instead of the browser clipping rows. */
+.app-content-marketplace .marketplace-page { height: auto; min-height: 0; flex: 1 0 auto; }
+.app-content-marketplace .marketplace-browser { flex: 1 0 auto; overflow: visible; }
+/* Image Studio saved-workflow row: selects shrink with their grid column instead of keeping their intrinsic width. */
+.workflow-source-row > *, .workflow-source-row label { min-width: 0; }
+.workflow-source-row select { width: 100%; min-width: 0; }
