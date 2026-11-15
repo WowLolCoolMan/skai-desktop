@@ -5,6 +5,7 @@ import { Button, EmptyState, StatusBadge } from "../../components/ui/Primitives"
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 
+export type MarketplaceSection = Section;
 type Section = "Discover" | "Models" | "Image models" | "Voices" | "Image workflows" | "Skills" | "Tools" | "Installed" | "Updates";
 type Filter = "All" | "Local models" | "Voices" | "Image workflows" | "Skills" | "Tools";
 type CatalogItem = { id: string; title: string; filter: Filter; description: string; detail: string; icon: NavIconName; status: string; tone: "neutral" | "success" | "warning"; publisher: string; version: string; compatibility: string; nextStep: string; installable: boolean };
@@ -31,8 +32,12 @@ function normalizeSource(value: string) {
   return value.toLowerCase().replace(/[^a-z]/g, "");
 }
 
-export function MarketplacePage({ onSelectAirLlmModel, onNavigate }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void }) {
-  const [section, setSection] = useState<Section>("Discover");
+// Embedded in the unified Marketplace catalog (PluginsPage) for the hub sections that catalog
+// does not cover itself: remote model search/install, Diffusers LoRAs and the local inventory.
+const EMBEDDED_SECTIONS: Section[] = ["Models", "Image models", "Installed"];
+
+export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSection = "Discover", onBack }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; initialSection?: Section; onBack?: () => void }) {
+  const [section, setSection] = useState<Section>(initialSection);
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(items[0].id);
@@ -272,11 +277,11 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate }: { onSelectA
     <div className="feature-page marketplace-page">
       <header className="marketplace-header">
         <div><p className="eyebrow">MARKETPLACE</p><h2>{sectionHeading[section]}</h2><p className="page-description">{sectionDescription[section]}</p></div>
-        {section !== "Installed" && <Button variant="ghost" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}>View installed</Button>}
+        <div className="marketplace-header-actions">{onBack && <Button variant="ghost" type="button" onClick={onBack}><NavIcon name="chevron-left" />Marketplace</Button>}{section !== "Installed" && <Button variant="ghost" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}>View installed</Button>}</div>
       </header>
       <div className="marketplace-browser">
         <nav className="marketplace-sections" aria-label="Marketplace sections">
-          {(["Discover", "Models", "Image models", "Voices", "Image workflows", "Skills", "Tools", "Installed", "Updates"] as Section[]).map((item) => (
+          {(onBack ? EMBEDDED_SECTIONS : ["Discover", "Models", "Image models", "Voices", "Image workflows", "Skills", "Tools", "Installed", "Updates"] as Section[]).map((item) => (
             <button key={item} className={section === item ? "is-active" : ""} type="button" aria-current={section === item ? "page" : undefined} onClick={() => { setSection(item); setQuery(""); }}>{item}</button>
           ))}
         </nav>

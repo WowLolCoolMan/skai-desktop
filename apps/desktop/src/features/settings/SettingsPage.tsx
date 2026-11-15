@@ -59,12 +59,12 @@ const providerChoices = [
 ];
 
 const builtInPetPreviews: Record<string, string> = {
-  percy: new URL("../../../../../assets/pets/percy-idle-frames.png", import.meta.url).href,
-  byte: new URL("../../../../../assets/pets/byte-idle-frames.png", import.meta.url).href,
-  ember: new URL("../../../../../assets/pets/ember-idle-frames.png", import.meta.url).href,
-  nova: new URL("../../../../../assets/pets/nova-idle-frames.png", import.meta.url).href,
-  rocky: new URL("../../../../../assets/pets/rocky-idle-frames.png", import.meta.url).href,
-  sprout: new URL("../../../../../assets/pets/sprout-idle-frames.png", import.meta.url).href,
+  percy: new URL("../../../../../assets/pets/generated/percy-idle-frames.png", import.meta.url).href,
+  byte: new URL("../../../../../assets/pets/generated/byte-idle-frames.png", import.meta.url).href,
+  ember: new URL("../../../../../assets/pets/generated/ember-idle-frames.png", import.meta.url).href,
+  nova: new URL("../../../../../assets/pets/generated/nova-idle-frames.png", import.meta.url).href,
+  rocky: new URL("../../../../../assets/pets/generated/rocky-idle-frames.png", import.meta.url).href,
+  sprout: new URL("../../../../../assets/pets/generated/sprout-idle-frames.png", import.meta.url).href,
 };
 
 type SettingsProps = {

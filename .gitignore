@@ -4,10 +4,9 @@ dist/
 release/
 release-check*/
 native/**/artifacts/
-native/**/bin/
-native/**/obj/
-services/**/bin/
-services/**/obj/
+bin/
+obj/
+.tmp/
 .env
 .env.*
 !.env.example

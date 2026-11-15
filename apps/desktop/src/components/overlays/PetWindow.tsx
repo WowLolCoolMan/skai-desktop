@@ -18,7 +18,7 @@ const BUILTIN_STRIPS: Record<string, Record<BuiltinPose, string>> = {
   },
   byte: {
     idle: new URL("../../../../../assets/pets/generated/byte-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/byte-walk-frames-v2.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/byte-walk-frames.png", import.meta.url).href,
     thinking: new URL("../../../../../assets/pets/generated/byte-thinking-frames.png", import.meta.url).href,
     coding: new URL("../../../../../assets/pets/generated/byte-coding-frames.png", import.meta.url).href,
     coding_malicious: new URL("../../../../../assets/pets/generated/byte-coding_malicious-frames.png", import.meta.url).href,
@@ -38,7 +38,7 @@ const BUILTIN_STRIPS: Record<string, Record<BuiltinPose, string>> = {
   },
   nova: {
     idle: new URL("../../../../../assets/pets/generated/nova-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/nova-walk-frames-v2.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/nova-walk-frames.png", import.meta.url).href,
     thinking: new URL("../../../../../assets/pets/generated/nova-thinking-frames.png", import.meta.url).href,
     coding: new URL("../../../../../assets/pets/generated/nova-coding-frames.png", import.meta.url).href,
     coding_malicious: new URL("../../../../../assets/pets/generated/nova-coding_malicious-frames.png", import.meta.url).href,
@@ -48,7 +48,7 @@ const BUILTIN_STRIPS: Record<string, Record<BuiltinPose, string>> = {
   },
   rocky: {
     idle: new URL("../../../../../assets/pets/generated/rocky-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/rocky-walk-frames-v2.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/rocky-walk-frames.png", import.meta.url).href,
     thinking: new URL("../../../../../assets/pets/generated/rocky-thinking-frames.png", import.meta.url).href,
     coding: new URL("../../../../../assets/pets/generated/rocky-coding-frames.png", import.meta.url).href,
     coding_malicious: new URL("../../../../../assets/pets/generated/rocky-coding_malicious-frames.png", import.meta.url).href,
