@@ -151,7 +151,7 @@ public static class AgentHostLoop
             "mcp.connection.connect" => ConnectMcpAsync(request).GetAwaiter().GetResult(),
             "mcp.connection.disconnect" => DisconnectMcp(request),
             "mcp.connection.revoke" => RevokeMcp(request),
-            "mcp.tools.list" => ListMcpTools(request),
+            "mcp.tools.list" => ListMcpToolsAsync(request).GetAwaiter().GetResult(),
             "mcp.tool.call" => CallMcpToolAsync(request).GetAwaiter().GetResult(),
             "voice.models" => ListVoiceModels(request),
             "voice.speak" => SpeakVoice(request, voice),
@@ -415,17 +415,39 @@ public static class AgentHostLoop
         return new(ProtocolVersion, request.Id, true, McpConnections.Revoke(connectionId));
     }
 
-    private static AgentResponse ListMcpTools(AgentRequest request)
+    private static async Task<AgentResponse> ListMcpToolsAsync(AgentRequest request)
     {
         var connectionId = RequiredBoundedString(request, "connectionId", 128);
+        IMcpClient? client;
         lock (McpClientsGate)
         {
-            return new(ProtocolVersion, request.Id, true, new
+            ActiveMcpClients.TryGetValue(connectionId, out client);
+            if (client is null)
+                return new(ProtocolVersion, request.Id, true, new { connectionId, connected = false, tools = Array.Empty<McpToolDescriptor>(), connection = McpConnections.Get(connectionId) });
+        }
+
+        try
+        {
+            var tools = await client.ListToolsAsync().ConfigureAwait(false);
+            lock (McpClientsGate)
             {
-                connectionId,
-                connected = ActiveMcpTools.ContainsKey(connectionId),
-                tools = ActiveMcpTools.TryGetValue(connectionId, out var tools) ? tools : [],
-            });
+                if (!ActiveMcpClients.TryGetValue(connectionId, out var current) || !ReferenceEquals(current, client))
+                    return new(ProtocolVersion, request.Id, true, new { connectionId, connected = false, tools = Array.Empty<McpToolDescriptor>(), connection = McpConnections.Get(connectionId) });
+                ActiveMcpTools[connectionId] = tools;
+                var connection = McpConnections.MarkHealthy(connectionId);
+                return new(ProtocolVersion, request.Id, true, new { connectionId, connected = true, tools, connection });
+            }
+        }
+        catch (Exception error)
+        {
+            var message = new string(error.Message.Where(character => !char.IsControl(character)).Take(2_000).ToArray());
+            lock (McpClientsGate)
+            {
+                if (!ActiveMcpClients.TryGetValue(connectionId, out var current) || !ReferenceEquals(current, client))
+                    return new(ProtocolVersion, request.Id, true, new { connectionId, connected = false, tools = Array.Empty<McpToolDescriptor>(), connection = McpConnections.Get(connectionId) });
+                var connection = McpConnections.MarkDegraded(connectionId, string.IsNullOrWhiteSpace(message) ? "MCP health check failed." : message);
+                return new(ProtocolVersion, request.Id, true, new { connectionId, connected = false, tools = Array.Empty<McpToolDescriptor>(), connection });
+            }
         }
     }
 
