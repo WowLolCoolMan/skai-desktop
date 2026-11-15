@@ -26,19 +26,26 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  processLocally?: boolean;
   onend: (() => void) | null;
   onerror: ((event: Event & { error?: string }) => void) | null;
   onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
   start: () => void;
   stop: () => void;
 };
-type SpeechWindow = Window & { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
+  available?: (options: { langs: string[]; processLocally: boolean; quality?: "dictation" }) => Promise<string>;
+  install?: (options: { langs: string[]; processLocally: boolean; quality?: "dictation" }) => Promise<boolean>;
+};
+type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
 
 export function ChatComposer({ draft, busy, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onOpenTaskPlanner }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voicePackNeeded, setVoicePackNeeded] = useState(false);
+  const [voicePackInstalling, setVoicePackInstalling] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const commandQuery = draft.match(/^\/([^\s]*)$/)?.[1] ?? null;
   const commandMatches = useMemo(() => commandQuery === null ? [] : composerCommands.filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery]);
@@ -51,22 +58,43 @@ export function ChatComposer({ draft, busy, attachments, queuedMessages, onDraft
   }, [activeCommandId, commandMatches.length, commandQuery]);
   useEffect(() => () => { recognitionRef.current?.stop(); recognitionRef.current = null; }, []);
 
-  const toggleVoiceInput = () => {
+  const toggleVoiceInput = async () => {
     if (voiceListening) { recognitionRef.current?.stop(); return; }
     const speechWindow = window as SpeechWindow;
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!Recognition) { setVoiceError("System speech input is not available in this desktop runtime."); return; }
     setVoiceError(null);
+    setVoicePackNeeded(false);
     const recognition = new Recognition();
+    if (!("processLocally" in recognition)) {
+      setVoiceError("This desktop runtime cannot guarantee on-device speech recognition, so voice input is unavailable to keep dictation private.");
+      return;
+    }
+    recognition.processLocally = true;
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = navigator.language || "en-US";
+    if (Recognition.available) {
+      try {
+        const availability = await Recognition.available({ langs: [recognition.lang], processLocally: true, quality: "dictation" });
+        if (availability !== "available") {
+          const canInstall = availability === "downloadable" || availability === "downloading";
+          setVoicePackNeeded(canInstall);
+          setVoiceError(canInstall ? "An on-device speech pack is required for this language." : "This desktop runtime has no on-device speech pack for this language. Remote recognition is disabled to keep dictation private.");
+          return;
+        }
+      } catch {
+        setVoiceError("On-device speech availability could not be checked. Remote recognition is disabled to keep dictation private.");
+        return;
+      }
+    }
     recognition.onresult = (event) => {
       const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index]?.[0]?.transcript ?? "").join(" ").trim();
       if (transcript) onDraftChange(`${draft.trim()}${draft.trim() ? " " : ""}${transcript}`);
     };
     recognition.onerror = (event) => {
-      setVoiceError(event.error === "not-allowed" ? "Microphone access was denied. Allow it in the desktop app permissions and try again." : "System speech input could not be completed.");
+      setVoicePackNeeded(event.error === "language-not-supported");
+      setVoiceError(event.error === "not-allowed" ? "Microphone access was denied. Allow it in the desktop app permissions and try again." : event.error === "language-not-supported" ? "The local speech pack for this language is not installed. Install an on-device speech pack in this desktop runtime, then try again." : "On-device speech input could not be completed.");
       setVoiceListening(false);
       recognitionRef.current = null;
     };
@@ -74,6 +102,29 @@ export function ChatComposer({ draft, busy, attachments, queuedMessages, onDraft
     recognitionRef.current = recognition;
     setVoiceListening(true);
     try { recognition.start(); } catch { setVoiceListening(false); recognitionRef.current = null; setVoiceError("System speech input could not start."); }
+  };
+
+  const installLocalSpeechPack = async () => {
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition?.install || voicePackInstalling) {
+      setVoiceError("This desktop runtime cannot install an on-device speech pack. Dictation remains disabled to prevent remote processing.");
+      setVoicePackNeeded(false);
+      return;
+    }
+    setVoicePackInstalling(true);
+    setVoiceError("Downloading the selected language pack for local speech recognition…");
+    try {
+      const installed = await Recognition.install({ langs: [navigator.language || "en-US"], processLocally: true, quality: "dictation" });
+      if (!installed) throw new Error("The desktop runtime could not install this language pack.");
+      setVoicePackNeeded(false);
+      setVoiceError("The speech pack is installed on this device. Start Voice again when you’re ready to dictate.");
+    } catch (error) {
+      setVoicePackNeeded(true);
+      setVoiceError(error instanceof Error ? error.message : "The local speech pack could not be installed.");
+    } finally {
+      setVoicePackInstalling(false);
+    }
   };
 
   const selectComposerCommand = (command: ComposerCommand) => {
@@ -121,7 +172,7 @@ export function ChatComposer({ draft, busy, attachments, queuedMessages, onDraft
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}><span>{queued.text}</span>{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`}>×</button></div>)}</div>}
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
     <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={busy ? "Type a follow-up while the model responds…" : "Message your model…"} aria-label="Message your model" aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />
-    {voiceError && <p className="composer-voice-error" role="alert">{voiceError}</p>}
+    {voiceError && <div className="composer-voice-status"><p className="composer-voice-error" role="status">{voiceError}</p>{voicePackNeeded && <div className="composer-voice-install"><Button variant="secondary" type="button" disabled={voicePackInstalling} onClick={() => void installLocalSpeechPack()}>{voicePackInstalling ? "Installing local pack…" : "Install local speech pack"}</Button><span>The pack downloads once; dictation is processed on this device.</span></div>}</div>}
     <div className="composer-actions"><Button variant="ghost" type="button" onClick={onAttach} disabled={attachments.length >= 5} aria-describedby="attachment-help">Attach</Button><Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"}>{voiceListening ? "Stop mic" : "Voice"}</Button><div><span id="attachment-help" className="composer-hint">{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span><Button variant={busy ? "secondary" : "primary"} disabled={!draft.trim() && attachments.length === 0} onClick={onSubmit}>{busy ? "Queue ↗" : "Send ↗"}</Button></div></div>
   </section>;
 }

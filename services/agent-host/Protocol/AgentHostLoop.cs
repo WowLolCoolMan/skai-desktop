@@ -492,12 +492,16 @@ public static class AgentHostLoop
             .GetAwaiter().GetResult();
         var providerId = OptionalString(request, "provider")?.Trim();
         if (string.IsNullOrWhiteSpace(providerId)) providerId = CreateSettingsStore().Load().ModelProvider;
+        IReadOnlyDictionary<string, int?> contextLengths = new Dictionary<string, int?>();
+        if (providerId.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            contextLengths = new ModelLibraryService().DiscoverOllamaContextLengthsAsync(endpoint, models.Select(model => model.Model)).GetAwaiter().GetResult();
         return new(ProtocolVersion, request.Id, true, models.Select(model => new
         {
             model = model.Model,
             vision = model.Vision,
             capabilities = model.Capabilities,
             provider = providerId,
+            contextLength = contextLengths.TryGetValue(model.Model, out var contextLength) ? contextLength : null,
         }).ToArray());
     }
 

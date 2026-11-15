@@ -43,10 +43,10 @@ cancellation, permission review, and local credential handling.
 - [x] Folders, tags, and pinned chats.
 - [x] Search within the current chat and jump to a matching message.
 - [x] Fork a chat from any message.
-- [ ] Voice input/output, hands-free calls, and advanced voice mode. (Local OS speech output and explicit one-shot system dictation are implemented; hands-free calls and advanced voice mode remain open.)
+- [ ] Voice input/output, hands-free calls, and advanced voice mode. (OS-native speech output and one-shot dictation forced to on-device recognition are implemented; users can explicitly install an on-device language pack, while runtime acceptance, hands-free calls, and advanced voice mode remain open.)
 - [ ] Image generation and editing. (Local ComfyUI workflow import/save, generation, and source-image editing through `{{image}}` and `{{prompt}}` are implemented; live ComfyUI acceptance remains open.)
 - [x] Context compaction. (Deterministic bounded provider-side compaction with omitted-history markers; semantic summarization remains open.)
-- [ ] 1M+ token context support. (Opt-in Ollama context windows up to 1M tokens and bounded 32 MB request payloads are implemented; supported-model discovery and live large-context acceptance remain open.)
+- [ ] 1M+ token context support. (Opt-in Ollama context windows up to 1M tokens, bounded 32 MB request payloads, and Ollama model-context discovery are implemented; this computer's installed models currently advertise up to 262,144 tokens, so 1M execution with a compatible local model remains unverified.)
 - [ ] Omni-modal input for text, images, audio, and video.
 - [x] Chat export and split view.
 - [x] NotebookLM-style mode grounded only in uploaded documents. (Bounded session-only mode is available from the composer, More actions, and command palette; durable corpus management remains open.)

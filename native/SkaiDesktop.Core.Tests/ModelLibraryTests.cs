@@ -55,6 +55,7 @@ internal static class ModelLibraryTests
             var models = (request.RequestUri?.Port, request.RequestUri?.AbsolutePath) switch
             {
                 (11434, "/api/tags") => "{\"models\":[{\"name\":\"llama3.2\",\"size\":123456789,\"details\":{\"family\":\"llama\"}},{\"name\":\"qwen3:8b\"}]}",
+                (11434, "/api/show") => "{\"model_info\":{\"llama.context_length\":131072}}",
                 (1234, "/api/v1/models") => "{\"models\":[{\"type\":\"llm\",\"key\":\"qwen3:8b\",\"display_name\":\"Qwen 3 8B\",\"size_bytes\":1234567890,\"loaded_instances\":[]}]}",
                 _ => "{\"data\":[]}"
             };
@@ -64,6 +65,7 @@ internal static class ModelLibraryTests
         Check(discoveredLocalModels.Count == 3, "model library finds installed models across multiple local runtimes");
         Check(discoveredLocalModels.Count(model => model.Model == "qwen3:8b") == 2 && discoveredLocalModels.Select(model => model.Endpoint).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 2, "same model ID remains distinguishable when installed in separate runtimes");
         Check(discoveredLocalModels.Any(model => model.Provider == "LM Studio" && model.IsLoaded == false && model.DisplayName == "Qwen 3 8B") && discoveredLocalModels.Any(model => model.Provider == "Ollama" && model.SizeBytes == 123456789), "runtime-native inventories include installed state and model metadata");
+        Check(discoveredLocalModels.Where(model => model.Provider == "Ollama").All(model => model.ContextLength == 131072), "Ollama inventory enriches short model lists with bounded context metadata");
         var resilientInventory = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
         {
             if (request.RequestUri?.Port == 1234 && request.RequestUri.AbsolutePath == "/api/v1/models")

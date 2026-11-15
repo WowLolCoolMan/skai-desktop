@@ -38,7 +38,7 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
         if (IsLoopbackEndpoint(configuredEndpoint) && !targets.Any(target => SameHost(target.Endpoint, configuredEndpoint)))
             targets.Add(("Current local endpoint", NormalizeModelsEndpoint(configuredEndpoint)));
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
         var results = await Task.WhenAll(targets.Select(async target =>
         {
             try
@@ -73,6 +73,26 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
             .ToArray();
     }
 
+    public async Task<IReadOnlyDictionary<string, int?>> DiscoverOllamaContextLengthsAsync(string endpoint, IEnumerable<string> modelNames, CancellationToken cancellationToken = default)
+    {
+        if (!IsLoopbackEndpoint(endpoint)) throw new InvalidOperationException("Ollama model metadata can be read only from a local endpoint.");
+        var names = modelNames.Where(IsSafeCatalogIdentifier).Distinct(StringComparer.OrdinalIgnoreCase).Take(64).ToArray();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        using var parallelism = new SemaphoreSlim(4, 4);
+        var contexts = await Task.WhenAll(names.Select(async name =>
+        {
+            await parallelism.WaitAsync(timeout.Token).ConfigureAwait(false);
+            try { return (Name: name, Length: await DiscoverOllamaContextLengthAsync(NormalizeModelsEndpoint(endpoint), name, timeout.Token).ConfigureAwait(false)); }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return (Name: name, Length: (int?)null); }
+            catch (HttpRequestException) { return (Name: name, Length: (int?)null); }
+            catch (JsonException) { return (Name: name, Length: (int?)null); }
+            catch (InvalidDataException) { return (Name: name, Length: (int?)null); }
+            finally { parallelism.Release(); }
+        })).ConfigureAwait(false);
+        return contexts.ToDictionary(item => item.Name, item => item.Length, StringComparer.OrdinalIgnoreCase);
+    }
+
     private async Task<InstalledLocalModel[]> DiscoverOllamaModelsAsync(string endpoint, CancellationToken cancellationToken)
     {
         var root = new Uri(endpoint);
@@ -81,7 +101,7 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
         if (!response.IsSuccessStatusCode) return [];
         using var json = await BoundedHttpContent.ReadJsonAsync(response.Content, cancellationToken, "Local model inventory response");
         if (!json.RootElement.TryGetProperty("models", out var models) || models.ValueKind != JsonValueKind.Array) return [];
-        return models.EnumerateArray()
+        var installed = models.EnumerateArray()
             .Where(item => item.TryGetProperty("name", out _))
             .Select(item => new InstalledLocalModel(
                 "Ollama",
@@ -92,6 +112,61 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
                 null))
             .Where(model => IsSafeCatalogIdentifier(model.Model))
             .ToArray();
+        // Ollama's tags endpoint does not include a model's training context.
+        // Ask /api/show for a bounded number of installed models so the UI can
+        // distinguish a known 1M-capable model from an unknown or smaller one.
+        using var parallelism = new SemaphoreSlim(4, 4);
+        var inspected = await Task.WhenAll(installed.Take(64).Select(async model =>
+        {
+            await parallelism.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var contextLength = await DiscoverOllamaContextLengthAsync(endpoint, model.Model, cancellationToken).ConfigureAwait(false);
+                return model with { ContextLength = contextLength };
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return model; }
+            catch (HttpRequestException) { return model; }
+            catch (JsonException) { return model; }
+            catch (InvalidDataException) { return model; }
+            finally { parallelism.Release(); }
+        })).ConfigureAwait(false);
+        var remainder = installed.Length > 64 ? installed[64..] : Array.Empty<InstalledLocalModel>();
+        return inspected.Concat(remainder).ToArray();
+    }
+
+    private async Task<int?> DiscoverOllamaContextLengthAsync(string endpoint, string model, CancellationToken cancellationToken)
+    {
+        var root = new Uri(endpoint);
+        var showUri = new UriBuilder(root) { Path = "/api/show", Query = "", Fragment = "" }.Uri;
+        using var response = await _http.PostAsJsonAsync(showUri, new { name = model }, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        using var json = await BoundedHttpContent.ReadJsonAsync(response.Content, cancellationToken, "Ollama model metadata").ConfigureAwait(false);
+        if (!json.RootElement.TryGetProperty("model_info", out var info) || info.ValueKind != JsonValueKind.Object) return null;
+        return FindContextLength(info);
+    }
+
+    private static int? FindContextLength(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if ((property.Name.Equals("context_length", StringComparison.OrdinalIgnoreCase) || property.Name.EndsWith(".context_length", StringComparison.OrdinalIgnoreCase))
+                    && property.Value.TryGetInt32(out var contextLength) && contextLength > 0)
+                    return contextLength;
+                var nested = FindContextLength(property.Value);
+                if (nested.HasValue) return nested;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+            {
+                var nested = FindContextLength(child);
+                if (nested.HasValue) return nested;
+            }
+        }
+        return null;
     }
 
     private async Task<InstalledLocalModel[]> DiscoverLmStudioModelsAsync(string endpoint, CancellationToken cancellationToken)
@@ -563,4 +638,4 @@ public sealed record ModelScopeGgufPackage(string Repository, string Name, IRead
 {
     public long SizeBytes => Files.Sum(file => Math.Max(0, file.SizeBytes));
 }
-public sealed record InstalledLocalModel(string Provider, string Model, string Endpoint, string? DisplayName = null, long? SizeBytes = null, bool? IsLoaded = null);
+public sealed record InstalledLocalModel(string Provider, string Model, string Endpoint, string? DisplayName = null, long? SizeBytes = null, bool? IsLoaded = null, int? ContextLength = null);

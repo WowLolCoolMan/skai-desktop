@@ -56,8 +56,11 @@ export async function speakNativeResponse(text: string, force = false) {
     if (native?.ok) return true;
   } catch { /* Browser preview fallback below. */ }
   if (!("speechSynthesis" in window)) return false;
+  const localVoice = window.speechSynthesis.getVoices().find((voice) => voice.localService);
+  if (!localVoice) return false;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text.replace(/[`*_>#]/g, "").replace(/\s+/g, " ").trim().slice(0, 4000));
+  utterance.voice = localVoice;
   utterance.rate = profile.rate;
   utterance.pitch = profile.pitch;
   window.speechSynthesis.speak(utterance);

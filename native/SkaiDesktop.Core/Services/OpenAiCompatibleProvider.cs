@@ -17,22 +17,23 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
     private const int MaxMessages = 500;
     private const int MaxMessageCharacters = 1_000_000;
     private const int MaxStreamedResponseCharacters = 1_000_000;
+    private const int ContextCompactionBytes = 8_000_000;
     private const int MaxRequestBytes = 32_000_000;
     private const int MaxPlanningCharacters = 32_000_000;
 
     // The planner budgets characters but the limit is UTF-8 bytes; multi-byte text (accented, Cyrillic,
     // CJK) needs up to 4 bytes per character. Plan, measure the serialized request, and shrink the
     // character budget by the measured ratio until it fits. ASCII histories fit on the first pass.
-    private static (IReadOnlyList<ChatMessage> Messages, string Json) CompactToRequestLimit(IReadOnlyList<ChatMessage> messages, Func<IReadOnlyList<ChatMessage>, string> serialize)
+    private static (IReadOnlyList<ChatMessage> Messages, string Json) CompactToRequestLimit(IReadOnlyList<ChatMessage> messages, int byteLimit, Func<IReadOnlyList<ChatMessage>, string> serialize)
     {
-        var budget = MaxRequestBytes - 1_000_000;
+        var budget = byteLimit - 1_000_000;
         for (var attempt = 0; attempt < 6 && budget > 0; attempt++)
         {
             var planned = ConversationContextPlanner.Plan(messages, budget).Messages;
             var json = serialize(planned);
             var bytes = Encoding.UTF8.GetByteCount(json);
-            if (bytes <= MaxRequestBytes) return (planned, json);
-            budget = (int)(budget * ((double)MaxRequestBytes / bytes) * 0.9);
+            if (bytes <= byteLimit) return (planned, json);
+            budget = (int)(budget * ((double)byteLimit / bytes) * 0.9);
         }
         throw new InvalidOperationException("The model request exceeds the 32 MB payload limit after bounded context compaction.");
     }
@@ -59,8 +60,8 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         timeout.CancelAfter(TimeSpan.FromMinutes(5));
         var requestMessages = messages;
         var requestJson = SerializeRequest(settings, requestMessages, maxTokens);
-        if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
-            (requestMessages, requestJson) = CompactToRequestLimit(messages, compacted => SerializeRequest(settings, compacted, maxTokens));
+        if (Encoding.UTF8.GetByteCount(requestJson) > ContextCompactionBytes)
+            (requestMessages, requestJson) = CompactToRequestLimit(messages, ContextCompactionBytes, compacted => SerializeRequest(settings, compacted, maxTokens));
         using var request = new HttpRequestMessage(HttpMethod.Post, BuildChatUri(settings.Endpoint))
         {
             Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
@@ -165,8 +166,8 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         timeout.CancelAfter(TimeSpan.FromMinutes(5));
         var requestMessages = messages;
         var requestJson = SerializeOllamaNativeRequest(settings, requestMessages, maxTokens);
-        if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
-            (requestMessages, requestJson) = CompactToRequestLimit(messages, compacted => SerializeOllamaNativeRequest(settings, compacted, maxTokens));
+        if (Encoding.UTF8.GetByteCount(requestJson) > ContextCompactionBytes)
+            (requestMessages, requestJson) = CompactToRequestLimit(messages, ContextCompactionBytes, compacted => SerializeOllamaNativeRequest(settings, compacted, maxTokens));
         var endpoint = new Uri(settings.Endpoint.TrimEnd('/') + "/");
         var chatUri = new UriBuilder(endpoint) { Path = "/api/chat", Query = "", Fragment = "" }.Uri;
         using var request = new HttpRequestMessage(HttpMethod.Post, chatUri) { Content = new StringContent(requestJson, Encoding.UTF8, "application/json") };

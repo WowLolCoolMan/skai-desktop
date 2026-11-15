@@ -748,3 +748,4 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .sidebar-active-session { display: none; }
   .sidebar-brand { padding-top: 4px; padding-bottom: 4px; }
 }
+.marketplace-grid .marketplace-card { width: 100%; border: 1px solid var(--skai-color-border); border-radius: 12px; color: var(--skai-color-text); background: var(--skai-color-surface); text-align: left; cursor: pointer; transition: border-color .15s ease, transform .15s ease; }.marketplace-grid .marketplace-card:hover { border-color: color-mix(in srgb, var(--skai-color-accent) 55%, var(--skai-color-border)); transform: translateY(-2px); }.marketplace-grid .marketplace-card > .nav-icon { color: var(--skai-color-accent); }.marketplace-grid .marketplace-card small { color: var(--skai-color-text-muted); font-size: 10px; }
