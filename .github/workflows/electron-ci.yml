@@ -50,6 +50,7 @@ jobs:
         run: |
           npm run audit:electron-runtime
           npm run audit:electron-tray
+          npm run audit:bridge-methods
           npm run audit:local-only
 
       - name: Electron main-process unit checks
