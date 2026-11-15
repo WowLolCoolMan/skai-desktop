@@ -12,20 +12,15 @@ when files under `docs/`, the workflow, or branding assets change on `main`. A
 manual run is also available from the Actions tab. The deployment uses the
 `github-pages` environment and GitHub's Pages artifact workflow.
 
-For the first deployment, open the repository's **Settings → Pages** and set
-the publishing source to **GitHub Actions**. This owner-level repository
-setting cannot be changed by the workflow token. Successful workflow runs
-publish the site at
-`https://wowlolcoolman.github.io/skai-desktop/`.
-
-On 2026-11-15, **Deploy project site** completed successfully for commit
-`77f766f9` and the public URL returned HTTP 200. However, a live content check
-still returned GitHub's Jekyll-rendered repository README instead of the custom
-`docs/index.html` artifact. The workflow run is green, but the custom landing
-page is not yet verified as the live page. Check the repository's **Settings →
-Pages** publishing source and the latest deployment before treating the design
-in `docs/index.html` as published. Once corrected, pushes to `main` that change
-`docs/`, branding assets, or this workflow should deploy automatically.
+The repository's **Settings → Pages** publishing source is **GitHub Actions**.
+This owner-level repository setting cannot be changed by the workflow token.
+The public site is
+`https://wowlolcoolman.github.io/skai-desktop/`; on 2026-11-15, a live check
+returned HTTP 200 and the custom title **Skai Desktop — Your local AI
+workspace**, confirming that `docs/index.html` is being served. A manually
+requested **Deploy project site** run for commit `101cd2bf` is also in progress
+after the source was corrected. Pushes to `main` that change `docs/`, branding
+assets, or this workflow should deploy automatically.
 
 ## Content maintenance
 
