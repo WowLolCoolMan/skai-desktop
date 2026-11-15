@@ -1,121 +1,65 @@
-# Built-in local image generation
+# Local image generation
 
-## Current implementation and future direction
+Skai has two local image paths. Both keep prompts and generated content on this
+computer; there is no hosted inference fallback.
 
-The Electron desktop client connects to a user-configured local ComfyUI server.
-It can discover installed checkpoints, create built-in text-to-image and
-image-edit workflows, import/save workflows, upload a source image, and queue
-and poll local jobs. Live generation acceptance against a running ComfyUI
-instance is still open. Skai does not bundle a Stable Diffusion runtime or
-provide a built-in image-model downloader. The proposal below describes a
-possible future local runtime that could complement or replace the ComfyUI
-integration; it is not implemented product behavior. Hosted inference is out
-of product scope.
+## Built-in Diffusers runtime
 
-## Recommended approach
+The Images page can install an optional Python environment in
+`%LOCALAPPDATA%\Skai\Diffusers` (Windows) and run Stable Diffusion Turbo through
+Hugging Face Diffusers. Setup is user initiated and reports pip output; PyTorch
+and related packages can use several gigabytes. The first generation downloads
+the `stabilityai/sd-turbo` model weights (about 5.2 GB). The current worker uses
+512×512 output, four inference steps, and CPU when CUDA is unavailable. The
+managed Python environment is installed on the local machine and is not bundled
+inside the desktop installer.
 
-Bundle a small native inference engine with the desktop app and have the app own
-model discovery, downloads, generation controls, saved images, and
-progress/cancellation. The strongest candidate is `stable-diffusion.cpp`: its
-upstream project describes a pure C/C++ implementation with no external runtime
-dependencies, an MIT license, Windows/Linux/macOS support, CPU and several GPU
-backends, and support for Stable Diffusion and other image model families. The
-first supported lane should be its CPU build; add a Vulkan build as an optional
-accelerated runtime after testing representative GPUs. This avoids bundling the
-large Python/PyTorch stack required by Hugging Face Diffusers.
+The worker accepts one prompt per process and returns a bounded JPEG to the
+renderer. The renderer keeps recent output history in IndexedDB on this device,
+including the Diffusers image bytes, prompt, provider, and timestamp. History is
+limited to 24 records and 32 MiB of URL data. Runtime dependency installation,
+the first model download, and local CPU generation were exercised in Skai on
+2026-11-15. The persistent IndexedDB database and image blob were present after
+closing and relaunching the app; visually reopening the gallery entry after that
+restart still needs acceptance. Cancellation during inference and the packaged
+hardware matrix also remain unverified.
 
-Users would not install or configure another app. We either bundle the CPU engine
-in our installer, or deliver a signed, version-pinned engine package from our own
-app release channel on first use. The app validates that package before launching
-it. GPU backends still need a compatible system driver, just as other native
-software does; CPU remains the universal fallback, with a clear slower-performance
-message. This is “built in” from the user's perspective, while acknowledging that
-the application redistributes a third-party open-source engine under its license.
+## ComfyUI integration
 
-The engine's format support is not identical to Hugging Face Diffusers' Python
-library. Start with compatible standalone `.safetensors` and `.gguf` image weights.
-Do not promise that every Hub repository works: standard Diffusers repositories
-may contain component folders and architectures that need conversion or are not
-supported by the native engine. Search results must identify the exact compatible
-file/layout, and unsupported repositories should say why they cannot be installed.
-Do not support pickle-based `.ckpt`/`.pt` downloads in the first release.
+The Electron client can connect to a user-configured local ComfyUI server,
+discover installed checkpoints, create built-in text-to-image and image-edit
+workflows, import and save workflows, upload a source image, and queue and poll
+local jobs. Live generation acceptance against a running ComfyUI instance is
+still open. ComfyUI is a separate local service; it is not required for the
+built-in Diffusers path.
 
-### User flow
+## Current boundaries and next work
 
-1. The Images page offers **Generate locally** as the simple default. Hosted
-   generation stays a separate, clearly labeled choice.
-2. First use checks for the bundled or app-managed image runtime. If absent, the
-   app explains the download size and supported hardware, then offers **Set up
-   local image generation**. This downloads and verifies our signed runtime asset;
-   users never open a terminal or install a separate tool.
-3. **Browse image models** searches Hugging Face for formats and architectures
-   supported by the bundled engine. Model cards show license, exact file format,
-   size, task, and whether the app recognizes the model layout. The catalog never
-   implies every Hub repository is runnable.
-4. The user downloads a compatible model into the app's dedicated image-model
-   store. The UI shows byte progress, cancel/retry, and enough disk-space guidance.
-5. The model dropdown selects among installed image models. Advanced controls
-   expose dimensions, steps, guidance, seed, and device choice; safe defaults keep
-   the first generation simple.
-6. Results are saved in the app's image history and remain available offline.
+- The built-in worker currently supports `stabilityai/sd-turbo` only. The UI does
+  not yet provide general model search, an installed-model library, arbitrary
+  model selection, or advanced generation controls.
+- The worker selects CUDA when PyTorch reports it available and otherwise uses
+  CPU. AMD GPU acceleration and backend selection are not implemented or
+  verified; CPU may be slow.
+- ComfyUI history retains local output URLs, so the local ComfyUI service must be
+  available to view those outputs later. Built-in Diffusers editing, resumable
+  downloads/jobs, inference progress, and cancellation of active generation
+  remain open.
+- Runtime setup and model download need clear disk/network requirements. Model
+  weights and Python packages are separate downloads.
+- Prompts and model execution remain local. Model downloads contact Hugging Face
+  and follow that repository's license and access requirements.
 
-### Format and security boundary
+## Acceptance criteria
 
-- First release supports only model families and file layouts validated against
-  the pinned native engine version. Prefer standalone safetensors or GGUF. It does
-  not load `.ckpt`/pickle weights or execute custom code from a model repository.
-- Model download allowlists repository files needed by standard pipelines,
-  enforces file-count and total-size limits, writes temporary files before
-  replacing completed files, and supports cancellation and retry.
-- The UI displays the repository license and links to its model card before the
-  user starts a large download. It does not claim to validate model safety or
-  grant redistribution rights.
-- Runtime installation is a user-initiated action with clear storage/network
-  requirements. Hub authentication is only used for the user's gated model
-  download; prompts and generated images stay local for local inference.
-- Generation has explicit memory-aware limits, cancellation, bounded output, and
-  clear errors for unsupported formats or insufficient memory.
+Do not call built-in generation complete until a real supported model has been
+downloaded, generated an image locally, and that image has been reopened from
+local storage. The first two steps were verified on Windows with Python 3,
+PyTorch 2.15.0+cpu, Diffusers 0.43.0, and CPU inference on 2026-11-15; visual
+reopen after restart remains outstanding. Mocked-worker tests verify plumbing
+only; they do not substitute for real model acceptance.
 
-## Delivery slices
+## References
 
-1. **Runtime boundary:** managed worker lifecycle, readiness/device probe,
-   cancellation, progress messages, output limits, and deterministic test seam.
-2. **Model library:** Hugging Face image-pipeline search, format/license metadata,
-   safe standard-Diffusers download, integrity/error recovery, and installed-model
-   inventory.
-3. **Image generation:** local text-to-image and image-to-image execution,
-   progress/stop, image history, and no-ComfyUI first-run behavior.
-4. **Product fit:** simple Images page, optional advanced controls, empty/loading/
-   offline/error states, keyboard/accessibility review, and native service
-   integration.
-5. **Verification:** mocked worker and Hub tests, real small permissively licensed
-   smoke model on CPU, GPU checks where hardware is available, desktop packaging,
-   and Windows/Linux runtime matrix evidence.
-
-Do not call the feature complete until a real small model has generated and
-reloaded an image locally. Unit tests with mocked models only verify plumbing.
-
-## Compatibility notes
-
-The native engine documents CPU, CUDA, Vulkan, Metal, OpenCL, and SYCL backends,
-with Linux, Windows, and macOS as supported platforms. Actual acceleration still
-depends on the binary we build, the user's GPU, and its driver. CPU is the broad
-fallback but may be slow. The feature must report the backend it detected and let
-users choose a compatible model size before downloading. The project's Windows 8
-target needs a separate compatibility decision; the app shell, native runtime,
-driver support, and packaged binary all need evidence before we claim it works.
-
-The upstream engine is under active development and says its CLI/API may change.
-Pin a reviewed release/commit, wrap it in our own small stable adapter, test its
-exact command and progress output, and verify the license of the full dependency
-tree before shipping. Include attribution and license notices in our packages.
-
-## Official references
-
-- [stable-diffusion.cpp supported models, formats, platforms, and backends](https://github.com/leejet/stable-diffusion.cpp)
-- [stable-diffusion.cpp build options](https://github.com/leejet/stable-diffusion.cpp/blob/master/docs/build.md)
-- [stable-diffusion.cpp backend selection and memory placement](https://github.com/leejet/stable-diffusion.cpp/blob/master/docs/backend.md)
-- [Hugging Face Diffusers model formats](https://github.com/huggingface/diffusers/blob/main/docs/source/en/using-diffusers/other-formats.md)
-- [Diffusers installation and supported devices](https://huggingface.co/docs/diffusers/installation) (comparison baseline; not the proposed shipped runtime)
-- [Transformers.js supported tasks and WebGPU behavior](https://huggingface.co/docs/transformers.js/)
-- [Hugging Face model API](https://huggingface.co/docs/hub/api)
+- [Diffusers installation](https://huggingface.co/docs/diffusers/installation)
+- [Stable Diffusion Turbo model card](https://huggingface.co/stabilityai/sd-turbo)

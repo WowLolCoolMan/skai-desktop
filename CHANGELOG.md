@@ -6,7 +6,10 @@
 
 - Added local MP4 and WebM chat input that samples four timestamped frames into
   JPEG attachments, with bounded size and duration, private temporary storage,
-  and packaged Electron smoke coverage.
+  and packaged Electron smoke coverage for WebM and H.264 MP4.
+- Added local audio-file transcription for MP3, M4A, OGG, and WAV into the chat
+  draft using an on-device speech track; packaged smoke verifies the fail-closed
+  path when the runtime speech pack is unavailable.
 - Added hands-free local voice turns that submit final on-device dictation and
   speak each reply and wait for local speech to finish before listening again,
   without changing the regular voice-output preference.
@@ -18,6 +21,8 @@
   a curated documentation index.
 - Added checkpoint discovery and built-in ComfyUI text-to-image and image-edit
   workflow templates to the Images workspace.
+- Added an optional managed Diffusers environment and local Stable Diffusion
+  Turbo worker, with runtime setup from the Images page and bounded JPEG results.
 
 ### Updated
 
@@ -25,6 +30,8 @@
   model boundary, Monaco project editor, and current image workflow support.
 - Synced the capability matrix, project site, voice architecture notes, and
   release docs with hands-free chat behavior and the Pages setup blocker.
+- Updated image-generation docs to describe the implemented Diffusers runtime
+  and clearly identify the real-model and packaged-runtime acceptance gaps.
 
 ### Fixed
 

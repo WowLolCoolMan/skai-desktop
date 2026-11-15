@@ -20,15 +20,15 @@ if (!allowBlock) {
 }
 const allowed = new Set([...allowBlock[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]));
 // Handled directly in main.cjs before requests reach the host.
-const shellHandled = new Set([...main.matchAll(/method === "([a-zA-Z]+\.[a-zA-Z.]+)"/g)].map((match) => match[1]));
+const shellHandled = new Set([...main.matchAll(/method === "([a-zA-Z]+\.[a-zA-Z.-]+)"/g)].map((match) => match[1]));
 
 const hostLoop = read("services/agent-host/Protocol/AgentHostLoop.cs");
-const hostMethods = new Set([...hostLoop.matchAll(/"([a-z]+(?:\.[a-zA-Z]+)+)"\s*=>/g)].map((match) => match[1]));
+const hostMethods = new Set([...hostLoop.matchAll(/"([a-z]+(?:\.[a-zA-Z-]+)+)"\s*=>/g)].map((match) => match[1]));
 
 const called = new Map();
 for (const file of walk(path.join(root, "apps", "desktop", "src"))) {
   const source = fs.readFileSync(file, "utf8");
-  for (const match of source.matchAll(/\brequest(?:<[^>]*>)?\(\s*"([a-zA-Z]+\.[a-zA-Z.]+)"/g)) {
+  for (const match of source.matchAll(/\brequest(?:<[^>]*>)?\(\s*"([a-zA-Z]+\.[a-zA-Z.-]+)"/g)) {
     if (!called.has(match[1])) called.set(match[1], path.relative(root, file));
   }
 }
