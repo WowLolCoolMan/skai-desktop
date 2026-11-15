@@ -17,6 +17,7 @@ const packageScript = fs.readFileSync(path.join(root, "scripts", "package-electr
 const smokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-artifact.cjs"), "utf8");
 const themeSmokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-themes.cjs"), "utf8");
 const overflowSmokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-overflow.cjs"), "utf8");
+const workspace = fs.readFileSync(path.join(root, "apps", "desktop", "src", "app", "useDesktopWorkspace.ts"), "utf8");
 
 function findAlternateDesktopFiles(directory, results = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -86,6 +87,7 @@ expect(packageScript.includes("electronDist") && packageScript.includes("const a
 expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("mainTarget") && smokeScript.includes("petTarget") && smokeScript.includes("Primary navigation") && smokeScript.includes("Percy desktop companion") && smokeScript.includes("pet-window-sprite"), "Electron packaged smoke must inspect the main navigation, Settings, and separate Percy surfaces");
 expect(packageJson.scripts["smoke:electron:themes"] === "node scripts/smoke-electron-themes.cjs" && themeSmokeScript.includes("Emulation.setDeviceMetricsOverride") && themeSmokeScript.includes("Page.captureScreenshot") && themeSmokeScript.includes("deep-space"), "Packaged Electron theme acceptance must exercise constrained rendering and capture appearance states");
 expect(packageJson.scripts["smoke:electron:overflow"] === "node scripts/smoke-electron-overflow.cjs" && overflowSmokeScript.includes("1920") && overflowSmokeScript.includes("routes") && overflowSmokeScript.includes("getBoundingClientRect"), "Packaged Electron overflow acceptance must exercise every route across supported viewport widths");
+expect(workspace.includes("const hasActiveTasks") && workspace.includes("loadWorkbench(false)") && workspace.includes("window.setInterval"), "Workbench must refresh background task state while local execution is active");
 const alternateDesktopFiles = findAlternateDesktopFiles(root);
 expect(alternateDesktopFiles.length === 0, `alternate desktop UI files must not return to the project: ${alternateDesktopFiles.join(", ")}`);
 
