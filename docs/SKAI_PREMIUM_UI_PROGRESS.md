@@ -574,7 +574,7 @@ The following working-tree paths are intentionally not part of the premium UI ch
 
 - `native/SkaiDesktop.Core.Tests/Program.cs`
 - `native/SkaiDesktop.Core/Models/AppSettings.cs`
-- `native/ServerRock.Native/**`
+- `native/SkaiDesktop.Core/**`
 - `native/SkaiDesktop.Core.Tests/AirLlmProviderTests.cs`
 - `native/SkaiDesktop.Core/Services/AirLlmProvider.cs`
 - `services/airllm/**`
