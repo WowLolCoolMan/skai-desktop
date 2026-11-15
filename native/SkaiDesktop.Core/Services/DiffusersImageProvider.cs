@@ -48,10 +48,22 @@ public sealed class DiffusersImageProvider
         await RunSetupProcessAsync(venvPython, ["-c", "import diffusers, torch; print('Diffusers and PyTorch are ready')"], root, reportProgress, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<LocalGeneratedImage> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
+    public async Task<LocalGeneratedImage> GenerateAsync(string prompt, string? sourceImageBase64 = null, string? sourceImageMediaType = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(prompt) || prompt.Length > MaxPromptCharacters)
             throw new ArgumentException($"Enter an image prompt up to {MaxPromptCharacters:N0} characters.", nameof(prompt));
+        if ((sourceImageBase64 is null) != (sourceImageMediaType is null))
+            throw new ArgumentException("Source image data and media type must be supplied together.");
+        if (sourceImageBase64 is not null)
+        {
+            if (sourceImageBase64.Length > 8_400_000 || sourceImageMediaType is not ("image/png" or "image/jpeg"))
+                throw new ArgumentException("Choose a PNG or JPEG source image up to 6 MB.", nameof(sourceImageBase64));
+            byte[] sourceBytes;
+            try { sourceBytes = Convert.FromBase64String(sourceImageBase64); }
+            catch (FormatException error) { throw new ArgumentException("The source image encoding is invalid.", nameof(sourceImageBase64), error); }
+            if (sourceBytes.Length is < 8 or > 6 * 1024 * 1024 || !ChatAttachmentPolicy.HasValidImageSignature(sourceImageMediaType, sourceBytes))
+                throw new ArgumentException("Choose a valid PNG or JPEG source image up to 6 MB.", nameof(sourceImageBase64));
+        }
         var worker = ResolveWorkerPath() ?? throw new InvalidOperationException("The local image worker is missing from this Skai installation.");
         var python = ResolvePythonPath();
         if (!CheckDependencies(python))
@@ -71,7 +83,7 @@ public sealed class DiffusersImageProvider
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the local image runtime.");
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
         using var cancellation = cancellationToken.Register(() => { try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { } });
-        await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { model = DefaultModel, prompt = prompt.Trim() }, JsonOptions)).ConfigureAwait(false);
+        await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { model = DefaultModel, prompt = prompt.Trim(), sourceImage = sourceImageBase64, sourceImageMediaType }, JsonOptions)).ConfigureAwait(false);
         await process.StandardInput.FlushAsync().ConfigureAwait(false);
         process.StandardInput.Close();
         string? dataUrl = null;

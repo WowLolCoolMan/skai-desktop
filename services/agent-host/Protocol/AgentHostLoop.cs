@@ -1807,9 +1807,14 @@ public static class AgentHostLoop
         if (provider.Length > 32) throw new InvalidOperationException("Image provider name exceeds its safety limit.");
         if (provider.Equals("diffusers", StringComparison.OrdinalIgnoreCase))
         {
-            if (request.Params?.TryGetProperty("sourceImage", out _) == true)
-                throw new InvalidOperationException("Image editing is currently available through the ComfyUI workflow option.");
-            var generated = await new DiffusersImageProvider().GenerateAsync(prompt).ConfigureAwait(false);
+            string? diffusersSourceImage = null;
+            string? diffusersSourceMediaType = null;
+            if (request.Params?.TryGetProperty("sourceImage", out var diffusersSource) == true && diffusersSource.ValueKind == JsonValueKind.String)
+            {
+                diffusersSourceImage = diffusersSource.GetString();
+                diffusersSourceMediaType = RequiredBoundedString(request, "sourceImageMediaType", 32);
+            }
+            var generated = await new DiffusersImageProvider().GenerateAsync(prompt, diffusersSourceImage, diffusersSourceMediaType).ConfigureAwait(false);
             return new(ProtocolVersion, request.Id, true, new { prompt, progress = "Generated locally with Stable Diffusion Turbo.", images = new[] { new { url = generated.DataUrl, fileName = generated.FileName } } });
         }
         if (!provider.Equals("comfyui", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Choose a supported local image provider.");

@@ -216,7 +216,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     localStorage.setItem("skai.imageProvider", imageProvider);
     localStorage.setItem("skai.imageWorkflow", imageWorkflow); localStorage.setItem("skai.imageProvider", imageProvider);
     try {
-      const response = await request("image.generate", { provider: imageProvider, ...(imageProvider === "comfyui" ? { endpoint: imageEndpoint, workflow: imageWorkflow, ...(source ? { sourceImage: source.content, sourceImageMediaType: source.mediaType } : {}) } : {}), prompt: imagePrompt });
+      const response = await request("image.generate", { provider: imageProvider, ...(imageProvider === "comfyui" ? { endpoint: imageEndpoint, workflow: imageWorkflow } : {}), ...(source ? { sourceImage: source.content, sourceImageMediaType: source.mediaType } : {}), prompt: imagePrompt });
       if (!response.ok) { setError(response.error?.message ?? "Image generation failed."); return; }
       const result = response.result as { images?: Array<{ url: string; fileName: string }> };
       const createdAt = new Date().toISOString();
