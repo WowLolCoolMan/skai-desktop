@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 
@@ -8,13 +9,14 @@ const executable = path.resolve(process.argv[2] || path.join(defaultRoot, defaul
 const port = 19322;
 const timeoutMs = 20_000;
 const prefillKey = "skai.chat.taskPrefill";
+const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-task-replan-"));
 
 if (!fs.existsSync(executable)) {
   console.error(`Electron artifact does not exist: ${executable}`);
   process.exit(1);
 }
 
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu"], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${profileRoot}`, "--disable-gpu"], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
@@ -58,8 +60,11 @@ async function main() {
   }
   if (!target) throw new Error(`Packaged Electron did not expose the main page before timeout. Output: ${output.slice(-2_000)}`);
 
-  const staged = await evaluate(target, `localStorage.setItem(${JSON.stringify(prefillKey)}, JSON.stringify({ title: "Recover local task", instruction: "Review the failed result and produce a verified local plan.", environment: "local" })); location.hash = "#/chat"; "staged"`);
+  const staged = await evaluate(target, `localStorage.setItem(${JSON.stringify(prefillKey)}, JSON.stringify({ title: "Recover local task", instruction: "Review the failed result and produce a verified local plan.", environment: "local" })); location.hash = "#/workbench"; "staged"`);
   if (staged !== "staged") throw new Error(`Could not stage the task handoff: ${JSON.stringify(staged)}`);
+  await sleep(250);
+  const navigated = await evaluate(target, `location.hash = "#/chat"; "navigated"`);
+  if (navigated !== "navigated") throw new Error("Could not navigate to Chat for the task re-plan handoff.");
 
   let state;
   const renderDeadline = Date.now() + 8_000;
@@ -75,6 +80,18 @@ async function main() {
   console.log(`Packaged task re-plan smoke passed: ${JSON.stringify({ route: state.hash, title: state.title, composerOpen: state.open, prefillConsumed: state.consumed })}`);
 }
 
-main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(() => {
-  if (!child.killed) child.kill();
+async function stopChild() {
+  if (child.exitCode !== null) return;
+  if (process.platform === "win32" && child.pid) {
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+    await new Promise((resolve) => { killer.once("close", resolve); killer.once("error", resolve); });
+  } else if (!child.killed) {
+    child.kill("SIGTERM");
+  }
+  await new Promise((resolve) => child.once("exit", resolve));
+}
+
+main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
+  await stopChild();
+  try { fs.rmSync(profileRoot, { recursive: true, force: true }); } catch { /* Electron may release the profile shortly after exit. */ }
 });
