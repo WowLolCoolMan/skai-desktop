@@ -13,5 +13,5 @@ public sealed record ChatMessage(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<ChatSource>? Sources = null)
 {
     /// <summary>Creates the provider payload version without local-only UI metadata.</summary>
-    public ChatMessage ForModel(string content) => new(Role, content, Attachments?.Where(attachment => attachment.IsImage).ToList());
+    public ChatMessage ForModel(string content) => new(Role, content, Attachments?.ToList());
 }

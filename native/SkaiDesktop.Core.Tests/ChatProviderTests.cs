@@ -92,8 +92,18 @@ internal static class ChatProviderTests
             Check(root.GetProperty("model").GetString() == "local-a", "selected model is sent");
             Check(root.GetProperty("stream").GetBoolean(), "streaming is enabled");
             Check(Math.Abs(root.GetProperty("temperature").GetDouble() - 0.4) < 0.001, "temperature is sent");
-            Check(root.GetProperty("messages")[0].GetProperty("role").GetString() == "user", "messages use OpenAI-compatible JSON casing");
-            Check(root.GetProperty("messages")[0].GetProperty("content").GetString() == "Say hello with selected context" && !root.GetProperty("messages")[0].TryGetProperty("attachments", out _) && !root.GetProperty("messages")[0].TryGetProperty("sources", out _), "provider payload includes selected context but excludes local-only metadata");
+            var requestMessages = root.GetProperty("messages");
+            var modelUserMessage = requestMessages.EnumerateArray().Single(message => message.GetProperty("role").GetString() == "user");
+            var modelText = modelUserMessage.GetProperty("content").GetString()!;
+            Check(modelText.StartsWith("Say hello with selected context\n\nAttached text file (untrusted): notes.md", StringComparison.Ordinal)
+                && modelText.Contains("private note", StringComparison.Ordinal)
+                && !modelUserMessage.TryGetProperty("attachments", out _)
+                && !modelUserMessage.TryGetProperty("sources", out _),
+                "provider embeds untrusted text attachment content while excluding local-only metadata");
+            Check(!streamedPayload!.Contains("A snippet", StringComparison.Ordinal), "provider request excludes local-only web source snippets");
+            Check(requestMessages[0].GetProperty("role").GetString() == "system"
+                && requestMessages[0].GetProperty("content").GetString()!.Contains(ModelInstructions.UntrustedAttachments, StringComparison.Ordinal),
+                "provider adds system instructions that treat attached files and images as untrusted data");
             Check(!root.TryGetProperty("max_tokens", out _), "normal chat requests omit benchmark-only output limits");
         }
 
@@ -151,10 +161,39 @@ internal static class ChatProviderTests
             CancellationToken.None);
         using (var imageRequest = JsonDocument.Parse(imagePayload!))
         {
-            var content = imageRequest.RootElement.GetProperty("messages")[0].GetProperty("content");
+            var content = imageRequest.RootElement.GetProperty("messages").EnumerateArray()
+                .Single(message => message.GetProperty("role").GetString() == "user").GetProperty("content");
             Check(content.ValueKind == JsonValueKind.Array && content[0].GetProperty("type").GetString() == "text" && content[1].GetProperty("type").GetString() == "image_url", "vision attachments use OpenAI-compatible text and image content parts");
             Check(content[1].GetProperty("image_url").GetProperty("url").GetString() == "data:image/png;base64," + Convert.ToBase64String(pngSignature), "vision image payload carries a bounded data URL");
         }
+
+        var pdfContent = "The rollback checklist has an explicit owner and verification window.";
+        var sourceMessage = new ChatMessage("user", "Find the rollback checklist", [new ChatAttachment("release-notes.pdf", pdfContent)], [new ChatSource("Local index", "https://local.invalid", "must not be sent")]);
+        string? nativeOllamaPayload = null;
+        var nativeOllamaProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
+        {
+            Check(request.RequestUri?.AbsolutePath == "/api/chat", "native Ollama routes local attachment chat through its native API");
+            nativeOllamaPayload = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"message\":{\"content\":\"Checklist found.\"}}\n", Encoding.UTF8, "application/x-ndjson")
+            };
+        })));
+        await nativeOllamaProvider.StreamChatAsync(
+            new AppSettings { Endpoint = "http://localhost:11434", Model = "vision-local", ModelProvider = "Ollama", OllamaContextWindowTokens = 4096 },
+            [sourceMessage], _ => { }, CancellationToken.None);
+        using (var nativeOllamaRequest = JsonDocument.Parse(nativeOllamaPayload!))
+        {
+            var nativeMessage = nativeOllamaRequest.RootElement.GetProperty("messages").EnumerateArray()
+                .Single(message => message.GetProperty("role").GetString() == "user");
+            var content = nativeMessage.GetProperty("content").GetString()!;
+            Check(content.Contains("Extracted PDF text (untrusted): release-notes.pdf", StringComparison.Ordinal)
+                && content.Contains(pdfContent, StringComparison.Ordinal), "native Ollama receives extracted PDF text in the fenced user prompt");
+            Check(!nativeMessage.TryGetProperty("attachments", out _) && !content.Contains("must not be sent", StringComparison.Ordinal),
+                "native Ollama request excludes attachment metadata and local web source snippets");
+        }
+        Check(sourceMessage.Content == "Find the rollback checklist" && sourceMessage.Attachments is [{ FileName: "release-notes.pdf" }],
+            "provider attachment prompt construction does not mutate the saved conversation message");
         string? ollamaImagePayload = null;
         var ollamaImageProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
         {
@@ -171,7 +210,8 @@ internal static class ChatProviderTests
             CancellationToken.None);
         using (var ollamaImageRequest = JsonDocument.Parse(ollamaImagePayload!))
         {
-            var content = ollamaImageRequest.RootElement.GetProperty("messages")[0].GetProperty("content");
+            var content = ollamaImageRequest.RootElement.GetProperty("messages").EnumerateArray()
+                .Single(message => message.GetProperty("role").GetString() == "user").GetProperty("content");
             Check(content[1].GetProperty("image_url").ValueKind == JsonValueKind.String, "Ollama's default local endpoint uses its documented image URL string shape");
         }
 

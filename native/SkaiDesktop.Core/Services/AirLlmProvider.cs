@@ -118,7 +118,8 @@ public sealed class AirLlmProvider
             {
                 op = "chat",
                 model = settings.Model,
-                messages = messages.Select(message => new { role = message.Role, content = message.Content }).ToArray(),
+                messages = ChatAttachmentPrompt.PrepareMessagesForModel(messages)
+                    .Select(message => new { role = message.Role, content = message.Content }).ToArray(),
                 max_new_tokens = Math.Clamp(maxTokens ?? 1024, 1, 4096),
                 temperature = Math.Clamp(settings.Temperature, 0, 2),
                 compression = NormalizeCompression(settings.AirLlmCompression),

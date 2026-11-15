@@ -36,7 +36,10 @@ internal static class ChatMessageTests
         Check(localOnlyMessage.ForModel(localOnlyMessage.Content).Sources is null, "web source metadata stays out of model requests");
         var pngSignature = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
         var modelImageMessage = new ChatMessage("user", "Describe this", [new ChatAttachment("sample.png", Convert.ToBase64String(pngSignature), "image/png")]).ForModel("Describe this");
-        Check(modelImageMessage.Attachments is [{ IsImage: true }], "model messages retain image attachments while stripping text attachment metadata");
+        Check(modelImageMessage.Attachments is [{ IsImage: true }], "model messages retain image attachments for vision handling");
+        var modelTextMessage = new ChatMessage("user", "Review this", [new ChatAttachment("notes.md", "private note")], [new ChatSource("Docs", "https://example.org", "A snippet")]).ForModel("Review this");
+        Check(modelTextMessage.Attachments is [{ IsImage: false }] && modelTextMessage.Sources is null,
+            "model messages preserve content attachments for provider prompt construction while stripping web source metadata");
 
         // Fixed model instruction text (moved from the former desktop shell into Core).
         Check(ModelInstructions.CodingAgent.StartsWith("You are the Coding Agent", StringComparison.Ordinal)

@@ -2,7 +2,7 @@
 // user's message as a fenced block labeled "untrusted". The fence is longer than any run of
 // backticks inside the file, so file content can't close it early. Images are skipped here;
 // they travel as image parts (see OpenAiCompatibleProvider).
-// Depends on: ChatAttachment, ChatAttachmentPolicy. Used by: the Agent Host when building model requests.
+// Depends on: ChatAttachment, ChatAttachmentPolicy. Used by: local model provider request builders.
 
 using System.Text;
 using System.Text.RegularExpressions;
@@ -24,6 +24,35 @@ public static class ChatAttachmentPrompt
     /// </summary>
     public static string AppendWithBoundedRetrieval(string userText, IReadOnlyList<ChatAttachment> attachments)
         => AppendCore(userText, attachments, retrieveLargeContent: true);
+
+    /// <summary>Builds provider-only messages with text/PDF content embedded and image parts retained.</summary>
+    public static IReadOnlyList<ChatMessage> PrepareMessagesForModel(IReadOnlyList<ChatMessage> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        var prepared = messages.Select(message =>
+        {
+            if (!string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase))
+                return new ChatMessage(message.Role, message.Content);
+            if (message.Attachments is not { Count: > 0 } attachments)
+                return message.ForModel(message.Content);
+
+            var content = attachments.Any(attachment => !attachment.IsImage)
+                ? AppendWithBoundedRetrieval(message.Content, attachments)
+                : message.Content;
+            return message.ForModel(content);
+        }).ToList();
+
+        if (messages.Any(message => string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase) && message.Attachments is { Count: > 0 }))
+        {
+            var systemIndex = prepared.FindIndex(message => string.Equals(message.Role, "system", StringComparison.OrdinalIgnoreCase));
+            if (systemIndex >= 0)
+                prepared[systemIndex] = prepared[systemIndex] with { Content = prepared[systemIndex].Content + "\n\n" + ModelInstructions.UntrustedAttachments };
+            else
+                prepared.Insert(0, new ChatMessage("system", ModelInstructions.UntrustedAttachments));
+        }
+
+        return prepared;
+    }
 
     private static string AppendCore(string userText, IReadOnlyList<ChatAttachment> attachments, bool retrieveLargeContent)
     {

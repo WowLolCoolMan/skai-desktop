@@ -51,17 +51,19 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         string? apiKey = null)
     {
         ValidateRequest(settings, messages);
+        var modelMessages = ChatAttachmentPrompt.PrepareMessagesForModel(messages);
+        ValidateRequest(settings, modelMessages);
         if (settings.ModelProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase) && settings.OllamaContextWindowTokens > 0)
         {
-            await StreamOllamaNativeChatAsync(settings, messages, onText, cancellationToken, maxTokens, apiKey).ConfigureAwait(false);
+            await StreamOllamaNativeChatAsync(settings, modelMessages, onText, cancellationToken, maxTokens, apiKey).ConfigureAwait(false);
             return;
         }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(5));
-        var requestMessages = messages;
+        var requestMessages = modelMessages;
         var requestJson = SerializeRequest(settings, requestMessages, maxTokens);
         if (Encoding.UTF8.GetByteCount(requestJson) > ContextCompactionBytes)
-            (requestMessages, requestJson) = CompactToRequestLimit(messages, compacted => SerializeRequest(settings, compacted, maxTokens));
+            (requestMessages, requestJson) = CompactToRequestLimit(modelMessages, compacted => SerializeRequest(settings, compacted, maxTokens));
         using var request = new HttpRequestMessage(HttpMethod.Post, BuildChatUri(settings.Endpoint))
         {
             Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
