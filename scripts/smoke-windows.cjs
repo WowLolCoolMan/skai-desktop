@@ -10,6 +10,7 @@ const steps = [
   "package:electron",
   "smoke:agent-host",
   "smoke:marketplace-host",
+  "test",
   "smoke:task-replan",
   "smoke:electron:artifact",
   "smoke:electron:themes",
