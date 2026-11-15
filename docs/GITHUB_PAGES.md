@@ -18,12 +18,14 @@ setting cannot be changed by the workflow token. Successful workflow runs
 publish the site at
 `https://wowlolcoolman.github.io/skai-desktop/`.
 
-As of 2026-11-15, this setup has not been completed: the Pages workflow fails
-in **Configure Pages** because GitHub returns `404 Not Found` when it looks up
-the repository's Pages site. After setting the source to **GitHub Actions**,
-rerun **Deploy project site** from the Actions tab; future pushes to `main`
-that change `docs/`, branding assets, or this workflow will deploy
-automatically.
+On 2026-11-15, **Deploy project site** completed successfully for commit
+`77f766f9` and the public URL returned HTTP 200. However, a live content check
+still returned GitHub's Jekyll-rendered repository README instead of the custom
+`docs/index.html` artifact. The workflow run is green, but the custom landing
+page is not yet verified as the live page. Check the repository's **Settings →
+Pages** publishing source and the latest deployment before treating the design
+in `docs/index.html` as published. Once corrected, pushes to `main` that change
+`docs/`, branding assets, or this workflow should deploy automatically.
 
 ## Content maintenance
 
