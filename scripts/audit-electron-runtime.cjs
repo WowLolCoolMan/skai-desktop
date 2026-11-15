@@ -51,6 +51,7 @@ expect(main.includes('"project.git.status"'), "Electron bridge must expose the r
 expect(main.includes('"workspace.importDroppedFiles"') && main.includes("decodeDroppedAttachment"), "Electron bridge must validate dropped chat files at the local boundary");
 expect(chatComposer.includes("onDrop={handleDrop}") && chatComposer.includes("Drop files to attach"), "Chat composer must expose a visible drag-and-drop attachment state");
 expect(chatComposer.includes("SpeechRecognition") && chatComposer.includes("aria-pressed={voiceListening}"), "Chat composer must expose explicit system voice input with a visible listening state");
+expect(chatComposer.includes("stopNativeSpeech();") && chatComposer.includes("setHandsFreeActive(false);"), "Disabling hands-free mode must interrupt local speech output");
 expect(chatComposer.includes("aria-activedescendant={commandQuery !== null ? activeCommandId : undefined}") && chatComposer.includes("(index + 1) % commandMatches.length"), "Chat composer commands must expose the active option and wrap keyboard navigation");
 expect(modelPicker.includes("const onPopoverKeyDown") && modelPicker.includes("aria-activedescendant={filtered[activeIndex]"), "Model picker must keep keyboard focus inside the popover and expose the active option");
 expect(overflowMenu.includes('event.key === "Tab"') && sidebar.includes('event.key === "Tab"'), "Overflow and recent-chat menus must close when keyboard focus leaves with Tab");

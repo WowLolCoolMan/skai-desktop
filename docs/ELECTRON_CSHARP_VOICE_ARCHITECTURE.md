@@ -26,7 +26,8 @@ The chat composer uses the browser's local speech-recognition mode for dictation
 and never falls back to remote recognition. One-shot dictation inserts text in
 the composer. Hands-free mode submits the final transcript, requests speech for
 that reply without changing the normal voice-output preference, waits for local
-speech to finish, then resumes listening. If local recognition is unavailable
+speech to finish, then resumes listening. Turning hands-free off stops both
+recognition and any reply currently being spoken. If local recognition is unavailable
 or a language pack is missing, the composer explains the limitation and keeps
 remote recognition disabled. Runtime microphone/language-pack acceptance is
 still open; barge-in and streamed speech are not implemented.

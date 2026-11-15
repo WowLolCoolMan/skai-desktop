@@ -5,7 +5,7 @@ import { Button } from "../../components/ui/Primitives";
 import { ComposerCommandMenu } from "../../components/ui/ComposerCommandMenu";
 import { AttachmentList } from "./AttachmentList";
 import { composerCommands, type ComposerCommand } from "./composerCommands";
-import { waitForLocalSpeechToFinish } from "../../services/nativeTts";
+import { stopNativeSpeech, waitForLocalSpeechToFinish } from "../../services/nativeTts";
 
 type ChatComposerProps = {
   draft: string;
@@ -184,6 +184,7 @@ export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMe
       awaitingResponseRef.current = false;
       sawBusyRef.current = false;
       setHandsFreeActive(false);
+      stopNativeSpeech();
       if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
       recognitionRef.current?.stop();
       return;
