@@ -24,6 +24,7 @@ requireContract("packaged smoke gate", /PACKAGED_SMOKE_READY/);
 requireContract("literal true gate enforcement", /\$\{!gate\}[\s\S]*!=[\s\S]*true/);
 requireContract("Windows signing material", /WINDOWS_CODESIGN_CERT_BASE64/);
 requireContract("Windows timestamp signing", /signtool\.exe[\s\S]*\/tr\s+\$env:WINDOWS_CODESIGN_TIMESTAMP_URL/);
+requireContract("Windows manifest hash refresh after signing", /artifact-manifest\.json[\s\S]*manifest\.files\.executable[\s\S]*Get-FileHash/);
 requireContract("Linux signing material", /RELEASE_GPG_PRIVATE_KEY/);
 requireContract("Linux detached signature", /--detach-sign/);
 requireContract("Electron release packaging job", /\n  electron:\s*\n\s+name:\s+Package Electron/);
