@@ -40,7 +40,7 @@ internal static class CatalogTests
               !expandedReleasePrompt.Contains("{{DATE}}", StringComparison.Ordinal),
             "release-readiness skill expands explicit user-name and date variables before review");
 
-        // Slash command catalog and suggestion filter (moved from MainPage into Core).
+        // Slash command catalog and suggestion filter (moved from the former desktop shell into Core).
         Check(SlashCommandCatalog.Commands.Select(item => item.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == SlashCommandCatalog.Commands.Length
             && SlashCommandCatalog.Commands.All(item => item.Name.StartsWith('/') && item.Description.Length > 0),
             "slash command catalog has unique, described commands");

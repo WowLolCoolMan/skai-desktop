@@ -1,6 +1,6 @@
 // Rules for chat attachments: allowed file types, secret-looking names to block,
 // size/character limits, and image signature checks.
-// Depends on: ChatAttachment. Used by: MainPage attachments, OpenAiCompatibleProvider, ConversationArchive.
+// Depends on: ChatAttachment. Used by: the Agent Host attachment boundary, OpenAiCompatibleProvider, ConversationArchive.
 
 using SkaiDesktop.Core.Models;
 

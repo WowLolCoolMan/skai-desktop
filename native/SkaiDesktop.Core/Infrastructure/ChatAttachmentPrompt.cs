@@ -2,7 +2,7 @@
 // user's message as a fenced block labeled "untrusted". The fence is longer than any run of
 // backticks inside the file, so file content can't close it early. Images are skipped here;
 // they travel as image parts (see OpenAiCompatibleProvider).
-// Depends on: ChatAttachment, ChatAttachmentPolicy. Used by: MainPage when building the model request.
+// Depends on: ChatAttachment, ChatAttachmentPolicy. Used by: the Agent Host when building model requests.
 
 using System.Text;
 using System.Text.RegularExpressions;

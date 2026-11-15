@@ -1,6 +1,6 @@
 // Keeps the last approved workspace file edits (workspace-undo.json) and undoes them
 // only if the file still matches what was applied.
-// Depends on: WorkspaceFileEditor, BoundedFileReader, AtomicFileWriter. Used by: MainPage undo history.
+// Depends on: WorkspaceFileEditor, BoundedFileReader, AtomicFileWriter. Used by Agent Host undo history.
 
 using System.Text.Json;
 

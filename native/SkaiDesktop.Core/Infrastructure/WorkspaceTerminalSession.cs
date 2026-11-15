@@ -1,6 +1,6 @@
 // Interactive pseudo-terminal (Porta.Pty) plus a VT screen buffer (XTerm.NET),
 // started in a selected project folder.
-// Depends on: WorkspaceCommandRunner (folder resolution). Used by: MainPage project terminal dialog.
+// Depends on: WorkspaceCommandRunner (folder resolution). Used by the Electron project terminal through the Agent Host.
 
 using System.Text;
 using Porta.Pty;

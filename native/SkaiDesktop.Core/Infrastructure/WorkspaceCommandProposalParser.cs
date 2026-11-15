@@ -1,6 +1,6 @@
 // Finds `<workspace-command>` blocks in a Coding Agent reply and strips them
 // from the displayed text.
-// Depends on: WorkspaceCommandRunner (limits). Used by: MainPage Coding Agent proposal review.
+// Depends on: WorkspaceCommandRunner (limits). Used by the Electron Coding Agent proposal review through the Agent Host.
 
 using System.Text.RegularExpressions;
 

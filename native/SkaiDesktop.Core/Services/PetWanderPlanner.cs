@@ -1,6 +1,6 @@
 // Pet wander planning: the grid, blocked cells, paths and the walking glide for the desktop
 // pet. Pure math with an injected Random so it can be tested with a seed; the UI side
-// (MainPage.CompanionWander.cs) only measures the window and moves the sprite.
+// The Electron companion window measures its bounds and moves the sprite.
 //
 // The movement area is a 10 × 10 grid over the window's content (cell = width / 10 by
 // height / 10). The pet picks a random free cell like a piece on a chessboard and walks there

@@ -553,7 +553,7 @@ internal static class LocalStorageAndWorkspaceTests
             if (Directory.Exists(settingsDirectory)) DeleteDirectoryTree(settingsDirectory);
         }
 
-        // Path comparison (moved from MainPage into Core).
+        // Path comparison (moved from the former desktop shell into Core).
         var comparedRoot = Path.Combine(Path.GetTempPath(), "server-rock-same-path");
         Check(WorkspacePath.AreSame(comparedRoot, comparedRoot + Path.DirectorySeparatorChar)
             && !WorkspacePath.AreSame(comparedRoot, comparedRoot + "-other"),

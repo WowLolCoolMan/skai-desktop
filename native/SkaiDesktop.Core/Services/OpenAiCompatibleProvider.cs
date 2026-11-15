@@ -1,7 +1,7 @@
 // HTTP client for OpenAI-compatible chat servers: streams /chat/completions (SSE)
 // and lists /models. Also shapes image attachments for vision models.
 // Depends on: AppSettings, ChatMessage, ChatAttachmentPolicy, BoundedHttpContent.
-// Used by: MainPage chat sending, connection check, prompt rewrite, and model benchmarks.
+// Used by: Agent Host chat, connection checks, prompt rewriting, and model benchmarks.
 
 using System.Net.Http.Json;
 using System.Text;

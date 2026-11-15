@@ -1,6 +1,6 @@
 // Local `git` operations for a GitHub repository: clone, status, diff preview, commit, push, and guarded PR creation.
 // Tokens are passed via a credential helper, never on the command line or in the remote URL.
-// Depends on: GitHubApiClient, WorkspaceFileEditor (bounded file read). Used by: MainPage.GitHub.cs.
+// Depends on: GitHubApiClient, WorkspaceFileEditor (bounded file read). Used by the Agent Host GitHub protocol.
 
 using System.Diagnostics;
 using System.Text;

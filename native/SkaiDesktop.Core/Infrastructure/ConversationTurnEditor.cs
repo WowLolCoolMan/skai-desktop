@@ -1,5 +1,5 @@
 // "Edit an earlier message": replaces that user turn and drops everything after it.
-// Depends on: ChatMessage. Used by: MainPage message edit/retry.
+// Depends on: ChatMessage. Used by the Agent Host message edit/retry protocol.
 
 using SkaiDesktop.Core.Models;
 

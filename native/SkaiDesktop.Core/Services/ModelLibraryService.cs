@@ -2,7 +2,7 @@
 // (Ollama, LM Studio, …), searches Hugging Face and ModelScope, downloads/imports GGUF files, and
 // pulls/deletes Ollama models.
 // Depends on: HttpClient, BoundedHttpContent (size-limited responses).
-// Used by: MainPage Model Library dialog and model selection.
+// Used by: the Agent Host model library and model-selection protocol.
 
 using System.Net.Http.Json;
 using System.Security.Cryptography;

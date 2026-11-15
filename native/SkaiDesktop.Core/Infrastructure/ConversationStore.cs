@@ -1,7 +1,7 @@
 // Loads/saves the conversation list (conversations.json). A corrupt file is reported
 // and left untouched, never overwritten.
 // Depends on: ConversationArchive, BoundedFileReader, AtomicFileWriter.
-// Used by: MainPage (history, recents, folders, import).
+// Used by: the Agent Host conversation protocol (history, recents, folders, import).
 
 using System.Text.Json;
 using SkaiDesktop.Core.Models;

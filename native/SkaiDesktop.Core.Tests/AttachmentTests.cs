@@ -57,7 +57,7 @@ internal static class AttachmentTests
         Check(ChatAttachmentPolicy.HasValidImageSignature("image/png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) && ChatAttachmentPolicy.HasValidImageSignature("image/jpeg", [0xFF, 0xD8, 0xFF, 0xD9]) && !ChatAttachmentPolicy.HasValidImageSignature("image/png", [0, 1, 2]), "chat attachment policy checks PNG/JPEG file signatures");
         Check(ChatAttachmentPolicy.RemainingImageBytes([new ChatAttachment("photo.png", Convert.ToBase64String([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), "image/png")]) == ChatAttachmentPolicy.MaxTotalImageBytes - 8, "chat attachment policy budgets decoded image bytes");
 
-        // Consent key and prompt formatting (moved from MainPage into Core).
+        // Consent key and prompt formatting (moved from the former desktop shell into Core).
         var notes = new ChatAttachment("notes.md", "alpha");
         var spec = new ChatAttachment("spec.txt", "beta");
         Check(ChatAttachmentPolicy.ConsentKey("https://remote.example/v1", [notes, spec]) == ChatAttachmentPolicy.ConsentKey("https://remote.example/v1", [spec, notes]),

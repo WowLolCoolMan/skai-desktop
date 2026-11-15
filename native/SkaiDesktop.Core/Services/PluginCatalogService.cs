@@ -1,5 +1,5 @@
 // Static list of supported plugins/integrations with search and categories.
-// Used by: MainPage plugin store dialog.
+// Used by: the Electron Marketplace and plugin catalog protocol.
 
 namespace SkaiDesktop.Core.Services;
 

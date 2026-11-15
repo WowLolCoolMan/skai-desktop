@@ -1,6 +1,6 @@
 // Image Studio back end: queues a user-supplied ComfyUI workflow on a loopback-only
 // endpoint, polls for the result, and returns image URLs.
-// Depends on: HttpClient, BoundedHttpContent. Used by: MainPage Image Studio dialog.
+// Depends on: HttpClient, BoundedHttpContent. Used by: the Electron Image Studio through the Agent Host.
 
 using System.Net.Http.Json;
 using System.Text.Json;

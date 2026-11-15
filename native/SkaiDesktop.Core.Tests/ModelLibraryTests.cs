@@ -189,7 +189,7 @@ internal static class ModelLibraryTests
         }
         catch (InvalidOperationException) { Check(true, "ModelScope GGUF import rejects path traversal before network access"); }
 
-        // Local speed averaging (moved from MainPage into Core).
+        // Local speed averaging (moved from the former desktop shell into Core).
         Check(LocalModelPerformance.Key(" HTTP://LocalHost:1234/v1/ ", "Qwen3") == "http://localhost:1234/v1\nQwen3",
             "local speed key normalizes the endpoint but keeps the model ID");
         var measuredAt = DateTimeOffset.Parse("2026-11-07T00:00:00Z");

@@ -1,6 +1,6 @@
 // One chat message (role, text, attachments, web sources).
 // Depends on: ChatAttachment, ChatSource.
-// Used by: ChatSession, OpenAiCompatibleProvider (request body), ConversationArchive, and MainPage chat.
+// Used by: ChatSession, OpenAiCompatibleProvider (request body), ConversationArchive, and the Electron chat surface.
 
 using System.Text.Json.Serialization;
 

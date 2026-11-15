@@ -185,7 +185,7 @@ internal static class ChatProviderTests
             Check(error.Message.Contains("model server unavailable", StringComparison.Ordinal), "provider HTTP errors include a readable response body");
         }
 
-        // Local endpoint check and error messages (moved from MainPage into Core).
+        // Local endpoint check and error messages (moved from the former desktop shell into Core).
         Check(LocalEndpoint.IsLocal("http://localhost:11434/v1") && LocalEndpoint.IsLocal("http://127.0.0.1:1234/v1") && LocalEndpoint.IsLocal("http://[::1]:8080"),
             "loopback and localhost endpoints count as on-device");
         Check(!LocalEndpoint.IsLocal("http://192.168.1.20:11434/v1") && !LocalEndpoint.IsLocal("https://openrouter.ai/api/v1") && !LocalEndpoint.IsLocal("not a url")

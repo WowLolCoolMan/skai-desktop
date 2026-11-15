@@ -1,6 +1,6 @@
 // Decides whether a model endpoint runs on this device (loopback/localhost only). The UI uses
 // this to label data as "on device" and to decide whether local-only work may proceed.
-// Depends on: nothing. Used by: MainPage chat, connection status, Model Library, composer labels.
+// Depends on: nothing. Used by: Agent Host chat, connection status, Model Library, and composer metadata.
 
 using System.Net;
 

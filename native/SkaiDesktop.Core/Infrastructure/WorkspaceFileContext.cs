@@ -1,6 +1,6 @@
 // Reads a small, text-only sample of a project's selected folders to send to the model
 // (skips secrets, VCS metadata, dependencies, binaries, and symlinks).
-// Depends on: WorkspaceFileEditor (bounded file read). Used by: MainPage when building the model request.
+// Depends on: WorkspaceFileEditor (bounded file read). Used by the Agent Host when building model requests.
 
 using System.Text;
 

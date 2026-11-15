@@ -1,5 +1,5 @@
 // One text file, extracted PDF text, or image attached to a chat message.
-// Depends on: nothing. Used by: ChatMessage, ChatAttachmentPolicy, the provider, and MainPage attachments.
+// Depends on: nothing. Used by: ChatMessage, ChatAttachmentPolicy, the provider, and the Agent Host attachment protocol.
 
 namespace SkaiDesktop.Core.Models;
 

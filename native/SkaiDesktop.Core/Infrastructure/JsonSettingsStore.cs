@@ -1,5 +1,5 @@
 // Loads/saves AppSettings as settings.json in the user's app-data folder.
-// Depends on: AppSettings, BoundedFileReader, AtomicFileWriter. Used by: MainPage (SaveSettings and startup).
+// Depends on: AppSettings, BoundedFileReader, AtomicFileWriter. Used by: the Agent Host settings protocol.
 
 using System.Text.Json;
 using SkaiDesktop.Core.Models;

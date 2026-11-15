@@ -1,7 +1,7 @@
 // The two workspace IDs. They are saved in ChatSession.Mode (conversations.json and chat
 // archives), so the string values must never change. Display text ("Chat", "Coding Agent")
 // is separate and lives in the UI.
-// Used by: ChatSession, ConversationStore, ConversationArchive, and MainPage (_mode).
+// Used by: ChatSession, ConversationStore, ConversationArchive, and the Electron workspace route state.
 
 namespace SkaiDesktop.Core.Models;
 
