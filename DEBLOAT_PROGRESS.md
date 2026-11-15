@@ -9,13 +9,13 @@ new history, not the existing `.git` pack (127 MiB at the start).
 - [x] 1. Audit: record folder sizes under `assets/`, duplicate files by hash, and unreferenced assets. — 0 bytes (audit only)
 - [x] 2. Repoint references to `assets/pets/*-frames.png` (for example in `apps/desktop/src/features/settings/SettingsPage.tsx`) at the identical copies in `assets/pets/generated/`. — 0 bytes (the 6 Settings previews now load from `generated/`; no other code referenced the root strips)
 - [x] 3. Remove the root-level `assets/pets/*.png` files that duplicate `generated/`. — 18,702,316 bytes (42 strips; `normalize-pet-animations.ps1` now reads them from `generated/`)
-- [ ] 4. Remove `assets/pets/archive/legacy-sheets/`, if nothing references it.
+- [x] 4. Remove `assets/pets/archive/legacy-sheets/`, if nothing references it. — 30,703,586 bytes (13 sheets; only the pets README and the archived legacy tools mentioned them; restore from the parent of this step's commit)
 - [ ] 5. Remove unreferenced `generated/*-walk-source.png` files and walk frames replaced by `-v2` versions.
 - [ ] 6. Remove unreferenced PNGs in `assets/branding/` (check README, docs and site HTML first).
 - [ ] 7. Compress the remaining PNGs losslessly with oxipng, keeping filenames and dimensions.
 - [ ] 8. Make sure `.gitignore` covers `bin/`, `obj/`, `.tmp/`, `dist/`, `release/` and `node_modules/`, and add a check that flags new files over 1 MB.
 
-**Total saved so far:** 18,702,316 bytes
+**Total saved so far:** 49,405,902 bytes
 
 ## Verification gate
 
@@ -83,6 +83,9 @@ for the 6 pets × 7 non-walk states. There are no other duplicates under `assets
 - **`normalize-pet-animations.ps1`** reads `generated/<pet>-walk-source.png` (step 5 keeps them for that reason). Step 3 changed
   its default input to `generated/`; this was not run, because PowerShell (`pwsh`) isn't installed here.
 - **`validate-pet-assets.cjs`** requires `generated/<pet>-walk-frames.png` for every pet, even where `-v2` replaced it at runtime.
+
+- **`archive/legacy-tools/`** (11 KB) still reads and writes the removed `*-sprite-sheet.png` files, so those scripts
+  no longer have inputs. Kept, because no step covers them.
 
 ## Failures
 

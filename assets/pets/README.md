@@ -6,8 +6,9 @@ are `idle`, `walk`, `thinking`, `coding`, `coding_malicious`, `stuck`, `success`
 The Electron companion loads the matching strip directly and only plays `walk` while the native
 window is actually moving.
 
-The older source sheets are retained under `archive/legacy-sheets/` for rollback only and are not
-loaded by the production companion.
+The older source sheets that used to live in `archive/legacy-sheets/` were removed during the asset
+de-bloat. They were never loaded by the production companion; restore them from git history
+(the parent of the `chore(debloat): step 4` commit) if the archived tools in `archive/legacy-tools/` are ever needed again.
 
 To rebuild the canonical runtime assets, place six-frame walk source strips in `generated/` and
 run `pwsh -NoProfile -ExecutionPolicy Bypass -File assets/pets/normalize-pet-animations.ps1`.
