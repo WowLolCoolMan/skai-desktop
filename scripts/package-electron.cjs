@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
@@ -12,6 +13,7 @@ const runtime = process.platform === "win32" ? "win-x64" : process.platform === 
 const electronBinary = process.platform === "win32" ? "electron.exe" : "electron";
 const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop";
 const hostBinary = process.platform === "win32" ? "ServerRock.AgentHost.exe" : "ServerRock.AgentHost";
+const desktopPackage = JSON.parse(fs.readFileSync(path.join(desktopRoot, "package.json"), "utf8"));
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit", shell: false });
@@ -53,6 +55,19 @@ fs.renameSync(path.join(outputRoot, electronBinary), path.join(outputRoot, packa
 const publishedHost = path.join(hostRoot, hostBinary);
 if (!fs.existsSync(publishedHost)) throw new Error(`The self-contained Agent Host was not published at ${publishedHost}.`);
 if (!fs.existsSync(path.join(airLlmWorkerTarget, "skai_airllm.py"))) throw new Error(`The packaged AirLLM worker was not staged at ${path.join(airLlmWorkerTarget, "skai_airllm.py")}.`);
+const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+fs.writeFileSync(path.join(outputRoot, "artifact-manifest.json"), JSON.stringify({
+  product: "Skai Desktop",
+  version: desktopPackage.version,
+  platform: process.platform,
+  architecture: "x64",
+  executable: packagedBinary,
+  files: {
+    executable: sha256(path.join(outputRoot, packagedBinary)),
+    agentHost: sha256(publishedHost),
+    airLlmWorker: sha256(path.join(airLlmWorkerTarget, "skai_airllm.py")),
+  },
+}, null, 2) + "\n", "utf8");
 // Linux: ship a per-user installer, app-launcher entry and icon alongside the portable folder.
 if (process.platform === "linux") {
   for (const script of ["install.sh", "uninstall.sh"]) {

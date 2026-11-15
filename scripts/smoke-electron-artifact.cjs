@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
 // Pick the Linux display backend up front; otherwise the app relaunches itself and the spawned PID is not the app.
@@ -9,6 +10,7 @@ const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platf
 const defaultName = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop";
 const defaultRoot = path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`);
 const executable = path.resolve(process.argv[2] || path.join(defaultRoot, defaultName));
+const artifactRoot = path.dirname(executable);
 const port = 19321;
 const timeoutMs = 20_000;
 
@@ -16,9 +18,20 @@ if (!fs.existsSync(executable)) {
   console.error(`Electron artifact does not exist: ${executable}`);
   process.exit(1);
 }
-const packagedAirLlmWorker = path.join(defaultRoot, "resources", "agent-host", "airllm", "skai_airllm.py");
+const packagedAirLlmWorker = path.join(artifactRoot, "resources", "agent-host", "airllm", "skai_airllm.py");
 if (!fs.existsSync(packagedAirLlmWorker)) {
   console.error(`Packaged AirLLM worker does not exist: ${packagedAirLlmWorker}`);
+  process.exit(1);
+}
+const artifactManifestPath = path.join(artifactRoot, "artifact-manifest.json");
+if (!fs.existsSync(artifactManifestPath)) {
+  console.error(`Packaged artifact manifest does not exist: ${artifactManifestPath}`);
+  process.exit(1);
+}
+const artifactManifest = JSON.parse(fs.readFileSync(artifactManifestPath, "utf8"));
+const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+if (artifactManifest.executable !== path.basename(executable) || artifactManifest.files?.executable !== sha256(executable) || artifactManifest.files?.agentHost !== sha256(path.join(artifactRoot, "resources", "agent-host", process.platform === "win32" ? "ServerRock.AgentHost.exe" : "ServerRock.AgentHost")) || artifactManifest.files?.airLlmWorker !== sha256(packagedAirLlmWorker)) {
+  console.error(`Packaged artifact manifest does not match the staged files: ${artifactManifestPath}`);
   process.exit(1);
 }
 
