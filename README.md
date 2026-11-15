@@ -127,7 +127,7 @@ Useful docs:
 - [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md) — visual migration ledger and evidence.
 - [`docs/FUTURE_FEATURES.md`](docs/FUTURE_FEATURES.md) — future product backlog.
 - [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — implemented, partial, and planned capabilities.
-- [`docs/ELECTRON_MIGRATION_CUTOVER.md`](docs/ELECTRON_MIGRATION_CUTOVER.md) — Electron replacement boundary and retirement gates.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Electron, Agent Host, and Core architecture boundary.
 - [`docs/GITHUB_INTEGRATION.md`](docs/GITHUB_INTEGRATION.md) — repository project workflows.
 - [`services/agent-host/README.md`](services/agent-host/README.md) — Agent Host protocol notes.
 

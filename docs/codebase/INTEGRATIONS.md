@@ -32,7 +32,7 @@
 ## Persistence and secrets
 
 - Local JSON-backed stores hold product state and are guarded by profile paths and recovery tests.
-- Windows-protected credential storage is used for sensitive local credentials where implemented.
+- Windows DPAPI or the Linux Secret Service is used for sensitive local credentials where implemented.
 - No external database, hosted queue, telemetry vendor, or cloud synchronization path is part of the intended architecture.
 
 ## Reliability boundary
@@ -50,4 +50,5 @@
 - `native/SkaiDesktop.Core/Services/ModelLibraryService.cs`
 - `native/SkaiDesktop.Core/Services/SkillPackageInstaller.cs`
 - `native/SkaiDesktop.Core/Services/AuthoredSkillCatalog.cs`
-- `native/SkaiDesktop.Core/Integrations/`
+- `native/SkaiDesktop.Core/Infrastructure/GitHubCredentialStore.cs`
+- `native/SkaiDesktop.Core/Services/GitHubWorkspaceService.cs`
