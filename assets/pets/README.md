@@ -1,32 +1,22 @@
 # Companion sprite sheets
 
-Each built-in pet has one identity sprite sheet (`<pet>-sprite-sheet.png`) and seven source state
-frames (`<pet>-<state>.png`, 256×256, transparent). The production animation layer now provides
-six aligned frames per state (`<pet>-<state>-1.png` through `<pet>-<state>-6.png`) and six walk
-frames for every pet. The native runtime cycles those frames at 8 FPS while retaining its
-transform animation for motion.
+The runtime format is one independent generated strip per pet and state in `generated/`:
+`<pet>-<state>-frames.png` is a 1536×256 transparent image with six 256×256 frames. The states
+are `idle`, `walk`, `thinking`, `coding`, `coding_malicious`, `stuck`, `success`, and `error`.
+The Electron companion loads the matching strip directly and only plays `walk` while the native
+window is actually moving.
 
-The sheets do not share one layout: Rocky's sheet is a 3×3 grid, the others are 4×4, and each
-sheet places its poses differently. Cells are numbered from zero, left to right, top to bottom.
+The older source sheets are retained under `archive/legacy-sheets/` for rollback only and are not
+loaded by the production companion.
 
-| Pet | Grid | idle | thinking | coding | coding_malicious | stuck | success | error |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| percy | 4×4 | 0 | 8 | 9 | 10 | 12 | 13 | 14 |
-| rocky | 3×3 | 0 | 2 | 3 | 5 | 8 | 6 | 7 |
-| byte | 4×4 | 0 | 4 | 6 | 8 | 10 | 14 | 12 |
-| sprout | 4×4 | 0 | 4 | 8 | 10 | 11 | 14 | 12 |
-| nova | 4×4 | 0 | 4 | 6 | 7 | 11 | 13 | 14 |
-| ember | 4×4 | 0 | 4 | 6 | 9 | 10 | 13 | 15 |
-
-To re-cut the frames after changing a sheet or this table, edit the `MAP` in `cut-frames.sh`
-(keep it in step with the table above) and run `sh assets/pets/cut-frames.sh` (needs ImageMagick 7).
-Each frame is the whole cell minus a thin edge band, padded to a square, so the character stays in
-the same spot in every state and cross-fades line up.
+To rebuild the canonical runtime assets, place six-frame walk source strips in `generated/` and
+run `pwsh -NoProfile -ExecutionPolicy Bypass -File assets/pets/normalize-pet-animations.ps1`.
+That pass crops by alpha, rejects missing/invalid frames, preserves aspect ratio, locks the
+baseline, and copies every other state into its own six-frame strip.
 
 Users can still assign local SVG/PNG/JPEG/WebP frames from the pet customization dialog; custom
 files stay on the device.
 
-Percy is the official Skai Desktop mascot and the default companion for new profiles. His
-generated 4×4 atlas also includes four source walk-cycle frames in row 2 (cells 4–7). The
-six-frame production atlases are `<pet>-animation-sprite-sheet.png`; regenerate every pet with
-`pwsh -NoProfile -ExecutionPolicy Bypass -File assets/pets/make-pet-frames.ps1`.
+Percy is the official Skai Desktop mascot and the default companion for new profiles. The six
+walk source strips in `generated/` are kept as the editable visual inputs; no atlas is required
+or loaded by the renderer.

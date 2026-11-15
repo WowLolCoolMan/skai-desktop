@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -40,6 +40,7 @@ const pending = new Map();
 const standardRequestTimeoutMs = 30_000;
 const chatRequestTimeoutMs = 5 * 60_000;
 const chatHostDeadlineSeconds = 285;
+const globalLauncherAccelerator = "CommandOrControl+Alt+Space";
 let isQuitting = false;
 let mainWindow;
 let petWindow;
@@ -57,6 +58,7 @@ let petWanderNextAt = 0;
 let petWanderLayoutSignature = "";
 const petWanderPlanner = new PetWanderPlanner();
 let petMotion = { wander: true, reduceMotion: false };
+let petActivity = { state: "idle", facing: 1 };
 const pendingPetMessages = [];
 const PET_WINDOW_WIDTH = 220;
 const PET_WINDOW_HEIGHT = 190;
@@ -139,18 +141,21 @@ function stopPetWander() {
   petWanderStepTimer = undefined;
   petWanderWalk = null;
   petWanderMoving = false;
+  setPetActivity("idle");
+}
+
+function setPetActivity(state, facing = petActivity.facing) {
+  const nextState = state === "walk" ? "walk" : "idle";
+  const nextFacing = facing === -1 ? -1 : 1;
+  if (petActivity.state === nextState && petActivity.facing === nextFacing) return;
+  petActivity = { state: nextState, facing: nextFacing };
+  if (petReady && petWindow && !petWindow.isDestroyed()) petWindow.webContents.send("pet:activity", petActivity);
 }
 
 function stopPetDrag() {
   if (petDragTimer) clearInterval(petDragTimer);
   petDragTimer = undefined;
   petDragOffset = null;
-}
-
-function petWorkArea() {
-  if (!petWindow || petWindow.isDestroyed()) return screen.getPrimaryDisplay().workArea;
-  const bounds = petWindow.getBounds();
-  return screen.getDisplayNearestPoint({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }).workArea;
 }
 
 function clampPetPosition(point) {
@@ -164,13 +169,25 @@ function clampPetPosition(point) {
 }
 
 function petWanderLayout() {
-  const area = petWorkArea();
-  const bounds = petWindow?.getBounds() ?? { x: area.x + area.width - PET_WINDOW_WIDTH - PET_WINDOW_MARGIN, y: area.y + area.height - PET_WINDOW_HEIGHT - PET_WINDOW_MARGIN };
+  const displays = screen.getAllDisplays()
+    .map(({ workArea }) => ({ x: workArea.x, y: workArea.y, width: workArea.width, height: workArea.height }))
+    .filter(({ width, height }) => width > 0 && height > 0)
+    .sort((left, right) => left.x - right.x || left.y - right.y);
+  const availableDisplays = displays.length > 0 ? displays : [screen.getPrimaryDisplay().workArea];
+  const left = Math.min(...availableDisplays.map(({ x }) => x));
+  const top = Math.min(...availableDisplays.map(({ y }) => y));
+  const right = Math.max(...availableDisplays.map(({ x, width }) => x + width));
+  const bottom = Math.max(...availableDisplays.map(({ y, height }) => y + height));
+  const area = { x: left, y: top, width: right - left, height: bottom - top };
+  const primaryArea = screen.getPrimaryDisplay().workArea;
+  const bounds = petWindow?.getBounds() ?? {
+    x: primaryArea.x + primaryArea.width - PET_WINDOW_WIDTH - PET_WINDOW_MARGIN,
+    y: primaryArea.y + primaryArea.height - PET_WINDOW_HEIGHT - PET_WINDOW_MARGIN,
+  };
   const grid = new PetWanderGrid(area.width, area.height, { x: PET_WINDOW_WIDTH, y: PET_WINDOW_HEIGHT }, PET_WINDOW_MARGIN);
-  // This is a desktop-wide companion. Keep the contributed grid authoritative
-  // for bounds and neighboring-cell movement without treating a maximized
-  // main window as an obstacle that would block every cell.
-  return { area, bounds, grid, blocked: new Set() };
+  const blocked = grid.blockedCellsOutsideDisplays(availableDisplays, { x: area.x, y: area.y });
+  const signature = `${availableDisplays.map(({ x, y, width, height }) => `${x}:${y}:${width}:${height}`).join("|")}`;
+  return { area, bounds, grid, blocked, signature };
 }
 
 function schedulePetWander() {
@@ -187,8 +204,7 @@ function schedulePetWander() {
 
 function startPetWander() {
   if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
-  const { area, bounds, grid, blocked } = petWanderLayout();
-  const signature = `${area.x}:${area.y}:${area.width}:${area.height}`;
+  const { area, bounds, grid, blocked, signature } = petWanderLayout();
   const relative = grid.clampPetPosition({ x: bounds.x - area.x, y: bounds.y - area.y });
   const plan = petWanderPlanner.tryPlanWalk(grid.cellForPetPosition(relative), blocked);
   if (!plan.planned || plan.path.length === 0) {
@@ -206,6 +222,7 @@ function startPetWander() {
   petWanderWalk = walk;
   petWanderStartedAt = Date.now();
   petWanderLayoutSignature = signature;
+  setPetActivity("walk");
   movePetTowardTarget();
 }
 
@@ -215,8 +232,7 @@ function movePetTowardTarget() {
     petWanderMoving = false;
     return;
   }
-  const { area, grid } = petWanderLayout();
-  const signature = `${area.x}:${area.y}:${area.width}:${area.height}`;
+  const { area, grid, signature } = petWanderLayout();
   if (signature !== petWanderLayoutSignature) {
     petWanderWalk = null;
     petWanderStepTimer = undefined;
@@ -228,10 +244,12 @@ function movePetTowardTarget() {
   const elapsed = (Date.now() - petWanderStartedAt) / 1000;
   const position = grid.clampPetPosition(petWanderWalk.positionAt(elapsed));
   petWanderMoving = true;
+  setPetActivity("walk", petWanderWalk.facingAt(elapsed) || petActivity.facing);
   petWindow.setPosition(Math.round(area.x + position.x), Math.round(area.y + position.y));
   if (petWanderWalk.isFinished(elapsed)) {
     petWanderWalk = null;
     petWanderMoving = false;
+    setPetActivity("idle");
     petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
     petWanderStepTimer = undefined;
     schedulePetWander();
@@ -391,6 +409,7 @@ function createPetWindow() {
   petWindow.on("moved", () => { if (!petWanderMoving) persistPetState(); });
   petWindow.webContents.on("did-finish-load", () => {
     petReady = true;
+    petWindow.webContents.send("pet:activity", petActivity);
     flushPetMessages();
   });
   // Window managers can close Percy directly (Hyprland/i3 close-window keybinds
@@ -434,6 +453,14 @@ function showMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+function registerGlobalLauncher() {
+  const registered = globalShortcut.register(globalLauncherAccelerator, () => {
+    showMainWindow();
+    sendTrayEvent("launcher:focus");
+  });
+  if (!registered) console.warn(`[windowing] Could not register the global launcher shortcut ${globalLauncherAccelerator}.`);
 }
 
 function sendTrayEvent(eventName, value) {
@@ -584,7 +611,7 @@ function scheduleUpdateCheck() {
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
   "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
-  "settings.save", "image.generate", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "corpus.list", "corpus.upsert", "corpus.remove",
+  "settings.save", "image.generate", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
@@ -948,6 +975,7 @@ app.whenReady().then(() => {
     schedulePetWander();
   });
   createWindow();
+  registerGlobalLauncher();
   void resolvePetSurface().finally(createPetWindow);
   createTray();
   scheduleUpdateCheck();
@@ -963,6 +991,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  globalShortcut.unregister(globalLauncherAccelerator);
   stopPetWander();
   if (petWindow && !petWindow.isDestroyed()) petWindow.destroy();
   stopAgentHost();

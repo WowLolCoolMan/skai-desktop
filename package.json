@@ -21,6 +21,7 @@
     "audit:local-only": "node scripts/audit-local-only.cjs",
     "check:hygiene": "node scripts/check-repo-hygiene.cjs",
     "check:release-config": "node scripts/validate-release-config.cjs",
+    "check:pet-assets": "node scripts/validate-pet-assets.cjs",
     "audit:release-workflow": "node scripts/audit-release-workflow.cjs",
     "package:electron": "node scripts/package-electron.cjs",
     "smoke:electron:artifact": "node scripts/smoke-electron-artifact.cjs",

@@ -31,6 +31,32 @@ function finite(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function rectCoveredByDisplays(rect, displays) {
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+  const yBands = [...new Set([
+    rect.y,
+    bottom,
+    ...displays.flatMap((display) => [display.y, display.y + display.height]).filter((edge) => edge > rect.y && edge < bottom),
+  ])].sort((left, rightEdge) => left - rightEdge);
+
+  for (let band = 1; band < yBands.length; band += 1) {
+    const y = (yBands[band - 1] + yBands[band]) / 2;
+    const intervals = displays
+      .filter((display) => y >= display.y && y < display.y + display.height)
+      .map((display) => ({ left: display.x, right: display.x + display.width }))
+      .sort((left, rightEdge) => left.left - rightEdge.left);
+    let coveredTo = rect.x;
+    for (const interval of intervals) {
+      if (interval.left > coveredTo) break;
+      coveredTo = Math.max(coveredTo, interval.right);
+      if (coveredTo >= right) break;
+    }
+    if (coveredTo < right) return false;
+  }
+  return yBands.length > 1;
+}
+
 class PetWanderGrid {
   static columns = COLUMNS;
   static rows = ROWS;
@@ -77,6 +103,19 @@ class PetWanderGrid {
 
   cellForPetPosition(position) {
     return this.cellAt({ x: finite(position?.x) + this.petSize.x / 2, y: finite(position?.y) + this.petSize.y / 2 });
+  }
+
+  blockedCellsOutsideDisplays(displays = [], origin = { x: 0, y: 0 }) {
+    const blocked = new Set();
+    for (let row = 0; row < ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        const rect = this.petRectFor({ column, row });
+        if (!rectCoveredByDisplays({ ...rect, x: rect.x + origin.x, y: rect.y + origin.y }, displays)) {
+          blocked.add(cellKey({ column, row }));
+        }
+      }
+    }
+    return blocked;
   }
 
   blockedCells(obstacles = [], clearance = 8) {

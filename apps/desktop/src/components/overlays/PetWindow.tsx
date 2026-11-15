@@ -1,21 +1,70 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
-import type { PetCompletionEvent, PetMotionSettings } from "../../../shared/contracts";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import type { PetActivity, PetCompletionEvent, PetMotionSettings } from "../../../shared/contracts";
 import { NavIcon } from "../ui/NavIcon";
 
-const WALK_SHEET = new URL("../../../../../assets/pets/percy-walk-frames.png", import.meta.url).href;
-const IDLE_SHEET = new URL("../../../../../assets/pets/percy-idle-frames.png", import.meta.url).href;
-const SUCCESS_SHEET = new URL("../../../../../assets/pets/percy-success-frames.png", import.meta.url).href;
-const ERROR_SHEET = new URL("../../../../../assets/pets/percy-error-frames.png", import.meta.url).href;
-const BUILTIN_SHEETS: Record<string, Record<PetPose, string>> = {
-  percy: { idle: IDLE_SHEET, walk: WALK_SHEET, success: SUCCESS_SHEET, error: ERROR_SHEET },
-  byte: { idle: new URL("../../../../../assets/pets/byte-idle-frames.png", import.meta.url).href, walk: new URL("../../../../../assets/pets/byte-walk-frames.png", import.meta.url).href, success: new URL("../../../../../assets/pets/byte-success-frames.png", import.meta.url).href, error: new URL("../../../../../assets/pets/byte-error-frames.png", import.meta.url).href },
-  ember: { idle: new URL("../../../../../assets/pets/ember-idle-frames.png", import.meta.url).href, walk: new URL("../../../../../assets/pets/ember-walk-frames.png", import.meta.url).href, success: new URL("../../../../../assets/pets/ember-success-frames.png", import.meta.url).href, error: new URL("../../../../../assets/pets/ember-error-frames.png", import.meta.url).href },
-  nova: { idle: new URL("../../../../../assets/pets/nova-idle-frames.png", import.meta.url).href, walk: new URL("../../../../../assets/pets/nova-walk-frames.png", import.meta.url).href, success: new URL("../../../../../assets/pets/nova-success-frames.png", import.meta.url).href, error: new URL("../../../../../assets/pets/nova-error-frames.png", import.meta.url).href },
-  rocky: { idle: new URL("../../../../../assets/pets/rocky-idle-frames.png", import.meta.url).href, walk: new URL("../../../../../assets/pets/rocky-walk-frames.png", import.meta.url).href, success: new URL("../../../../../assets/pets/rocky-success-frames.png", import.meta.url).href, error: new URL("../../../../../assets/pets/rocky-error-frames.png", import.meta.url).href },
-  sprout: { idle: new URL("../../../../../assets/pets/sprout-idle-frames.png", import.meta.url).href, walk: new URL("../../../../../assets/pets/sprout-walk-frames.png", import.meta.url).href, success: new URL("../../../../../assets/pets/sprout-success-frames.png", import.meta.url).href, error: new URL("../../../../../assets/pets/sprout-error-frames.png", import.meta.url).href },
+type PetPose = "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "success" | "error";
+const BUILTIN_STRIPS: Record<string, Record<PetPose, string>> = {
+  percy: {
+    idle: new URL("../../../../../assets/pets/generated/percy-idle-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/percy-walk-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/percy-thinking-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/percy-coding-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/percy-coding_malicious-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/percy-stuck-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/percy-success-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/percy-error-frames.png", import.meta.url).href,
+  },
+  byte: {
+    idle: new URL("../../../../../assets/pets/generated/byte-idle-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/byte-walk-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/byte-thinking-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/byte-coding-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/byte-coding_malicious-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/byte-stuck-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/byte-success-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/byte-error-frames.png", import.meta.url).href,
+  },
+  ember: {
+    idle: new URL("../../../../../assets/pets/generated/ember-idle-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/ember-walk-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/ember-thinking-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/ember-coding-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/ember-coding_malicious-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/ember-stuck-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/ember-success-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/ember-error-frames.png", import.meta.url).href,
+  },
+  nova: {
+    idle: new URL("../../../../../assets/pets/generated/nova-idle-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/nova-walk-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/nova-thinking-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/nova-coding-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/nova-coding_malicious-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/nova-stuck-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/nova-success-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/nova-error-frames.png", import.meta.url).href,
+  },
+  rocky: {
+    idle: new URL("../../../../../assets/pets/generated/rocky-idle-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/rocky-walk-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/rocky-thinking-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/rocky-coding-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/rocky-coding_malicious-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/rocky-stuck-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/rocky-success-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/rocky-error-frames.png", import.meta.url).href,
+  },
+  sprout: {
+    idle: new URL("../../../../../assets/pets/generated/sprout-idle-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/sprout-walk-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/sprout-thinking-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/sprout-coding-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/sprout-coding_malicious-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/sprout-stuck-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/sprout-success-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/sprout-error-frames.png", import.meta.url).href,
+  },
 };
-
-type PetPose = "idle" | "walk" | "success" | "error";
 
 // Native Wayland: the app cannot move its own windows, so the compositor drags
 // Percy (CSS app-region) and Percy stays put instead of walking in place.
@@ -28,6 +77,7 @@ export function PetWindow() {
   const [bubble, setBubble] = useState<string | null>(null);
   const [bubbleKind, setBubbleKind] = useState<PetCompletionEvent["kind"]>("success");
   const [motion, setMotion] = useState<PetMotionSettings>({ wander: true, reduceMotion: false });
+  const [activity, setActivity] = useState<PetActivity>({ state: "idle", facing: 1 });
   const [character, setCharacter] = useState(() => localStorage.getItem("skai.pet.character") ?? "percy");
   const [customSprite, setCustomSprite] = useState(() => localStorage.getItem("skai.pet.sprite") ?? "");
   const dragging = useRef(false);
@@ -59,6 +109,7 @@ export function PetWindow() {
     };
     const removeMessage = pet.onMessage(showCompletion);
     const removeMotion = pet.onMotionChange(setMotion);
+    const removeActivity = pet.onActivityChange(setActivity);
     const cancelDrag = () => {
       if (!dragging.current) return;
       dragging.current = false;
@@ -68,6 +119,7 @@ export function PetWindow() {
     return () => {
       removeMessage();
       removeMotion();
+      removeActivity();
       window.removeEventListener("blur", cancelDrag);
       cancelDrag();
       window.clearTimeout(bubbleTimer.current);
@@ -78,9 +130,10 @@ export function PetWindow() {
     };
   }, []);
 
-  const activePose = pose === "success" || pose === "error" ? pose : motion.wander && !COMPOSITOR_DRAG ? "walk" : "idle";
-  const sheet = customSprite || (BUILTIN_SHEETS[character] ?? BUILTIN_SHEETS.percy)[activePose];
+  const activePose = pose === "success" || pose === "error" ? pose : COMPOSITOR_DRAG ? "idle" : activity.state;
+  const sheet = customSprite || (BUILTIN_STRIPS[character] ?? BUILTIN_STRIPS.percy)[activePose];
   const animationPaused = motion.reduceMotion;
+  const spriteStyle = { backgroundImage: `url(${sheet})` } as CSSProperties;
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
     event.preventDefault();
@@ -102,6 +155,6 @@ export function PetWindow() {
   return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}`} aria-label="Percy desktop companion. Drag to move." data-pose={activePose} {...dragHandlers}>
     {bubble && <div className={`pet-window-bubble pet-window-bubble-${bubbleKind}`} role="status" aria-live="polite">{bubble}</div>}
     <button className="pet-window-hide" type="button" onClick={() => window.serverRockAgent?.pet?.hide()} aria-label="Hide Percy companion"><NavIcon name="close" /></button>
-    <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}`} style={{ backgroundImage: `url(${sheet})` }} role="img" aria-label="Animated Percy companion" />
+    <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}${activity.facing === -1 ? " is-facing-left" : ""}`} style={spriteStyle} role="img" aria-label={`Animated ${character} companion`} />
   </main>;
 }

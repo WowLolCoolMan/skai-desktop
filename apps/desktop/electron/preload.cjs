@@ -54,6 +54,11 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
       ipcRenderer.on("pet:motion", listener);
       return () => ipcRenderer.removeListener("pet:motion", listener);
     },
+    onActivityChange: (handler) => {
+      const listener = (_event, activity) => handler(activity);
+      ipcRenderer.on("pet:activity", listener);
+      return () => ipcRenderer.removeListener("pet:activity", listener);
+    },
   },
   tray: {
     refresh: () => ipcRenderer.send("tray:refresh"),

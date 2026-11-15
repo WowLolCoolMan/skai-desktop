@@ -127,6 +127,11 @@ export type PetMotionSettings = {
   reduceMotion: boolean;
 };
 
+export type PetActivity = {
+  state: "idle" | "walk";
+  facing: 1 | -1;
+};
+
 export type PetCompletionEvent = {
   text: string;
   at: number;
@@ -143,6 +148,7 @@ export interface PetBridge {
   onMessage(handler: (event: PetCompletionEvent) => void): () => void;
   onVisibilityChange(handler: (visible: boolean) => void): () => void;
   onMotionChange(handler: (settings: PetMotionSettings) => void): () => void;
+  onActivityChange(handler: (activity: PetActivity) => void): () => void;
 }
 
 /** What closing the main window does. "ask" shows the Linux close prompt. */
