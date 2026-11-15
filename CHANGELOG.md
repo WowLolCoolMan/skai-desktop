@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added local MP4 and WebM chat input that samples four timestamped frames into
+  JPEG attachments, with bounded size and duration, private temporary storage,
+  and packaged Electron smoke coverage.
 - Added hands-free local voice turns that submit final on-device dictation and
   speak each reply and wait for local speech to finish before listening again,
   without changing the regular voice-output preference.
@@ -22,6 +25,11 @@
   model boundary, Monaco project editor, and current image workflow support.
 - Synced the capability matrix, project site, voice architecture notes, and
   release docs with hands-free chat behavior and the Pages setup blocker.
+
+### Fixed
+
+- Preserved the built-in project reverse-engineering skill and allowed normal
+  line breaks in reviewed skill prompts after the plugin catalog update.
 
 ## [0.1.3] - 2026-11-14
 

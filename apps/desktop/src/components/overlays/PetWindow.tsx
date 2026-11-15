@@ -134,23 +134,40 @@ function sampleRigPose(pose: PetPose, phase: number): RigPose {
   return target;
 }
 
+function blendRigPose(from: RigPose, to: RigPose, amount: number): RigPose {
+  const t = amount * amount * (3 - 2 * amount);
+  return Object.fromEntries(Object.keys(RIG_BASE).map((key) => [key, {
+    x: from[key].x + (to[key].x - from[key].x) * t,
+    y: from[key].y + (to[key].y - from[key].y) * t,
+  }])) as RigPose;
+}
+
 function StickRigPet({ pose, facing, dragHandlers }: { pose: PetPose; facing: number; dragHandlers: PetDragHandlers }) {
-  const [phase, setPhase] = useState(0);
+  const [clock, setClock] = useState(() => performance.now());
+  const previousPose = useRef(pose);
+  const activePose = useRef(pose);
+  const transitionStart = useRef(performance.now());
+  useEffect(() => {
+    if (activePose.current === pose) return;
+    previousPose.current = activePose.current;
+    activePose.current = pose;
+    transitionStart.current = performance.now();
+  }, [pose]);
   useEffect(() => {
     let frame = 0;
     let lastPaint = 0;
-    const started = performance.now();
     const tick = (now: number) => {
       if (now - lastPaint >= 33) {
         lastPaint = now;
-        setPhase(((now - started) / (pose === "walk" ? 560 : 1300)) % 1);
+        setClock(now);
       }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [pose]);
-  const points = sampleRigPose(pose, phase);
+  }, []);
+  const phase = (clock / (pose === "walk" ? 560 : 1300)) % 1;
+  const points = blendRigPose(sampleRigPose(previousPose.current, phase), sampleRigPose(activePose.current, phase), Math.min(1, (clock - transitionStart.current) / 260));
   const working = pose === "coding" || pose === "thinking";
   const success = pose === "success";
   const failure = pose === "error" || pose === "stuck" || pose === "needs-attention";
