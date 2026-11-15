@@ -6,7 +6,7 @@
 
 - Added local MP4 and WebM chat input that samples four timestamped frames into
   JPEG attachments, with bounded size and duration, private temporary storage,
-  and packaged Electron smoke coverage.
+  and packaged Electron smoke coverage for WebM and H.264 MP4.
 - Added hands-free local voice turns that submit final on-device dictation and
   speak each reply and wait for local speech to finish before listening again,
   without changing the regular voice-output preference.

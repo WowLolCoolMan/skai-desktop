@@ -13,6 +13,7 @@ const executable = path.resolve(process.argv[2] || path.join(defaultRoot, defaul
 const artifactRoot = path.dirname(executable);
 const port = 19321;
 const timeoutMs = 20_000;
+const mp4FixtureBase64 = fs.readFileSync(path.join(__dirname, "fixtures", "video-frame-smoke.mp4")).toString("base64");
 
 if (!fs.existsSync(executable)) {
   console.error(`Electron artifact does not exist: ${executable}`);
@@ -101,7 +102,20 @@ async function main() {
       await sleep(100);
     }
   }
-  console.log(`Packaged local video sampling: ${videoFixtureResult} ${videoResult}`);
+  await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+  await sleep(150);
+  const mp4DropResult = await evaluate(mainTarget, `(() => { const binary = atob('${mp4FixtureBase64}'); const bytes = new Uint8Array(binary.length); for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index); const file = new File([bytes], 'smoke-video.mp4', { type: 'video/mp4' }); const data = new DataTransfer(); data.items.add(file); const zone = document.querySelector('.composer-card'); if (!zone) return 'missing-drop-zone'; zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data })); zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data })); return 'dropped'; })()`);
+  let mp4VideoResult = JSON.stringify({ frames: [], errors: [] });
+  if (mp4DropResult === "dropped") {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      mp4VideoResult = await evaluate(mainTarget, "(() => JSON.stringify({ frames: [...document.querySelectorAll('.attachment-list-composer .attachment-card')].map((card) => ({ name: card.querySelector('strong')?.textContent ?? '', kind: card.querySelector('small')?.textContent ?? '' })), errors: [...document.querySelectorAll('[role=\\\"alert\\\"]')].map((item) => item.textContent ?? '') }))()");
+      if (JSON.parse(mp4VideoResult).frames.length || JSON.parse(mp4VideoResult).errors.some(Boolean)) break;
+      await sleep(100);
+    }
+  }
+  console.log(`Packaged local WebM sampling: ${videoFixtureResult} ${videoResult}`);
+  console.log(`Packaged local H.264 MP4 sampling: drop=${mp4DropResult} ${mp4VideoResult}`);
   const voiceResult = await evaluate(mainTarget, "(async () => { const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition; if (!Recognition) return JSON.stringify({ api: false, processLocally: false, install: false, availability: 'unsupported' }); const recognition = new Recognition(); let availability = 'not-reported'; if (typeof Recognition.available === 'function') { try { availability = await Recognition.available({ langs: [navigator.language || 'en-US'], processLocally: true, quality: 'dictation' }); } catch (error) { availability = `error: ${error instanceof Error ? error.message : String(error)}`; } } return JSON.stringify({ api: true, processLocally: 'processLocally' in recognition, install: typeof Recognition.install === 'function', availability, language: navigator.language }); })()");
   console.log(`Packaged local voice capability: ${voiceResult}`);
   const localVoiceState = JSON.parse(voiceResult);
@@ -128,6 +142,7 @@ async function main() {
   if (typeof mainResult !== "string" || typeof videoResult !== "string" || typeof voiceResult !== "string" || typeof dictationResult !== "string" || typeof settingsResult !== "string" || typeof marketplaceResult !== "string" || typeof installedResult !== "string" || typeof modelsResult !== "string" || typeof petResult !== "string") throw new Error(`Packaged Electron returned an unexpected evaluation value: ${JSON.stringify({ mainResult, videoResult, voiceResult, dictationResult, settingsResult, marketplaceResult, installedResult, modelsResult, petResult })}`);
   const mainState = JSON.parse(mainResult);
   const videoState = JSON.parse(videoResult);
+  const mp4VideoState = JSON.parse(mp4VideoResult);
   const voiceState = JSON.parse(voiceResult);
   const dictationState = JSON.parse(dictationResult);
   const settingsState = JSON.parse(settingsResult);
@@ -137,9 +152,10 @@ async function main() {
   const petState = JSON.parse(petResult);
   const error = dictationState.error.toLowerCase();
   const dictationFailClosed = dictationState.skipped || (!voiceState.api && error.includes("system speech input is not available")) || (voiceState.api && !voiceState.processLocally && error.includes("cannot guarantee on-device")) || (voiceState.processLocally && voiceState.availability !== "available" && error.includes("remote recognition is disabled"));
-  const videoSamplingWorked = !videoFixture.supported || (videoFixture.recorded && videoFixture.dropped && videoState.frames.length === 4 && videoState.frames.every((frame) => frame.kind.startsWith("Video frame")));
+  const videoSamplingWorked = (!videoFixture.supported || (videoFixture.recorded && videoFixture.dropped && videoState.frames.length === 4 && videoState.frames.every((frame) => frame.kind.startsWith("Video frame"))))
+    && mp4DropResult === "dropped" && mp4VideoState.frames.length === 4 && mp4VideoState.frames.every((frame) => frame.kind.startsWith("Video frame"));
   if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !dictationState.button || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.modelsTab || !marketplaceState.reviewButton || !marketplaceState.reviewDialog || !marketplaceState.confirmButton || installedState.route !== "#/marketplace" || !installedState.installedTab || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Percy") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, videoFixture, videoState, voiceState, dictationState, settingsState, marketplaceState, installedState, modelsState, petState })}`);
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, videoFixture, videoState, mp4DropResult, mp4VideoState, voiceState, dictationState, settingsState, marketplaceState, installedState, modelsState, petState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }
