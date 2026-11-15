@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, safeStorage, screen, session, shell, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -8,6 +8,7 @@ const { randomUUID } = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
+const { createChatGptAuth } = require("./chatgpt-auth.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -70,6 +71,7 @@ const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production",
 const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let updateCheckTimer;
+let chatGptAuth;
 
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
@@ -467,7 +469,9 @@ function createPetWindow() {
   }
   // On native Wayland, dragging is handed to the compositor (app-region drag →
   // xdg_toplevel.move) because the app can neither read nor set its position.
-  const petQuery = { pet: "1", ...(process.env.SKAI_RIG_PET === "1" ? { rig: "1" } : {}), ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
+  // The renderer selects the pet from its persisted character setting. Do not
+  // force rig mode here: doing so makes every selected sprite appear as Skai.
+  const petQuery = { pet: "1", ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
   const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
   if (devUrl) {
     const url = new URL(devUrl);
@@ -735,12 +739,18 @@ function restartAgentHost() {
   });
 }
 
-function requestAgent(method, params) {
+async function requestAgent(method, params) {
   if (typeof method !== "string" || !allowedMethods.has(method)) {
     return Promise.resolve({ v: 1, ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "That desktop operation is not exposed by the renderer bridge." } });
   }
   if (params !== undefined && (params === null || typeof params !== "object" || Array.isArray(params))) {
     return Promise.resolve({ v: 1, ok: false, error: { code: "INVALID_PARAMS", message: "Agent parameters must be an object." } });
+  }
+  let authenticatedParams = params;
+  if (method === "chat.complete" && params?.provider === "ChatGPT plan") {
+    const accessToken = await chatGptAuth?.token();
+    if (!accessToken) return { v: 1, ok: false, error: { code: "CHATGPT_AUTH_REQUIRED", message: "Sign in with ChatGPT before using the ChatGPT plan provider." } };
+    authenticatedParams = { ...params, apiKey: accessToken };
   }
   if (!host || host.stdin.destroyed) {
     const response = { v: 1, ok: false, error: { code: "HOST_UNAVAILABLE", message: "Agent host is not running." } };
@@ -750,8 +760,8 @@ function requestAgent(method, params) {
   }
   const id = `desktop-${nextRequestId++}`;
   const requestParams = method === "chat.complete"
-    ? { ...params, timeoutSeconds: chatHostDeadlineSeconds }
-    : params;
+    ? { ...(authenticatedParams || {}), timeoutSeconds: chatHostDeadlineSeconds }
+    : authenticatedParams;
   return new Promise((resolve) => {
     const timeoutMs = method === "chat.complete" ? chatRequestTimeoutMs : standardRequestTimeoutMs;
     const timer = setTimeout(() => {
@@ -905,6 +915,7 @@ function applyProductionContentSecurityPolicy() {
 app.whenReady().then(() => {
   if (relaunchingForDisplayBackend || !hasSingleInstanceLock) return;
   startAgentHost();
+  chatGptAuth = createChatGptAuth({ userDataPath: app.getPath("userData"), openExternal: (url) => shell.openExternal(url), safeStorage });
   const localVideos = new Map();
   ipcMain.handle("video:create-local-url", (event, payload) => {
     if (!payload || !["video/mp4", "video/webm"].includes(payload.mediaType) || typeof payload.content !== "string" || payload.content.length > 28_000_000 || payload.content.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(payload.content))
@@ -932,6 +943,9 @@ app.whenReady().then(() => {
     return true;
   });
   if (!process.env.SERVER_ROCK_RENDERER_URL) applyProductionContentSecurityPolicy();
+  ipcMain.handle("chatgpt:status", (event) => BrowserWindow.fromWebContents(event.sender) ? chatGptAuth.status() : { signedIn: false, email: null, scopes: [] });
+  ipcMain.handle("chatgpt:sign-in", async (event) => { if (!BrowserWindow.fromWebContents(event.sender)) return { signedIn: false, email: null, scopes: [] }; return chatGptAuth.signIn(); });
+  ipcMain.handle("chatgpt:sign-out", (event) => BrowserWindow.fromWebContents(event.sender) ? chatGptAuth.signOut() : { signedIn: false, email: null, scopes: [] });
   ipcMain.handle("agent:request", async (event, method, params) => {
     if (method === "workspace.pickFolder") {
       const window = BrowserWindow.fromWebContents(event.sender);
