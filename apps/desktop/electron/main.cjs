@@ -402,6 +402,9 @@ function createPetWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Percy is an unfocused companion; without this Chromium throttles or pauses its sprite
+      // animation whenever another window has focus or the OS reports it occluded (Windows).
+      backgroundThrottling: false,
       preload: path.join(__dirname, "preload.cjs"),
     },
   });
