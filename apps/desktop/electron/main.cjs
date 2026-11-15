@@ -380,6 +380,14 @@ function createPetWindow() {
     petReady = true;
     flushPetMessages();
   });
+  // Window managers can close Percy directly (Hyprland/i3 close-window keybinds
+  // ignore `closable: false`). Treat that as "hide Percy" so the tray and
+  // Settings can bring it back, instead of destroying the window for the session.
+  petWindow.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    setPetVisible(false);
+  });
   petWindow.on("closed", () => { petReady = false; stopPetDrag(); petWindow = undefined; });
   if (typeof petWindow.setVisibleOnAllWorkspaces === "function") {
     petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -644,23 +652,94 @@ function createWindow() {
   mainWindow.on("close", (event) => {
     if (isQuitting) return;
     event.preventDefault();
-    // Closing hides to the tray, but only where a tray can actually be shown.
-    // Many Linux setups (bare Hyprland/Sway, GNOME without the AppIndicator
-    // extension) have no tray host; hiding there would leave Skai running with
-    // no visible way back, so quit instead. Probe on every close because panels
-    // such as Waybar can start or restart at any time.
-    void hasStatusNotifierHost().then((statusNotifierHost) => {
-      if (isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
-      if (!isTrayLikelyVisible({ statusNotifierHost })) {
-        console.log("[windowing] no system tray host detected; quitting instead of hiding to the tray.");
-        app.quit();
-        return;
-      }
-      mainWindow.hide();
-      void refreshTrayMenu();
-    });
+    void handleMainWindowClose();
   });
-  mainWindow.on("closed", () => { mainWindow = undefined; });
+  mainWindow.on("closed", () => { mainWindow = undefined; closePromptOpen = false; });
+  // A reload or renderer crash drops any open close prompt; let the next close ask again.
+  mainWindow.webContents.on("did-start-loading", () => { closePromptOpen = false; });
+  mainWindow.webContents.on("render-process-gone", () => { closePromptOpen = false; });
+}
+
+// --- Closing the main window -------------------------------------------------
+// Windows/macOS: closing hides Skai to the tray. Linux: window managers close
+// windows from keybindings (Hyprland/Sway/i3 "close window"), where silently
+// vanishing to a tray reads as a full quit, so Skai asks "Fully close" or "Run
+// in background" (remembered on request, changeable in Settings → General).
+const CLOSE_BEHAVIORS = new Set(["ask", "background", "quit"]);
+let closePromptOpen = false;
+
+function windowBehaviorPath() {
+  return path.join(app.getPath("userData"), "window-behavior.json");
+}
+
+function readCloseBehavior() {
+  try {
+    const value = JSON.parse(fsSync.readFileSync(windowBehaviorPath(), "utf8"))?.closeBehavior;
+    if (CLOSE_BEHAVIORS.has(value)) return value;
+  } catch { /* first run or unreadable: fall through to the default */ }
+  return process.platform === "linux" ? "ask" : "background";
+}
+
+function writeCloseBehavior(value) {
+  if (!CLOSE_BEHAVIORS.has(value)) return readCloseBehavior();
+  fsSync.mkdirSync(app.getPath("userData"), { recursive: true });
+  fsSync.writeFileSync(windowBehaviorPath(), JSON.stringify({ closeBehavior: value }, null, 2), "utf8");
+  return value;
+}
+
+function runMainWindowInBackground() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+  void refreshTrayMenu();
+}
+
+async function handleMainWindowClose() {
+  // Probe on every close because panels such as Waybar can start or restart at any time.
+  const trayAvailable = isTrayLikelyVisible({ statusNotifierHost: await hasStatusNotifierHost() });
+  if (isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
+  if (process.platform !== "linux") {
+    if (trayAvailable) runMainWindowInBackground();
+    else app.quit();
+    return;
+  }
+  const behavior = readCloseBehavior();
+  if (behavior === "quit") { app.quit(); return; }
+  if (behavior === "background") { runMainWindowInBackground(); return; }
+  if (closePromptOpen) return;
+  closePromptOpen = true;
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+  const contents = mainWindow.webContents;
+  if (contents.isLoading() || contents.isCrashed()) {
+    // The renderer cannot show its prompt; fall back to a native dialog.
+    await askCloseWithNativeDialog(trayAvailable);
+    return;
+  }
+  contents.send("window:close-requested", { trayAvailable });
+}
+
+async function askCloseWithNativeDialog(trayAvailable) {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "question",
+    buttons: ["Run in background", "Fully close", "Cancel"],
+    defaultId: 0,
+    cancelId: 2,
+    title: "Close Skai Desktop",
+    message: "Keep Skai running in the background?",
+    detail: trayAvailable
+      ? "Skai stays in your system tray with Percy and the local agent host. Use the tray icon to reopen it or quit."
+      : "No system tray was found. Skai keeps running; launch it again from your app launcher to reopen the window.",
+    checkboxLabel: "Remember my choice",
+  });
+  applyCloseChoice(["background", "quit", "cancel"][result.response] ?? "cancel", result.checkboxChecked);
+}
+
+function applyCloseChoice(choice, remember) {
+  closePromptOpen = false;
+  if (choice !== "background" && choice !== "quit") return;
+  if (remember) writeCloseBehavior(choice);
+  if (choice === "quit") app.quit();
+  else runMainWindowInBackground();
 }
 
 function applyProductionContentSecurityPolicy() {
@@ -735,6 +814,19 @@ app.whenReady().then(() => {
       return { v: 1, ok: true, result: { attachments } };
     }
     return requestAgent(method, params);
+  });
+  ipcMain.on("window:close-choice", (event, response) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents || !closePromptOpen) return;
+    const choice = response?.choice;
+    applyCloseChoice(choice === "background" || choice === "quit" ? choice : "cancel", Boolean(response?.remember));
+  });
+  ipcMain.handle("window:get-close-behavior", (event) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return "background";
+    return readCloseBehavior();
+  });
+  ipcMain.handle("window:set-close-behavior", (event, behavior) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return readCloseBehavior();
+    return writeCloseBehavior(behavior);
   });
   ipcMain.on("pet:set-visible", (event, visible) => {
     if (BrowserWindow.fromWebContents(event.sender)) setPetVisible(Boolean(visible));

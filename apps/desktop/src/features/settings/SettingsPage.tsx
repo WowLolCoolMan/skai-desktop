@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { Model, ThemeMode } from "../../app/types";
-import type { AgentResponse } from "../../../shared/contracts";
+import type { AgentResponse, CloseBehavior } from "../../../shared/contracts";
 import { saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceModels, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
 import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
@@ -25,7 +25,7 @@ const categoryIcons: Record<Category, NavIconName> = {
 };
 
 const categorySearchText: Record<Category, string> = {
-  General: "runtime provider model answer local preferred",
+  General: "runtime provider model answer local preferred close window background tray quit linux",
   Appearance: "theme color accent density backdrop reduced motion pet companion animation",
   Pet: "companion Percy sprite sheet character walk wander always on top overlay custom",
   "Models & Providers": "endpoint runtime model discover Ollama LM Studio AirLLM provider local",
@@ -116,7 +116,7 @@ export function SettingsPage(props: SettingsProps) {
       <main className="settings-content">
         <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h3>{activeCategory}</h3><p>{categoryDescription(activeCategory)}</p></div><StatusBadge tone={activeCategory === "Integrations" ? "neutral" : "success"}>{activeCategory === "Integrations" ? "Review connections" : "Available"}</StatusBadge></div>
 
-        {activeCategory === "General" && <><div className="settings-callout"><strong>{selectedProvider.label}</strong><span>{selectedProvider.detail}</span></div><div className="settings-field"><label>How should Skai answer?<select value={selectedProviderId} onChange={(event) => change("provider", event.target.value)}>{providerChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><label>Preferred model<select value={props.model} onChange={(event) => change("model", event.target.value)}>{props.models.length === 0 && <option value={props.model}>{props.model}</option>}{props.models.map((item) => <option key={item.model} value={item.model}>{item.model}</option>)}</select></label></div><p className="settings-help">All model runtimes run on this computer. Select a local provider and configure its loopback endpoint below.</p></>}
+        {activeCategory === "General" && <><CloseBehaviorSetting /><div className="settings-callout"><strong>{selectedProvider.label}</strong><span>{selectedProvider.detail}</span></div><div className="settings-field"><label>How should Skai answer?<select value={selectedProviderId} onChange={(event) => change("provider", event.target.value)}>{providerChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><label>Preferred model<select value={props.model} onChange={(event) => change("model", event.target.value)}>{props.models.length === 0 && <option value={props.model}>{props.model}</option>}{props.models.map((item) => <option key={item.model} value={item.model}>{item.model}</option>)}</select></label></div><p className="settings-help">All model runtimes run on this computer. Select a local provider and configure its loopback endpoint below.</p></>}
 
         {activeCategory === "Appearance" && <><div className="settings-field"><label>Color theme<select value={props.themeMode} onChange={(event) => change("themeMode", event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label><label>Accent<select value={props.accentColor} onChange={(event) => change("accentColor", event.target.value)}><option value="cyan">Cyan</option><option value="violet">Violet</option><option value="amber">Amber</option><option value="rose">Rose</option></select></label></div><div className="settings-field"><label>Interface density<select value={props.density} onChange={(event) => change("density", event.target.value)}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label><label>Backdrop<select value={props.backdrop} onChange={(event) => change("backdrop", event.target.value)}><option value="none">None</option><option value="deep-sea">Deep sea</option><option value="deep-space">Deep space</option></select></label></div><Toggle label="Reduced motion" detail="Minimize interface animations and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /></>}
 
@@ -149,6 +149,16 @@ export function SettingsPage(props: SettingsProps) {
 function categoryDescription(category: Category) {
   const descriptions: Record<Category, string> = { General: "Choose the local runtime and model Skai should use first.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize Percy as a separate desktop companion window.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review the local data boundary and storage controls.", Storage: "Back up local workspace data without destructive shortcuts.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
   return descriptions[category];
+}
+
+// Linux only: what closing the main window does (see electron/main.cjs). Saved immediately in the shell.
+function CloseBehaviorSetting() {
+  const bridge = window.serverRockAgent?.window;
+  const [behavior, setBehavior] = useState<CloseBehavior | null>(null);
+  useEffect(() => { if (bridge?.platform === "linux") void bridge.getCloseBehavior().then(setBehavior); }, [bridge]);
+  if (!bridge || bridge.platform !== "linux" || behavior === null) return null;
+  const update = (event: ChangeEvent<HTMLSelectElement>) => { void bridge.setCloseBehavior(event.target.value as CloseBehavior).then(setBehavior); };
+  return <div className="settings-field"><label>When you close the window<select value={behavior} onChange={update}><option value="ask">Ask every time</option><option value="background">Run in background</option><option value="quit">Fully close</option></select></label><p className="settings-help">Applies to window-manager close shortcuts such as Super+C. Quit any time from the tray menu.</p></div>;
 }
 
 function Toggle({ label, detail, checked, onChange }: { label: string; detail: string; checked: boolean; onChange: (value: boolean) => void }) {

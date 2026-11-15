@@ -4,6 +4,7 @@ import { useDesktopWorkspace } from "./app/useDesktopWorkspace";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Toolbar } from "./components/layout/Toolbar";
 import { CommandPalette } from "./components/overlays/CommandPalette";
+import { CloseChoiceDialog } from "./components/overlays/CloseChoiceDialog";
 import { GlobalRail } from "./components/layout/GlobalRail";
 
 export default function App() {
@@ -17,5 +18,6 @@ export default function App() {
       <div className={`app-content ${workspace.route === "chat" ? "app-content-chat" : ""} ${workspace.route === "coding" ? "app-content-coding" : ""} ${workspace.route === "settings" ? "app-content-settings" : ""} ${workspace.route === "images" ? "app-content-images" : ""} ${workspace.route === "marketplace" ? "app-content-marketplace" : ""} ${workspace.route === "workbench" ? "app-content-workbench" : ""} ${workspace.route === "terminal" ? "app-content-terminal" : ""}`}><AppRouteView state={workspace.routeState} actions={workspace.routeActions} />{workspace.error && <p className="global-error" role="alert">{workspace.error}</p>}{workspace.health && <span className="sr-only">{workspace.health.service} protocol {workspace.health.protocolVersion}</span>}</div>
     </main>
     <CommandPalette open={workspace.commandOpen} onClose={workspace.closeCommandPalette} onNavigate={workspace.onNavigate} />
+    <CloseChoiceDialog />
   </div>;
 }

@@ -12,6 +12,17 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
     ipcRenderer.on("tray:new-chat", listener);
     return () => ipcRenderer.removeListener("tray:new-chat", listener);
   },
+  window: {
+    platform: process.platform,
+    onCloseRequested: (handler) => {
+      const listener = (_event, request) => handler({ trayAvailable: Boolean(request?.trayAvailable) });
+      ipcRenderer.on("window:close-requested", listener);
+      return () => ipcRenderer.removeListener("window:close-requested", listener);
+    },
+    respondToClose: (choice, remember) => ipcRenderer.send("window:close-choice", { choice: String(choice), remember: Boolean(remember) }),
+    getCloseBehavior: () => ipcRenderer.invoke("window:get-close-behavior"),
+    setCloseBehavior: (behavior) => ipcRenderer.invoke("window:set-close-behavior", String(behavior)),
+  },
   pet: {
     setVisible: (visible) => ipcRenderer.send("pet:set-visible", Boolean(visible)),
     setMotion: (settings) => ipcRenderer.send("pet:set-motion", settings),

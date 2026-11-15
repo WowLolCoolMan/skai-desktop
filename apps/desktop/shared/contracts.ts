@@ -145,11 +145,26 @@ export interface PetBridge {
   onMotionChange(handler: (settings: PetMotionSettings) => void): () => void;
 }
 
+/** What closing the main window does. "ask" shows the Linux close prompt. */
+export type CloseBehavior = "ask" | "background" | "quit";
+export type CloseChoice = "background" | "quit" | "cancel";
+
+export interface WindowBridge {
+  /** process.platform of the desktop shell, e.g. "linux" or "win32". */
+  platform: string;
+  /** Fired on Linux when the user closes the main window and no choice is remembered. */
+  onCloseRequested(handler: (request: { trayAvailable: boolean }) => void): () => void;
+  respondToClose(choice: CloseChoice, remember: boolean): void;
+  getCloseBehavior(): Promise<CloseBehavior>;
+  setCloseBehavior(behavior: CloseBehavior): Promise<CloseBehavior>;
+}
+
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
   onTrayOpenConversation?(handler: (id: string) => void): () => void;
   onTrayNewChat?(handler: () => void): () => void;
   pet?: PetBridge;
+  window?: WindowBridge;
 }
 
 declare global {
