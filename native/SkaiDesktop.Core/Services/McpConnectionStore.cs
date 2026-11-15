@@ -14,7 +14,7 @@ public sealed class McpConnectionStore
 
     public McpConnectionStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "mcp-connections.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "mcp-connections.json");
     }
 
     public IReadOnlyList<McpConnection> Load()

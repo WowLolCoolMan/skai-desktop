@@ -195,7 +195,7 @@ public sealed class AirLlmProvider
     {
         if (!string.IsNullOrWhiteSpace(configured) && !configured.Equals("python", StringComparison.OrdinalIgnoreCase) && !configured.Equals("python3", StringComparison.OrdinalIgnoreCase))
             return configured;
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Skai", "AirLLM", "venv");
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "AirLLM", "venv");
         var managed = OperatingSystem.IsWindows() ? Path.Combine(root, "Scripts", "python.exe") : Path.Combine(root, "bin", "python");
         return File.Exists(managed) ? managed : (string.IsNullOrWhiteSpace(configured) ? "python" : configured);
     }

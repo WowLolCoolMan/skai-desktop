@@ -19,7 +19,7 @@ public sealed class GitHubCredentialStore(string? windowsCredentialPath = null, 
     private const string AccountAttribute = "github-user-token";
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes(ProductIdentity.GitHubCredentialEntropy);
     private readonly string _windowsCredentialPath = windowsCredentialPath ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ServerRock", "AI", "github-user-token.bin");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "github-user-token.bin");
     private readonly string? _secretToolPath = secretToolPath ?? FindExecutable("secret-tool");
 
     public GitHubCredentialStorageStatus GetStatus()

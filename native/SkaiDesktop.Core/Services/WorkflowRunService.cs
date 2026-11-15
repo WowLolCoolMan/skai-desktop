@@ -19,7 +19,7 @@ public sealed class WorkflowRunService
     public WorkflowRunService(WorkflowService definitions, string? path = null)
     {
         _definitions = definitions;
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "workflow-runs.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "workflow-runs.json");
     }
 
     public WorkflowRun Create(WorkflowDefinition definition, string actor = "user")

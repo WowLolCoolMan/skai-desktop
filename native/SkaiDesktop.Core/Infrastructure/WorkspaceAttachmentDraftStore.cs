@@ -14,7 +14,7 @@ public sealed class WorkspaceAttachmentDraftStore
     public WorkspaceAttachmentDraftStore(string? path = null)
     {
         _path = path ?? Environment.GetEnvironmentVariable("SRAI_ATTACHMENT_DRAFTS_PATH") ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "attachment-drafts.json");
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "attachment-drafts.json");
     }
 
     public IReadOnlyList<ChatAttachment> Load(string workspace)

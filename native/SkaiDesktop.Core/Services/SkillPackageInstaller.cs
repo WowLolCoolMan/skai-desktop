@@ -19,7 +19,7 @@ public sealed class SkillPackageInstaller
 
     public SkillPackageInstaller(string? root = null)
     {
-        _root = Path.GetFullPath(root ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "skills"));
+        _root = Path.GetFullPath(root ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "skills"));
     }
 
     public IReadOnlyList<InstalledSkill> ListInstalled()

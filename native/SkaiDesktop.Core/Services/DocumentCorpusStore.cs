@@ -18,7 +18,7 @@ public sealed class DocumentCorpusStore
 
     public DocumentCorpusStore(string? path = null, ICorpusVectorIndex? vectorIndex = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "document-corpus.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "document-corpus.json");
         _vectorIndex = vectorIndex ?? new TokenVectorIndex();
     }
 

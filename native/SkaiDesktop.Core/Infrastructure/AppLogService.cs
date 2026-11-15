@@ -24,7 +24,7 @@ public sealed class AppLogService
     public AppLogService(string? directory = null)
     {
         Directory = Path.GetFullPath(directory ?? Environment.GetEnvironmentVariable("SRAI_LOG_DIRECTORY") ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ServerRock", "AI", "logs"));
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "logs"));
         System.IO.Directory.CreateDirectory(Directory);
     }
 

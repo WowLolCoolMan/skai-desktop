@@ -22,7 +22,7 @@ public sealed class AgentTaskArtifactStore
 
     public AgentTaskArtifactStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ServerRock", "AI", "agent-tasks.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "agent-tasks.json");
     }
 
     public IReadOnlyList<AgentTaskArtifact> Load()

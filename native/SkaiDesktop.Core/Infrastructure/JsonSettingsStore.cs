@@ -15,7 +15,7 @@ public sealed class JsonSettingsStore
     public JsonSettingsStore(string? path = null)
     {
         _path = path ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
             "ServerRock", "AI", "settings.json");
     }
 
