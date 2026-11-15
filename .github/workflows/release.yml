@@ -112,8 +112,11 @@ jobs:
           $manifestPath = Join-Path $publish 'artifact-manifest.json'
           if (-not (Test-Path $manifestPath)) { throw 'The packaged artifact manifest is missing before Windows signing.' }
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest.files.executable = (Get-FileHash -Algorithm SHA256 (Join-Path $publish 'Skai Desktop.exe')).Hash.ToLowerInvariant()
+          $signedHash = (Get-FileHash -Algorithm SHA256 (Join-Path $publish 'Skai Desktop.exe')).Hash.ToLowerInvariant()
+          $manifest.files.executable = $signedHash
           $manifest | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $manifestPath
+          $verifiedHash = (Get-Content $manifestPath -Raw | ConvertFrom-Json).files.executable
+          if ($verifiedHash -ne $signedHash) { throw 'The signed executable hash was not persisted to artifact-manifest.json.' }
           Get-AuthenticodeSignature (Join-Path $publish 'Skai Desktop.exe') | Format-List | Out-File -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'SIGNATURES-electron-win-x64.txt')
       - name: Sign Linux Electron archive
         if: runner.os == 'Linux' && env.RELEASE_SIGNING_READY == 'true'
