@@ -16,6 +16,11 @@ if (!fs.existsSync(executable)) {
   console.error(`Electron artifact does not exist: ${executable}`);
   process.exit(1);
 }
+const packagedAirLlmWorker = path.join(defaultRoot, "resources", "agent-host", "airllm", "skai_airllm.py");
+if (!fs.existsSync(packagedAirLlmWorker)) {
+  console.error(`Packaged AirLLM worker does not exist: ${packagedAirLlmWorker}`);
+  process.exit(1);
+}
 
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
 const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -78,7 +83,7 @@ async function main() {
   if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !petState.title.includes("Percy") || !petState.companion || !petState.sprite || !petState.transparent || !petState.animated) {
     throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, petState })}`);
   }
-  console.log(`Packaged Electron smoke passed: ${mainState.title}; main and separate transparent Percy surfaces rendered with animated sprite.`);
+  console.log(`Packaged Electron smoke passed: ${mainState.title}; main and separate transparent Percy surfaces rendered with animated sprite; AirLLM worker staged.`);
 }
 
 async function cleanup() {

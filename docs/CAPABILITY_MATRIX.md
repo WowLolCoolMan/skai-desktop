@@ -15,7 +15,7 @@ means it is not yet implemented. A build alone never upgrades a feature to
 | Chat and persistence | working | Agent Host `chat.complete`, local conversation storage, streaming/error states, attachments, retry, export/import, chat smoke | Broader provider and multi-pane acceptance |
 | Local models | working | Ollama/OpenAI-compatible discovery, model selection, model library, benchmark metadata, local-only recovery | More runtime adapters and resource scheduling |
 | Cloud providers | partial | Provider contracts and explicit route selection exist | Complete credential storage, OAuth/account sign-in, data-route consent, and remote acceptance |
-| AirLLM | partial | Core provider strategy and Agent Host route exist | Packaged model download/compatibility acceptance and hardware-aware scheduling |
+| AirLLM | partial | Core provider strategy, Agent Host route, packaged `airllm/skai_airllm.py` worker, and artifact smoke assertion exist | Managed Python dependency/runtime setup, model compatibility acceptance, and hardware-aware scheduling |
 | Marketplace | working | Host-backed catalog/provider search, installed model routes, verified install review, packaged artifact smoke | More catalogs and download recovery UX |
 | Projects and GitHub | partial | Local projects, Git review/push, GitHub integration docs and guarded operations | Full live GitHub permission/error matrix and richer worktree UX |
 | Coding Agent / workbench | partial | Task artifacts, approvals, durable activity events, guarded worktree leases | Actual model/tool dispatch and background execution |

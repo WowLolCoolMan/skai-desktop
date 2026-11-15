@@ -27,6 +27,10 @@ fs.mkdirSync(appRoot, { recursive: true });
 fs.mkdirSync(hostRoot, { recursive: true });
 
 run("dotnet", ["publish", path.join("services", "agent-host", "ServerRock.AgentHost.csproj"), "-c", "Release", "-r", runtime, "--self-contained", "true", "-p:PublishSingleFile=true", "-p:PublishTrimmed=false", "-o", hostRoot]);
+const airLlmWorkerSource = path.join(root, "services", "airllm");
+const airLlmWorkerTarget = path.join(hostRoot, "airllm");
+if (!fs.existsSync(path.join(airLlmWorkerSource, "skai_airllm.py"))) throw new Error("The AirLLM worker is missing from services/airllm.");
+fs.cpSync(airLlmWorkerSource, airLlmWorkerTarget, { recursive: true, force: true });
 
 fs.cpSync(electronDist, outputRoot, { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "dist"), path.join(appRoot, "dist"), { recursive: true, force: true });
@@ -38,10 +42,11 @@ fs.renameSync(path.join(outputRoot, electronBinary), path.join(outputRoot, packa
 
 const publishedHost = path.join(hostRoot, hostBinary);
 if (!fs.existsSync(publishedHost)) throw new Error(`The self-contained Agent Host was not published at ${publishedHost}.`);
+if (!fs.existsSync(path.join(airLlmWorkerTarget, "skai_airllm.py"))) throw new Error(`The packaged AirLLM worker was not staged at ${path.join(airLlmWorkerTarget, "skai_airllm.py")}.`);
 fs.writeFileSync(path.join(outputRoot, "README-release.txt"), [
   "Skai Desktop portable Electron artifact",
   "",
-  `Run ${packagedBinary} from this folder. The bundled Agent Host is in resources/agent-host.`,
+  `Run ${packagedBinary} from this folder. The bundled Agent Host is in resources/agent-host, including the AirLLM worker contract.`,
   "This portable artifact is for release validation; signed installers require the release signing gate.",
   "",
 ].join("\n"), "utf8");
