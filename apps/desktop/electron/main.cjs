@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, systemPreferences, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -64,6 +64,11 @@ let petWanderNextAt = 0;
 let petWanderLayoutSignature = "";
 const petWanderPlanner = new PetWanderPlanner();
 let petMotion = { wander: true, reduceMotion: false };
+// The OS "reduce motion" / "show animations: off" preference also stills Percy: the renderer's
+// prefers-reduced-motion CSS stops the sprite, so wandering would slide a frozen sprite around.
+function osPrefersReducedMotion() {
+  try { return Boolean(systemPreferences.getAnimationSettings?.().prefersReducedMotion); } catch { return false; }
+}
 let petActivity = { state: "idle", facing: 1 };
 const pendingPetMessages = [];
 const PET_WINDOW_WIDTH = 220;
@@ -212,18 +217,18 @@ function petWanderLayout() {
 
 function schedulePetWander() {
   if (!windowPositioningAvailable) return;
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
   if (petWanderPauseTimer || petWanderStepTimer) return;
   const delay = Math.max(0, petWanderNextAt - Date.now()) || 1800 + Math.round(Math.random() * 2600);
   petWanderPauseTimer = setTimeout(() => {
     petWanderPauseTimer = undefined;
-    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
     startPetWander();
   }, delay);
 }
 
 function startPetWander() {
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || petDragOffset) return;
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
   const { area, bounds, grid, blocked, signature } = petWanderLayout();
   const relative = grid.clampPetPosition({ x: bounds.x - area.x, y: bounds.y - area.y });
   const plan = petWanderPlanner.tryPlanWalk(grid.cellForPetPosition(relative), blocked);
@@ -249,7 +254,7 @@ function startPetWander() {
 }
 
 function movePetTowardTarget() {
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petWanderWalk || !petMotion.wander || petMotion.reduceMotion || petDragOffset) {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petWanderWalk || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) {
     petWanderStepTimer = undefined;
     petWanderMoving = false;
     return;
@@ -661,7 +666,7 @@ function scheduleUpdateCheck() {
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
   "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
-  "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
+  "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
