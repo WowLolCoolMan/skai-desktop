@@ -390,6 +390,10 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .chat-page .composer-card .attachment-list-composer { display: flex; gap: 8px; margin: 0; padding: 10px 14px 0; overflow-x: auto; }
 .chat-page .composer-card .attachment-list-composer .attachment-card { min-width: 190px; padding: 6px; border-radius: var(--skai-radius-lg); }
 .chat-page .composer-card .composer-hint[role="status"], .chat-page .composer-card .composer-voice-status { margin: 0 16px 8px; }
+.chat-page .composer-card .voice-mode-panel { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 16px 8px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 36%, transparent); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 9%, var(--skai-color-surface)); }
+.chat-page .composer-card .voice-mode-panel > div { display: grid; gap: 2px; min-width: 0; }
+.chat-page .composer-card .voice-mode-panel strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
+.chat-page .composer-card .voice-mode-panel span { overflow: hidden; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); text-overflow: ellipsis; white-space: nowrap; }
 .chat-page .composer-card .composer-actions {
   display: grid;
   grid-template-columns: repeat(5, auto) minmax(0, 1fr);
