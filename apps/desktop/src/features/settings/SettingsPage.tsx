@@ -3,7 +3,7 @@ import type { Model, Route, ThemeMode } from "../../app/types";
 import type { AgentResponse, CloseBehavior, UpdateCheckResult } from "../../../shared/contracts";
 import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
-import { listPetSpriteProfiles, savePetSpriteProfile, validatePetStrip, type PetSpriteProfile, type PetStrip } from "./petSprites";
+import { listPetSpriteProfiles, petStripFrameCount, savePetSpriteProfile, validatePetStrip, type PetSpriteProfile, type PetStrip } from "./petSprites";
 import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 
@@ -17,8 +17,9 @@ function petStripPreviewStyle(strip: PetStrip): CSSProperties {
   const frameHeight = strip.frameHeight * scale;
   return {
     backgroundImage: `url(${strip.dataUrl})`,
-    backgroundSize: `${frameWidth * 6}px ${frameHeight}px`,
-    "--pet-preview-strip-end": `${-frameWidth * 5}px`,
+    backgroundSize: `${frameWidth * petStripFrameCount(strip)}px ${frameHeight}px`,
+    "--pet-preview-strip-end": `${-frameWidth * (petStripFrameCount(strip) - 1)}px`,
+    "--pet-preview-steps": petStripFrameCount(strip) - 1,
   } as CSSProperties;
 }
 const categoryIcons: Record<Category, NavIconName> = {
@@ -242,7 +243,7 @@ function PetSettings({ props, change }: { props: SettingsProps; change: (key: st
       const legacy = props.petSpriteDataUrl || localStorage.getItem("skai.pet.sprite") || "";
       if (legacy && !stored.some((profile) => profile.id === "legacy")) {
         const legacyBlob = await (await fetch(legacy)).blob();
-        const strip = await validatePetStrip(new File([legacyBlob], `legacy.${legacyBlob.type === "image/webp" ? "webp" : "png"}`, { type: legacyBlob.type }));
+        const strip = await validatePetStrip(new File([legacyBlob], `legacy.${legacyBlob.type === "image/webp" ? "webp" : "png"}`, { type: legacyBlob.type }), true);
         const migrated: PetSpriteProfile = { id: "legacy", name: "My companion", strips: { idle: strip } };
         await savePetSpriteProfile(migrated);
         next = [...stored, migrated];
