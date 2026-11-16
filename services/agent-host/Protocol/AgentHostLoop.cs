@@ -11,9 +11,8 @@ public static class AgentHostLoop
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Dictionary<string, ActiveTaskExecution> ActiveTaskExecutions = new(StringComparer.Ordinal);
     private static readonly object ActiveTaskExecutionsGate = new();
-    // Local providers do not expose enough allocation telemetry to admit parallel
-    // coding runs safely yet. Keep one shared slot and let durable tasks queue.
-    private static readonly SemaphoreSlim LocalTaskExecutionSlot = new(1, 1);
+    private static readonly object LocalExecutionGate = new();
+    private static int LocalAdmittedTaskCount;
     private static readonly Dictionary<string, WorkspaceTerminalSession> TerminalSessions = new(StringComparer.Ordinal);
     private static readonly object TerminalSessionsGate = new();
     private static readonly Dictionary<string, ModelPullOperation> ModelPulls = new(StringComparer.Ordinal);
@@ -252,7 +251,9 @@ public static class AgentHostLoop
     {
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
         var tasks = CreateTaskStore().Load();
-        var activeTaskCount = tasks.Count(task => task.Status == AgentTaskStatuses.Running);
+        var decision = LocalExecutionCapacityPolicy.Decide(snapshot);
+        int activeTaskCount;
+        lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
         var queuedTaskCount = tasks.Count(task => task.Status == AgentTaskStatuses.Queued);
         return new(ProtocolVersion, request.Id, true, new
         {
@@ -262,7 +263,7 @@ public static class AgentHostLoop
             snapshot.CpuUtilizationPercent,
             snapshot.Gpu,
             snapshot.MeasurementNote,
-            scheduler = new { activeTaskCount, queuedTaskCount, executionSlotLimit = 1 },
+            scheduler = new { activeTaskCount, queuedTaskCount, executionSlotLimit = decision.SlotLimit, limitingResource = decision.LimitingResource },
         });
     }
 
@@ -1470,7 +1471,11 @@ public static class AgentHostLoop
             ActiveTaskExecutions[taskId] = execution;
         }
 
-        var status = LocalTaskExecutionSlot.CurrentCount > 0 ? AgentTaskStatuses.Running : AgentTaskStatuses.Queued;
+        var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
+        var decision = LocalExecutionCapacityPolicy.Decide(snapshot);
+        int activeTaskCount;
+        lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
+        var status = activeTaskCount < decision.SlotLimit ? AgentTaskStatuses.Running : AgentTaskStatuses.Queued;
         return new(ProtocolVersion, request.Id, true, new { id = taskId, status, execution = "local-queue" });
     }
 
@@ -1479,7 +1484,7 @@ public static class AgentHostLoop
         var acquired = false;
         try
         {
-            await LocalTaskExecutionSlot.WaitAsync(execution.Cancellation.Token).ConfigureAwait(false);
+            await WaitForLocalExecutionCapacityAsync(execution.Cancellation.Token).ConfigureAwait(false);
             acquired = true;
             var store = CreateTaskStore();
             if (execution.Cancellation.IsCancellationRequested || store.Get(taskId).Status != AgentTaskStatuses.Queued)
@@ -1508,11 +1513,36 @@ public static class AgentHostLoop
         }
         finally
         {
-            if (acquired) LocalTaskExecutionSlot.Release();
+            if (acquired)
+            {
+                lock (LocalExecutionGate)
+                {
+                    LocalAdmittedTaskCount = Math.Max(0, LocalAdmittedTaskCount - 1);
+                    Monitor.PulseAll(LocalExecutionGate);
+                }
+            }
             lock (ActiveTaskExecutionsGate)
             {
                 if (ActiveTaskExecutions.Remove(taskId, out var finished)) finished.Cancellation.Dispose();
             }
+        }
+    }
+
+    private static async Task WaitForLocalExecutionCapacityAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var snapshot = await new LocalCapacityProbe().GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var decision = LocalExecutionCapacityPolicy.Decide(snapshot);
+            lock (LocalExecutionGate)
+            {
+                if (LocalAdmittedTaskCount < decision.SlotLimit)
+                {
+                    LocalAdmittedTaskCount++;
+                    return;
+                }
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken).ConfigureAwait(false);
         }
     }
 
