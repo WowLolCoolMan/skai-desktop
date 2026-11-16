@@ -103,7 +103,7 @@ export function ProjectFileTree({ files, selectedFile, query, onOpenFile }: Proj
       type="button"
     >
       <span className="project-file-tree-chevron project-file-tree-spacer" aria-hidden="true" />
-      <span className="project-file-tree-icon project-file-document-icon" aria-hidden="true">{file.kind === "image" ? "▧" : file.kind === "pdf" ? "PDF" : "·"}</span>
+      <span className="project-file-tree-icon project-file-document-icon" aria-hidden="true">{file.kind === "image" ? "▧" : file.kind === "pdf" ? "PDF" : file.kind === "svg" ? "SVG" : "·"}</span>
       <span className="project-file-tree-name">{filename}</span>
       <small>{file.bytes.toLocaleString()} B</small>
     </button>;

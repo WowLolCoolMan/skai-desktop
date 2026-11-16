@@ -14,6 +14,7 @@ public static class WorkspaceFileContext
     public const int MaxTotalCharacters = 48_000;
     public const int MaxPreviewEntries = 24;
     public const int MaxInlinePdfPreviewBytes = 8 * 1024 * 1024;
+    public const int MaxInlineSvgPreviewBytes = 1 * 1024 * 1024;
     public const int MaxBrowserTextEntries = 128;
     public const string BrowserBoundaryDescription = "Shows up to 128 readable text files. Protected names, dependency/build directories, and linked paths are hidden.";
 
@@ -220,7 +221,8 @@ public static class WorkspaceFileContext
                     if (result.Count >= MaxPreviewEntries || IsLink(file)) continue;
                     var name = Path.GetFileName(file);
                     if (IsExcludedFile(name)) continue;
-                    var kind = includeText && ChatAttachmentPolicy.IsAllowedTextName(name) ? "text"
+                    var kind = IsSvgName(name) ? "svg"
+                        : includeText && ChatAttachmentPolicy.IsAllowedTextName(name) ? "text"
                         : ChatAttachmentPolicy.GetImageMediaType(name) is not null ? "image"
                         : ChatAttachmentPolicy.IsAllowedPdfName(name) ? "pdf"
                         : null;
@@ -228,7 +230,7 @@ public static class WorkspaceFileContext
                     try
                     {
                         var length = new FileInfo(file).Length;
-                        var maxBytes = kind == "pdf" ? ChatAttachmentPolicy.MaxPdfBytes : kind == "image" ? ChatAttachmentPolicy.MaxFileBytes : MaxFileCharacters * 4L;
+                        var maxBytes = kind == "pdf" ? ChatAttachmentPolicy.MaxPdfBytes : kind == "image" ? ChatAttachmentPolicy.MaxFileBytes : kind == "svg" ? MaxInlineSvgPreviewBytes : MaxFileCharacters * 4L;
                         if (length > maxBytes) continue;
                         result.Add(new WorkspaceFileEntry(Path.GetRelativePath(root, file), Path.GetFullPath(file), kind, length));
                     }
@@ -249,7 +251,11 @@ public static class WorkspaceFileContext
         return result;
     }
 
-    /// <summary>Reads one enumerated image/PDF preview after rechecking workspace containment and reparse-point boundaries.</summary>
+    private static bool IsSvgName(string fileName) => !string.IsNullOrWhiteSpace(fileName)
+        && Path.GetExtension(fileName).Equals(".svg", StringComparison.OrdinalIgnoreCase)
+        && !fileName.Contains(".env.", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Reads one enumerated image/PDF/SVG preview after rechecking workspace containment and reparse-point boundaries.</summary>
     public static (WorkspaceFileEntry Entry, byte[] Content) ReadPreviewableFile(IEnumerable<string> selectedFolders, string relativePath)
     {
         ArgumentNullException.ThrowIfNull(selectedFolders);

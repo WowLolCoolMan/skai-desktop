@@ -24,7 +24,7 @@ public sealed class WorkspaceFileEditor
     private static readonly HashSet<string> WritableExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".cs", ".csproj", ".sln", ".xaml", ".xml", ".json", ".md", ".txt", ".yml", ".yaml", ".toml", ".ini",
-        ".props", ".targets", ".razor", ".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".sh", ".ps1",
+        ".props", ".targets", ".razor", ".html", ".svg", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".sh", ".ps1",
         ".sql", ".go", ".rs", ".java", ".kt", ".swift", ".c", ".h", ".cpp", ".hpp", ".vue", ".svelte"
     };
 

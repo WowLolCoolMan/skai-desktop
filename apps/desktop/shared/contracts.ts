@@ -44,12 +44,12 @@ export type DesktopProject = {
 export type DesktopProjectFile = {
   relativePath: string;
   bytes: number;
-  kind?: "text" | "image" | "pdf";
+  kind?: "text" | "image" | "pdf" | "svg";
 };
 
 export type DesktopProjectPreview = {
   relativePath: string;
-  kind: "image" | "pdf";
+  kind: "image" | "pdf" | "svg";
   mediaType: string | null;
   content: string;
 };

@@ -100,7 +100,7 @@ cancellation, permission review, and local credential handling.
 
 - [ ] Capacity-aware concurrent local runs. (The chat header compares known model size plus rough startup headroom against measured available RAM, reports context and GPU memory separately, and clearly labels the estimate as advisory. The capacity popover now also reports the conservative local scheduler's active/queued work and one-slot limit. Runtime-specific context allocation, loaded model accounting, hardware budgets, AirLLM-aware scheduling, and capacity-derived parallel execution remain open.)
 
-- [ ] Interactive artifacts for code, HTML, and diagrams. (The project workspace now provides a sandboxed, draft-aware HTML preview without script or Electron privileges; richer interactive artifacts remain open.)
+- [ ] Interactive artifacts for code, HTML, and diagrams. (The project workspace now provides sandboxed, draft-aware HTML and SVG/diagram previews without script or Electron privileges; richer interactive artifacts remain open.)
 - [ ] Tabs beside chat for files, terminals, and previews.
 - [x] In-browser terminal. (Project sessions open a persistent terminal dock in place; the standalone terminal destination remains available elsewhere.)
 - [ ] Rich Markdown editor with in-place AI enhancement.

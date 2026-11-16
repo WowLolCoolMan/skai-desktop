@@ -1219,6 +1219,15 @@ public static class AgentHostLoop
                 throw new InvalidDataException("The selected image has an unsupported or invalid file signature.");
             return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "image", mediaType, content = Convert.ToBase64String(bytes) });
         }
+        if (entry.Kind == "svg")
+        {
+            string content;
+            try { content = new System.Text.UTF8Encoding(false, true).GetString(bytes); }
+            catch (System.Text.DecoderFallbackException error) { throw new InvalidDataException("The selected SVG is not valid UTF-8 text.", error); }
+            if (content.Contains('\0') || !content.Contains("<svg", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The selected SVG does not contain a valid SVG root.");
+            return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "svg", mediaType = "image/svg+xml", content });
+        }
         if (bytes.Length <= WorkspaceFileContext.MaxInlinePdfPreviewBytes)
             return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = "application/pdf", content = Convert.ToBase64String(bytes) });
         var text = PdfAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
