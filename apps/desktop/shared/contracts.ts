@@ -88,6 +88,11 @@ export type DesktopConversation = {
   title: string;
   mode?: "ChatBot" | "Coding Agent";
   responseMode?: "think" | "coding" | "security";
+  model?: string | null;
+  modelProvider?: string | null;
+  modelSizeBytes?: number | null;
+  modelContextLength?: number | null;
+  airLlmCompatible?: boolean;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string; attachments?: ChatAttachment[] }>;
   projectId?: string | null;
   projectName?: string | null;

@@ -40,7 +40,7 @@ public sealed class AgentTaskArtifactStore
         }
     }
 
-    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null, string responseMode = ChatResponseModes.Coding)
+    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null, string responseMode = ChatResponseModes.Coding, string? model = null, string? modelProvider = null, long? modelSizeBytes = null, int? modelContextLength = null, bool airLlmCompatible = false)
     {
         var now = DateTimeOffset.UtcNow;
         var task = new AgentTaskArtifact
@@ -48,6 +48,11 @@ public sealed class AgentTaskArtifactStore
             Title = Normalize(title, MaxTitleCharacters, "task title"),
             Instruction = Normalize(instruction, MaxInstructionCharacters, "task instruction"),
             ResponseMode = ChatResponseModes.IsValid(responseMode) ? responseMode : throw new ArgumentException("The response mode is invalid.", nameof(responseMode)),
+            Model = NormalizeOptional(model, 512, "model"),
+            ModelProvider = NormalizeOptional(modelProvider, 128, "model provider"),
+            ModelSizeBytes = modelSizeBytes,
+            ModelContextLength = modelContextLength,
+            AirLlmCompatible = airLlmCompatible,
             Role = Normalize(role, MaxRoleCharacters, "task role"),
             RequiresApproval = requiresApproval,
             ParentRunId = NormalizeOptional(parentRunId, 128, "parent run ID"),
@@ -292,6 +297,10 @@ public sealed class AgentTaskArtifactStore
             Normalize(task.Instruction, MaxInstructionCharacters, "task instruction");
             if (!ChatResponseModes.IsValid(task.ResponseMode)) task.ResponseMode = ChatResponseModes.Coding;
             Normalize(task.Role, MaxRoleCharacters, "task role");
+            NormalizeOptional(task.Model, 512, "model");
+            NormalizeOptional(task.ModelProvider, 128, "model provider");
+            if (task.ModelSizeBytes is < 0 or > (1L << 50)) throw new InvalidDataException("The agent task model size is invalid.");
+            if (task.ModelContextLength is < 0 or > 16_777_216) throw new InvalidDataException("The agent task model context is invalid.");
             NormalizeOptional(task.ParentRunId, 128, "parent run ID");
             NormalizeOptional(task.ProjectId, 128, "project ID");
             NormalizeOptional(task.ConversationId, 128, "conversation ID");
@@ -345,6 +354,11 @@ public sealed class AgentTaskArtifactStore
         Title = source.Title,
         Instruction = source.Instruction,
         ResponseMode = source.ResponseMode,
+        Model = source.Model,
+        ModelProvider = source.ModelProvider,
+        ModelSizeBytes = source.ModelSizeBytes,
+        ModelContextLength = source.ModelContextLength,
+        AirLlmCompatible = source.AirLlmCompatible,
         Role = source.Role,
         Status = source.Status,
         RequiresApproval = source.RequiresApproval,

@@ -10,7 +10,7 @@ public static class LocalExecutionCapacityPolicy
     private const long RamPerTaskBytes = 8L * 1024 * 1024 * 1024;
     private const long GpuPerTaskBytes = 6L * 1024 * 1024 * 1024;
 
-    public static LocalExecutionCapacityDecision Decide(LocalCapacitySnapshot snapshot, long? ramBudgetBytes = null, long? gpuBudgetBytes = null)
+    public static LocalExecutionCapacityDecision Decide(LocalCapacitySnapshot snapshot, long? ramBudgetBytes = null, long? gpuBudgetBytes = null, long? modelSizeBytes = null, int? modelContextLength = null, bool airLlmCompatible = false, bool airLlmAvailable = false)
     {
         if (snapshot.RamAvailableBytes is not > 0)
             return new(1, "RAM telemetry unavailable");
@@ -19,18 +19,26 @@ public static class LocalExecutionCapacityPolicy
 
         var availableRam = ApplyBudget(snapshot.RamAvailableBytes.Value, snapshot.RamTotalBytes, ramBudgetBytes);
         if (availableRam <= 0) return new(1, "RAM budget");
-        var ramSlots = Math.Max(1, (int)((availableRam - ReservedRamBytes) / RamPerTaskBytes));
+        var perTaskRam = EstimateRamPerTask(modelSizeBytes, modelContextLength, airLlmCompatible && airLlmAvailable);
+        var ramSlots = Math.Max(1, (int)((availableRam - ReservedRamBytes) / perTaskRam));
         var slotLimit = Math.Clamp(ramSlots, 1, MaximumSlots);
         var limitingResource = "RAM headroom";
 
         if (snapshot.Gpu?.AvailableBytes is > 0)
         {
             var availableGpu = ApplyBudget(snapshot.Gpu.AvailableBytes.Value, snapshot.Gpu.TotalBytes, gpuBudgetBytes);
-            var gpuSlots = Math.Max(1, (int)(availableGpu / GpuPerTaskBytes));
+            var gpuSlots = Math.Max(1, (int)(availableGpu / (airLlmCompatible && airLlmAvailable ? 1L * 1024 * 1024 * 1024 : GpuPerTaskBytes)));
             if (gpuSlots < slotLimit) { slotLimit = gpuSlots; limitingResource = "GPU memory"; }
         }
 
         return new(Math.Clamp(slotLimit, 1, MaximumSlots), limitingResource);
+    }
+
+    private static long EstimateRamPerTask(long? modelSizeBytes, int? contextLength, bool useAirLlm)
+    {
+        var weights = modelSizeBytes is > 0 ? (long)(modelSizeBytes.Value * (useAirLlm ? 0.35 : 1.25)) : RamPerTaskBytes;
+        var context = contextLength is > 0 ? Math.Clamp((long)contextLength.Value * 4, 256L * 1024 * 1024, 8L * 1024 * 1024 * 1024) : 0;
+        return Math.Max(1L * 1024 * 1024 * 1024, weights + context);
     }
 
     private static long ApplyBudget(long availableBytes, long? totalBytes, long? budgetBytes)
