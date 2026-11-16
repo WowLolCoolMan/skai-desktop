@@ -6,7 +6,8 @@
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
-const { parseThemeFile, validateThemeFamily, buildSchema, colorKeyForToken, MAX_FILE_BYTES } = require("./theme-files.cjs");
+const { parseThemeFile, parseFont, validateThemeFamily, buildSchema, colorKeyForToken, FONT_ROLES, MAX_FILE_BYTES } = require("./theme-files.cjs");
+const { listCustomFonts, readCustomFont, listInstalledFonts } = require("./theme-fonts.cjs");
 const { base16ToFamily } = require("./theme-base16.cjs");
 
 const MAX_THEME_FILES = 64;
@@ -17,21 +18,42 @@ const DEFAULT_PICKS = { lightTheme: "builtin:Skai/Skai Light", darkTheme: "built
 function createThemeService({ userDataPath, getWindow, shell, dialog }) {
   const themesDir = path.join(userDataPath, "themes");
   const appearancePath = path.join(userDataPath, "appearance.json");
+  const fontsDir = path.join(userDataPath, "fonts");
   const lastGood = new Map(); // file name -> last valid family, kept while the file is broken
   let watchers = [];
   let reloadTimer = null;
 
-  async function readPicks() {
+  // appearance.json: theme picks plus the user's font role overrides (validated like theme fonts).
+  async function readAppearance() {
+    const defaults = { picks: { ...DEFAULT_PICKS }, fonts: {} };
+    let json;
     try {
       const stat = await fsp.stat(appearancePath);
-      if (stat.size > 64 * 1024) return { picks: { ...DEFAULT_PICKS }, problem: { file: "appearance.json", key: "(file)", problem: "is larger than 64 KB" } };
-      const json = JSON.parse(await fsp.readFile(appearancePath, "utf8"));
-      const pick = (value, fallback) => (typeof value === "string" && value.length <= MAX_ID ? value : fallback);
-      return { picks: { lightTheme: pick(json?.lightTheme, DEFAULT_PICKS.lightTheme), darkTheme: pick(json?.darkTheme, DEFAULT_PICKS.darkTheme) } };
+      if (stat.size > 64 * 1024) return { ...defaults, problems: [{ file: "appearance.json", key: "(file)", problem: "is larger than 64 KB" }] };
+      json = JSON.parse(await fsp.readFile(appearancePath, "utf8"));
     } catch (error) {
-      if (error?.code === "ENOENT") return { picks: { ...DEFAULT_PICKS } };
-      return { picks: { ...DEFAULT_PICKS }, problem: { file: "appearance.json", key: "(file)", problem: "is not valid JSON; using the default themes" } };
+      if (error?.code === "ENOENT") return { ...defaults, problems: [] };
+      return { ...defaults, problems: [{ file: "appearance.json", key: "(file)", problem: "is not valid JSON; using the default themes" }] };
     }
+    const problems = [];
+    const pick = (value, fallback) => (typeof value === "string" && value.length <= MAX_ID ? value : fallback);
+    const fonts = {};
+    for (const [role, value] of Object.entries(json?.fonts && typeof json.fonts === "object" ? json.fonts : {})) {
+      const font = FONT_ROLES.includes(role) ? parseFont(value) : null;
+      if (font) fonts[role] = font;
+      else problems.push({ file: "appearance.json", key: `fonts.${role}`, problem: "was ignored (unknown role or invalid values)" });
+    }
+    return { picks: { lightTheme: pick(json?.lightTheme, DEFAULT_PICKS.lightTheme), darkTheme: pick(json?.darkTheme, DEFAULT_PICKS.darkTheme) }, fonts, problems };
+  }
+  const readPicks = async () => ({ picks: (await readAppearance()).picks });
+
+  async function writeAppearance(patch) {
+    let existing = {};
+    try { existing = JSON.parse(await fsp.readFile(appearancePath, "utf8")); } catch { /* new file */ }
+    const next = { ...(existing && typeof existing === "object" && !Array.isArray(existing) ? existing : {}), ...patch };
+    await fsp.mkdir(userDataPath, { recursive: true });
+    await fsp.writeFile(appearancePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    return next;
   }
 
   async function readThemes() {
@@ -70,8 +92,8 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
   }
 
   async function snapshot() {
-    const [{ families, problems }, { picks, problem }] = await Promise.all([readThemes(), readPicks()]);
-    return { families, problems: problem ? [...problems, problem] : problems, picks, themesDir };
+    const [{ families, problems }, appearance, custom] = await Promise.all([readThemes(), readAppearance(), listCustomFonts(fontsDir)]);
+    return { families, problems: [...problems, ...appearance.problems, ...custom.problems], picks: appearance.picks, fonts: appearance.fonts, customFonts: custom.fonts, themesDir, fontsDir };
   }
 
   async function push() {
@@ -90,7 +112,9 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
     fs.mkdirSync(themesDir, { recursive: true });
     // A schema copy next to the themes gives editors completion ("$schema": "./theme.schema.json").
     try { fs.writeFileSync(path.join(themesDir, SCHEMA_FILE), `${JSON.stringify(buildSchema(), null, 2)}\n`); } catch { /* optional */ }
+    fs.mkdirSync(fontsDir, { recursive: true });
     try { watchers.push(fs.watch(themesDir, scheduleReload)); } catch { /* no live reload; Reload themes still works */ }
+    try { watchers.push(fs.watch(fontsDir, scheduleReload)); } catch { /* ignore */ }
     try { watchers.push(fs.watch(userDataPath, (_event, name) => { if (name === "appearance.json") scheduleReload(); })); } catch { /* ignore */ }
   }
 
@@ -108,12 +132,22 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
       if (typeof value !== "string" || !value || value.length > MAX_ID) throw new Error(`${key} must be a theme id.`);
       picks[key] = value;
     }
-    let existing = {};
-    try { existing = JSON.parse(await fsp.readFile(appearancePath, "utf8")); } catch { /* new file */ }
-    const next = { ...(existing && typeof existing === "object" && !Array.isArray(existing) ? existing : {}), ...picks };
-    await fsp.mkdir(userDataPath, { recursive: true });
-    await fsp.writeFile(appearancePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    await writeAppearance(picks);
     return picks;
+  }
+
+  // Font role overrides from Appearance: { role: font | null } (null clears the role).
+  async function saveFonts(params) {
+    const { fonts } = await readAppearance();
+    for (const [role, value] of Object.entries(params?.fonts && typeof params.fonts === "object" ? params.fonts : {})) {
+      if (!FONT_ROLES.includes(role)) throw new Error(`Unknown font role: ${role}`);
+      if (value === null) { delete fonts[role]; continue; }
+      const font = parseFont(value);
+      if (!font) throw new Error(`The ${role} font settings are not valid.`);
+      fonts[role] = font;
+    }
+    await writeAppearance({ fonts });
+    return fonts;
   }
 
   // Theme: turn a renderer theme definition (tokens) back into theme-file JSON.
@@ -193,6 +227,16 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
     }
     if (method === "appearance.getThemes") return { v: 1, ok: true, result: await snapshot() };
     if (method === "appearance.saveThemeSelection") return { v: 1, ok: true, result: await savePicks(params) };
+    if (method === "appearance.saveFonts") return { v: 1, ok: true, result: await saveFonts(params) };
+    if (method === "appearance.listFonts") return { v: 1, ok: true, result: await listInstalledFonts() };
+    if (method === "appearance.readCustomFont") {
+      try { return { v: 1, ok: true, result: { data: await readCustomFont(fontsDir, params?.file) } }; } catch (error) { return { v: 1, ok: false, error: { code: "FONT_UNAVAILABLE", message: error.message } }; }
+    }
+    if (method === "appearance.openFontsFolder") {
+      await fsp.mkdir(fontsDir, { recursive: true });
+      const error = await shell.openPath(fontsDir);
+      return error ? { v: 1, ok: false, error: { code: "OPEN_FAILED", message: error } } : { v: 1, ok: true, result: { path: fontsDir } };
+    }
     if (method === "appearance.openThemesFolder") {
       await fsp.mkdir(themesDir, { recursive: true });
       const error = await shell.openPath(themesDir);
@@ -201,7 +245,7 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
     return null;
   }
 
-  return { start, stop, handle, snapshot, themesDir, appearancePath };
+  return { start, stop, handle, snapshot, themesDir, fontsDir, appearancePath };
 }
 
 module.exports = { createThemeService, DEFAULT_PICKS };

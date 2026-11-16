@@ -8,6 +8,7 @@ const themes = require("../apps/desktop/electron/theme-files.cjs");
 const os = require("node:os");
 const { base16ToFamily, parseScheme } = require("../apps/desktop/electron/theme-base16.cjs");
 const { createThemeService } = require("../apps/desktop/electron/theme-service.cjs");
+const fontsModule = require("../apps/desktop/electron/theme-fonts.cjs");
 const { buildSkaiFamily, buildSchema, serialize, presetPath, schemaPath } = require("./theme-generate.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -120,6 +121,16 @@ test("base16: incomplete or junk schemes are refused", () => {
   assert.throws(() => base16ToFamily(base16().replace("#5599ff", "url(x)")), /missing base0D/i);
 });
 
+test("fonts: signatures and file-name families", () => {
+  assert.equal(fontsModule.hasFontSignature(Buffer.from([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), true);
+  for (const tag of ["OTTO", "wOFF", "wOF2", "true"]) assert.equal(fontsModule.hasFontSignature(Buffer.from(`${tag}........`)), true, tag);
+  for (const junk of ["<svg>.......", "PK\u0003\u0004........", "abc"]) assert.equal(fontsModule.hasFontSignature(Buffer.from(junk)), false, junk);
+  assert.equal(fontsModule.familyFromFileName("Inter-Variable.ttf"), "Inter Variable");
+  assert.equal(fontsModule.familyFromFileName("My_Font  Bold.otf"), "My Font Bold");
+  assert.equal(fontsModule.familyFromFileName("\"; } body { x.ttf"), "body x");
+  assert.equal(fontsModule.familyFromFileName("....ttf"), null);
+});
+
 async function serviceTests() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-theme-test-"));
   const opened = [];
@@ -143,6 +154,32 @@ async function serviceTests() {
     assert.equal((await service.handle("appearance.editTheme", { id: "user:my-skai-dark.json/Skai Dark (mine)" })).ok, true);
     assert.deepEqual(opened, [path.join(dir, "themes", "my-skai-dark.json")]);
     assert.equal(await service.handle("appearance.unknown", {}), null);
+    // Custom fonts: real signature + caps; junk, oversize and symlinks are reported, not loaded.
+    const fontsDir = path.join(dir, "fonts");
+    fs.writeFileSync(path.join(fontsDir, "Good-Sans.ttf"), Buffer.concat([Buffer.from([0, 1, 0, 0]), Buffer.alloc(60)]));
+    fs.writeFileSync(path.join(fontsDir, "Fake.ttf"), "not a font at all");
+    fs.writeFileSync(path.join(fontsDir, "Huge.woff2"), Buffer.alloc(fontsModule.MAX_FONT_BYTES + 1));
+    // Symlinks need extra privileges on Windows; test them where the OS allows it.
+    let linked = true;
+    try { fs.symlinkSync(path.join(dir, "appearance-outside.bin"), path.join(fontsDir, "Link.otf")); } catch { linked = false; }
+    fs.writeFileSync(path.join(fontsDir, "notes.txt"), "ignored");
+    const withFonts = await service.snapshot();
+    assert.deepEqual(withFonts.customFonts.map((font) => font.family), ["Good Sans"]);
+    assert.deepEqual(withFonts.problems.map((problem) => problem.file).sort(), ["Fake.ttf", "Huge.woff2", ...(linked ? ["Link.otf"] : [])]);
+    assert.equal((await service.handle("appearance.readCustomFont", { file: "Good-Sans.ttf" })).ok, true);
+    for (const file of ["../appearance.json", "Fake.ttf", "Link.otf", "notes.txt", "..\\Good-Sans.ttf"]) assert.equal((await service.handle("appearance.readCustomFont", { file })).ok, false, file);
+    // Font overrides in appearance.json: validated on save and on read.
+    const saved = await service.handle("appearance.saveFonts", { fonts: { reading: { family: ["Good Sans"], size: 15 } } });
+    assert.deepEqual(saved.result, { reading: { family: ["Good Sans"], size: 15 } });
+    await assert.rejects(service.handle("appearance.saveFonts", { fonts: { reading: { family: "x; y: url(z)" } } }));
+    await assert.rejects(service.handle("appearance.saveFonts", { fonts: { sidebar: { size: 12 } } }));
+    assert.deepEqual((await service.handle("appearance.saveFonts", { fonts: { reading: null } })).result, {});
+    const picks = JSON.parse(fs.readFileSync(path.join(dir, "appearance.json"), "utf8"));
+    picks.fonts = { code: { size: 99 }, ui: { family: "Inter" } };
+    fs.writeFileSync(path.join(dir, "appearance.json"), JSON.stringify(picks));
+    const read = await service.snapshot();
+    assert.deepEqual(read.fonts, { ui: { family: ["Inter"] } });
+    assert.ok(read.problems.some((problem) => problem.key === "fonts.code"));
   } finally {
     service.stop();
     fs.rmSync(dir, { recursive: true, force: true });

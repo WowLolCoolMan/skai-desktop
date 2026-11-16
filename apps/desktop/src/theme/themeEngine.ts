@@ -1,5 +1,5 @@
-import type { AgentResponse, ThemeDefinition, ThemeFamily, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
-import { buildFontRoles } from "./fontRoles";
+import type { AgentResponse, CustomFont, ThemeDefinition, ThemeFamily, ThemeFont, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
+import { buildFontRoles, FONT_ROLES, type FontRole, type FontRoles } from "./fontRoles";
 
 // Theme engine (renderer). Built-in presets ship in src/theme/presets; user themes
 // arrive from the main process already validated (electron/theme-service.cjs).
@@ -42,13 +42,17 @@ export type ThemeState = {
   problems: ThemeProblem[];
   picks: ThemePicks;
   themesDir: string;
+  fontsDir: string;
+  // Font role overrides chosen in Appearance (appearance.json); they win over the theme's fonts.
+  userFonts: FontRoles;
+  customFonts: (CustomFont & { status: "loading" | "ready" | "failed" })[];
   scheme: "light" | "dark";
   active: ThemeDefinition | null;
   loaded: boolean;
   notice: { tone: "info" | "error"; text: string } | null;
 };
 
-let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", scheme: "dark", active: null, loaded: false, notice: null };
+let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], scheme: "dark", active: null, loaded: false, notice: null };
 const listeners = new Set<() => void>();
 let applied: string[] = [];
 let request: Request | null = null;
@@ -82,8 +86,9 @@ function applyTheme(theme: ThemeDefinition | null) {
       if (/^--skai-[a-z0-9-]+$/.test(property) && SAFE_COLOR.test(value)) set(property, value);
     }
   }
-  // Fonts: family stacks and size scales as properties, the rest as a generated stylesheet.
-  const fonts = buildFontRoles(theme?.fonts ?? {});
+  // Fonts: the theme's roles with Appearance overrides on top (per property), as family
+  // stacks and size scales (properties) plus a generated stylesheet for the rest.
+  const fonts = buildFontRoles(effectiveFonts(theme));
   for (const [property, value] of Object.entries(fonts.properties)) set(property, value);
   let style = document.getElementById("skai-font-roles");
   if (!fonts.css) { style?.remove(); return; }
@@ -91,17 +96,87 @@ function applyTheme(theme: ThemeDefinition | null) {
   style.textContent = fonts.css;
 }
 
+export function effectiveFonts(theme: ThemeDefinition | null, current: ThemeState = state): FontRoles {
+  const merged: FontRoles = {};
+  for (const role of FONT_ROLES) {
+    const font = { ...(theme?.fonts?.[role] ?? {}), ...(current.userFonts[role] ?? {}) };
+    if (Object.keys(font).length) merged[role] = font;
+  }
+  return merged;
+}
+
 function update(patch: Partial<ThemeState>) {
   const next = { ...state, ...patch };
   next.active = resolveActive(next);
-  const changed = next.active?.id !== state.active?.id || next.active !== state.active || !state.loaded;
+  const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || !state.loaded;
   state = next;
   if (changed) applyTheme(state.active);
   listeners.forEach((listener) => listener());
 }
 
 function receive(snapshot: ThemeSnapshot) {
-  update({ user: snapshot.families, problems: snapshot.problems, picks: snapshot.picks, themesDir: snapshot.themesDir, loaded: true });
+  update({ user: snapshot.families, problems: snapshot.problems, picks: snapshot.picks, themesDir: snapshot.themesDir, fontsDir: snapshot.fontsDir ?? "", userFonts: (snapshot.fonts ?? {}) as FontRoles, loaded: true });
+  void loadCustomFonts(snapshot.customFonts ?? []);
+}
+
+// Custom fonts: bytes come from the main process (already checked), loaded with the
+// FontFace API under the family name derived from the file name. A font the browser
+// can't parse is reported and skipped; it never breaks the UI.
+const loadedFaces = new Map<string, FontFace>();
+async function loadCustomFonts(fonts: CustomFont[]) {
+  const wanted = new Set(fonts.map((font) => `${font.file}:${font.bytes}`));
+  for (const [key, face] of loadedFaces) if (!wanted.has(key)) { document.fonts.delete(face); loadedFaces.delete(key); }
+  update({ customFonts: fonts.map((font) => ({ ...font, status: loadedFaces.has(`${font.file}:${font.bytes}`) ? "ready" as const : "loading" as const })) });
+  for (const font of fonts) {
+    const key = `${font.file}:${font.bytes}`;
+    if (loadedFaces.has(key)) continue;
+    let status: "ready" | "failed" = "failed";
+    let message = "";
+    const response = await call("appearance.readCustomFont", { file: font.file });
+    if (response?.ok) {
+      try {
+        const binary = atob((response.result as { data: string }).data);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        const face = await new FontFace(font.family, bytes.buffer).load();
+        document.fonts.add(face);
+        loadedFaces.set(key, face);
+        status = "ready";
+      } catch { message = "could not be loaded as a font; it was skipped"; }
+    } else message = response?.error?.message ?? "could not be read";
+    update({ customFonts: state.customFonts.map((entry) => (entry.file === font.file ? { ...entry, status } : entry)), problems: message ? [...state.problems, { file: font.file, key: "(file)", problem: message }] : state.problems });
+  }
+}
+
+export type InstalledFont = { family: string; monospace: boolean | null };
+let installedCache: Promise<InstalledFont[]> | null = null;
+// Installed fonts: Chromium's Local Font Access API first; fontconfig in the main process as fallback.
+export function listInstalledFonts(): Promise<InstalledFont[]> {
+  installedCache ??= (async () => {
+    const query = (window as Window & { queryLocalFonts?: () => Promise<{ family: string }[]> }).queryLocalFonts;
+    if (query) {
+      try {
+        const faces = await query.call(window);
+        const families = [...new Set(faces.map((face) => face.family).filter((family) => /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,62}$/.test(family)))].sort((a, b) => a.localeCompare(b));
+        if (families.length) return families.map((family) => ({ family, monospace: null }));
+      } catch { /* permission or platform: fall back below */ }
+    }
+    const response = await call("appearance.listFonts");
+    return response?.ok ? ((response.result as { fonts: { family: string; monospace: boolean }[] }).fonts) : [];
+  })();
+  const pending = installedCache;
+  pending.then((fonts) => { if (!fonts.length && installedCache === pending) installedCache = null; }).catch(() => { installedCache = null; });
+  return pending;
+}
+
+// Is a family monospace? Compare glyph widths with a canvas (narrow vs wide letters).
+export function isMonospace(family: string): boolean {
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) return false;
+  context.font = `16px "${family}", serif`;
+  const narrow = context.measureText("iiiiiiiiii").width;
+  const wide = context.measureText("WWWWWWWWWW").width;
+  return Math.abs(narrow - wide) < 0.5;
 }
 
 export const themeEngine = {
@@ -167,6 +242,18 @@ export const themeEngine = {
     notify("info", "Back to the default Skai themes.");
   },
   dismissNotice() { update({ notice: null }); },
+  // Appearance font overrides: patch one role (null clears it), saved to appearance.json.
+  async setFont(role: FontRole, font: ThemeFont | null) {
+    const userFonts: FontRoles = { ...state.userFonts };
+    if (font && Object.keys(font).length) userFonts[role] = font; else delete userFonts[role];
+    update({ userFonts });
+    const response = await call("appearance.saveFonts", { fonts: { [role]: font && Object.keys(font).length ? font : null } });
+    if (response && !response.ok) notify("error", response.error?.message ?? "The font settings could not be saved.");
+  },
+  async openFontsFolder() {
+    const response = await call("appearance.openFontsFolder");
+    if (response && !response.ok) notify("error", response.error?.message ?? "The fonts folder could not be opened.");
+  },
 };
 
 async function call(method: string, params?: Record<string, unknown>): Promise<AgentResponse | null> {

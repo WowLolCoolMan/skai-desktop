@@ -9,3 +9,30 @@
 .theme-settings-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--skai-space-2); padding: var(--skai-space-2) var(--skai-space-3); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font-size: var(--skai-text-md); }
 .theme-settings-notice.is-error { border-color: color-mix(in srgb, var(--skai-color-danger) 40%, transparent); color: var(--skai-color-danger-text); }
 .theme-settings-notice button { border: 0; color: inherit; background: transparent; font-size: var(--skai-text-lg); cursor: pointer; }
+
+/* ===== Font settings (Appearance → Fonts) ===== */
+.font-settings { display: grid; gap: var(--skai-space-3); padding-top: var(--skai-space-3); border-top: 1px solid var(--skai-color-border); }
+.font-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--skai-space-3); }
+.font-settings-heading > div { display: grid; gap: var(--skai-space-1); }
+.font-settings-heading span, .font-role-copy span { color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+.font-settings-custom { display: flex; flex-wrap: wrap; gap: var(--skai-space-2); margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+.font-settings-custom span { padding: 2px var(--skai-space-2); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text); }
+.font-settings-custom span.is-failed { border-color: color-mix(in srgb, var(--skai-color-danger) 45%, transparent); color: var(--skai-color-danger-text); }
+.font-role { display: grid; gap: var(--skai-space-2); padding: var(--skai-space-3); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.font-role-copy { display: grid; gap: 2px; }
+.font-role-controls { display: grid; grid-template-columns: minmax(160px, 1.6fr) repeat(4, minmax(78px, .7fr)) auto; gap: var(--skai-space-2); align-items: end; }
+.font-role-controls label { display: grid; gap: var(--skai-space-1); color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+.font-role-controls input, .font-role-controls select, .font-role-family, .font-picker input { width: 100%; min-height: 36px; padding: 0 var(--skai-space-2); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font-size: var(--skai-text-base); }
+.font-role-family { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.font-role-family:hover { border-color: var(--skai-color-border-strong); }
+.font-role-preview { margin: 0; padding: var(--skai-space-2) var(--skai-space-3); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); overflow-wrap: anywhere; }
+.font-role-warning { margin: 0; color: var(--skai-color-warning); font-size: var(--skai-text-md); }
+.font-picker { display: grid; gap: var(--skai-space-2); padding: var(--skai-space-2); border: 1px solid var(--skai-color-border-strong); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-raised); box-shadow: var(--skai-shadow-popover); }
+.font-picker-list { display: grid; max-height: 260px; overflow-y: auto; }
+.font-picker-list button { display: flex; align-items: center; justify-content: space-between; gap: var(--skai-space-2); min-height: 34px; padding: 0 var(--skai-space-2); border: 0; border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: transparent; font-size: var(--skai-text-xl); text-align: left; cursor: pointer; }
+.font-picker-list button:hover, .font-picker-list button:focus-visible { background: var(--skai-color-surface-soft); }
+.font-picker-list small { flex: 0 0 auto; color: var(--skai-color-text-muted); font-family: var(--skai-font-ui); font-size: var(--skai-text-xs); }
+.font-picker-status { padding: var(--skai-space-2); color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+@media (max-width: 900px) { .font-role-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } .font-role-family { grid-column: 1 / -1; } }
+.font-role-controls input[aria-invalid="true"] { border-color: var(--skai-color-danger); }
+.settings-content .font-role-controls select { min-height: 36px; padding: 0 var(--skai-space-2); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }

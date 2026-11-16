@@ -194,6 +194,21 @@ async function main() {
   await waitFor(devtools.evaluate, "document.querySelector('.theme-settings-problems')?.textContent || ''", (value) => value.includes("smoke.json"), "problem report for a broken theme file");
   const keptCanvas = await devtools.evaluate(canvasToken);
   if (keptCanvas !== "#203040") throw new Error(`A broken theme file replaced the last good theme (canvas ${keptCanvas}).`);
+  // Custom fonts: a real font file dropped into <userData>/fonts loads through FontFace and
+  // can be chosen for a role; a junk file is reported and skipped.
+  const sampleFont = path.join(__dirname, "..", "apps", "desktop", "node_modules", "monaco-editor", "esm", "vs", "base", "browser", "ui", "codicons", "codicon", "codicon.ttf");
+  if (fs.existsSync(sampleFont)) {
+    const fontsDir = path.join(smokeUserDataDir, "fonts");
+    fs.mkdirSync(fontsDir, { recursive: true });
+    fs.copyFileSync(sampleFont, path.join(fontsDir, "Smoke-Icons.ttf"));
+    fs.writeFileSync(path.join(fontsDir, "Broken.ttf"), "not a font");
+    await waitFor(devtools.evaluate, "[...document.fonts].some((face) => face.family.replace(/\"/g, '') === 'Smoke Icons' && face.status === 'loaded')", Boolean, "custom font to load with FontFace");
+    await devtools.evaluate("window.skaiAgent.request('appearance.saveFonts', { fonts: { ui: { family: ['Smoke Icons'], weight: 500 } } }).then((response) => response.ok)");
+    await waitFor(devtools.evaluate, "getComputedStyle(document.documentElement).getPropertyValue('--skai-font-ui').trim()", (value) => value.startsWith('"Smoke Icons",'), "Appearance font override to apply");
+    await waitFor(devtools.evaluate, "document.querySelector('.theme-settings-problems')?.textContent || ''", (value) => value.includes("Broken.ttf"), "problem report for a junk font file");
+    await devtools.evaluate("window.skaiAgent.request('appearance.saveFonts', { fonts: { ui: null } }).then((response) => response.ok)");
+    await waitFor(devtools.evaluate, "getComputedStyle(document.documentElement).getPropertyValue('--skai-font-ui').trim()", (value) => !value.startsWith('"Smoke Icons"'), "font override to clear");
+  }
   const savedPicks = JSON.parse(fs.readFileSync(path.join(smokeUserDataDir, "appearance.json"), "utf8"));
   if (savedPicks.darkTheme !== "user:smoke.json/Smoke Dark") throw new Error(`The theme pick was not saved to appearance.json: ${JSON.stringify(savedPicks)}`);
   fs.mkdirSync(outputDir, { recursive: true });

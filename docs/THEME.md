@@ -287,3 +287,30 @@ Round 6 was pushed as d0bd09a (the gated push passed every check).
   15px with line height 1.7.
 - **Found for later:** the Monaco editor uses `theme="vs-dark"` and `fontSize: 13`, even in the light theme. It
   should follow the code role and the syntax tokens (Monaco theme from tokens).
+
+### Round 8: font picker, overrides, custom fonts folder (Phase 4, part 2)
+
+Round 7 was pushed as 101d5bd.
+
+- **Main:** `electron/theme-fonts.cjs` (new) lists custom fonts in `<userData>/fonts/` (`.ttf/.otf/.woff2/.woff`; up to 32
+  files, 10 MB each and 40 MB in total, regular files only, real sfnt/WOFF signature, family named from the file name
+  within the safe-name character set). It also reads one font's bytes for the renderer and has the fontconfig
+  fallback list (with monospace flags). `theme-service.cjs` now reads and writes `fonts` in `appearance.json`
+  (validated per role on read and save), watches the fonts folder, and puts `fonts`, `customFonts` and `fontsDir`
+  in the snapshot. It gained the shell methods `appearance.saveFonts`, `listFonts`, `readCustomFont` and
+  `openFontsFolder`.
+- **Renderer:** `themeEngine` merges the theme's fonts with the Appearance overrides property by property. It
+  loads custom fonts with `FontFace` from bytes (no URLs, so the CSP and `audit:local-only` are unchanged), and
+  reports and skips fonts the browser can't parse. Installed fonts come from `queryLocalFonts()` (1013 faces here),
+  with fontconfig as the fallback, and monospace is detected by measuring glyph widths on a canvas.
+- **UI:** `src/theme/FontSettings.tsx` adds one row per role (picker button drawn in its font, size, weight,
+  line height, spacing, Reset, preview line). The searchable picker draws each name in its own font, lists custom
+  fonts first, and for Code lists monospace first and warns on a non-monospace pick. Number fields keep a draft
+  and commit on blur or Enter, so typing "15" isn't rejected at "1".
+- **Tests:** 17 groups: font signatures, file-name families (including a CSS-breakout file name), and service tests
+  for custom fonts (junk, oversized and symlinked files reported; traversal names refused; the symlink case is
+  skipped where the OS doesn't allow links) and for font overrides (validated on save and read).
+- **Smoke:** copies a real font file (Monaco's `codicon.ttf`) and a junk `.ttf` into the profile's fonts folder,
+  waits for the `FontFace` load, picks the font for UI through the bridge, checks the stack and the problem
+  report, then clears the override.
+- **Screens:** `.theme-shots/r8-fonts-{dark,light}.png` show the Code picker open in both themes.

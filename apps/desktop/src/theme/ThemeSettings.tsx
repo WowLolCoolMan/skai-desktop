@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { ThemePicks } from "../../shared/contracts";
 import { Button } from "../components/ui/Primitives";
 import { themeEngine, themeStore } from "./themeEngine";
+import { FontSettings } from "./FontSettings";
 import "./theme.css";
 
 // Theme: Appearance controls for theme files: a light pick and a dark pick
@@ -37,6 +38,7 @@ export function ThemeSettings() {
       </div>
       {state.themesDir && <span className="theme-settings-path" title={state.themesDir}>{state.themesDir}</span>}
       {state.notice && <div className={`theme-settings-notice is-${state.notice.tone}`} role="status"><span>{state.notice.text}</span><button type="button" onClick={() => themeEngine.dismissNotice()} aria-label="Dismiss">×</button></div>}
+      <FontSettings />
       {state.problems.length > 0 && (
         <div className="theme-settings-problems" role="status">
           <strong>Some theme files have problems. Everything else still works.</strong>

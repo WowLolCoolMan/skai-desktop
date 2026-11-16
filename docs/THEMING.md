@@ -5,9 +5,9 @@ The schema is `docs/theme.schema.json`; most editors use it for completion when 
 `$schema` points at a copy of it (Export puts one next to your themes).
 
 > Status: theme files, light/dark picks, the themes folder, live reload, Edit, Duplicate,
-> Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Fonts in theme files
-> apply (Phase 4); the font picker and custom fonts folder come next. Gradients are validated and
-> applied in Phase 5.
+> Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Fonts work: theme
+> fonts, the font picker, your overrides and a custom fonts folder (Phase 4). Gradients are
+> validated now and applied in Phase 5.
 
 ## Using a theme
 
@@ -165,7 +165,33 @@ Each role takes:
 }
 ```
 
-Settings you choose in Appearance override a theme's fonts (coming next round).
+### Choosing fonts in Appearance
+
+Settings → Appearance → **Fonts** has one row per role. **Choose** opens a searchable list of
+the fonts installed on this computer, each drawn in its own font. For **Code**, monospace fonts
+come first and are marked, and choosing a font that isn't monospace shows a warning.
+Size, weight, line height and spacing apply as you leave each field (or press Enter), with a live
+preview line per role. Your choices are saved under `fonts` in `appearance.json` and override
+the active theme's fonts property by property. **Reset** on a row goes back to the theme's
+fonts.
+
+The installed-font list comes from Chromium's Local Font Access API (`queryLocalFonts()`) on
+Windows, macOS and Linux. If that isn't available, Linux falls back to fontconfig (`fc-list`).
+
+### Your own font files
+
+Put `.ttf`, `.otf`, `.woff2` or `.woff` files in `<userData>/fonts/` (**Open fonts folder**). Linux:
+`~/.config/skai-desktop/fonts/`. Each file becomes a family named after the file
+(`Literata-Regular.ttf` → "Literata Regular") and shows up first in the picker. Skai checks each
+file before using it: up to 32 files, 10 MB each and 40 MB in total, regular files only (no links),
+and the file must start with a real font signature. It then loads the bytes with the browser's
+`FontFace` API. Loading from bytes works the same way on every platform and every Linux display
+server (X11 and Wayland alike), because no file paths or URLs are involved. A file that fails any
+check, or that the browser can't parse, is listed under the problems and skipped; it never breaks
+the UI. The folder is watched, so new files appear straight away.
+
+Skai doesn't bundle extra fonts. Use the fonts already on your computer or put your own in
+this folder.
 
 ## What is rejected, and why
 
