@@ -61,5 +61,6 @@ partial or planned in `docs/CAPABILITY_MATRIX.md` and
 controls until their host contracts and packaged acceptance evidence exist.
 
 The full `smoke:windows` run passed on 2026-11-16. Pet asset and behavior checks
-passed as well. The expanded UI matrix still reports narrow-layout overlaps and
-unreachable controls; it is an open acceptance item, not a passing claim.
+passed as well. The packaged UI matrix also passed across fourteen routes, five
+supported sizes, and four theme/sidebar variants. Live accessibility and
+cross-platform visual acceptance remain open.

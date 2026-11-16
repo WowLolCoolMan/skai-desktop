@@ -53,8 +53,9 @@ function connect(url) {
 // Collected in the page: layout problems for the current route and viewport.
 const PROBE = String.raw`(() => {
   const vw = window.innerWidth, vh = window.innerHeight;
-  const visible = (el) => { if (el.closest('details:not([open])') && !el.closest('summary')) return false; if (el.closest('.skip-link, .sr-only') && document.activeElement !== el) return false; const s = getComputedStyle(el); if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-  const describe = (el) => { const r = el.getBoundingClientRect(); return { el: el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''), text: (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 50), box: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)] }; };
+  const modal = document.querySelector('[aria-modal="true"]');
+  const visible = (el) => { if (modal && !el.closest('[aria-modal="true"]')) return false; if (el.closest('details:not([open])') && !el.closest('summary')) return false; if (el.closest('.skip-link, .sr-only') && document.activeElement !== el) return false; const s = getComputedStyle(el); if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const describe = (el) => { const r = el.getBoundingClientRect(); const card = el.closest('.ui-card'); const cr = card?.getBoundingClientRect(); return { el: el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''), text: (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 50), box: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], card: card ? [Math.round(cr.left), Math.round(cr.top), Math.round(cr.width), Math.round(cr.height)] : null }; };
   const scrollerX = (el) => { for (let a = el.parentElement; a; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll)/.test(s.overflowX)) return a; } return null; };
   const positioned = (el, stop) => { for (let a = el; a && a !== stop; a = a.parentElement) { const p = getComputedStyle(a).position; if (p === 'absolute' || p === 'fixed' || p === 'sticky') return true; } return false; };
   const isBox = (el) => { const s = getComputedStyle(el); const bg = s.backgroundColor; const hasBg = bg && bg !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(bg); const hasBorder = ['Top','Right','Bottom','Left'].some((k) => parseFloat(s['border' + k + 'Width']) > 0); return hasBg || hasBorder; };
@@ -110,7 +111,12 @@ const PROBE = String.raw`(() => {
 const routeType = fs.readFileSync(path.join(__dirname, "..", "apps", "desktop", "src", "app", "types.ts"), "utf8").match(/export type Route = ([^;]+);/);
 const routes = routeType ? [...routeType[1].matchAll(/"([a-z-]+)"/g)].map((match) => match[1]) : [];
 if (routes.length < 5) throw new Error("Could not read the Route union from apps/desktop/src/app/types.ts.");
-const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [945, 1033], [945, 515], [800, 600], [640, 900], [480, 700], [400, 500]];
+// Match BrowserWindow's supported minimum size (960×640); smaller synthetic
+// viewports cannot be reached because Electron clamps the actual window.
+const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [960, 640]];
+const testedRoutes = process.env.UI_MATRIX_ROUTE ? routes.filter((route) => process.env.UI_MATRIX_ROUTE.split(",").includes(route)) : routes;
+const requestedViewport = /^(\d+)x(\d+)$/.exec(process.env.UI_MATRIX_VIEWPORT || "");
+const testedViewports = requestedViewport ? [[Number(requestedViewport[1]), Number(requestedViewport[2])]] : viewports;
 const variants = process.env.UI_MATRIX_QUICK === "1" ? [["dark", "false"]] : [["dark", "false"], ["light", "false"], ["dark", "true"], ["light", "true"]];
 
 async function main() {
@@ -156,9 +162,9 @@ async function main() {
     await cdp.evaluate(`localStorage.setItem('skai.themeMode', '${theme}'); localStorage.setItem('skai.sidebar.collapsed', '${collapsed}'); location.reload(); 1`).catch(() => {});
     await sleep(500);
     await cdp.evaluate("(async () => { for (let i = 0; i < 150 && !document.querySelector('[aria-label=\"Primary navigation\"]'); i++) await new Promise((r) => setTimeout(r, 100)); return 1; })()");
-    for (const [width, height] of viewports) {
+    for (const [width, height] of testedViewports) {
       await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
-      for (const route of routes) {
+      for (const route of testedRoutes) {
         phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/${route}`;
         await cdp.evaluate(`location.hash = '#/${route}'; 1`);
         await sleep(260);
@@ -167,7 +173,7 @@ async function main() {
         if (issues.blank) problems.push("blank page");
         if (issues.pageOverflowX > 1) problems.push(`page scrolls sideways by ${issues.pageOverflowX}px`);
         for (const [kind, label] of [["offscreen", "off-screen"], ["clipped", "clipped"], ["bleed", "bleeds out of its card"], ["unreachable", "unreachable"]]) for (const item of issues[kind]) problems.push(`${label}: ${item.el} "${item.text}"${item.container ? ` in ${item.container}` : ""}`);
-        for (const [a, b] of issues.overlap) problems.push(`overlap: ${a.el} "${a.text}" x ${b.el} "${b.text}"`);
+        for (const [a, b] of issues.overlap) problems.push(`overlap: ${a.el} "${a.text}" ${JSON.stringify(a.box)} in ${JSON.stringify(a.card)} x ${b.el} "${b.text}" ${JSON.stringify(b.box)} in ${JSON.stringify(b.card)}`);
         if (problems.length) findings.push(`${phase}\n    ${problems.join("\n    ")}`);
       }
     }
@@ -176,7 +182,7 @@ async function main() {
   cdp.close();
   if (runtimeErrors.length) findings.push(`runtime errors:\n    ${[...new Set(runtimeErrors)].slice(0, 15).join("\n    ")}`);
   if (findings.length) throw new Error(`UI matrix smoke found ${findings.length} problem group(s):\n  ${findings.slice(0, 25).join("\n  ")}`);
-  console.log(`Packaged UI matrix smoke passed: ${routes.length} routes x ${viewports.length} window sizes x ${variants.length} theme/sidebar variants, no runtime errors.`);
+  console.log(`Packaged UI matrix smoke passed: ${testedRoutes.length} routes x ${testedViewports.length} window sizes x ${variants.length} theme/sidebar variants, no runtime errors.`);
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => {

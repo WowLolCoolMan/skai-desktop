@@ -314,7 +314,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-chat .conversation-surface { position: relative; display: flex; height: clamp(300px, calc(100vh - 560px), 450px); min-height: 0; flex-direction: column; overflow: hidden; }
 .app-content-chat .message-list { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .app-content-chat .conversation-surface > .ui-empty { min-height: 0; flex: 1; }
-.chat-latest-action { position: absolute; right: 18px; bottom: 14px; z-index: 2; }
+.chat-latest-action { position: absolute; left: 18px; bottom: 14px; z-index: 2; }
 .chat-latest-action .ui-button { padding: 7px 10px; border-radius: 999px; font-size: 10px; box-shadow: 0 8px 20px rgba(15,20,36,.18); }
 .app-content-chat .chat-rail { min-height: 0; overflow-y: auto; }
 @media (max-width: 1100px) { .app-content-chat .chat-rail { display: none; }.app-content-chat .chat-layout { grid-template-columns: minmax(0,1fr); } }
@@ -325,7 +325,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-chat .conversation-surface { width: min(920px, 100%); border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .app-content-chat .conversation-surface .conversation-header { padding: 0 0 12px; border-bottom-color: color-mix(in srgb, var(--skai-color-border) 82%, transparent); }
 .app-content-chat .conversation-surface .message-list { width: 100%; margin: 0; padding: 24px 0 30px; }
-.app-content-chat .conversation-surface .chat-empty-surface { display: grid; min-height: 360px; place-items: center; }
+.app-content-chat .conversation-surface .chat-empty-surface { display: grid; min-height: 0; flex: 1 1 auto; place-items: center; overflow-y: auto; }
 .app-content-chat .conversation-surface .ui-empty { width: min(420px, 100%); min-height: 0; padding: 44px 20px; border: 0; background: transparent; }
 .app-content-chat .conversation-surface .chat-message { max-width: 100%; padding: 5px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .app-content-chat .conversation-surface .chat-message.user { max-width: min(760px, 88%); margin-left: auto; padding: 13px 16px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 20%, var(--skai-color-border)); border-radius: 15px; background: color-mix(in srgb, var(--skai-color-accent) 8%, var(--skai-color-surface-soft)); }
@@ -895,6 +895,8 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .sidebar-agent-trigger small { color: var(--skai-color-sidebar-muted); font-size: 8px; letter-spacing: .1em; }
 .sidebar-agent-trigger strong { color: var(--skai-color-sidebar-strong); font-size: 13px; font-weight: 550; }
 .sidebar-agent-trigger > .nav-icon:last-child { width: 14px; height: 14px; color: var(--skai-color-sidebar-muted); transform: rotate(90deg); }
+.app-sidebar.is-collapsed .sidebar-agent-trigger { justify-content: center; padding-inline: 5px; }
+.app-sidebar.is-collapsed .sidebar-agent-trigger > span, .app-sidebar.is-collapsed .sidebar-agent-trigger > .nav-icon:last-child { display: none; }
 .sidebar-agent-menu { position: absolute; z-index: 10; top: calc(100% + 5px); left: 0; width: 100%; display: grid; gap: 3px; padding: 5px; border: 1px solid var(--skai-color-border-strong); border-radius: 10px; background: var(--skai-color-surface); box-shadow: 0 14px 36px rgba(0,0,0,.35); }
 .sidebar-agent-menu > button { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px; border: 0; border-radius: 7px; color: var(--skai-color-text); background: transparent; text-align: left; }
 .sidebar-agent-menu > button:hover, .sidebar-agent-menu > button[aria-checked="true"] { background: var(--skai-color-surface-soft); }
@@ -1175,6 +1177,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .marketplace-field { display: grid; gap: 6px; margin-top: 8px; color: var(--skai-color-text-muted); font-size: 10px; }
 .marketplace-field select { min-height: 34px; padding: 7px 9px; border: 1px solid var(--skai-color-border); border-radius: 8px; color: var(--skai-color-text); background: var(--skai-color-surface-soft); font: inherit; }
 .voice-workbench-actions { display: flex; gap: 8px; margin-top: 8px; }
+.voice-workbench-actions .ui-button { flex: 0 0 auto; white-space: nowrap; }
 .marketplace-muted { color: var(--skai-color-text-muted); font-size: 10px !important; }
 .marketplace-toggle { display: flex; gap: 9px; align-items: flex-start; margin-top: 8px; color: var(--skai-color-text); font-size: 11px; }
 .marketplace-toggle input { margin-top: 2px; accent-color: var(--skai-color-accent); }

@@ -38,7 +38,7 @@ remain unchanged across the product rename.
 - Improve model-library explanations for compatibility, task support, licensing, download size, import progress, and failure recovery.
 - Add clearer per-provider capability messaging before a user attaches unsupported media.
 - Improve voice availability messaging and recovery across OS speech-service differences.
-- Resolve the overlaps and unreachable controls reported by the expanded packaged UI matrix at narrow widths, then verify settings, marketplace, GitHub, and companion layouts across supported window sizes.
+- Keep the packaged UI matrix green across supported window sizes; live keyboard and assistive-technology behavior still needs acceptance on each supported platform.
 - Add user-facing diagnostics that are redacted, exportable, and easy to attach to a bug report without including credentials or private content.
 
 ## Exit criteria

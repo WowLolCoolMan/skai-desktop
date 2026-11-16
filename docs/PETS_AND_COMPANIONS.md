@@ -60,8 +60,8 @@ visible motion, blink bounds, and Blaze's effects. `npm run test:pet` checks
 wander placement and attack sequencing. `npm run smoke:windows` checks the
 packaged companion surface as part of the Electron artifact smoke.
 
-Those checks do not replace live visual acceptance of attack timing, cursor
-tracking, multi-monitor placement, reduced-motion behavior, or Linux compositor
-differences. The full UI matrix currently reports several narrow-layout
-overlaps and unreachable controls; see [release readiness](RELEASE_READINESS.md)
-before treating the build as ready to publish.
+The full packaged UI matrix passes across fourteen routes, five supported
+window sizes, and four theme/sidebar variants. Those checks do not replace live
+visual acceptance of attack timing, cursor tracking, multi-monitor placement,
+reduced-motion behavior, or Linux compositor differences. See
+[release readiness](RELEASE_READINESS.md) for the remaining release gates.
