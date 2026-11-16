@@ -267,9 +267,30 @@ async function run() {
     secondTerminal = snapshot.result.find(item => item.id === secondQueued.result.id) ?? null;
     if ([firstTerminal, secondTerminal].every(task => task && ["completed", "failed", "cancelled", "blocked"].includes(task.status))) break;
   }
-  await new Promise(resolve => queueModelServer.close(resolve));
   if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2)
     throw new Error(`Queued task dispatch did not run both tasks serially: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests })}`);
+  const cancellationLeader = await request("tasks.plan", { title: "Cancellation leader", instruction: "Keep the local slot occupied briefly.", environment: "local" });
+  const cancellationWaiter = await request("tasks.plan", { title: "Cancellation waiter", instruction: "Cancel while waiting for the local slot.", environment: "local" });
+  for (const task of [cancellationLeader, cancellationWaiter]) {
+    const queuedTask = await request("tasks.queue", { id: task.result.id });
+    if (!queuedTask.ok || queuedTask.result?.status !== "queued") throw new Error("tasks.queue did not queue the cancellation pair.");
+  }
+  const leaderExecution = await request("tasks.execute", { id: cancellationLeader.result.id });
+  const waiterExecution = await request("tasks.execute", { id: cancellationWaiter.result.id });
+  if (!leaderExecution.ok || !waiterExecution.ok || waiterExecution.result?.status !== "queued") throw new Error("The cancellation waiter did not enter the local queue.");
+  const waiterCancelled = await request("tasks.cancel", { id: cancellationWaiter.result.id });
+  if (!waiterCancelled.ok || waiterCancelled.result?.status !== "queued" || waiterCancelled.result?.cancellationRequested !== true) throw new Error(`Queued task cancellation was not acknowledged: ${JSON.stringify(waiterCancelled)}`);
+  let cancelledTask = null;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error("tasks.list failed while observing queued cancellation.");
+    cancelledTask = snapshot.result.find(item => item.id === cancellationWaiter.result.id) ?? null;
+    if (cancelledTask?.status === "cancelled") break;
+  }
+  await new Promise(resolve => queueModelServer.close(resolve));
+  if (!cancelledTask || cancelledTask.status !== "cancelled" || queueRequests !== 3)
+    throw new Error(`Queued task cancellation did not stop the waiting task before execution: ${JSON.stringify({ cancelledTask, queueRequests })}`);
   const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
   if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Only the Local environment")) throw new Error("tasks.plan accepted an unsupported environment.");
   const scheduled = await request("scheduled.create", { prompt: "Run the local review", dueAt: new Date(Date.now() + 60_000).toISOString(), repeatEveryMinutes: 60 });
