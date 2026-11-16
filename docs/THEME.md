@@ -261,3 +261,29 @@ out after a `Page.captureScreenshot` timeout in the smoke test. The same tree th
   copy, duplicate naming, unsafe definitions refused, built-in edit refused, traversal ids refused, edit
   opens the right file).
 - **Smoke:** per-theme screenshots are now best-effort too (they're evidence, not assertions).
+
+### Round 7: font roles (Phase 4, part 1)
+
+Round 6 was pushed as d0bd09a (the gated push passed every check).
+
+- **Role tokens** (`tokens.css`): `--skai-font-ui`, `--skai-font-heading`, `--skai-font-reading` and `--skai-font-code` are
+  full fallback stacks. Heading and reading default to UI. `--skai-font-sans` and `--skai-font-mono` are now aliases of
+  the UI and code roles, so the existing 49 rules follow the roles without being edited. `--skai-heading-scale`
+  and `--skai-code-scale` are new.
+- **Sizes:** the 51 heading `font-size` values and 7 code-block ones in `styles.css` are multiplied by those scales
+  (mechanical, idempotent script). Defaults are 1, so nothing changes visually.
+- **Applying theme fonts:** `src/theme/fontRoles.ts` (new) builds the CSS from validated values only. It quotes
+  family names after re-checking them, appends the role's fallbacks, and clamps every number. Family stacks and size
+  ratios become inline properties: `ui` size → `--skai-text-scale` (13px reference), `heading` → heading scale (20px),
+  `code` → code scale (12px). Weight, line height, letter spacing and the reading px size go into a generated
+  `<style id="skai-font-roles">` with `!important`, so an explicit choice beats component defaults. The CSP already
+  allows inline styles.
+- **Fixed:** switching from an explicit mode to **System** left the light palette for up to about half a second,
+  until Chromium's `prefers-color-scheme` change event arrived after `nativeTheme` changed. The hook now applies
+  the scheme from the bridge's `dark` answer straight away. The smoke test caught it reading the light canvas
+  in System on a dark desktop, and now asserts that `data-scheme` matches the mode (and the native scheme in System).
+- **Smoke:** the user theme now carries `reading` and `code` fonts. The test checks the stack (a missing first font
+  stays in the stack ahead of the fallbacks), the code scale (13/12 → 1.0833), and that chat text computes to
+  15px with line height 1.7.
+- **Found for later:** the Monaco editor uses `theme="vs-dark"` and `fontSize: 13`, even in the light theme. It
+  should follow the code role and the syntax tokens (Monaco theme from tokens).

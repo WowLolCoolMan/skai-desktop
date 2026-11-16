@@ -1,4 +1,5 @@
 import type { AgentResponse, ThemeDefinition, ThemeFamily, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
+import { buildFontRoles } from "./fontRoles";
 
 // Theme engine (renderer). Built-in presets ship in src/theme/presets; user themes
 // arrive from the main process already validated (electron/theme-service.cjs).
@@ -6,7 +7,7 @@ import type { AgentResponse, ThemeDefinition, ThemeFamily, ThemePicks, ThemeProb
 // properties on <html>. Keys a theme leaves out keep the tokens.css default.
 
 type Request = (method: string, params?: Record<string, unknown>) => Promise<AgentResponse>;
-type RawFamily = { name: string; author?: string; license?: string; themes: { name: string; appearance: "light" | "dark"; colors?: Record<string, string> }[] };
+type RawFamily = { name: string; author?: string; license?: string; themes: { name: string; appearance: "light" | "dark"; colors?: Record<string, string>; fonts?: ThemeDefinition["fonts"] }[] };
 
 export const DEFAULT_PICKS: ThemePicks = { lightTheme: "builtin:Skai/Skai Light", darkTheme: "builtin:Skai/Skai Dark" };
 // The Skai family is what tokens.css already defines, so it applies nothing inline
@@ -30,7 +31,7 @@ function builtinFamilies(): ThemeFamily[] {
       appearance: theme.appearance,
       colors: Object.fromEntries(Object.entries(theme.colors ?? {}).map(([key, value]) => [tokenForColorKey(key), value])),
       gradients: {},
-      fonts: {},
+      fonts: theme.fonts ?? {},
     })),
   })).sort((a, b) => (a.name === CSS_DEFAULT_FAMILY ? -1 : b.name === CSS_DEFAULT_FAMILY ? 1 : a.name.localeCompare(b.name)));
 }
@@ -73,14 +74,21 @@ function applyTheme(theme: ThemeDefinition | null) {
   const root = document.documentElement;
   for (const property of applied) root.style.removeProperty(property);
   applied = [];
-  const isCssDefault = !theme || theme.id.startsWith(`builtin:${CSS_DEFAULT_FAMILY}/`);
+  const set = (property: string, value: string) => { root.style.setProperty(property, value); applied.push(property); };
   root.dataset.themeId = theme?.id ?? "";
-  if (isCssDefault) return;
-  for (const [property, value] of Object.entries(theme.colors)) {
-    if (!/^--skai-[a-z0-9-]+$/.test(property) || !SAFE_COLOR.test(value)) continue;
-    root.style.setProperty(property, value);
-    applied.push(property);
+  // Colors: the built-in Skai family is what tokens.css already defines.
+  if (theme && !theme.id.startsWith(`builtin:${CSS_DEFAULT_FAMILY}/`)) {
+    for (const [property, value] of Object.entries(theme.colors)) {
+      if (/^--skai-[a-z0-9-]+$/.test(property) && SAFE_COLOR.test(value)) set(property, value);
+    }
   }
+  // Fonts: family stacks and size scales as properties, the rest as a generated stylesheet.
+  const fonts = buildFontRoles(theme?.fonts ?? {});
+  for (const [property, value] of Object.entries(fonts.properties)) set(property, value);
+  let style = document.getElementById("skai-font-roles");
+  if (!fonts.css) { style?.remove(); return; }
+  if (!style) { style = document.createElement("style"); style.id = "skai-font-roles"; document.head.append(style); }
+  style.textContent = fonts.css;
 }
 
 function update(patch: Partial<ThemeState>) {

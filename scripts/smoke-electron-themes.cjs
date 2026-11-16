@@ -151,6 +151,10 @@ async function main() {
     if (!popupState.options) throw new Error(`No <option> elements were found on Appearance for ${theme}/${backdrop}.`);
     if (popupState.problems.length) throw new Error(`Select popups are unthemed or unreadable in ${theme}/${backdrop}: ${popupState.problems.join("; ")}`);
     parsed.nativeDark = popupState.nativeDark;
+    // Theme: the resolved scheme (data-scheme) must agree with the theme mode, and in
+    // System mode with the native scheme.
+    const expectedScheme = theme === "system" ? (popupState.nativeDark ? "dark" : "light") : theme;
+    parsed.canvas = JSON.parse(await waitFor(devtools.evaluate, "JSON.stringify({ scheme: document.documentElement.dataset.scheme, canvas: getComputedStyle(document.documentElement).getPropertyValue('--skai-color-canvas').trim() })", (value) => JSON.parse(value).scheme === expectedScheme, `${theme} to resolve to the ${expectedScheme} scheme`)).canvas;
     fs.mkdirSync(outputDir, { recursive: true });
     // Best effort: screenshots are evidence, not assertions, and on a busy desktop the
     // compositor sometimes doesn't hand over a frame within the DevTools timeout.
@@ -169,7 +173,7 @@ async function main() {
   // and a problem must be shown), and check the pick was saved to appearance.json.
   const themesDir = path.join(smokeUserDataDir, "themes");
   const themeFile = path.join(themesDir, "smoke.json");
-  const writeTheme = (canvas) => fs.writeFileSync(themeFile, JSON.stringify({ name: "Smoke", license: "CC0-1.0", themes: [{ name: "Smoke Dark", appearance: "dark", colors: { canvas } }] }));
+  const writeTheme = (canvas) => fs.writeFileSync(themeFile, JSON.stringify({ name: "Smoke", license: "CC0-1.0", themes: [{ name: "Smoke Dark", appearance: "dark", colors: { canvas }, fonts: { reading: { family: "Smoke Missing Serif, DejaVu Serif", size: 15, lineHeight: 1.7 }, code: { family: "DejaVu Sans Mono", size: 13 } } }] }));
   const canvasToken = "getComputedStyle(document.documentElement).getPropertyValue('--skai-color-canvas').trim()";
   await setAppearance("dark", "none");
   fs.mkdirSync(themesDir, { recursive: true });
@@ -178,6 +182,12 @@ async function main() {
   const picked = await devtools.callFunction("function (id) { const select = [...document.querySelectorAll('.settings-content label')].find((label) => label.textContent?.startsWith('Dark theme'))?.querySelector('select'); if (!select) return false; select.value = id; select.dispatchEvent(new Event('change', { bubbles: true })); return true; }", ["user:smoke.json/Smoke Dark"]);
   if (!picked) throw new Error("The Dark theme picker was not found on Appearance.");
   await waitFor(devtools.evaluate, canvasToken, (value) => value === "#102030", "picked user theme to apply");
+  // Theme fonts: a family stack built by Skai (chosen fonts first, then fallbacks), a code
+  // size scale, and generated role rules. A missing first font must not break the stack.
+  const fontState = JSON.parse(await devtools.evaluate("JSON.stringify({ reading: getComputedStyle(document.documentElement).getPropertyValue('--skai-font-reading').trim(), codeScale: getComputedStyle(document.documentElement).getPropertyValue('--skai-code-scale').trim(), roles: document.getElementById('skai-font-roles')?.textContent || '', messageFont: (() => { const probe = document.createElement('div'); probe.className = 'message-content'; document.body.append(probe); const style = getComputedStyle(probe); const result = { family: style.fontFamily, size: style.fontSize, lineHeight: style.lineHeight }; probe.remove(); return result; })() })"));
+  if (!fontState.reading.startsWith('"Smoke Missing Serif", "DejaVu Serif",') || !/sans-serif$/.test(fontState.reading)) throw new Error(`Reading font stack is wrong: ${fontState.reading}`);
+  if (fontState.codeScale !== "1.0833") throw new Error(`Code size scale is wrong: ${fontState.codeScale}`);
+  if (fontState.messageFont.size !== "15px" || !fontState.roles.includes("line-height: 1.7 !important")) throw new Error(`Reading role rules were not applied: ${JSON.stringify(fontState)}`);
   writeTheme("#203040");
   await waitFor(devtools.evaluate, canvasToken, (value) => value === "#203040", "edited theme file to live-reload");
   fs.writeFileSync(themeFile, "{ broken");

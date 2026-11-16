@@ -5,8 +5,9 @@ The schema is `docs/theme.schema.json`; most editors use it for completion when 
 `$schema` points at a copy of it (Export puts one next to your themes).
 
 > Status: theme files, light/dark picks, the themes folder, live reload, Edit, Duplicate,
-> Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Gradients and fonts in
-> theme files are validated now and applied in Phases 4–5.
+> Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Fonts in theme files
+> apply (Phase 4); the font picker and custom fonts folder come next. Gradients are validated and
+> applied in Phase 5.
 
 ## Using a theme
 
@@ -145,10 +146,26 @@ readable against every stop, not just the average.
 
 ## Fonts
 
-Four roles: `ui` (menus, buttons, sidebar), `heading`, `reading` (chat messages) and `code`
-(code blocks, editor, terminal, diffs). Each role takes `family` (up to 4 plain font names, first
-installed one wins), `size` (8–32 px), `weight` (100–900), `lineHeight` (1–2.5) and
-`letterSpacing` (−0.1 to 0.3 em). Settings in `appearance.json` override a theme's fonts.
+Four roles: `ui` (menus, buttons, sidebar, everything by default), `heading` (all headings),
+`reading` (chat messages) and `code` (code blocks, inline code, terminal, diffs, the file editor).
+Each role takes:
+
+| Key | Range | Effect |
+|---|---|---|
+| `family` | up to 4 plain font names | First installed one wins; then the system UI font (or the system monospace font for `code`), then a generic family, so a missing font never shows boxes |
+| `size` | 8–32 px | `ui`: scales the whole interface (13 = default). `heading`: scales every heading (20 = default). `reading`: the chat text size in px. `code`: scales code text (12 = default) |
+| `weight` | 100–900 | Font weight for the role |
+| `lineHeight` | 1–2.5 | Line height for the role |
+| `letterSpacing` | −0.1 to 0.3 em | Tracking for the role |
+
+```json
+"fonts": {
+  "reading": { "family": "Literata, Georgia", "size": 15, "lineHeight": 1.65 },
+  "code": { "family": "JetBrains Mono, Fira Code", "size": 13 }
+}
+```
+
+Settings you choose in Appearance override a theme's fonts (coming next round).
 
 ## What is rejected, and why
 

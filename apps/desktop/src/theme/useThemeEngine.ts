@@ -13,26 +13,29 @@ export function useThemeEngine(request: Request, themeMode: ThemeMode) {
   // Theme: load built-in and user themes and keep them live-reloading.
   useEffect(() => { themeEngine.start(request); }, [request]);
 
-  // Theme: keep Electron's nativeTheme in step with the app's Light/Dark/System pick.
-  // Without it, native pieces (select popups, scrollbars, dialogs, the window frame)
-  // follow the OS theme, so a dark app on a light desktop gets light popups.
+  // Theme: keep Electron's nativeTheme in step with the app's Light/Dark/System pick
+  // (otherwise select popups, scrollbars, dialogs and the window frame follow the OS),
+  // and publish the resolved scheme as <html data-scheme="light|dark"> so tokens.css
+  // writes each palette once. System follows OS changes live. Switching from an
+  // explicit mode to System, Chromium's prefers-color-scheme updates a moment after
+  // nativeTheme does, so the bridge's answer (dark or not) is applied straight away.
   useEffect(() => {
-    if (!window.skaiAgent) return;
-    void request("appearance.setNativeTheme", { mode: themeMode }).catch(() => undefined);
-  }, [request, themeMode]);
-
-  // Theme: publish the resolved scheme as <html data-scheme="light|dark"> (tokens.css
-  // writes each palette once) and apply the picked light or dark theme. System
-  // follows OS changes live.
-  useEffect(() => {
+    let current = true;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => {
-      const scheme = resolveScheme(themeMode, media.matches);
+    const apply = (prefersDark: boolean) => {
+      if (!current) return;
+      const scheme = resolveScheme(themeMode, prefersDark);
       document.documentElement.dataset.scheme = scheme;
       themeEngine.setScheme(scheme);
     };
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, [themeMode]);
+    const onChange = () => apply(media.matches);
+    apply(media.matches);
+    media.addEventListener("change", onChange);
+    if (window.skaiAgent) {
+      void request("appearance.setNativeTheme", { mode: themeMode })
+        .then((response) => { const result = response.result as { dark?: unknown } | undefined; if (response.ok && typeof result?.dark === "boolean") apply(result.dark); })
+        .catch(() => undefined);
+    }
+    return () => { current = false; media.removeEventListener("change", onChange); };
+  }, [request, themeMode]);
 }

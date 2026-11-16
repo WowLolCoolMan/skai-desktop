@@ -1,7 +1,19 @@
 :root {
   color-scheme: dark;
-  --skai-font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --skai-font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  /* Theme: font roles. Each role's family is a full fallback stack (chosen font,
+     then the system UI or monospace font, then a generic family), so a missing
+     font never shows boxes. Themes and Appearance replace the first entries;
+     weight, size, line height and letter spacing are applied by src/theme. */
+  --skai-font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --skai-font-heading: var(--skai-font-ui);
+  --skai-font-reading: var(--skai-font-ui);
+  --skai-font-code: "JetBrains Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  /* Older names, kept for existing rules: sans is the UI role, mono the code role. */
+  --skai-font-sans: var(--skai-font-ui);
+  --skai-font-mono: var(--skai-font-code);
+  /* Size multipliers for the heading and code roles (1 = default). */
+  --skai-heading-scale: 1;
+  --skai-code-scale: 1;
   --skai-space-1: 4px;
   --skai-space-2: 8px;
   --skai-space-3: 12px;
