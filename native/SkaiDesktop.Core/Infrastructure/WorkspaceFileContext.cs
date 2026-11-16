@@ -16,7 +16,7 @@ public static class WorkspaceFileContext
     public const int MaxBrowserTextEntries = 128;
     public const string BrowserBoundaryDescription = "Shows up to 128 readable text files. Protected names, dependency/build directories, and linked paths are hidden.";
 
-    public sealed record WorkspaceFileEntry(string RelativePath, string FullPath, string Kind);
+    public sealed record WorkspaceFileEntry(string RelativePath, string FullPath, string Kind, long Bytes);
     public sealed record WorkspaceTextFileEntry(string RelativePath, string FullPath, long Bytes);
     public sealed record WorkspaceTextFileBrowserSnapshot(
         IReadOnlyList<WorkspaceTextFileEntry> Files,
@@ -196,7 +196,7 @@ public static class WorkspaceFileContext
         return new WorkspaceTextFileBrowserSnapshot(result, protectedFilesSkipped, excludedDirectoriesSkipped, linkedPathsSkipped, hitEntryLimit);
     }
 
-    public static IReadOnlyList<WorkspaceFileEntry> EnumeratePreviewableFiles(IEnumerable<string> selectedFolders)
+    public static IReadOnlyList<WorkspaceFileEntry> EnumeratePreviewableFiles(IEnumerable<string> selectedFolders, bool includeText = true)
     {
         ArgumentNullException.ThrowIfNull(selectedFolders);
         var result = new List<WorkspaceFileEntry>();
@@ -219,7 +219,7 @@ public static class WorkspaceFileContext
                     if (result.Count >= MaxPreviewEntries || IsLink(file)) continue;
                     var name = Path.GetFileName(file);
                     if (IsExcludedFile(name)) continue;
-                    var kind = ChatAttachmentPolicy.IsAllowedTextName(name) ? "text"
+                    var kind = includeText && ChatAttachmentPolicy.IsAllowedTextName(name) ? "text"
                         : ChatAttachmentPolicy.GetImageMediaType(name) is not null ? "image"
                         : ChatAttachmentPolicy.IsAllowedPdfName(name) ? "pdf"
                         : null;
@@ -229,7 +229,7 @@ public static class WorkspaceFileContext
                         var length = new FileInfo(file).Length;
                         var maxBytes = kind == "pdf" ? ChatAttachmentPolicy.MaxPdfBytes : kind == "image" ? ChatAttachmentPolicy.MaxFileBytes : MaxFileCharacters * 4L;
                         if (length > maxBytes) continue;
-                        result.Add(new WorkspaceFileEntry(Path.GetRelativePath(root, file), Path.GetFullPath(file), kind));
+                        result.Add(new WorkspaceFileEntry(Path.GetRelativePath(root, file), Path.GetFullPath(file), kind, length));
                     }
                     catch (IOException) { }
                     catch (UnauthorizedAccessException) { }
@@ -246,6 +246,66 @@ public static class WorkspaceFileContext
             }
         }
         return result;
+    }
+
+    /// <summary>Reads one enumerated image/PDF preview after rechecking workspace containment and reparse-point boundaries.</summary>
+    public static (WorkspaceFileEntry Entry, byte[] Content) ReadPreviewableFile(IEnumerable<string> selectedFolders, string relativePath)
+    {
+        ArgumentNullException.ThrowIfNull(selectedFolders);
+        if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath) || relativePath.Contains(':'))
+            throw new InvalidOperationException("Only a supported project-relative preview path is allowed.");
+        var parts = relativePath.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, '/', '\\'], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0 || parts.Any(part => part is "." or ".." || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
+            throw new InvalidOperationException("The project preview path is invalid.");
+
+        var roots = selectedFolders.Where(path => !string.IsNullOrWhiteSpace(path)).Select(Path.GetFullPath).ToArray();
+        var requested = relativePath.Replace('\\', '/');
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var entry = EnumeratePreviewableFiles(roots, includeText: false).FirstOrDefault(file =>
+            string.Equals(file.RelativePath.Replace('\\', '/'), requested, comparison));
+        if (entry is null) throw new FileNotFoundException("The selected project preview is unavailable or protected.");
+
+        var root = roots.FirstOrDefault(candidate =>
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(candidate, Path.Combine(parts)));
+            return string.Equals(fullPath, entry.FullPath, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+        });
+        if (root is null) throw new FileNotFoundException("The selected project preview is outside its connected folders.");
+        EnsureNoLinksInPath(root, entry.FullPath);
+
+        var maxBytes = entry.Kind == "pdf" ? ChatAttachmentPolicy.MaxPdfBytes : ChatAttachmentPolicy.MaxFileBytes;
+        using var stream = new FileStream(entry.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, FileOptions.SequentialScan);
+        if (stream.Length > maxBytes || stream.Length > int.MaxValue) throw new InvalidDataException("The project preview exceeds its size limit.");
+        var content = new byte[(int)stream.Length];
+        var offset = 0;
+        while (offset < content.Length)
+        {
+            var read = stream.Read(content, offset, content.Length - offset);
+            if (read == 0) throw new IOException("The project preview changed while it was being read.");
+            offset += read;
+        }
+        if (stream.ReadByte() != -1) throw new IOException("The project preview changed while it was being read.");
+        EnsureNoLinksInPath(root, entry.FullPath);
+        return (entry, content);
+    }
+
+    private static void EnsureNoLinksInPath(string root, string target)
+    {
+        var fullRoot = Path.GetFullPath(root);
+        var fullTarget = Path.GetFullPath(target);
+        var relative = Path.GetRelativePath(fullRoot, fullTarget);
+        if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new InvalidOperationException("The project preview path leaves its connected folder.");
+        var current = fullRoot;
+        if (IsLink(current)) throw new IOException("Linked project folders cannot be previewed.");
+        var segments = relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 0; index < segments.Length; index++)
+        {
+            current = Path.Combine(current, segments[index]);
+            if (IsLink(current)) throw new IOException("Linked project paths cannot be previewed.");
+            if (index < segments.Length - 1 && !Directory.Exists(current))
+                throw new DirectoryNotFoundException("The project preview folder is unavailable.");
+        }
     }
 
     private static bool IsLink(string path)

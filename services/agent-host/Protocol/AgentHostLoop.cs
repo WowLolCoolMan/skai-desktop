@@ -79,7 +79,7 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
+                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
             "system.capacity" => GetLocalCapacity(request),
             "airllm.status" => GetAirLlmStatus(request),
             "airllm.install.start" => StartAirLlmInstall(request),
@@ -97,6 +97,7 @@ public static class AgentHostLoop
             "project.save" => SaveProject(request),
             "project.files" => ListProjectFiles(request),
             "project.file.read" => ReadProjectFile(request),
+            "project.preview.read" => ReadProjectPreview(request),
             "project.file.write" => WriteProjectFile(request),
             "project.file.undo" => UndoProjectFile(request),
             "project.command.run" => RunProjectCommandAsync(request).GetAwaiter().GetResult(),
@@ -1085,10 +1086,16 @@ public static class AgentHostLoop
         var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
             ?? throw new KeyNotFoundException("The project does not exist.");
         var snapshot = WorkspaceFileContext.EnumerateTextFileBrowser(project.FolderPaths);
+        var visualPreviews = WorkspaceFileContext.EnumeratePreviewableFiles(project.FolderPaths, includeText: false);
+        var files = snapshot.Files.Select(file => new { relativePath = file.RelativePath, bytes = file.Bytes, kind = "text" })
+            .Concat(visualPreviews.Select(file => new { relativePath = file.RelativePath, bytes = file.Bytes, kind = file.Kind }))
+            .GroupBy(file => file.relativePath, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToArray();
         return new(ProtocolVersion, request.Id, true, new
         {
             projectId = id,
-            files = snapshot.Files.Select(file => new { relativePath = file.RelativePath, bytes = file.Bytes }).ToArray(),
+            files,
             protectedFilesSkipped = snapshot.ProtectedFilesSkipped,
             excludedDirectoriesSkipped = snapshot.ExcludedDirectoriesSkipped,
             linkedPathsSkipped = snapshot.LinkedPathsSkipped,
@@ -1114,6 +1121,24 @@ public static class AgentHostLoop
             catch (DirectoryNotFoundException) { }
         }
         throw new FileNotFoundException("The selected project file is unavailable or protected.");
+    }
+
+    private static AgentResponse ReadProjectPreview(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 128);
+        var relativePath = RequiredBoundedString(request, "relativePath", 512);
+        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
+            ?? throw new KeyNotFoundException("The project does not exist.");
+        var (entry, bytes) = WorkspaceFileContext.ReadPreviewableFile(project.FolderPaths, relativePath);
+        if (entry.Kind == "image")
+        {
+            var mediaType = ChatAttachmentPolicy.GetImageMediaType(entry.RelativePath);
+            if (mediaType is null || !ChatAttachmentPolicy.HasValidImageSignature(mediaType, bytes))
+                throw new InvalidDataException("The selected image has an unsupported or invalid file signature.");
+            return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "image", mediaType, content = Convert.ToBase64String(bytes) });
+        }
+        var text = PdfAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
+        return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = (string?)null, content = text });
     }
 
     private static AgentResponse WriteProjectFile(AgentRequest request)

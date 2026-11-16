@@ -43,6 +43,14 @@ export type DesktopProject = {
 export type DesktopProjectFile = {
   relativePath: string;
   bytes: number;
+  kind?: "text" | "image" | "pdf";
+};
+
+export type DesktopProjectPreview = {
+  relativePath: string;
+  kind: "image" | "pdf";
+  mediaType: string | null;
+  content: string;
 };
 
 export type DesktopGitChange = {

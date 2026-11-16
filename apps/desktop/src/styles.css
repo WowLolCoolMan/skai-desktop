@@ -251,6 +251,11 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .project-file-folder .project-file-tree-name { font-weight: 600; }
 .project-file-tree-spacer { visibility: hidden; }
 .project-file-directory-children { display: grid; }
+.project-file-preview { display: grid; align-content: start; justify-items: center; gap: 10px; min-height: 330px; height: 100%; overflow: auto; padding: 14px; border: 1px solid var(--skai-color-border); border-radius: 9px; background: var(--skai-color-code-surface); }
+.project-file-preview > img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.project-file-preview > p { align-self: center; margin: 0; color: var(--skai-color-text-muted); font-size: 11px; }
+.project-pdf-preview-label { width: 100%; color: var(--skai-color-text-muted); font-size: 10px; }
+.project-file-preview > pre { width: 100%; margin: 0; color: var(--skai-color-text); font-family: var(--skai-font-mono); font-size: 11px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .sidebar-resize-handle { position: absolute; z-index: 3; top: 0; right: -5px; bottom: 0; width: 10px; cursor: col-resize; }
 .sidebar-resize-handle::after { position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; content: ""; transition: background var(--skai-duration-fast) var(--skai-ease-standard); }
 .sidebar-resize-handle:hover::after, .sidebar-resize-handle:focus-visible::after, .app-sidebar.is-resizing .sidebar-resize-handle::after { background: var(--skai-color-accent); }

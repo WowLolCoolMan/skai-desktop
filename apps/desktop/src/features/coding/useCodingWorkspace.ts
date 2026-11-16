@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile } from "../../../shared/contracts";
+import { useEffect, useRef, useState } from "react";
+import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
 import type { Route } from "../../app/types";
 import type { AgentRequest } from "../../services/agentClient";
 
@@ -17,6 +17,8 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileDraft, setFileDraft] = useState("");
   const [fileOriginal, setFileOriginal] = useState("");
+  const [filePreview, setFilePreview] = useState<DesktopProjectPreview | null>(null);
+  const [filePreviewError, setFilePreviewError] = useState<string | null>(null);
   const [fileHash, setFileHash] = useState<string | null>(null);
   const [fileUndoId, setFileUndoId] = useState<string | null>(null);
   const [fileSummary, setFileSummary] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   const [gitCommitBusy, setGitCommitBusy] = useState(false);
   const [gitPushBusy, setGitPushBusy] = useState(false);
   const [gitPullRequestBusy, setGitPullRequestBusy] = useState(false);
+  const fileReadRequestId = useRef(0);
 
   useEffect(() => {
     if (connection !== "ready") return;
@@ -67,8 +70,9 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   };
 
   const selectProject = async (project: DesktopProject) => {
+    fileReadRequestId.current += 1;
     localStorage.setItem("skai.selectedProject", project.id);
-    setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFileHash(null); setFileUndoId(null); setGitStatus(null); setGitDiff(null);
+    setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); setGitStatus(null); setGitDiff(null);
     const response = await request("project.files", { id: project.id });
     if (!response.ok) { setSelectedProject(null); setProjectFiles([]); localStorage.removeItem("skai.selectedProject"); onError(`${response.error?.message ?? "Project folder is unavailable."} Reconnect its folder in Projects.`); onNavigate("projects"); return; }
     const result = response.result as { files: DesktopProjectFile[]; protectedFilesSkipped: number; hitEntryLimit: boolean };
@@ -141,14 +145,26 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
 
   const openProjectFile = async (relativePath: string) => {
     if (!selectedProject) return;
-    setSelectedFile(relativePath); setFileDraft(""); setFileOriginal(""); setFileHash(null); setFileUndoId(null);
+    const requestId = ++fileReadRequestId.current;
+    setSelectedFile(relativePath); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null);
+    const kind = projectFiles.find((file) => file.relativePath === relativePath)?.kind ?? "text";
+    if (kind === "image" || kind === "pdf") {
+      const previewResponse = await request("project.preview.read", { id: selectedProject.id, relativePath });
+      if (requestId !== fileReadRequestId.current) return;
+      if (!previewResponse.ok) { const message = previewResponse.error?.message ?? "Project file preview failed."; setFilePreviewError(message); onError(message); return; }
+      setFilePreview(previewResponse.result as DesktopProjectPreview);
+      setFilePreviewError(null);
+      onError(null);
+      return;
+    }
     const response = await request("project.file.read", { id: selectedProject.id, relativePath });
+    if (requestId !== fileReadRequestId.current) return;
     if (!response.ok) { onError(response.error?.message ?? "File preview failed."); return; }
     const result = response.result as { content: string; hash: string };
     setFileDraft(result.content); setFileOriginal(result.content); setFileHash(result.hash);
   };
 
-  const closeProjectFile = () => { setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFileHash(null); setFileUndoId(null); };
+  const closeProjectFile = () => { fileReadRequestId.current += 1; setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); };
 
   const saveProjectFile = async () => {
     if (!selectedProject || !selectedFile || !fileHash || fileBusy) return;
@@ -212,5 +228,5 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setTerminalSessionId(null); setTerminalScreen(null); setTerminalExitCode(null); return true;
   };
 
-  return { projects, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest };
+  return { projects, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest };
 }

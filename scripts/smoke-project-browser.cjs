@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const readline = require("node:readline");
+const zlib = require("node:zlib");
 const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -14,8 +15,12 @@ const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-project-browser-smo
 const workspace = path.join(tempRoot, "workspace");
 fs.mkdirSync(path.join(workspace, "node_modules"), { recursive: true });
 fs.mkdirSync(path.join(workspace, "src", "features", "coding"), { recursive: true });
+fs.mkdirSync(path.join(workspace, "assets"), { recursive: true });
 fs.writeFileSync(path.join(workspace, "README.md"), "safe metadata fixture\n");
 fs.writeFileSync(path.join(workspace, "src", "features", "coding", "page.tsx"), "export const page = true;\n");
+fs.writeFileSync(path.join(workspace, "assets", "pixel.png"), makePng());
+fs.writeFileSync(path.join(workspace, "assets", "invalid.png"), "not an image");
+fs.writeFileSync(path.join(workspace, "assets", "guide.pdf"), makePdf("Safe PDF Preview Text"));
 fs.writeFileSync(path.join(workspace, ".env"), "SECRET=must-not-appear\n");
 fs.writeFileSync(path.join(workspace, "node_modules", "ignored.js"), "ignored\n");
 
@@ -38,6 +43,51 @@ reader.on("line", line => {
   } catch { /* timeout reports malformed host output */ }
 });
 
+function pngCrc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const name = Buffer.from(type, "ascii");
+  const body = Buffer.concat([name, data]);
+  const size = Buffer.alloc(4); size.writeUInt32BE(data.length);
+  const crc = Buffer.alloc(4); crc.writeUInt32BE(pngCrc32(body));
+  return Buffer.concat([size, body, crc]);
+}
+
+function makePng() {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(1, 0); header.writeUInt32BE(1, 4); header[8] = 8; header[9] = 6;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk("IHDR", header), pngChunk("IDAT", zlib.deflateSync(Buffer.from([0, 32, 128, 220, 255]))), pngChunk("IEND", Buffer.alloc(0))]);
+}
+
+function makePdf(text) {
+  const stream = `BT /F1 12 Tf 24 700 Td (${text}) Tj ET\n`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}endstream`,
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(body));
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xrefOffset = Buffer.byteLength(body);
+  body += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+  body += offsets.slice(1).map(offset => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  body += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(body, "ascii");
+}
+
 function request(method, params) {
   const id = `browser-smoke-${nextId++}`;
   child.stdin.write(`${JSON.stringify({ v: 1, id, method, params })}\n`);
@@ -53,12 +103,27 @@ async function run() {
   const browser = await request("project.files", { id: saved.result.id });
   const files = browser.result?.files ?? [];
   const paths = files.map(file => file.relativePath.replaceAll("\\", "/"));
-  if (!browser.ok || files.length !== 2 || !paths.includes("README.md") || !paths.includes("src/features/coding/page.tsx"))
-    throw new Error("project.files did not preserve nested relative paths and safe filtering.");
+  if (!browser.ok || files.length !== 5 || !paths.includes("README.md") || !paths.includes("src/features/coding/page.tsx")
+    || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/pixel.png" && file.kind === "image")
+    || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/invalid.png" && file.kind === "image")
+    || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/guide.pdf" && file.kind === "pdf"))
+    throw new Error(`project.files did not preserve nested paths, safe filtering, and visual preview kinds: ${JSON.stringify(files)}`);
   if (browser.result.protectedFilesSkipped < 1 || browser.result.excludedDirectoriesSkipped < 1)
     throw new Error("project.files did not report protected/dependency exclusions.");
   if (Object.values(files[0]).some(value => String(value).includes("SECRET"))) throw new Error("project browser leaked protected content.");
-  console.log("Project browser smoke passed: disposable project round trip, safe filtering, and exclusion summary.");
+  const image = await request("project.preview.read", { id: saved.result.id, relativePath: "assets/pixel.png" });
+  if (!image.ok || image.result?.kind !== "image" || image.result.mediaType !== "image/png" || !image.result.content)
+    throw new Error("project.preview.read did not return a validated local PNG preview.");
+  const pdf = await request("project.preview.read", { id: saved.result.id, relativePath: "assets/guide.pdf" });
+  if (!pdf.ok || pdf.result?.kind !== "pdf" || !pdf.result.content.includes("Safe PDF Preview Text"))
+    throw new Error("project.preview.read did not return bounded locally extracted PDF text.");
+  const protectedPreview = await request("project.preview.read", { id: saved.result.id, relativePath: ".env" });
+  if (protectedPreview.ok) throw new Error("project.preview.read opened a protected file.");
+  const malformedImage = await request("project.preview.read", { id: saved.result.id, relativePath: "assets/invalid.png" });
+  if (malformedImage.ok) throw new Error("project.preview.read accepted an invalid image signature.");
+  const traversal = await request("project.preview.read", { id: saved.result.id, relativePath: "../secret.png" });
+  if (traversal.ok) throw new Error("project.preview.read accepted a path outside the project.");
+  console.log("Project browser smoke passed: nested listing, safe filtering, bounded PNG/PDF previews, protected/malformed/traversal rejection, and exclusion summary.");
 }
 
 run().catch(error => {
