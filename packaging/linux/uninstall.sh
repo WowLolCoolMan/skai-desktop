@@ -22,6 +22,6 @@ command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q
 
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 echo "Skai Desktop was removed. Your data was kept in:"
-echo "  $CONFIG_HOME/ServerRock    (chats, projects, memory, settings)"
+echo "  $CONFIG_HOME/SkaiDesktop    (chats, projects, memory, settings)"
 echo "  $CONFIG_HOME/skai-desktop  (window and companion preferences)"
 echo "Delete those folders yourself if you also want to remove your data."

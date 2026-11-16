@@ -19,7 +19,7 @@ internal static class WorkflowServiceTests
             ],
             Edges = [new() { From = "prompt", To = "approval" }, new() { From = "approval", To = "test" }]
         };
-        var path = Path.Combine(Path.GetTempPath(), $"server-rock-workflow-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"skai-workflow-{Guid.NewGuid():N}.json");
         var service = new WorkflowService(path);
         try
         {

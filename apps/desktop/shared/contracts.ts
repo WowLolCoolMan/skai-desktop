@@ -22,6 +22,15 @@ export type RuntimeHealth = {
   capabilities: string[];
 };
 
+export type LocalCapacitySnapshot = {
+  capturedAtUtc: string;
+  ramTotalBytes: number | null;
+  ramAvailableBytes: number | null;
+  cpuUtilizationPercent: number | null;
+  gpu: { name: string; totalBytes: number | null; availableBytes: number | null; utilizationPercent: number | null } | null;
+  measurementNote: string | null;
+};
+
 export type DesktopProject = {
   id: string;
   name: string;
@@ -90,6 +99,9 @@ export type DesktopTask = {
   id: string;
   title: string;
   instruction: string;
+  projectId?: string | null;
+  conversationId?: string | null;
+  changedFiles?: string[];
   role: string;
   status: string;
   resultSummary?: string | null;
@@ -223,6 +235,6 @@ export interface AgentBridge {
 
 declare global {
   interface Window {
-    serverRockAgent: AgentBridge;
+    skaiAgent: AgentBridge;
   }
 }

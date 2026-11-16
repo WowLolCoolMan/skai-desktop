@@ -29,7 +29,7 @@ function findAlternateDesktopFiles(directory, results = []) {
     if (entry.name.endsWith(".csproj.user") || entry.name.endsWith(".sln.user")) continue;
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) findAlternateDesktopFiles(fullPath, results);
-    else if (/\.(xaml|xaml\.cs)$/i.test(entry.name) || /(?:^|\.)?(?:uno|winui|native)\.(?:csproj|sln)$/i.test(entry.name) || /ServerRock\.Native/i.test(entry.name)) results.push(path.relative(root, fullPath));
+    else if (/\.(xaml|xaml\.cs)$/i.test(entry.name) || /(?:^|\.)?(?:uno|winui|native)\.(?:csproj|sln)$/i.test(entry.name) || /SkaiDesktop\.Native/i.test(entry.name)) results.push(path.relative(root, fullPath));
   }
   return results;
 }
@@ -74,7 +74,7 @@ expect(main.includes("new Tray") && main.includes("event.preventDefault()") && m
 expect(main.includes("requestSingleInstanceLock") && main.includes('app.on("second-instance"'), "Electron must reopen the resident instance instead of creating duplicate desktop processes");
 expect(main.includes("globalShortcut.register") && main.includes("CommandOrControl+Alt+Space") && main.includes("globalShortcut.unregister"), "Electron must expose and clean up the system-wide launcher shortcut");
 expect(main.includes("Recent chats") && main.includes("tray:open-conversation") && main.includes("Quit Skai Desktop"), "The system tray menu must expose recent chats, reopen, and explicit quit actions");
-expect(main.includes("Hide Percy") && main.includes("Show Percy"), "The system tray menu must expose Percy visibility control");
+expect(main.includes("Hide all pets") && main.includes("Show all pets"), "The system tray menu must expose companion visibility control");
 expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "The preload bridge must expose typed tray navigation events");
 expect(main.includes("taskkill") && main.includes("/T"), "Electron shutdown must terminate the full Windows host process tree");
 expect(main.includes("restartAgentHost"), "Electron must restart a timed-out host after resolving pending requests");
@@ -88,10 +88,10 @@ expect(main.includes("setVisibleOnAllWorkspaces(true") && percyTransparent && ma
 expect(main.includes('"tasks.retry": "Retried the local task."'), "Percy must summarize successful task retries");
 expect(main.includes('kind = "success"') && main.includes('kind: "error"'), "Percy completion events must distinguish successful and failed local work");
 expect(main.includes("if (!task) return null"), "Percy completion bubbles must stay scoped to tracked agent work");
-expect(petWindow.includes("BUILTIN_STRIPS") && petWindow.includes("percy-error-frames.png") && petWindow.includes("event.kind"), "Percy must render independent six-frame state strips and completion states");
+expect(petWindow.includes("BUILTIN_STRIPS") && petWindow.includes("percy-error-frames.png") && petWindow.includes("event.kind"), "The companion must render independent state strips and completion states");
 expect(petWindow.includes("window.addEventListener(\"blur\", cancelDrag)") && petWindow.includes("event.target instanceof Element"), "Percy renderer must cancel lost drags and protect its hide control from drag initiation");
 expect(main.includes("packagedRuntime") && main.includes("process.resourcesPath"), "Electron must resolve packaged runtime paths");
-expect(main.includes("packagedHost") && main.includes("ServerRock.AgentHost"), "Electron must launch a bundled Agent Host when packaged");
+expect(main.includes("packagedHost") && main.includes("SkaiDesktop.AgentHost"), "Electron must launch a bundled Agent Host when packaged");
 expect(packageScript.includes("dotnet\", [\"publish\"") && packageScript.includes("PublishSingleFile=true"), "Electron packaging must publish a self-contained Agent Host");
 expect(packageScript.includes("electronDist") && packageScript.includes("const appRoot = path.join(outputRoot, \"resources\", \"app\")"), "Electron packaging must stage the renderer and runtime files");
 expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("mainTarget") && smokeScript.includes("petTarget") && smokeScript.includes("Primary navigation") && smokeScript.includes(".pet-window-root") && smokeScript.includes("pet-window-sprite") && smokeScript.includes("smoke-silence.wav"), "Electron packaged smoke must inspect the main navigation, local audio, and separate Percy surfaces");

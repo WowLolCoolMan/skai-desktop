@@ -9,7 +9,7 @@ public static class ProductIdentity
 
     // Stable protocol identifier for outbound User-Agent headers. This is intentionally
     // independent from the display name and must not change during a visual rebrand.
-    public const string UserAgentProduct = "ServerRockAI";
+    public const string UserAgentProduct = "SkaiDesktop";
     public const string UserAgentVersion = "1.0";
 
     public static string UserAgent(string surface) =>
@@ -17,8 +17,11 @@ public static class ProductIdentity
 
     // Stable storage identifiers are intentionally independent from the display name so a
     // future rebrand does not strand existing protected GitHub credentials or keyring entries.
-    public const string GitHubCredentialEntropy = "Server Rock AI GitHub credential v1";
-    public const string GitHubCredentialLabel = "Server Rock AI GitHub";
+    public const string GitHubCredentialEntropy = "Skai Desktop GitHub credential v1";
+    public const string GitHubCredentialLabel = "Skai Desktop GitHub";
+
+    public static string DataDirectory(Environment.SpecialFolder folder) => Path.Combine(
+        Environment.GetFolderPath(folder, Environment.SpecialFolderOption.Create), "SkaiDesktop", "AI");
 
     /// <summary>Safe lower-case filename stem derived from the current short product name.</summary>
     public static string FileNameStem => new string(ShortName

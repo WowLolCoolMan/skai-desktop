@@ -6,7 +6,7 @@ internal static class McpConnectionRegistryTests
 {
     public static void Run()
     {
-        var path = Path.Combine(Path.GetTempPath(), "server-rock-mcp-" + Guid.NewGuid().ToString("N"), "connections.json");
+        var path = Path.Combine(Path.GetTempPath(), "skai-mcp-" + Guid.NewGuid().ToString("N"), "connections.json");
         try
         {
         var registry = new McpConnectionRegistry(new McpConnectionStore(path));

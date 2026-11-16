@@ -16,7 +16,7 @@ public sealed class JsonSettingsStore
     {
         _path = path ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
-            "ServerRock", "AI", "settings.json");
+            "SkaiDesktop", "AI", "settings.json");
     }
 
     public AppSettings Load()

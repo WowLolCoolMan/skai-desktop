@@ -26,5 +26,10 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest"
+  },
+  "overrides": {
+    "monaco-editor": {
+      "dompurify": "3.4.18"
+    }
   }
 }

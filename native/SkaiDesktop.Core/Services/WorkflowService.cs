@@ -15,7 +15,7 @@ public sealed class WorkflowService
     private readonly string _path;
 
     public WorkflowService(string? path = null) => _path = path ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "workflows.json");
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "SkaiDesktop", "AI", "workflows.json");
 
     public IReadOnlyList<string> Validate(WorkflowDefinition workflow)
     {

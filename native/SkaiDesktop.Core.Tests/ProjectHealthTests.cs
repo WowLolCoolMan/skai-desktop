@@ -10,7 +10,7 @@ internal static class ProjectHealthTests
 {
     public static async Task RunAsync()
     {
-        var healthRoot = Path.Combine(Path.GetTempPath(), "server-rock-health-test-" + Guid.NewGuid().ToString("N"));
+        var healthRoot = Path.Combine(Path.GetTempPath(), "skai-health-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(healthRoot);
         try
         {
@@ -25,12 +25,12 @@ internal static class ProjectHealthTests
         }
         finally { if (Directory.Exists(healthRoot)) Directory.Delete(healthRoot, recursive: true); }
 
-        var safetyRoot = Path.Combine(Path.GetTempPath(), "server-rock-health-safety-" + Guid.NewGuid().ToString("N"));
+        var safetyRoot = Path.Combine(Path.GetTempPath(), "skai-health-safety-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(safetyRoot);
         try
         {
             await File.WriteAllTextAsync(Path.Combine(safetyRoot, "MainPage.xaml.cs"), new string('x', 400_000));
-            var outside = Path.Combine(Path.GetTempPath(), "server-rock-health-outside-" + Guid.NewGuid().ToString("N") + ".cs");
+            var outside = Path.Combine(Path.GetTempPath(), "skai-health-outside-" + Guid.NewGuid().ToString("N") + ".cs");
             await File.WriteAllTextAsync(outside, "var access_token=\"must-not-be-read\";");
             try
             {

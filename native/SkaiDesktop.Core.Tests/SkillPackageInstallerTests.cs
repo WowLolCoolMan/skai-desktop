@@ -5,7 +5,7 @@ internal static class SkillPackageInstallerTests
 {
     public static void Run()
     {
-        var root = Path.Combine(Path.GetTempPath(), "server-rock-skills-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "skai-skills-" + Guid.NewGuid().ToString("N"));
         var source = Path.Combine(root, "source");
         Directory.CreateDirectory(source);
         File.WriteAllText(Path.Combine(source, "skill.json"), JsonSerializer.Serialize(new { id = "review-skill", name = "Review skill", version = "1.0.0", publisher = "Test publisher", requiredPermissions = new[] { "project.read" } }));

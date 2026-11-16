@@ -8,7 +8,7 @@ internal static class OperationServiceTests
 {
     public static void Run()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"server-rock-operation-service-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"skai-operation-service-{Guid.NewGuid():N}.json");
         try
         {
             var service = new OperationService(new OperationJournal(path));

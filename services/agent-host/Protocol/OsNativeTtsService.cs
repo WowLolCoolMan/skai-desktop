@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 
-namespace ServerRock.AgentHost.Protocol;
+namespace SkaiDesktop.AgentHost.Protocol;
 
 /// <summary>
 /// Starts and interrupts the operating system's local text-to-speech process.

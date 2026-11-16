@@ -138,7 +138,7 @@ async function main() {
   const seedProject = fs.mkdtempSync(path.join(temp, "project-with-an-exceptionally-long-folder-name-for-layout-testing-"));
   fs.writeFileSync(path.join(seedProject, "README.md"), `# Seed\n${longWord}\n`);
   const seeded = await cdp.evaluate(`(async () => {
-    const r = (m, p) => window.serverRockAgent.request(m, p);
+    const r = (m, p) => window.skaiAgent.request(m, p);
     const ok = [];
     ok.push((await r("conversation.save", { title: ${JSON.stringify(longTitle)}, messages: [{ role: "user", content: ${JSON.stringify(`Unbroken token: ${longWord}`)} }, { role: "assistant", content: ${JSON.stringify("Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40))} }] })).ok);
     ok.push((await r("conversation.save", { title: ${JSON.stringify(longWord)}, messages: [{ role: "user", content: "short" }] })).ok);

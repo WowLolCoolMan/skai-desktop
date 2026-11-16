@@ -7,7 +7,7 @@
 #
 # Installs to ${XDG_DATA_HOME:-~/.local/share}/skai-desktop, adds an app-launcher
 # entry and a `skai-desktop` command in ~/.local/bin. Your chats and settings live
-# in ~/.config/ServerRock and ~/.config/skai-desktop and are never touched here.
+# in ~/.config/SkaiDesktop and ~/.config/skai-desktop and are never touched here.
 set -euo pipefail
 
 SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -22,7 +22,7 @@ public sealed class AgentTaskArtifactStore
 
     public AgentTaskArtifactStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "agent-tasks.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "SkaiDesktop", "AI", "agent-tasks.json");
     }
 
     public IReadOnlyList<AgentTaskArtifact> Load()
@@ -40,7 +40,7 @@ public sealed class AgentTaskArtifactStore
         }
     }
 
-    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false)
+    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null)
     {
         var now = DateTimeOffset.UtcNow;
         var task = new AgentTaskArtifact
@@ -50,6 +50,8 @@ public sealed class AgentTaskArtifactStore
             Role = Normalize(role, MaxRoleCharacters, "task role"),
             RequiresApproval = requiresApproval,
             ParentRunId = NormalizeOptional(parentRunId, 128, "parent run ID"),
+            ProjectId = NormalizeOptional(projectId, 128, "project ID"),
+            ConversationId = NormalizeOptional(conversationId, 128, "conversation ID"),
             DependsOn = NormalizeIds(dependsOn),
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -289,6 +291,8 @@ public sealed class AgentTaskArtifactStore
             Normalize(task.Instruction, MaxInstructionCharacters, "task instruction");
             Normalize(task.Role, MaxRoleCharacters, "task role");
             NormalizeOptional(task.ParentRunId, 128, "parent run ID");
+            NormalizeOptional(task.ProjectId, 128, "project ID");
+            NormalizeOptional(task.ConversationId, 128, "conversation ID");
             NormalizeIds(task.DependsOn);
             if (task.DependsOn.Any(id => !ids.Contains(id)) || task.DependsOn.Contains(task.Id, StringComparer.Ordinal)) throw new InvalidDataException("The agent task store contains an invalid dependency.");
             if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Running or AgentTaskStatuses.Verifying or AgentTaskStatuses.Completed or AgentTaskStatuses.Failed or AgentTaskStatuses.Cancelled or AgentTaskStatuses.Blocked)) throw new InvalidDataException("The agent task store contains an invalid status.");
@@ -334,6 +338,8 @@ public sealed class AgentTaskArtifactStore
     {
         Id = source.Id,
         ParentRunId = source.ParentRunId,
+        ProjectId = source.ProjectId,
+        ConversationId = source.ConversationId,
         Title = source.Title,
         Instruction = source.Instruction,
         Role = source.Role,
@@ -342,6 +348,7 @@ public sealed class AgentTaskArtifactStore
         DependsOn = source.DependsOn.ToList(),
         ResultSummary = source.ResultSummary,
         ArtifactLabels = source.ArtifactLabels.ToList(),
+        ChangedFiles = source.ChangedFiles.ToList(),
         WorktreePath = source.WorktreePath,
         WorktreeBranch = source.WorktreeBranch,
         WorktreeRepositoryRoot = source.WorktreeRepositoryRoot,

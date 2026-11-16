@@ -7,8 +7,8 @@ internal static class ChatMessageQueueStoreTests
 {
     public static void Run()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"server-rock-queue-{Guid.NewGuid():N}.json");
-        var environmentPath = Path.Combine(Path.GetTempPath(), $"server-rock-queue-env-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"skai-queue-{Guid.NewGuid():N}.json");
+        var environmentPath = Path.Combine(Path.GetTempPath(), $"skai-queue-env-{Guid.NewGuid():N}.json");
         var previousEnvironmentPath = Environment.GetEnvironmentVariable("SRAI_QUEUE_PATH");
         try
         {

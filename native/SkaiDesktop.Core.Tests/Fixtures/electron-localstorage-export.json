@@ -1,5 +1,5 @@
 {
-  "format": "server-rock-electron-localstorage-v1",
+  "format": "skai-electron-localstorage-v1",
   "exportedAt": "2026-11-05T00:00:00.000Z",
   "activePage": "chat",
   "agentMode": "chat",

@@ -12,7 +12,7 @@ const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-project-editor-smok
 const workspace = path.join(tempRoot, "workspace");
 fs.mkdirSync(workspace, { recursive: true });
 fs.writeFileSync(path.join(workspace, "README.md"), "before edit\n");
-const child = spawn("dotnet", ["run", "--project", path.join(root, "services", "agent-host", "ServerRock.AgentHost.csproj"), "--no-build", "--", "--stdio"], {
+const child = spawn("dotnet", ["run", "--project", path.join(root, "services", "agent-host", "SkaiDesktop.AgentHost.csproj"), "--no-build", "--", "--stdio"], {
   cwd: root,
   env: { ...process.env, SRAI_PROJECTS_PATH: path.join(tempRoot, "projects.json"), SRAI_UNDO_PATH: path.join(tempRoot, "undo.json") },
   stdio: ["pipe", "pipe", "pipe"],

@@ -6,7 +6,7 @@ internal static class ReadOnlyWorkspaceAdapterTests
 {
     public static void Run()
     {
-        var root = Path.Combine(Path.GetTempPath(), $"server-rock-read-adapter-{Guid.NewGuid():N}");
+        var root = Path.Combine(Path.GetTempPath(), $"skai-read-adapter-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         try
         {

@@ -24,7 +24,7 @@ public sealed class AppLogService
     public AppLogService(string? directory = null)
     {
         Directory = Path.GetFullPath(directory ?? Environment.GetEnvironmentVariable("SRAI_LOG_DIRECTORY") ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "logs"));
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "SkaiDesktop", "AI", "logs"));
         System.IO.Directory.CreateDirectory(Directory);
     }
 
@@ -40,8 +40,8 @@ public sealed class AppLogService
         var destination = Path.GetFullPath(destinationDirectory);
         DirectoryInfo? parent = System.IO.Directory.Exists(destination) ? new DirectoryInfo(destination) : new DirectoryInfo(Path.GetDirectoryName(destination)!);
         parent.Create();
-        var archive = Path.Combine(parent.FullName, "server-rock-logs-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + ".zip");
-        var stagingArchive = Path.Combine(Path.GetTempPath(), "server-rock-logs-" + Guid.NewGuid().ToString("N") + ".zip");
+        var archive = Path.Combine(parent.FullName, "skai-logs-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + ".zip");
+        var stagingArchive = Path.Combine(Path.GetTempPath(), "skai-logs-" + Guid.NewGuid().ToString("N") + ".zip");
         lock (_gate)
         {
             if (File.Exists(archive)) File.Delete(archive);
@@ -77,12 +77,12 @@ public sealed class AppLogService
         var line = $"{DateTimeOffset.UtcNow:O} [{level}] {Redact(category)}: {Redact(message)}{Environment.NewLine}";
         lock (_gate)
         {
-            var path = Path.Combine(Directory, "server-rock.log");
+            var path = Path.Combine(Directory, "skai.log");
             File.AppendAllText(path, line, new UTF8Encoding(false));
             var info = new FileInfo(path);
             if (info.Length > 2_000_000)
             {
-                var rotated = Path.Combine(Directory, "server-rock.previous.log");
+                var rotated = Path.Combine(Directory, "skai.previous.log");
                 File.Copy(path, rotated, overwrite: true);
                 File.WriteAllText(path, string.Empty, new UTF8Encoding(false));
             }

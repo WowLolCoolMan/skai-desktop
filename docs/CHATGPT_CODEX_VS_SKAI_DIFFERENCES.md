@@ -1,6 +1,6 @@
 # ChatGPT/Codex Desktop vs. Skai Desktop: Difference Register
 
-**Snapshot date:** 2026-11-15  
+**Snapshot date:** 2026-11-16
 **Audience:** Product, design, and engineering  
 **Purpose:** Record the material product, interaction, capability, privacy, and platform differences that affect how a person moves through either desktop app.
 
@@ -12,10 +12,12 @@ This register compares Skai's current Electron application with the current Chat
 
 ## Executive summary
 
+**Implementation note (2026-11-16):** The current working tree adds persisted workspace tabs, a Chat/Coding mode switch, an Extras flyout, a Settings overlay, project-linked coding conversations with in-thread task cards, project details editing, and persistent Marketplace model filters. The remaining planned gaps are tracked in [WORKFLOW_OVERHAUL_PLAN.md](WORKFLOW_OVERHAUL_PLAN.md). Several lower sections still describe the baseline captured on 2026-11-15; consult the plan's implementation snapshot for the current changed paths until each comparison section is refreshed.
+
 The largest difference is the **work loop**:
 
 - **Codex:** choose a project, start or resume a project conversation, direct the agent, inspect its work and diffs in that same conversation, then steer or request changes without losing project context.
-- **Skai:** choose a local project, open its Coding Workspace, browse or edit files, create a proposed task, and move to Agent Workbench to review task state. General chat is another route. The Coding Workspace does not yet provide the same project-scoped agent conversation and end-to-end review loop.
+- **Skai:** choose a local project and work in a project-linked conversation alongside its files and Git review; direct task dispatch and compact run cards are now connected. The planned Codex-like three-pane change inspector, persistent per-thread queue, and capacity-aware multi-run controls are still incomplete.
 
 Skai's core distinction is deliberate: **local-first execution and explicit local boundaries**. It supports local models, guarded project files and terminal operations, local memory, and Linux packaging. ChatGPT/Codex is an account-based product with hosted ChatGPT and Codex models, cloud features, project and app integrations, and cross-device workflows where available.
 
@@ -23,11 +25,11 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 
 | Stage | ChatGPT/Codex desktop | Skai Desktop | User-facing difference |
 |---|---|---|---|
-| Choose an experience | Switch between ChatGPT and Codex; ChatGPT itself has Chat and Work modes. | Use the Skai rail for Chat, Images, Usage, Marketplace, and Settings; secondary destinations live under Quick Actions. | Skai groups its own tools in one local app. It does not provide separate ChatGPT-style Chat/Work/Codex modes. |
-| Find prior work | Chat and Work share Recents; Codex history remains separate. ChatGPT search can find chats, projects, and files. | Sidebar lists recent chats and a short project list; there is also a project directory and a command palette. | Skai has separate conversation/project discovery surfaces. It does not provide unified cross-type search comparable to ChatGPT's documented search. |
-| Start project work | Open a project and start Chat or Work with its project context; in Codex, open a project conversation and prompt the agent. | Open Projects, select a project, enter Coding Workspace, then use its task planner or leave for general Chat. | Skai's task brief is a proposed task. It is not a project conversation that directly dispatches and follows model-directed code work. |
-| Follow progress | The thread remains the center; changes, outputs, subagents, sources, and background activity are available in the task context. | Coding shows files, Git state, and recent task activity; planned tasks and their actions are handled in Agent Workbench. | Skai requires more route changes to see the request, execution state, and code review together. |
-| Review and iterate | Review changes in context, comment or edit diffs, and continue steering in the thread. | Open files or Git diff in Coding; navigate to Workbench for task artifacts and lifecycle actions. | Skai's review surface is split across file/Git and task pages and is not attached to the originating chat response. |
+| Choose an experience | Switch between ChatGPT and Codex; ChatGPT itself has Chat and Work modes. | Use Skai's Home, Images, Usage, Marketplace, Extras, and Settings destinations; Chatting and Coding Agent modes have separate thread lists. | Skai is a local-first workspace with fewer global destinations; it does not provide ChatGPT account-backed Chat/Work/Codex surfaces. |
+| Find prior work | Chat and Work share Recents; Codex history remains separate. ChatGPT search can find chats, projects, and files. | Persisted workspace tabs keep active sessions open; sidebar mode switches between chat and coding threads, with a Projects list in Coding Agent mode. | Skai now restores session tabs, but search and history behavior still differ from ChatGPT's account-wide search. |
+| Start project work | Open a project and start Chat or Work with its project context; in Codex, open a project conversation and prompt the agent. | Open a project-linked Coding Agent session; its conversation is embedded beside project files and Git state, and Send dispatches task work. | Skai now connects project context and a coding conversation; multi-folder and local-only behavior differ from ChatGPT's synced projects. |
+| Follow progress | The thread remains the center; changes, outputs, subagents, sources, and background activity are available in the task context. | Compact task status and result cards appear in the project conversation; task artifacts remain reviewable there. | Skai has not yet unified live progress, logs, approvals, queued prompts, and capacity status into a complete Codex-like thread flow. |
+| Review and iterate | Review changes in context, comment or edit diffs, and continue steering in the thread. | Project files, Monaco editor, Git status/diff, and terminal remain available in the project session beside its conversation. | Skai's planned three-pane layout and contextual right-side change inspector are not complete; several review actions still use existing project panels. |
 
 ## Difference register
 
@@ -256,3 +258,9 @@ The full evidence-backed status is maintained in [CAPABILITY_MATRIX.md](CAPABILI
 - Update Skai status from source/tests and the capability matrix, not from the appearance of a menu item or a successful build alone.
 - When comparing a screenshot, record its capture date and distinguish it from current product behavior.
 - Keep the comparison focused on interaction and capability. Skai should borrow the Codex project's continuity and review hierarchy while keeping its own brand and local-first trust model.
+
+## Implementation update — 2026-11-16
+
+The workflow redesign is underway. Skai now has persisted chat/project session tabs, an Extras flyout in place of Quick Actions, and a Settings overlay that leaves the selected workspace underneath. Coding Agent Send starts a local task directly, task records retain their project/conversation IDs, and the conversation can show task status, results, file labels, Stop/Retry, and Review changes. The task executor can read/write project files with the existing hash checks and undo journal, and can run bounded project commands. Old Workbench links are redirected into the conversation/coding surface.
+
+These changes narrow the original page-handoff gap, but do not yet complete the intended Codex-like experience. The project workspace still needs its final three-pane layout and responsive drawers; queued follow-ups and scheduled runs are not yet scoped to a project conversation; Marketplace still contains duplicate catalog/hub navigation; live capacity-aware scheduling and AirLLM queue handoff are not complete; and the current-tree legacy-name/data migration is still outstanding. See [Workflow Overhaul Plan](WORKFLOW_OVERHAUL_PLAN.md) for the accepted requirements, sequence, and acceptance criteria.

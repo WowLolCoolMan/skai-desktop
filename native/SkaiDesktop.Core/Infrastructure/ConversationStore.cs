@@ -18,7 +18,7 @@ public sealed class ConversationStore
     {
         _path = path ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
-            "ServerRock", "AI", "conversations.json");
+            "SkaiDesktop", "AI", "conversations.json");
     }
 
     public List<ChatSession> Load()

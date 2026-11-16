@@ -5,7 +5,7 @@ internal static class ScheduledTaskTests
 {
     public static void Run()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "server-rock-scheduled-" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(Path.GetTempPath(), "skai-scheduled-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         var store = new ScheduledTaskStore(Path.Combine(directory, "scheduled.json"));
         var now = DateTimeOffset.UtcNow;

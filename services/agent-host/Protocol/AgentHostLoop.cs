@@ -3,7 +3,7 @@ using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
 using SkaiDesktop.Core.Services;
 
-namespace ServerRock.AgentHost.Protocol;
+namespace SkaiDesktop.AgentHost.Protocol;
 
 public static class AgentHostLoop
 {
@@ -28,6 +28,7 @@ public static class AgentHostLoop
 
     public static async Task RunAsync(Stream input, Stream output, CancellationToken cancellationToken = default)
     {
+        LegacyDataMigration.MigrateLocalData();
         using var reader = new StreamReader(input);
         await using var writer = new StreamWriter(output) { AutoFlush = true };
         using var voice = new OsNativeTtsService();
@@ -77,7 +78,8 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
+                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
+            "system.capacity" => GetLocalCapacity(request),
             "airllm.status" => GetAirLlmStatus(request),
             "airllm.install.start" => StartAirLlmInstall(request),
             "airllm.install.status" => GetAirLlmInstallStatus(request),
@@ -143,6 +145,7 @@ public static class AgentHostLoop
             "settings.get" => GetSettings(request),
             "settings.save" => SaveSettings(request),
             "image.generate" => GenerateImageAsync(request).GetAwaiter().GetResult(),
+            "pet.background.remove" => RemovePetBackgroundAsync(request).GetAwaiter().GetResult(),
             "image.models.list" => ListImageCheckpointsAsync(request).GetAwaiter().GetResult(),
             "chat.complete" => CompleteChatAsync(request).GetAwaiter().GetResult(),
             "skills.list" => ListSkills(request),
@@ -171,6 +174,12 @@ public static class AgentHostLoop
             "marketplace.models.install.cancel" => CancelMarketplaceModelInstall(request),
             _ => new(ProtocolVersion, request.Id, false, Error: new("METHOD_NOT_FOUND", $"Unknown method '{request.Method}'.")),
         };
+    }
+
+    private static AgentResponse GetLocalCapacity(AgentRequest request)
+    {
+        var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
+        return new(ProtocolVersion, request.Id, true, snapshot);
     }
 
     private static AgentResponse GetAirLlmStatus(AgentRequest request)
@@ -1282,6 +1291,9 @@ public static class AgentHostLoop
                 id = task.Id,
                 title = task.Title,
                 instruction = task.Instruction,
+                projectId = task.ProjectId,
+                conversationId = task.ConversationId,
+                changedFiles = task.ChangedFiles,
                 role = task.Role,
                 status = task.Status,
                 resultSummary = task.ResultSummary,
@@ -1304,7 +1316,9 @@ public static class AgentHostLoop
             RequiredBoundedString(request, "title", AgentTaskArtifactStore.MaxTitleCharacters),
             RequiredBoundedString(request, "instruction", AgentTaskArtifactStore.MaxInstructionCharacters),
             OptionalString(request, "role") ?? "specialist",
-            requiresApproval: request.Params?.TryGetProperty("requiresApproval", out var requiresApproval) == true && requiresApproval.ValueKind == JsonValueKind.True);
+            requiresApproval: request.Params?.TryGetProperty("requiresApproval", out var requiresApproval) == true && requiresApproval.ValueKind == JsonValueKind.True,
+            projectId: OptionalString(request, "projectId"),
+            conversationId: OptionalString(request, "conversationId"));
         return new(ProtocolVersion, request.Id, true, new
         {
             id = task.Id,
@@ -1349,27 +1363,90 @@ public static class AgentHostLoop
         await executor.ExecuteAsync(taskId, async (task, cancellationToken) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var messages = new[]
+            var project = task.ProjectId is null ? null : CreateProjectStore().Load().SingleOrDefault(item => item.Id == task.ProjectId)
+                ?? throw new InvalidOperationException("The project linked to this thread is no longer available.");
+            var root = project?.FolderPaths.FirstOrDefault();
+            if (project is not null && string.IsNullOrWhiteSpace(root)) throw new InvalidOperationException("Select a local project folder before starting a coding task.");
+            var editor = new WorkspaceFileEditor();
+            var undoStore = CreateUndoStore();
+            var changedFiles = new List<string>();
+            var commandCount = 0;
+            IReadOnlyList<WorkspaceFileContext.WorkspaceTextFileEntry> files = project is null
+                ? Array.Empty<WorkspaceFileContext.WorkspaceTextFileEntry>()
+                : WorkspaceFileContext.EnumerateTextFileBrowser(project.FolderPaths).Files;
+            var system = project is null
+                ? "You are Skai's local coding agent. Work only from the user's prompt; do not claim file edits or commands. Return exactly one JSON object: {\"action\":\"done\",\"summary\":\"...\"}."
+                : "You are Skai's local coding agent. Return exactly one JSON object and no markdown. Actions: {\"action\":\"read_file\",\"path\":\"relative/path\"}; {\"action\":\"write_file\",\"path\":\"relative/path\",\"content\":\"complete file text\",\"expectedHash\":\"current hash or null for a new file\"}; {\"action\":\"run_command\",\"command\":\"...\",\"cwd\":\".\"}; {\"action\":\"done\",\"summary\":\"...\"}. Use the provided workspace paths. Read files before editing. Never claim an action before its result is returned. Keep edits focused. You may make at most 12 file or command actions, and at most 3 commands. Commands run in the selected project folder with a two-minute timeout. If an operation fails, adapt or report it honestly.";
+            var messages = new List<ChatMessage>
             {
-                new ChatMessage("system", "You are executing a local task for Skai Desktop. Return a concise, truthful result. Do not claim to edit files, run tools, or complete external actions; this execution path currently provides model reasoning only."),
-                new ChatMessage("user", task.Instruction),
+                new("system", system),
+                new("user", $"Task: {task.Instruction}\n\nProject: {project?.Name ?? "No project selected"}\n\nReadable project files:\n{string.Join("\n", files.Select(file => $"- {file.RelativePath} ({file.Bytes} bytes)"))}"),
             };
-            var parameters = JsonSerializer.SerializeToElement(new
+            string? summary = null;
+            for (var step = 0; step < 13; step++)
             {
-                endpoint = settings.Endpoint,
-                provider = settings.ModelProvider,
-                model = settings.Model,
-                timeoutSeconds = 5,
-                messages,
-            }, JsonOptions);
-            var response = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"task-{task.Id}", "chat.complete", parameters), cancellationToken);
-            if (!response.Ok)
-                throw new InvalidOperationException(response.Error?.Message ?? "The local model could not complete the task.");
-
-            var result = JsonSerializer.SerializeToElement(response.Result, JsonOptions);
-            var content = result.TryGetProperty("content", out var contentValue) ? contentValue.GetString() : null;
-            if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException("The local model returned an empty task result.");
-            return new AgentTaskExecutionResult(content.Trim(), ["local-model-response"]);
+                cancellationToken.ThrowIfCancellationRequested();
+                var parameters = JsonSerializer.SerializeToElement(new
+                {
+                    endpoint = settings.Endpoint,
+                    provider = settings.ModelProvider,
+                    model = settings.Model,
+                    timeoutSeconds = 285,
+                    messages,
+                }, JsonOptions);
+                var response = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"task-{task.Id}-{step}", "chat.complete", parameters), cancellationToken);
+                if (!response.Ok) throw new InvalidOperationException(response.Error?.Message ?? "The local model could not complete the task.");
+                var responseJson = JsonSerializer.SerializeToElement(response.Result, JsonOptions);
+                var content = responseJson.TryGetProperty("content", out var contentValue) ? contentValue.GetString() : null;
+                if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException("The local model returned an empty coding-agent action.");
+                messages.Add(new ChatMessage("assistant", content));
+                using var actionDocument = JsonDocument.Parse(content);
+                var action = actionDocument.RootElement;
+                var actionName = action.TryGetProperty("action", out var actionValue) ? actionValue.GetString() : null;
+                if (actionName == "done")
+                {
+                    summary = action.TryGetProperty("summary", out var summaryValue) ? summaryValue.GetString() : null;
+                    break;
+                }
+                if (step >= 12) throw new InvalidOperationException("The coding agent reached its 12-action limit before finishing.");
+                if (project is null || root is null) throw new InvalidOperationException("This coding thread has no project. Choose a project before asking it to change files.");
+                switch (actionName)
+                {
+                    case "read_file":
+                    {
+                        var path = action.GetProperty("path").GetString() ?? throw new InvalidOperationException("The model omitted the file path.");
+                        var text = editor.ReadText(root, path);
+                        messages.Add(new ChatMessage("user", $"READ RESULT for {path}:\n{text}"));
+                        break;
+                    }
+                    case "write_file":
+                    {
+                        var path = action.GetProperty("path").GetString() ?? throw new InvalidOperationException("The model omitted the file path.");
+                        var text = action.GetProperty("content").GetString() ?? throw new InvalidOperationException("The model omitted the file content.");
+                        var expectedHash = action.TryGetProperty("expectedHash", out var hashValue) && hashValue.ValueKind == JsonValueKind.String ? hashValue.GetString() : null;
+                        var receipt = editor.Apply(root, path, text, expectedHash);
+                        var undoId = Guid.NewGuid().ToString("N");
+                        undoStore.Add(undoStore.Load(), new WorkspaceUndoEntry(undoId, DateTimeOffset.UtcNow, project.Name, root, path, receipt.PreviousContent, receipt.AppliedHash));
+                        if (!changedFiles.Contains(path, StringComparer.Ordinal)) changedFiles.Add(path);
+                        messages.Add(new ChatMessage("user", $"WRITE RESULT for {path}: applied successfully; undo ID {undoId}; current hash {receipt.AppliedHash}."));
+                        break;
+                    }
+                    case "run_command":
+                    {
+                        if (++commandCount > 3) throw new InvalidOperationException("The coding agent reached its 3-command limit.");
+                        var command = action.GetProperty("command").GetString() ?? throw new InvalidOperationException("The model omitted the command.");
+                        var cwd = action.TryGetProperty("cwd", out var cwdValue) ? cwdValue.GetString() ?? "." : ".";
+                        var result = await new WorkspaceCommandRunner().RunAsync(root, cwd, command, TimeSpan.FromMinutes(2), cancellationToken);
+                        messages.Add(new ChatMessage("user", $"COMMAND RESULT (exit {result.ExitCode}, timed out: {result.TimedOut}):\n{result.Output}"));
+                        break;
+                    }
+                    default:
+                        throw new InvalidOperationException("The local model returned an unsupported coding-agent action. Ask it again with one valid JSON action.");
+                }
+            }
+            if (string.IsNullOrWhiteSpace(summary)) throw new InvalidOperationException("The local model did not return a final summary.");
+            var labels = changedFiles.Count == 0 ? new[] { "local-model-response" } : changedFiles.ToArray();
+            return new AgentTaskExecutionResult(summary.Trim(), labels);
         }).ConfigureAwait(false);
     }
 
@@ -1782,6 +1859,7 @@ public static class AgentHostLoop
             reduceMotion = settings.ReduceMotion,
             developerMode = settings.DeveloperMode,
             memoryInjectionEnabled = settings.MemoryInjectionEnabled,
+            smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled,
         });
     }
 
@@ -1821,11 +1899,21 @@ public static class AgentHostLoop
                 settings.DeveloperMode = developer.GetBoolean();
             if (parameters.TryGetProperty("memoryInjectionEnabled", out var memoryInjection) && memoryInjection.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 settings.MemoryInjectionEnabled = memoryInjection.GetBoolean();
+            if (parameters.TryGetProperty("smartPromptRewritingEnabled", out var smartPromptRewriting) && smartPromptRewriting.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                settings.SmartPromptRewritingEnabled = smartPromptRewriting.GetBoolean();
             if (parameters.TryGetProperty("reduceMotion", out var reduceMotion) && reduceMotion.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 settings.ReduceMotion = reduceMotion.GetBoolean();
         }
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled });
+        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled });
+    }
+
+    private static async Task<AgentResponse> RemovePetBackgroundAsync(AgentRequest request)
+    {
+        var image = RequiredBoundedString(request, "image", 8_400_000);
+        var mediaType = RequiredBoundedString(request, "mediaType", 32);
+        var result = await new DiffusersImageProvider().RemovePetBackgroundAsync(image, mediaType).ConfigureAwait(false);
+        return new(ProtocolVersion, request.Id, true, new { image = result.DataUrl, fileName = result.FileName, progress = "Background removed locally with U2Net." });
     }
 
     private static async Task<AgentResponse> GenerateImageAsync(AgentRequest request)

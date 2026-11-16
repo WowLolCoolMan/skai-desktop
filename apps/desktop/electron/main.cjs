@@ -31,8 +31,8 @@ const windowPositioningAvailable = canPositionWindows(displayBackend);
 if (process.platform === "linux" && !relaunchingForDisplayBackend) console.log(`[windowing] display backend: ${displayBackend.backend} (${displayBackend.reason})`);
 
 const repoRoot = path.resolve(__dirname, "../../..");
-const hostProject = path.join(repoRoot, "services", "agent-host", "ServerRock.AgentHost.csproj");
-const hostBinary = process.platform === "win32" ? "ServerRock.AgentHost.exe" : "ServerRock.AgentHost";
+const hostProject = path.join(repoRoot, "services", "agent-host", "SkaiDesktop.AgentHost.csproj");
+const hostBinary = process.platform === "win32" ? "SkaiDesktop.AgentHost.exe" : "SkaiDesktop.AgentHost";
 const packagedRoot = path.join(process.resourcesPath, "app");
 const packagedHost = path.join(process.resourcesPath, "agent-host", hostBinary);
 const packagedRuntime = fsSync.existsSync(path.join(packagedRoot, "dist", "index.html")) && fsSync.existsSync(packagedHost);
@@ -313,7 +313,8 @@ function makePetBehaviorWalk(fromBounds, toBounds, speed = 380) {
   const cells = PetWanderPlanner.planPath(startCell, targetCell, blocked);
   const waypoints = cells.map((cell) => grid.petPositionFor(cell));
   if (waypoints.length === 0 && (Math.abs(start.x - target.x) > 2 || Math.abs(start.y - target.y) > 2)) waypoints.push(target);
-  return waypoints.length > 0 ? new PetWalk(start, waypoints, speed) : null;
+  const walk = waypoints.length > 0 ? new PetWalk(start, waypoints, speed) : null;
+  return walk;
 }
 
 function movePetForBehavior(mode, targetBounds) {
@@ -498,7 +499,10 @@ async function startPetWander() {
   if (petMotion.interactionDemo && process.platform === "win32") {
     let excludedHandle = "0";
     try { excludedHandle = petWindow.getNativeWindowHandle().readBigUInt64LE(0).toString(); } catch {}
-    const visibleWindows = await listVisibleWindows(excludedHandle);
+    let visibleWindows = [];
+    try { visibleWindows = await listVisibleWindows(excludedHandle); }
+    catch { visibleWindows = []; }
+    finally { petWanderPlanning = false; }
     if (planSequence !== petWanderPlanSequence || !petMotion.wander || !petMotion.interactionDemo || petDragOffset) return;
     demoTarget = petDemoShelfTarget(area, grid, visibleWindows);
   }
@@ -807,7 +811,7 @@ function createPetWindow() {
     // awesome, and Hyprland/Sway for XWayland clients) float Percy instead of
     // tiling it into the layout.
     ...(process.platform === "linux" ? { type: "toolbar" } : {}),
-    title: "Percy · Skai companion",
+    title: "Skai Desktop · Pets",
     transparent: !petOpaque,
     frame: false,
     resizable: false,
@@ -852,7 +856,7 @@ function createPetWindow() {
   // On native Wayland, dragging is handed to the compositor (app-region drag →
   // xdg_toplevel.move) because the app can neither read nor set its position.
   const petQuery = { pet: "1", ...(process.env.SKAI_RIG_PET === "1" ? { rig: "1" } : {}), ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
-  const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
+  const devUrl = process.env.SKAI_DESKTOP_RENDERER_URL;
   if (devUrl) {
     const url = new URL(devUrl);
     for (const [key, value] of Object.entries(petQuery)) url.searchParams.set(key, value);
@@ -943,7 +947,7 @@ function setTrayMenu(conversations = []) {
     { type: "separator" },
     { label: "Recent chats", submenu: recentConversationMenuItems(conversations) },
     { type: "separator" },
-    { label: petVisible ? "Hide Percy" : "Show Percy", click: () => setPetVisible(!petVisible) },
+    { label: petVisible ? "Hide all pets" : "Show all pets", click: () => setPetVisible(!petVisible) },
     { type: "separator" },
     { label: "Quit Skai Desktop", click: () => app.quit() },
   ]));
@@ -1040,7 +1044,7 @@ function scheduleUpdateCheck() {
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "tasks.list",
   "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get",
-  "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
+  "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "plugins.directory", "plugins.download", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
@@ -1144,7 +1148,7 @@ function requestAgent(method, params) {
   return new Promise((resolve) => {
     const timeoutMs = method === "chat.complete"
       ? chatRequestTimeoutMs
-      : method === "image.generate"
+      : method === "image.generate" || method === "pet.background.remove"
         ? imageGenerationRequestTimeoutMs
         : standardRequestTimeoutMs;
     const timer = setTimeout(() => {
@@ -1176,6 +1180,11 @@ function createWindow() {
     height: 900,
     minWidth: 960,
     minHeight: 640,
+    autoHideMenuBar: true,
+    ...(process.platform === "win32" ? {
+      titleBarStyle: "hidden",
+      titleBarOverlay: { color: "#10141d", symbolColor: "#aab0bf", height: 48 },
+    } : {}),
     backgroundColor: "#10141d",
     icon: resolveAppIconPath() || undefined,
     webPreferences: {
@@ -1185,8 +1194,9 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
     },
   });
+  mainWindow.setMenuBarVisibility(false);
 
-  const devUrl = process.env.SERVER_ROCK_RENDERER_URL;
+  const devUrl = process.env.SKAI_DESKTOP_RENDERER_URL;
   if (devUrl) mainWindow.loadURL(devUrl);
   else mainWindow.loadFile(path.join(rendererRoot, "dist", "index.html"));
   mainWindow.on("close", (event) => {
@@ -1267,7 +1277,7 @@ async function askCloseWithNativeDialog(trayAvailable) {
     title: "Close Skai Desktop",
     message: "Keep Skai running in the background?",
     detail: trayAvailable
-      ? "Skai stays in your system tray with Percy and the local agent host. Use the tray icon to reopen it or quit."
+      ? "Skai stays in your system tray with desktop pets and the local agent host. Use the tray icon to reopen it or quit."
       : "No system tray was found. Skai keeps running; launch it again from your app launcher to reopen the window.",
     checkboxLabel: "Remember my choice",
   });
@@ -1297,6 +1307,7 @@ function applyProductionContentSecurityPolicy() {
 
 app.whenReady().then(() => {
   if (relaunchingForDisplayBackend || !hasSingleInstanceLock) return;
+  Menu.setApplicationMenu(null);
   startAgentHost();
   const localMedia = new Map();
   ipcMain.handle("media:create-local-url", (event, payload) => {
@@ -1326,7 +1337,7 @@ app.whenReady().then(() => {
     } catch { /* Ignore malformed cleanup requests. */ }
     return true;
   });
-  if (!process.env.SERVER_ROCK_RENDERER_URL) applyProductionContentSecurityPolicy();
+  if (!process.env.SKAI_DESKTOP_RENDERER_URL) applyProductionContentSecurityPolicy();
   ipcMain.handle("agent:request", async (event, method, params) => {
     if (method === "workspace.pickFolder") {
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -1411,7 +1422,7 @@ app.whenReady().then(() => {
     if (!BrowserWindow.fromWebContents(event.sender) || typeof url !== "string") return false;
     let parsed;
     try { parsed = new URL(url); } catch { return false; }
-    if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") return false;
+    if (parsed.protocol !== "https:" || !["github.com", "huggingface.co"].includes(parsed.hostname)) return false;
     await shell.openExternal(parsed.toString());
     return true;
   });
@@ -1452,6 +1463,11 @@ app.whenReady().then(() => {
     if (!BrowserWindow.fromWebContents(event.sender)) return;
     const allowedStates = new Set(["idle", "thinking", "coding", "coding_malicious", "stuck", "needs-attention"]);
     if (typeof state !== "string" || !allowedStates.has(state)) return;
+    // Workspace activity is a higher-level source than a demo attack. If work
+    // starts, cancel the attack cleanly; an idle update must never interrupt an
+    // attack that is already in progress.
+    if (petBehaviorRunning && state === "idle") return;
+    if (petBehaviorRunning) stopPetBehavior(true);
     if (state === "idle" && petEntranceMoving) return;
     if (state === "idle") { schedulePetWander(); schedulePetBehaviorAttack(); }
     else { stopPetBehavior(true); stopPetWander(); }

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatAttachment, DesktopQueuedMessage, TaskEnvironment } from "../../../shared/contracts";
+import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
 import type { Message, Model, Route } from "../../app/types";
-import { Button, Card, EmptyState } from "../../components/ui/Primitives";
-import { EnvironmentPicker } from "../../components/ui/EnvironmentPicker";
+import { Button, Card, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
 import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { ModelPicker } from "../../components/ui/ModelPicker";
@@ -13,21 +12,11 @@ const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png"
 const CHAT_SCROLL_KEY_PREFIX = "skai.chat.scroll.";
 const CHAT_DRAFT_KEY_PREFIX = "skai.chat.draft.";
 const LEGACY_CHAT_DRAFT_KEY = "skai.chat.draft";
-const CHAT_TASK_PREFILL_KEY = "skai.chat.taskPrefill";
 
-type ChatTaskPrefill = { title: string; instruction: string; environment: TaskEnvironment };
-
-function takeTaskPrefill(): ChatTaskPrefill | null {
-  const raw = localStorage.getItem(CHAT_TASK_PREFILL_KEY);
-  if (!raw) return null;
-  localStorage.removeItem(CHAT_TASK_PREFILL_KEY);
-  try {
-    const value = JSON.parse(raw) as Partial<ChatTaskPrefill>;
-    if (typeof value.title !== "string" || typeof value.instruction !== "string") return null;
-    return { title: value.title.slice(0, 200), instruction: value.instruction.slice(0, 9000), environment: "local" };
-  } catch {
-    return null;
-  }
+function formatCapacityBytes(value: number | null | undefined) {
+  if (value == null) return "Unknown";
+  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
+  return `${(value / 1024 ** 2).toFixed(0)} MB`;
 }
 
 function chatScrollKey(conversationId: string | null) {
@@ -52,6 +41,8 @@ function readChatDraft(conversationId: string | null) {
 }
 
 type ChatPageProps = {
+  capacity: LocalCapacitySnapshot | null;
+  recentConversations: DesktopConversation[];
   provider: string;
   model: string;
   endpoint: string;
@@ -59,12 +50,15 @@ type ChatPageProps = {
   messages: Message[];
   busy: boolean;
   taskBusy: string | null;
+  tasks: DesktopTask[];
   attachments: ChatAttachment[];
   queuedMessages: DesktopQueuedMessage[];
   conversationId: string | null;
   conversationTitle: string;
   pinned: boolean;
   archived: boolean;
+  smartPromptRewritingEnabled: boolean;
+  onRewritePrompt: (draft: string) => Promise<string | null>;
   onSend: (text: string, attachments: ChatAttachment[], documentsOnly: boolean, speakReply?: boolean, temporary?: boolean) => void;
   onStartTemporaryChat: () => void;
   onQueue: (text: string, attachments: ChatAttachment[]) => void;
@@ -74,7 +68,9 @@ type ChatPageProps = {
   onRemoveAttachment: (index: number) => void;
   onModelChange: (model: Model) => void;
   onNavigate: (route: Route) => void;
-  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment) => Promise<boolean>;
+  onSelectConversation: (id: string) => void;
+  onNewWorkspaceTab: () => void;
+  onTaskAction: (id: string, operation: "cancel" | "retry") => void;
   onExport: () => void;
   onFork: () => void;
   onForkFromMessage: (index: number) => void;
@@ -86,19 +82,16 @@ type ChatPageProps = {
   workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ provider, model, endpoint, models, messages, busy, taskBusy, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onPlanTask, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, workspaceMode = "conversation" }: ChatPageProps) {
-  const [taskPrefill] = useState<ChatTaskPrefill | null>(takeTaskPrefill);
+export function ChatPage({ capacity, recentConversations, provider, model, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, workspaceMode = "conversation" }: ChatPageProps) {
   const [draft, setDraft] = useState(() => readChatDraft(conversationId));
   const [documentsOnly, setDocumentsOnly] = useState(false);
   const [temporaryChat, setTemporaryChat] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState<number | null>(null);
-  const [taskTitle, setTaskTitle] = useState(() => taskPrefill?.title ?? "");
-  const [taskInstruction, setTaskInstruction] = useState(() => taskPrefill?.instruction ?? "");
-  const [taskEnvironment, setTaskEnvironment] = useState<TaskEnvironment>(() => taskPrefill?.environment ?? "local");
-  const [taskComposerOpen, setTaskComposerOpen] = useState(() => Boolean(taskPrefill) || localStorage.getItem("skai.chat.taskComposerOpen") === "true");
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState(conversationTitle);
   const [renameBusy, setRenameBusy] = useState(false);
+  const [rewriteBusy, setRewriteBusy] = useState(false);
+  const [rewritePreview, setRewritePreview] = useState<{ original: string; candidate: string } | null>(null);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
@@ -106,6 +99,7 @@ export function ChatPage({ provider, model, endpoint, models, messages, busy, ta
   const restoreScrollPendingRef = useRef(false);
   const stickToLatestRef = useRef(true);
   const draftConversationRef = useRef(conversationId);
+  const threadTasks = tasks.filter((task) => task.conversationId === conversationId);
   useEffect(() => {
     if (draftConversationRef.current !== conversationId) {
       draftConversationRef.current = conversationId;
@@ -114,7 +108,6 @@ export function ChatPage({ provider, model, endpoint, models, messages, busy, ta
     }
     localStorage.setItem(chatDraftKey(conversationId), draft);
   }, [conversationId, draft]);
-  useEffect(() => { localStorage.setItem("skai.chat.taskComposerOpen", String(taskComposerOpen)); }, [taskComposerOpen]);
   useEffect(() => { if (!renameOpen) setRenameDraft(conversationTitle); }, [conversationTitle, renameOpen]);
   useEffect(() => { setDocumentsOnly(false); }, [conversationId]);
   useEffect(() => {
@@ -157,12 +150,26 @@ export function ChatPage({ provider, model, endpoint, models, messages, busy, ta
     messageListRef.current?.scrollTo({ top: messageListRef.current.scrollHeight, behavior: "smooth" });
   };
 
+  const sendDraft = (text: string) => {
+    onSend(text, attachments, documentsOnly, false, temporaryChat);
+    setDraft("");
+    setDocumentsOnly(false);
+    setRewritePreview(null);
+  };
+
   const submit = () => {
     const text = draft.trim();
-    if ((!text && attachments.length === 0) || (documentsOnly && attachments.length === 0)) return;
+    if (rewriteBusy || (!text && attachments.length === 0) || (documentsOnly && attachments.length === 0)) return;
     if (busy) onQueue(text, attachments);
-    else { onSend(text, attachments, documentsOnly, false, temporaryChat); setDocumentsOnly(false); }
+    else if (smartPromptRewritingEnabled && text) {
+      setRewriteBusy(true);
+      void onRewritePrompt(text).then((candidate) => {
+        if (candidate) setRewritePreview({ original: text, candidate });
+      }).finally(() => setRewriteBusy(false));
+      return;
+    } else { sendDraft(text); return; }
     setDraft("");
+    setDocumentsOnly(false);
   };
 
   const submitVoiceTranscript = (transcript: string) => {
@@ -186,17 +193,6 @@ export function ChatPage({ provider, model, endpoint, models, messages, busy, ta
     }
   };
 
-  const planTask = async () => {
-    if (!taskTitle.trim() || !taskInstruction.trim() || taskBusy === "planning") return;
-    const planned = await onPlanTask(taskTitle.trim(), taskInstruction.trim(), taskEnvironment);
-    if (planned) {
-      setTaskTitle("");
-      setTaskInstruction("");
-      setTaskComposerOpen(false);
-      onNavigate("workbench");
-    }
-  };
-
   const renameConversation = async () => {
     const title = renameDraft.trim();
     if (!title || !conversationId || renameBusy) return;
@@ -209,17 +205,33 @@ export function ChatPage({ provider, model, endpoint, models, messages, busy, ta
   return <div className={`feature-page chat-page ${workspaceMode === "project" ? "project-task-chat" : ""}`}>
     <div className="chat-context-bar">
       <div><p className="section-kicker">{temporaryChat ? "TEMPORARY CHAT" : "CONVERSATION"}</p><strong>{conversationId ? conversationTitle : "New chat"}</strong><span>{temporaryChat ? "This chat stays in memory only and won’t appear in Recents." : `${provider} · saved on this device · keep the thread focused, then turn work into a reviewed task when needed.`}</span></div>
-      <div className="chat-header-actions"><ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>
+      <div className="chat-header-actions"><ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><details className="capacity-popover"><summary><StatusBadge tone={capacity?.gpu?.availableBytes != null || capacity?.ramAvailableBytes != null ? "success" : "neutral"}>Device capacity</StatusBadge></summary><div className="capacity-popover-content"><strong>Local device · measurements stay here</strong><span>Available RAM: {formatCapacityBytes(capacity?.ramAvailableBytes)}</span><span>CPU load: {capacity?.cpuUtilizationPercent == null ? "Unknown" : `${capacity.cpuUtilizationPercent.toFixed(0)}%`}</span><span>GPU: {capacity?.gpu?.name ?? "Not detected"}</span><span>GPU memory: {formatCapacityBytes(capacity?.gpu?.availableBytes)}</span>{capacity?.measurementNote && <small>{capacity.measurementNote}</small>}</div></details><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>
     </div>
-    <div className="chat-layout">
+    <div className={`chat-layout${messages.length === 0 ? " is-start-screen" : ""}`}>
       <main className="chat-column">
         <section className="conversation-surface" aria-label="Conversation">
-          {messages.length === 0 ? <div className="chat-empty-surface"><EmptyState visual={<img src={SKAI_WOLF_ICON} alt="" />} title="Start a conversation" description="Ask a question, attach a file, or jump into a coding workspace." /></div> : <><div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={`${message.role}-${index}`} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />)}{busy && <article className="message-bubble chat-message assistant"><div className="message-meta"><span>{model}</span></div><p className="typing">Thinking…</p></article>}</div>{showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>Jump to latest ↓</Button></div>}</>}
+          {threadTasks.map((task) => <article className={`thread-run-card thread-run-${task.status}`} key={task.id}><div className="thread-run-heading"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>{task.resultSummary && <p>{task.resultSummary}</p>}{(task.changedFiles?.length || task.artifactLabels?.length) ? <div className="thread-run-files">{(task.changedFiles?.length ? task.changedFiles : task.artifactLabels ?? []).map((file) => <code key={file}>{file}</code>)}</div> : null}<div className="thread-run-actions">{["queued", "running", "verifying"].includes(task.status) && <Button variant="ghost" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "cancel")}>Stop</Button>}{["failed", "blocked"].includes(task.status) && <Button variant="secondary" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "retry")}>Retry</Button>}{task.status === "completed" && <Button variant="secondary" type="button" onClick={() => onNavigate("coding")}>Review changes</Button>}</div></article>)}
+          {messages.length === 0 ? (
+            <div className="chat-empty-surface"><section className="chat-start-screen">
+              <img src={SKAI_WOLF_ICON} alt="" /><p className="section-kicker">SKAI DESKTOP</p>
+              <h2>What would you like to work on?</h2><p>Start a conversation or bring a project into the thread.</p>
+              <div className="chat-start-actions">
+                <button type="button" onClick={onNewWorkspaceTab}><strong>New chat</strong><span>Open a fresh conversation tab</span></button>
+                <button type="button" onClick={() => onNavigate("projects")}><strong>Open project</strong><span>Browse folders and coding sessions</span></button>
+              </div>
+              {recentConversations.filter((item) => !item.archived && item.id !== conversationId).slice(0, 4).length > 0 && <div className="chat-start-recent"><h3>Recent</h3>
+                {recentConversations.filter((item) => !item.archived && item.id !== conversationId).slice(0, 4).map((item) => <button type="button" key={item.id} onClick={() => onSelectConversation(item.id)}><span>{item.title}</span><small>{item.mode === "Coding Agent" ? "Coding" : "Chat"} · {new Date(item.updatedAt).toLocaleDateString()}</small></button>)}
+              </div>}
+            </section></div>
+          ) : (
+            <><div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={index} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>{showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>Jump to latest ↓</Button></div>}</>
+          )}
         </section>
-        <ChatComposer draft={draft} busy={busy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={setDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onOpenTaskPlanner={() => setTaskComposerOpen(true)} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} />
+        <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={setDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} />
       </main>
-      <aside className="chat-rail">{messages.length === 0 ? <Card className="rail-card"><p className="section-kicker">QUICK START</p><button onClick={() => onNavigate("coding")} type="button"><strong>Build in a project</strong><span>Open files, terminal, and agent tasks</span></button><button onClick={() => onNavigate("images")} type="button"><strong>Create an image</strong><span>Use a local image workflow</span></button><button onClick={() => onNavigate("workbench")} type="button"><strong>Run an agent</strong><span>Plan, execute, and verify work</span></button><button onClick={() => onNavigate("marketplace")} type="button"><strong>Find a model or tool</strong><span>Browse voices, image models, skills, and runtimes</span></button></Card> : <Card className="rail-card chat-thread-summary"><p className="section-kicker">ACTIVE THREAD</p><strong>{conversationTitle}</strong><span>{messages.length} messages · {model}</span><small>Saved locally on this device.</small></Card>}<form className={`task-composer chat-task-composer ${taskComposerOpen ? "is-open" : ""}`} onSubmit={(event) => { event.preventDefault(); void planTask(); }}><div className="task-composer-heading"><div><p className="section-kicker">TASK BRIEF</p><h3>Plan local work</h3><p>Prepare a task for review before any tools run.</p></div><div className="task-composer-heading-actions"><span className="task-composer-badge">Local only</span><Button variant="ghost" type="button" className="task-composer-toggle" aria-expanded={taskComposerOpen} aria-controls="chat-task-composer-fields" onClick={() => setTaskComposerOpen((open) => !open)}>{taskComposerOpen ? "Collapse" : "Open"}</Button></div></div>{taskComposerOpen && <div id="chat-task-composer-fields"><div className="task-composer-fields"><label>Task title<input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Triage the next change" /></label><label>What should happen?<textarea value={taskInstruction} onChange={(event) => setTaskInstruction(event.target.value)} placeholder="Describe the outcome and how you will verify it." rows={4} /></label></div><EnvironmentPicker value={taskEnvironment} onChange={setTaskEnvironment} /><div className="task-composer-footer"><span>Creates a proposed task. Nothing runs yet.</span><Button variant="primary" type="submit" disabled={taskBusy === "planning" || !taskTitle.trim() || !taskInstruction.trim()}>{taskBusy === "planning" ? "Planning…" : "Add to task plan"}</Button></div></div>}</form></aside>
+      <aside className="chat-rail">{messages.length === 0 ? <Card className="rail-card"><p className="section-kicker">QUICK START</p><button onClick={() => onNavigate("coding")} type="button"><strong>Build in a project</strong><span>Open files, terminal, and agent tasks</span></button><button onClick={() => onNavigate("images")} type="button"><strong>Create an image</strong><span>Use a local image workflow</span></button><button onClick={() => onNavigate("marketplace")} type="button"><strong>Find a model or tool</strong><span>Browse voices, image models, skills, and runtimes</span></button></Card> : <Card className="rail-card chat-thread-summary"><p className="section-kicker">ACTIVE THREAD</p><strong>{conversationTitle}</strong><span>{messages.length} messages · {model}</span><small>Saved locally on this device.</small></Card>}</aside>
     </div>
     <ModalDialog open={renameOpen} onClose={() => setRenameOpen(false)} titleId="rename-conversation-title" initialFocusRef={renameInputRef}><form onSubmit={(event) => { event.preventDefault(); void renameConversation(); }}><div className="dialog-heading"><div><p className="section-kicker">CONVERSATION</p><h3 id="rename-conversation-title">Rename chat</h3><p>Use a short name that makes this thread easy to find later.</p></div><button type="button" onClick={() => setRenameOpen(false)} aria-label="Close rename dialog">×</button></div><label>Conversation name<input ref={renameInputRef} value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} maxLength={200} autoComplete="off" /></label><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setRenameOpen(false)}>Cancel</Button><Button variant="primary" type="submit" disabled={renameBusy || !renameDraft.trim()}>{renameBusy ? "Saving…" : "Save name"}</Button></div></form></ModalDialog>
+    <ModalDialog open={Boolean(rewritePreview)} onClose={() => setRewritePreview(null)} titleId="rewrite-prompt-title" className="ui-dialog rewrite-prompt-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL MODEL · REVIEW BEFORE SEND</p><h3 id="rewrite-prompt-title">Smart prompt rewrite</h3><p>Edit the suggestion, use your original draft, or cancel. Nothing is sent until you choose.</p></div><button type="button" onClick={() => setRewritePreview(null)} aria-label="Close prompt rewrite preview">×</button></div><div className="rewrite-prompt-fields"><label>Original draft<textarea value={rewritePreview?.original ?? ""} readOnly rows={4} /></label><label>Rewritten prompt<textarea value={rewritePreview?.candidate ?? ""} onChange={(event) => setRewritePreview((current) => current ? { ...current, candidate: event.target.value } : current)} maxLength={24_000} rows={7} /></label></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setRewritePreview(null)}>Cancel</Button><Button variant="secondary" type="button" onClick={() => rewritePreview && sendDraft(rewritePreview.original)}>Use original</Button><Button variant="primary" type="button" disabled={!rewritePreview?.candidate.trim()} onClick={() => rewritePreview && sendDraft(rewritePreview.candidate.trim())}>Use rewritten prompt</Button></div></ModalDialog>
   </div>;
 }

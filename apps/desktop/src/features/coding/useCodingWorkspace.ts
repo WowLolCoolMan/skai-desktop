@@ -48,18 +48,20 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     return (response.result as { path?: string | null }).path ?? null;
   };
 
-  const saveProject = async (name: string, instructions: string, folderPaths: string[]): Promise<DesktopProject | null> => {
-    const response = await request("project.save", { name, instructions, folderPaths });
+  const saveProject = async (name: string, instructions: string, folderPaths: string[], id?: string): Promise<DesktopProject | null> => {
+    const response = await request("project.save", { name, instructions, folderPaths, ...(id ? { id } : {}) });
     if (!response.ok) { onError(response.error?.message ?? "Project could not be saved."); return null; }
     const result = response.result as { id?: string; updatedAt?: string };
     const createdId = result.id;
     if (!createdId) { onError("Project was saved, but Skai could not identify it to open the workspace."); return null; }
-    const savedProject: DesktopProject = { id: createdId, name, instructions, folderPaths, updatedAt: result.updatedAt ?? new Date().toISOString(), gitHubRepository: null };
+    const savedProject: DesktopProject = { ...(projects.find((project) => project.id === createdId) ?? {} as DesktopProject), id: createdId, name, instructions, folderPaths, updatedAt: result.updatedAt ?? new Date().toISOString(), gitHubRepository: projects.find((project) => project.id === createdId)?.gitHubRepository ?? null };
     const refreshed = await request("projects.list");
     if (!refreshed.ok) { setProjects((current) => [savedProject, ...current.filter((project) => project.id !== createdId)]); onError(null); return savedProject; }
     const updatedProjects = (refreshed.result as DesktopProject[]) ?? [];
     const createdProject = updatedProjects.find((project) => project.id === createdId) ?? savedProject;
-    setProjects(updatedProjects.some((project) => project.id === createdId) ? updatedProjects : [savedProject, ...updatedProjects]);
+    const finalProjects = updatedProjects.some((project) => project.id === createdId) ? updatedProjects : [savedProject, ...updatedProjects];
+    setProjects(finalProjects);
+    setSelectedProject((current) => current?.id === createdId ? finalProjects.find((project) => project.id === createdId) ?? savedProject : current);
     onError(null);
     return createdProject;
   };

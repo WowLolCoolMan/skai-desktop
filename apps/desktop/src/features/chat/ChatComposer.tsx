@@ -11,6 +11,7 @@ import { isLocalAudioFile, transcribeLocalAudioFile } from "./localAudioTranscri
 type ChatComposerProps = {
   draft: string;
   busy: boolean;
+  rewriteBusy?: boolean;
   documentsOnly: boolean;
   attachments: ChatAttachment[];
   queuedMessages: DesktopQueuedMessage[];
@@ -21,7 +22,6 @@ type ChatComposerProps = {
   onFilesDropped: (files: File[]) => void;
   onRemoveAttachment: (index: number) => void;
   onNavigate: (route: Route) => void;
-  onOpenTaskPlanner: () => void;
   onToggleDocumentsOnly: () => void;
   onVoiceTranscript: (transcript: string) => boolean;
 };
@@ -44,7 +44,7 @@ type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
 };
 type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
 
-export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onOpenTaskPlanner, onToggleDocumentsOnly, onVoiceTranscript }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
@@ -281,10 +281,6 @@ export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMe
 
   const selectComposerCommand = (command: ComposerCommand) => {
     onDraftChange("");
-    if (command.opensTaskPlanner) {
-      onOpenTaskPlanner();
-      return;
-    }
     if (command.route) onNavigate(command.route);
   };
 
@@ -318,18 +314,18 @@ export function ChatComposer({ draft, busy, documentsOnly, attachments, queuedMe
     if (event.dataTransfer.files.length > 0) handleAudioDrop(Array.from(event.dataTransfer.files));
   };
 
-  return <section className={`composer-card ${dragActive ? "is-drag-active" : ""}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+  return <section className={`composer-card ${dragActive ? "is-drag-active" : ""}`} aria-busy={rewriteBusy} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
     {commandQuery !== null && <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} />}
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}><span>{queued.text}</span>{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`}>×</button></div>)}</div>}
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
     <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,audio/mpeg,audio/mp4,audio/ogg,audio/wav" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
-    <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={busy ? "Type a follow-up while the model responds…" : "Message your model…"} aria-label="Message your model" aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />
+    <textarea value={draft} disabled={rewriteBusy} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : "Message your model…"} aria-label="Message your model" aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
     {handsFreeActive && <p className="composer-hint" role="status">{voiceListening ? "Hands-free is listening on this device. Pause after speaking to send." : busy ? "Waiting for the reply and local speech to finish…" : "Hands-free is reconnecting to on-device speech…"}</p>}
     {audioTranscribing && <p className="composer-hint" role="status">Transcribing the selected audio on this device…</p>}
     {audioTranscriptReady && <p className="composer-hint" role="status">Local transcript added to the draft. Review it before sending.</p>}
     {voiceError && <div className="composer-voice-status"><p className="composer-voice-error" role="status">{voiceError}</p>{voicePackNeeded && <div className="composer-voice-install"><Button variant="secondary" type="button" disabled={voicePackInstalling} onClick={() => void installLocalSpeechPack()}>{voicePackInstalling ? "Installing local pack…" : "Install local speech pack"}</Button><span>The pack downloads once; dictation is processed on this device.</span></div>}</div>}
-    <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy} aria-pressed={documentsOnly} title="Use only documents attached to this message as evidence">{documentsOnly ? "Docs only: on" : "Docs only"}</Button><Button variant="ghost" type="button" onClick={onAttach} disabled={attachments.length >= 5} aria-describedby="attachment-help">Attach</Button><Button variant={audioTranscribing ? "secondary" : "ghost"} type="button" onClick={() => audioAbortRef.current ? audioAbortRef.current.abort() : audioPickerRef.current?.click()} disabled={busy || voiceListening || handsFreeActive} title="Transcribe MP3, M4A, OGG, or WAV locally">{audioTranscribing ? "Stop audio" : "Audio"}</Button><Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"}>{voiceListening && !handsFreeActive ? "Stop mic" : "Voice"}</Button><Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={(voiceListening && !handsFreeActive) || audioTranscribing} aria-pressed={handsFreeActive} title="Keep on-device dictation active between your turns">{handsFreeActive ? "Hands-free: on" : "Hands-free"}</Button><div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span><Button variant={busy ? "secondary" : "primary"} disabled={(!draft.trim() && attachments.length === 0) || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{busy ? "Queue ↗" : "Send ↗"}</Button></div></div>
+    <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy || rewriteBusy} aria-pressed={documentsOnly} title="Use only documents attached to this message as evidence">{documentsOnly ? "Docs only: on" : "Docs only"}</Button><Button variant="ghost" type="button" onClick={onAttach} disabled={rewriteBusy || attachments.length >= 5} aria-describedby="attachment-help">Attach</Button><Button variant={audioTranscribing ? "secondary" : "ghost"} type="button" onClick={() => audioAbortRef.current ? audioAbortRef.current.abort() : audioPickerRef.current?.click()} disabled={busy || rewriteBusy || voiceListening || handsFreeActive} title="Transcribe MP3, M4A, OGG, or WAV locally">{audioTranscribing ? "Stop audio" : "Audio"}</Button><Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"}>{voiceListening && !handsFreeActive ? "Stop mic" : "Voice"}</Button><Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={rewriteBusy || (voiceListening && !handsFreeActive) || audioTranscribing} aria-pressed={handsFreeActive} title="Keep on-device dictation active between your turns">{handsFreeActive ? "Hands-free: on" : "Hands-free"}</Button><div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span><Button variant={busy ? "secondary" : "primary"} disabled={rewriteBusy || (!draft.trim() && attachments.length === 0) || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{rewriteBusy ? "Rewriting…" : busy ? "Queue ↗" : "Send ↗"}</Button></div></div>
   </section>;
 }

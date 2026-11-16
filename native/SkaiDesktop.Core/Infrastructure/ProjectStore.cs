@@ -23,7 +23,7 @@ public sealed class ProjectStore
     {
         _path = path ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
-            "ServerRock", "AI", "projects.json");
+            "SkaiDesktop", "AI", "projects.json");
     }
 
     public List<LocalProject> Load()

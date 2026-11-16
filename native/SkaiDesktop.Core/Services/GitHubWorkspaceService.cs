@@ -211,7 +211,7 @@ public sealed class GitHubWorkspaceService
             .Cast<string>()
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var temporaryIndex = Path.Combine(Path.GetTempPath(), $"server-rock-index-{Guid.NewGuid():N}");
+        var temporaryIndex = Path.Combine(Path.GetTempPath(), $"skai-index-{Guid.NewGuid():N}");
         try
         {
             var resetIndex = await RunGitAsync(root, ["read-tree", "HEAD"], null, TimeSpan.FromMinutes(2), cancellationToken, temporaryIndex).ConfigureAwait(false);

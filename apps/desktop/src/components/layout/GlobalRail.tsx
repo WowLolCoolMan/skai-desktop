@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "../../app/types";
 import { NavIcon, type NavIconName } from "../ui/NavIcon";
+import { installedVoiceModels } from "../../services/nativeTts";
 
 const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = [
   { route: "chat", icon: "chat", label: "Home" },
@@ -9,9 +10,14 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
   { route: "marketplace", icon: "marketplace", label: "Marketplace" },
 ];
 
-export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (route: Route) => void }) {
+export function GlobalRail({ route, agentMode, onNavigate }: { route: Route; agentMode: "ChatBot" | "Coding Agent"; onNavigate: (route: Route) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPetWorkshop, setShowPetWorkshop] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
+  const [query, setQuery] = useState("");
+  const [recentRoutes, setRecentRoutes] = useState<Route[]>(() => {
+    try { const value = JSON.parse(localStorage.getItem("skai.extras.recent") ?? "[]"); return Array.isArray(value) ? value.filter((route): route is Route => ["memory", "voice-workbench", "pet-workshop"].includes(route)).slice(0, 3) : []; }
+    catch { return []; }
+  });
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const refresh = () => setShowPetWorkshop(localStorage.getItem("skai.pet.workshop.enabled") === "true");
@@ -27,20 +33,33 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
     document.addEventListener("keydown", closeEscape);
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape); };
   }, [menuOpen]);
-  const menuItems: Array<{ route: Route; label: string; icon: NavIconName }> = [
-    { route: "projects", label: "Projects", icon: "project" },
-    { route: "coding", label: "Coding workspace", icon: "code" },
-    { route: "workbench", label: "Agent workbench", icon: "sparkle" },
-    { route: "terminal", label: "Terminal", icon: "terminal" },
-    { route: "models", label: "Models", icon: "model" },
-    { route: "memory", label: "Memory", icon: "memory" },
-  ];
+  const menuItems = useMemo(() => [
+    { route: "memory" as Route, label: "Memory", icon: "memory" as NavIconName, unavailable: false },
+    { route: "voice-workbench" as Route, label: "Voice Workbench", icon: "activity" as NavIconName, unavailable: installedVoiceModels.length === 0 },
+    ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pet Workshop", icon: "sparkle" as NavIconName, unavailable: false }] : []),
+  ], [showPetWorkshop]);
+  const filteredItems = menuItems.filter((item) => !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const openExtra = (itemRoute: Route) => {
+    const next = [itemRoute, ...recentRoutes.filter((route) => route !== itemRoute)].slice(0, 3);
+    setRecentRoutes(next);
+    localStorage.setItem("skai.extras.recent", JSON.stringify(next));
+    setMenuOpen(false);
+    setQuery("");
+    onNavigate(itemRoute);
+  };
   return <aside className="global-rail" aria-label="Global navigation">
     <nav className="global-rail-destinations" aria-label="Primary navigation">
       {destinations.map((item) => <button key={item.route} className={route === item.route ? "is-active" : ""} type="button" aria-current={route === item.route ? "page" : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.route)}><NavIcon name={item.icon} /></button>)}
       <div className="global-rail-app-menu" ref={menuRef}>
-        <button className={menuOpen ? "is-active" : ""} type="button" aria-label="Quick actions" title="Quick actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><NavIcon name="more" /></button>
-    {menuOpen && <div className="global-rail-app-menu-panel" role="group" aria-label="Quick actions">{menuItems.map((item) => <button type="button" key={item.route} onClick={() => { setMenuOpen(false); onNavigate(item.route); }}><NavIcon name={item.icon} /><span>{item.label}</span></button>)}{showPetWorkshop && <button type="button" onClick={() => { setMenuOpen(false); onNavigate("pet-workshop"); }}><NavIcon name="sparkle" /><span>Pet Workshop</span></button>}<div className="global-rail-app-menu-divider" /><button type="button" onClick={() => { setMenuOpen(false); onNavigate("marketplace"); }}><NavIcon name="marketplace" /><span>Voice Workbench &amp; tools</span></button></div>}
+        <button className={menuOpen ? "is-active" : ""} type="button" aria-label="Extras" title="Extras" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><NavIcon name="more" />{menuItems.some((item) => item.unavailable) && <span className="global-rail-attention-dot" aria-label="Setup needs attention" />}</button>
+        {menuOpen && <section className="global-rail-extras-panel" aria-label="Extras">
+          <header><div><p className="section-kicker">YOUR WORKSPACE</p><strong>Extras</strong><span>More ways to work with Skai</span></div><button type="button" aria-label="Close Extras" onClick={() => setMenuOpen(false)}>×</button></header>
+          {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search extras" aria-label="Search extras" /></label>}
+          {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PICK UP WHERE YOU LEFT OFF</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
+          <div className="global-rail-extras-group"><p className="global-rail-extras-label">FEATURES</p>
+          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching extras.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.route === "memory" ? "Your saved notes and knowledge" : item.route === "voice-workbench" ? "Choose and preview local voices" : "Customize your desktop companion"}</small></span>{item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
+          </div>
+        </section>}
       </div>
     </nav>
     <div className="global-rail-more">

@@ -5,7 +5,7 @@ using SkaiDesktop.Core.Models;
 
 namespace SkaiDesktop.Core.Services;
 
-public sealed record DiffusersRuntimeStatus(bool WorkerAvailable, bool DependenciesAvailable, string PythonCommand, string Status, string Message);
+public sealed record DiffusersRuntimeStatus(bool WorkerAvailable, bool DependenciesAvailable, string PythonCommand, string Status, string Message, bool BackgroundRemovalAvailable = false);
 public sealed record LocalGeneratedImage(string DataUrl, string FileName);
 
 /// <summary>Optional built-in local image generation through Hugging Face Diffusers.</summary>
@@ -21,9 +21,11 @@ public sealed class DiffusersImageProvider
         var python = ResolvePythonPath();
         if (worker is null)
             return new(false, false, python, "worker-missing", "The built-in image worker is missing from this Skai installation.");
-        if (CheckDependencies(python))
-            return new(true, true, python, "ready", "The local Diffusers runtime is ready. The model downloads separately the first time you generate an image.");
-        return new(true, false, python, "dependencies-missing", "Install the optional Diffusers runtime to use local Stable Diffusion. Python dependencies may use several gigabytes; model weights download separately.");
+        var dependenciesAvailable = CheckDependencies(python);
+        var backgroundRemovalAvailable = dependenciesAvailable && CheckBackgroundDependencies(python);
+        if (dependenciesAvailable)
+            return new(true, true, python, "ready", "The local image runtime is ready. Image models download separately on first use.", backgroundRemovalAvailable);
+        return new(true, false, python, "dependencies-missing", "Install the optional local image runtime to use Stable Diffusion and pet background removal. Python dependencies may use several gigabytes; models download separately.");
     }
 
     public async Task InstallRuntimeAsync(Action<string> reportProgress, CancellationToken cancellationToken)
@@ -124,6 +126,74 @@ public sealed class DiffusersImageProvider
         }
     }
 
+    public async Task<LocalGeneratedImage> RemovePetBackgroundAsync(string imageBase64, string mediaType, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(imageBase64) || imageBase64.Length > 8_400_000 || mediaType is not ("image/png" or "image/jpeg"))
+            throw new ArgumentException("Choose a PNG or JPEG frame up to 6 MB.", nameof(imageBase64));
+        byte[] sourceBytes;
+        try { sourceBytes = Convert.FromBase64String(imageBase64); }
+        catch (FormatException error) { throw new ArgumentException("The frame image encoding is invalid.", nameof(imageBase64), error); }
+        if (sourceBytes.Length is < 8 or > 6 * 1024 * 1024 || !ChatAttachmentPolicy.HasValidImageSignature(mediaType, sourceBytes))
+            throw new ArgumentException("Choose a valid PNG or JPEG frame up to 6 MB.", nameof(imageBase64));
+
+        var packageDirectory = ResolvePackageDirectory() ?? throw new InvalidOperationException("The local pet image tools are missing from this Skai installation.");
+        var worker = Path.Combine(packageDirectory, "skai_pet_background.py");
+        if (!File.Exists(worker)) throw new InvalidOperationException("The local pet background worker is missing from this Skai installation.");
+        var python = ResolvePythonPath();
+        if (!CheckBackgroundDependencies(python)) throw new InvalidOperationException("Install or update the optional local image runtime in Image Studio before removing a background.");
+
+        var start = new ProcessStartInfo
+        {
+            FileName = python,
+            WorkingDirectory = packageDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        start.ArgumentList.Add(worker);
+        start.Environment["U2NET_HOME"] = Path.Combine(GetRuntimeRoot(), "models");
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start local pet background removal.");
+        using var cancellation = cancellationToken.Register(() => { try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { } });
+        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { image = imageBase64 }, JsonOptions)).ConfigureAwait(false);
+        await process.StandardInput.FlushAsync().ConfigureAwait(false);
+        process.StandardInput.Close();
+        string? data = null;
+        var done = false;
+        try
+        {
+            while (await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+            {
+                if (line.Length > 7_500_000) throw new InvalidDataException("The background remover returned an oversized image.");
+                using var item = JsonDocument.Parse(line);
+                var root = item.RootElement;
+                var type = root.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : null;
+                if (type == "error") throw new InvalidOperationException(root.TryGetProperty("message", out var message) ? message.GetString() : "Local background removal failed.");
+                if (type == "result")
+                {
+                    data = root.GetProperty("data").GetString();
+                    if (root.GetProperty("mediaType").GetString() != "image/png" || string.IsNullOrWhiteSpace(data) || data.Length > 7_000_000)
+                        throw new InvalidDataException("The background remover returned invalid image data.");
+                    var bytes = Convert.FromBase64String(data);
+                    if (!ChatAttachmentPolicy.HasValidImageSignature("image/png", bytes) || bytes.Length > 5 * 1024 * 1024)
+                        throw new InvalidDataException("The background remover returned invalid or oversized image bytes.");
+                }
+                if (type == "done") done = true;
+            }
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            if (!done || data is null)
+                throw new InvalidOperationException((await stderrTask.ConfigureAwait(false)).Trim() is { Length: > 0 } error ? error[..Math.Min(error.Length, 500)] : "The local background remover closed without returning an image.");
+            return new($"data:image/png;base64,{data}", $"skai-pet-transparent-{DateTime.UtcNow:yyyyMMdd-HHmmss}.png");
+        }
+        catch
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            throw;
+        }
+    }
+
     private static bool CheckDependencies(string python)
     {
         try
@@ -134,6 +204,30 @@ public sealed class DiffusersImageProvider
             if (process is null) return false;
             // Drain both redirected streams while the import runs, then join the drains before
             // disposing the process. This avoids a pipe-buffer deadlock and orphaned readers.
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(20_000))
+            {
+                try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                try { process.WaitForExit(3_000); } catch (InvalidOperationException) { }
+                try { Task.WaitAll([stdout, stderr], TimeSpan.FromSeconds(3)); } catch (AggregateException) { }
+                return false;
+            }
+            try { Task.WaitAll([stdout, stderr], TimeSpan.FromSeconds(3)); } catch (AggregateException) { return false; }
+            return process.ExitCode == 0;
+        }
+        catch (System.ComponentModel.Win32Exception) { return false; }
+        catch (InvalidOperationException) { return false; }
+    }
+
+    private static bool CheckBackgroundDependencies(string python)
+    {
+        try
+        {
+            var start = new ProcessStartInfo { FileName = python, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            start.ArgumentList.Add("-c"); start.ArgumentList.Add("import importlib.util,sys; sys.exit(0 if all(importlib.util.find_spec(name) for name in ('rembg','onnxruntime')) else 1)");
+            using var process = Process.Start(start);
+            if (process is null) return false;
             var stdout = process.StandardOutput.ReadToEndAsync();
             var stderr = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(20_000))

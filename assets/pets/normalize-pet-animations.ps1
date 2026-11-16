@@ -4,7 +4,7 @@ param(
 )
 
 # Normalizes the authored six-pose walk source into intermediate strips. Run
-# convert-six-to-ten.py afterward to make the closed ten-frame runtime loops.
+# convert-pet-strips-to-eleven.py afterward to make the closed eleven-frame runtime loops.
 Add-Type -AssemblyName System.Drawing.Common
 
 $frameSize = 256
@@ -75,4 +75,4 @@ foreach ($pet in $pets) {
         }
     }
 }
-Write-Output "Normalized $($pets.Count * $states.Count) independent walk/state strips in $OutputDirectory; run convert-six-to-ten.py next."
+Write-Output "Normalized $($pets.Count * $states.Count) independent walk/state strips in $OutputDirectory; run convert-pet-strips-to-eleven.py next."

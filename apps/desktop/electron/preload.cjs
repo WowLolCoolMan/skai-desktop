@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("serverRockAgent", {
+contextBridge.exposeInMainWorld("skaiAgent", {
   request: (method, params) => ipcRenderer.invoke("agent:request", method, params),
   media: {
     createLocalUrl: (mediaType, content) => ipcRenderer.invoke("media:create-local-url", { mediaType: String(mediaType), content: String(content) }),

@@ -16,7 +16,7 @@ public sealed class MemoryStore
 
     public MemoryStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "memory.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "SkaiDesktop", "AI", "memory.json");
     }
 
     public IReadOnlyList<MemoryEntry> Load()
@@ -86,7 +86,7 @@ public sealed class MemoryStore
         Validate(entries);
         return JsonSerializer.Serialize(new MemoryBackup
         {
-            Format = "server-rock-memory-v1",
+            Format = "skai-memory-v1",
             ExportedAtUtc = DateTimeOffset.UtcNow,
             Entries = entries
         }, Options);
@@ -99,7 +99,8 @@ public sealed class MemoryStore
         MemoryBackup backup;
         try { backup = JsonSerializer.Deserialize<MemoryBackup>(json, Options) ?? throw new InvalidDataException("The memory backup is empty."); }
         catch (JsonException exception) { throw new InvalidDataException("The memory backup is not valid JSON.", exception); }
-        if (!string.Equals(backup.Format, "server-rock-memory-v1", StringComparison.Ordinal) || backup.Entries is null)
+        if (!(string.Equals(backup.Format, "skai-memory-v1", StringComparison.Ordinal) ||
+              string.Equals(backup.Format, LegacyDataMigration.LegacyFormat("c2VydmVyLXJvY2stbWVtb3J5LXYx"), StringComparison.Ordinal)) || backup.Entries is null)
             throw new InvalidDataException("The memory backup format is unsupported.");
         Validate(backup.Entries);
         var existingIds = Load().Select(entry => entry.Id).ToHashSet(StringComparer.Ordinal);
@@ -161,7 +162,7 @@ public sealed class MemoryStore
 
     private sealed class MemoryBackup
     {
-        public string Format { get; set; } = "server-rock-memory-v1";
+        public string Format { get; set; } = "skai-memory-v1";
         public DateTimeOffset ExportedAtUtc { get; set; }
         public List<MemoryEntry> Entries { get; set; } = [];
     }

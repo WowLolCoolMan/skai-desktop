@@ -16,7 +16,7 @@ internal static class AttachmentTests
 {
     public static async Task RunAsync()
     {
-        var attachmentProbePath = Path.Combine(Path.GetTempPath(), "server-rock-attachment-" + Guid.NewGuid().ToString("N") + ".png");
+        var attachmentProbePath = Path.Combine(Path.GetTempPath(), "skai-attachment-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
             File.WriteAllBytes(attachmentProbePath, new byte[ChatAttachmentPolicy.MaxFileBytes + 1]);
@@ -65,7 +65,7 @@ internal static class AttachmentTests
         Check(ChatAttachmentPolicy.ConsentKey("https://remote.example/v1", [notes]) != ChatAttachmentPolicy.ConsentKey("https://remote.example/v1", [notes with { Content = "changed" }])
             && ChatAttachmentPolicy.ConsentKey("https://a.example/v1", [notes]) != ChatAttachmentPolicy.ConsentKey("https://b.example/v1", [notes]),
             "attachment consent key changes with file content and endpoint");
-        var attachmentDraftPath = Path.Combine(Path.GetTempPath(), "server-rock-attachment-drafts-" + Guid.NewGuid().ToString("N") + ".json");
+        var attachmentDraftPath = Path.Combine(Path.GetTempPath(), "skai-attachment-drafts-" + Guid.NewGuid().ToString("N") + ".json");
         try
         {
             var draftStore = new WorkspaceAttachmentDraftStore(attachmentDraftPath);

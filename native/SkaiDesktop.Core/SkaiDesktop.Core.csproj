@@ -9,8 +9,11 @@
     <Content Include="..\..\services\airllm\**\*" Link="airllm\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\services\diffusers\**\*" Link="diffusers\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Remove="artifacts\**" />
+    <Compile Remove=".build\**" />
     <EmbeddedResource Remove="artifacts\**" />
+    <EmbeddedResource Remove=".build\**" />
     <None Remove="artifacts\**" />
+    <None Remove=".build\**" />
     <PackageReference Include="PdfPig" />
     <PackageReference Include="Porta.Pty" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />

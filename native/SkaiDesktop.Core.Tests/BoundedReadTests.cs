@@ -42,7 +42,7 @@ internal static class BoundedReadTests
         {
             Check(true, "native stream line reader rejects oversized lines before JSON parsing");
         }
-        var oversizedStorePath = Path.Combine(Path.GetTempPath(), "server-rock-oversized-store-" + Guid.NewGuid().ToString("N") + ".json");
+        var oversizedStorePath = Path.Combine(Path.GetTempPath(), "skai-oversized-store-" + Guid.NewGuid().ToString("N") + ".json");
         try
         {
             File.WriteAllText(oversizedStorePath, new string('x', BoundedFileReader.MaxJsonBytes + 1));
@@ -57,7 +57,7 @@ internal static class BoundedReadTests
             }
         }
         finally { if (File.Exists(oversizedStorePath)) File.Delete(oversizedStorePath); }
-        var invalidUtf8Path = Path.Combine(Path.GetTempPath(), "server-rock-invalid-utf8-" + Guid.NewGuid().ToString("N") + ".json");
+        var invalidUtf8Path = Path.Combine(Path.GetTempPath(), "skai-invalid-utf8-" + Guid.NewGuid().ToString("N") + ".json");
         try
         {
             File.WriteAllBytes(invalidUtf8Path, [0xC3, 0x28]);

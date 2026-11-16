@@ -34,7 +34,7 @@ requireContract("Electron Windows signature evidence", /SIGNATURES-electron-win-
 requireContract("Electron Linux signature evidence", /SIGNATURES-electron-linux-x64\.txt/);
 requireContract("Electron release readiness gate", /ELECTRON_PACKAGED_READY/);
 requireContract("Release waits for Electron packaging", /needs:\s*\[electron\]/);
-requireContract("no legacy Uno packaging", { test: (text) => !/ServerRock\.Native|NATIVE_MIGRATION_COMPLETE|\n  package:/.test(text) });
+requireContract("no legacy Uno packaging", { test: (text) => !/SkaiDesktop\.Native|NATIVE_MIGRATION_COMPLETE|\n  package:/.test(text) });
 requireContract("verify job runs Core tests", /run:\s+npm test/);
 requireContract("Release downloads Electron artifacts", /pattern:\s+Skai-Desktop-\*/);
 requireContract("release signature evidence gate", /Require signed artifact evidence/);

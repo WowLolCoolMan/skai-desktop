@@ -18,6 +18,8 @@ public sealed class AgentTaskArtifact
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string? ParentRunId { get; set; }
+    public string? ProjectId { get; set; }
+    public string? ConversationId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Instruction { get; set; } = string.Empty;
     public string Role { get; set; } = "specialist";
@@ -26,6 +28,7 @@ public sealed class AgentTaskArtifact
     public List<string> DependsOn { get; set; } = [];
     public string? ResultSummary { get; set; }
     public List<string> ArtifactLabels { get; set; } = [];
+    public List<string> ChangedFiles { get; set; } = [];
     public string? WorktreePath { get; set; }
     public string? WorktreeBranch { get; set; }
     public string? WorktreeRepositoryRoot { get; set; }

@@ -14,7 +14,7 @@ Skai Desktop connects directly to GitHub from the desktop app. The GitHub access
 The application publisher needs to register a GitHub App, enable **Device flow**, and configure **Metadata: read-only** plus **Contents: read and write**. Do not request account-wide repository administration. GitHub's device authorization grant is intended for desktop clients; device flow must be enabled in the app settings. The desktop client uses the GitHub App's **Client ID** (not its App ID or client secret); IDs may contain punctuation such as the `Iv1.` prefix.
 
 For development builds, enter the GitHub App public Client ID in Settings →
-GitHub or provide `SERVER_ROCK_GITHUB_APP_CLIENT_ID` at process launch. The
+GitHub or provide `SKAI_DESKTOP_GITHUB_APP_CLIENT_ID` at process launch. The
 client ID is not a secret; no GitHub private key or client secret belongs in
 this desktop app. Users must install the GitHub App on the account or
 organization and grant it access to the repositories they want to use.

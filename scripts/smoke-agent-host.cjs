@@ -46,9 +46,9 @@ fs.writeFileSync(env.SRAI_TASKS_PATH, JSON.stringify([{
   updatedAtUtc: new Date().toISOString(),
 }], null, 2));
 const hostOutput = path.join(root, "services", "agent-host", "bin", "Debug", "net10.0");
-const hostProgram = process.platform === "win32" ? path.join(hostOutput, "ServerRock.AgentHost.exe") : "dotnet";
-const hostArgs = process.platform === "win32" ? ["--stdio"] : [path.join(hostOutput, "ServerRock.AgentHost.dll"), "--stdio"];
-if (!require("node:fs").existsSync(path.join(hostOutput, "ServerRock.AgentHost.dll"))) {
+const hostProgram = process.platform === "win32" ? path.join(hostOutput, "SkaiDesktop.AgentHost.exe") : "dotnet";
+const hostArgs = process.platform === "win32" ? ["--stdio"] : [path.join(hostOutput, "SkaiDesktop.AgentHost.dll"), "--stdio"];
+if (!require("node:fs").existsSync(path.join(hostOutput, "SkaiDesktop.AgentHost.dll"))) {
   console.error("The Agent Host has not been built. Run npm run agent-host:build first.");
   process.exit(1);
 }

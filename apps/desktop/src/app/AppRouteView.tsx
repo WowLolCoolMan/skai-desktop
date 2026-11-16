@@ -1,4 +1,4 @@
-import type { ChatAttachment, DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, ScheduledTaskDraft, TaskEnvironment } from "../../shared/contracts";
+import type { ChatAttachment, DesktopConversation, DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, ScheduledTaskDraft, TaskEnvironment } from "../../shared/contracts";
 import type { CorpusDocument, MemoryEntry, Message, Model, Route, ThemeMode } from "./types";
 import { ChatPage } from "../features/chat/ChatPage";
 import { CodingPage } from "../features/coding/CodingPage";
@@ -7,15 +7,16 @@ import { ModelsPage } from "../features/catalog/ModelsPage";
 import { MemoryPage } from "../features/memory/MemoryPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { TerminalPage } from "../features/terminal/TerminalPage";
-import { WorkbenchPage } from "../features/agents/WorkbenchPage";
 import { UsagePage } from "../features/usage/UsagePage";
-import { PluginsPage } from "../features/catalog/PluginsPage";
+import { PluginsPage, VoiceWorkbench } from "../features/catalog/PluginsPage";
 import { PetWorkshopPage } from "../features/pets/PetWorkshopPage";
 
 export type AppRouteState = {
   route: Route;
+  conversations: DesktopConversation[];
   provider: string;
   model: string;
+  capacity: LocalCapacitySnapshot | null;
   ollamaContextWindowTokens?: number;
   models: Model[];
   messages: Message[];
@@ -59,6 +60,7 @@ export type AppRouteState = {
   petSpriteDataUrl: string;
   developerMode: boolean;
   memoryInjectionEnabled: boolean;
+  smartPromptRewritingEnabled: boolean;
   endpoint: string;
   imageEndpoint: string;
   imageProvider: string;
@@ -82,7 +84,10 @@ export type AppRouteState = {
 
 export type AppRouteActions = {
   onNavigate: (route: Route) => void;
+  onSelectConversation: (id: string) => void;
+  onNewWorkspaceTab: () => void;
   onSend: (text: string, attachments: ChatAttachment[], documentsOnly: boolean, speakReply?: boolean, temporary?: boolean) => void;
+  onRewritePrompt: (draft: string) => Promise<string | null>;
   onStartTemporaryChat: () => void;
   onQueue: (text: string, attachments: ChatAttachment[]) => void;
   onRemoveQueued: (index: number) => void;
@@ -100,7 +105,7 @@ export type AppRouteActions = {
   onArchive: () => void;
   onRenameConversation: (title: string) => Promise<boolean>;
   onPickFolder: () => Promise<string | null>;
-  onSaveProject: (name: string, instructions: string, folderPaths: string[]) => Promise<DesktopProject | null>;
+  onSaveProject: (name: string, instructions: string, folderPaths: string[], id?: string) => Promise<DesktopProject | null>;
   onOpenProject: (project: DesktopProject) => void;
   onOpenFile: (path: string) => void;
   onCloseFile: () => void;
@@ -118,6 +123,7 @@ export type AppRouteActions = {
   onRefreshTerminalSession?: () => Promise<boolean>;
   onCloseTerminalSession?: () => Promise<boolean>;
   onPlanTask: (title: string, instruction: string, environment: TaskEnvironment) => Promise<boolean>;
+  onTaskAction: (id: string, operation: "cancel" | "retry") => void;
   onSettingsChange: (key: string, value: string | boolean) => void;
   onSaveSettings: () => Promise<boolean>;
   onDiscoverModels: () => void | Promise<boolean>;
@@ -148,21 +154,21 @@ export type AppRouteActions = {
 
 export function AppRouteView({ state, actions }: { state: AppRouteState; actions: AppRouteActions }) {
   const { route } = state;
-  const chat = (workspaceMode: "conversation" | "project" = "conversation") => <ChatPage provider={state.provider} model={state.model} endpoint={state.endpoint} models={state.models} messages={state.messages} busy={state.busy} taskBusy={state.taskBusy} attachments={state.attachments} queuedMessages={state.queuedMessages} conversationId={state.conversationId} conversationTitle={state.conversationTitle} pinned={state.pinned} archived={state.archived} onSend={actions.onSend} onStartTemporaryChat={actions.onStartTemporaryChat} onQueue={actions.onQueue} onRemoveQueued={actions.onRemoveQueued} onAttach={actions.onAttach} onFilesDropped={actions.onFilesDropped} onRemoveAttachment={actions.onRemoveAttachment} onModelChange={actions.onModelChange} onNavigate={actions.onNavigate} onPlanTask={actions.onPlanTask} onExport={actions.onExportConversations} onFork={actions.onFork} onForkFromMessage={actions.onForkFromMessage} onRetryMessage={actions.onRetryMessage} onEditMessage={actions.onEditMessage} onTogglePinned={actions.onTogglePinned} onArchive={actions.onArchive} onRenameConversation={actions.onRenameConversation} workspaceMode={workspaceMode} />;
+  const chat = (workspaceMode: "conversation" | "project" = "conversation") => <ChatPage capacity={state.capacity} recentConversations={state.conversations} onSelectConversation={actions.onSelectConversation} onNewWorkspaceTab={actions.onNewWorkspaceTab} provider={state.provider} model={state.model} endpoint={state.endpoint} models={state.models} messages={state.messages} busy={state.busy} taskBusy={state.taskBusy} tasks={state.tasks} attachments={state.attachments} queuedMessages={state.queuedMessages} conversationId={state.conversationId} conversationTitle={state.conversationTitle} pinned={state.pinned} archived={state.archived} smartPromptRewritingEnabled={state.smartPromptRewritingEnabled} onRewritePrompt={actions.onRewritePrompt} onSend={actions.onSend} onStartTemporaryChat={actions.onStartTemporaryChat} onQueue={actions.onQueue} onRemoveQueued={actions.onRemoveQueued} onAttach={actions.onAttach} onFilesDropped={actions.onFilesDropped} onRemoveAttachment={actions.onRemoveAttachment} onModelChange={actions.onModelChange} onNavigate={actions.onNavigate} onTaskAction={actions.onTaskAction} onExport={actions.onExportConversations} onFork={actions.onFork} onForkFromMessage={actions.onForkFromMessage} onRetryMessage={actions.onRetryMessage} onEditMessage={actions.onEditMessage} onTogglePinned={actions.onTogglePinned} onArchive={actions.onArchive} onRenameConversation={actions.onRenameConversation} workspaceMode={workspaceMode} />;
   if (route === "chat") return chat();
   if (route === "coding" || route === "projects") {
-    const editor = <CodingPage projectDirectory={route === "projects"} projects={state.projects} selectedProject={state.selectedProject} tasks={state.tasks} projectFiles={state.projectFiles} selectedFile={state.selectedFile} fileDraft={state.fileDraft} fileOriginal={state.fileOriginal} fileSummary={state.fileSummary} fileBusy={state.fileBusy} fileUndoAvailable={state.fileUndoAvailable} terminalBusy={state.terminalBusy} terminalOutput={state.terminalOutput} terminalExitCode={state.terminalExitCode} gitStatus={state.gitStatus} gitBusy={state.gitBusy} gitDiff={state.gitDiff} gitDiffBusy={state.gitDiffBusy} gitCommitBusy={state.gitCommitBusy} gitPushBusy={state.gitPushBusy ?? false} gitPullRequestBusy={state.gitPullRequestBusy ?? false} onRefreshGitStatus={actions.onRefreshGitStatus} onLoadGitDiff={actions.onLoadGitDiff} onCommitGitChanges={actions.onCommitGitChanges} onPushGitChanges={actions.onPushGitChanges ?? (async () => false)} onCreateGitPullRequest={actions.onCreateGitPullRequest ?? (async () => false)} onPickFolder={actions.onPickFolder} onSaveProject={actions.onSaveProject} onOpenProject={actions.onOpenProject} onOpenFile={actions.onOpenFile} onCloseFile={actions.onCloseFile} onDraftChange={actions.onDraftChange} onSaveFile={actions.onSaveFile} onUndoFile={actions.onUndoFile} onRunTerminal={actions.onRunTerminal} onPlanTask={actions.onPlanTask} onNavigate={actions.onNavigate} />;
-    return route === "coding" && state.selectedProject ? <div className="project-task-workspace">{chat("project")}{editor}</div> : editor;
+    const editor = <CodingPage conversation={route === "coding" && state.selectedProject ? chat("project") : undefined} projectDirectory={route === "projects"} projects={state.projects} selectedProject={state.selectedProject} projectFiles={state.projectFiles} selectedFile={state.selectedFile} fileDraft={state.fileDraft} fileOriginal={state.fileOriginal} fileSummary={state.fileSummary} fileBusy={state.fileBusy} fileUndoAvailable={state.fileUndoAvailable} terminalBusy={state.terminalBusy} terminalOutput={state.terminalOutput} terminalExitCode={state.terminalExitCode} gitStatus={state.gitStatus} gitBusy={state.gitBusy} gitDiff={state.gitDiff} gitDiffBusy={state.gitDiffBusy} gitCommitBusy={state.gitCommitBusy} gitPushBusy={state.gitPushBusy ?? false} gitPullRequestBusy={state.gitPullRequestBusy ?? false} onRefreshGitStatus={actions.onRefreshGitStatus} onLoadGitDiff={actions.onLoadGitDiff} onCommitGitChanges={actions.onCommitGitChanges} onPushGitChanges={actions.onPushGitChanges ?? (async () => false)} onCreateGitPullRequest={actions.onCreateGitPullRequest ?? (async () => false)} onPickFolder={actions.onPickFolder} onSaveProject={actions.onSaveProject} onOpenProject={actions.onOpenProject} onOpenFile={actions.onOpenFile} onCloseFile={actions.onCloseFile} onDraftChange={actions.onDraftChange} onSaveFile={actions.onSaveFile} onUndoFile={actions.onUndoFile} onRunTerminal={actions.onRunTerminal} onNavigate={actions.onNavigate} />;
+    return editor;
   }
-  if (route === "settings") return <SettingsPage provider={state.provider} endpoint={state.endpoint} model={state.model} models={state.models} ollamaContextWindowTokens={state.ollamaContextWindowTokens ?? 0} themeMode={state.themeMode} accentColor={state.accentColor} density={state.density} backdrop={state.backdrop} reduceMotion={state.reduceMotion} petVisible={state.petVisible} petWander={state.petWander} petInteractionDemo={state.petInteractionDemo} petCharacter={state.petCharacter} petSpriteDataUrl={state.petSpriteDataUrl} developerMode={state.developerMode} memoryInjectionEnabled={state.memoryInjectionEnabled} imageEndpoint={state.imageEndpoint} imageWorkflow={state.imageWorkflow} onChange={actions.onSettingsChange} onSave={actions.onSaveSettings} onDiscoverModels={actions.onDiscoverModels} onImageChange={actions.onImageChange} onExportMemory={actions.onExportMemory} onNavigate={actions.onNavigate} />;
+  if (route === "settings") return <SettingsPage provider={state.provider} endpoint={state.endpoint} model={state.model} models={state.models} ollamaContextWindowTokens={state.ollamaContextWindowTokens ?? 0} themeMode={state.themeMode} accentColor={state.accentColor} density={state.density} backdrop={state.backdrop} reduceMotion={state.reduceMotion} petVisible={state.petVisible} petWander={state.petWander} petInteractionDemo={state.petInteractionDemo} petCharacter={state.petCharacter} petSpriteDataUrl={state.petSpriteDataUrl} developerMode={state.developerMode} memoryInjectionEnabled={state.memoryInjectionEnabled} smartPromptRewritingEnabled={state.smartPromptRewritingEnabled} imageEndpoint={state.imageEndpoint} imageWorkflow={state.imageWorkflow} onChange={actions.onSettingsChange} onSave={actions.onSaveSettings} onDiscoverModels={actions.onDiscoverModels} onImageChange={actions.onImageChange} onExportMemory={actions.onExportMemory} onNavigate={actions.onNavigate} />;
   if (route === "pet-workshop") return <PetWorkshopPage />;
+  if (route === "voice-workbench") return <div className="feature-page plugins-page"><VoiceWorkbench onBack={() => actions.onNavigate("marketplace")} /></div>;
   if (route === "models") return <ModelsPage models={state.models} onDiscover={actions.onDiscoverModels} onPull={actions.onPullModel} onCancelPull={actions.onCancelModelPull ?? (async () => false)} onSelect={actions.onSelectModel} />;
   if (route === "images") return <ImagesPage provider={state.imageProvider} endpoint={state.imageEndpoint} prompt={state.imagePrompt} workflow={state.imageWorkflow} busy={state.imageBusy} images={state.generatedImages} onChange={actions.onImageChange} onGenerate={actions.onGenerateImage} onImportWorkflow={actions.onImportWorkflow ?? (async () => null)} onPickSourceImage={actions.onPickImageSource ?? (async () => null)} />;
   // Marketplace is the unified capabilities catalog. Keep the legacy plugins
   // route as an alias so existing deep links continue to work, but render the
   // Plugins-style catalog as the single entry point.
   if (route === "marketplace") return <PluginsPage onNavigate={(nextRoute) => actions.onNavigate(nextRoute)} onSelectAirLlmModel={actions.onSelectModel} />;
-  if (route === "workbench") return <WorkbenchPage tasks={state.tasks} scheduled={state.scheduledTasks} busyTask={state.taskBusy} loading={state.tasksLoading} error={state.tasksError} onRetry={actions.onRetryWorkbench} onNavigate={(route) => actions.onNavigate(route)} onTransition={actions.onTransitionTask} onExecuteTask={actions.onExecuteTask} onSchedule={actions.onScheduleTask} onScheduledTransition={actions.onTransitionScheduledTask} />;
   if (route === "memory") return <MemoryPage entries={state.memoryEntries} busy={state.memoryBusy} loading={state.memoryLoading} error={state.memoryError} onRetry={actions.onRetryMemory} onSearch={actions.onSearchMemory} onSave={actions.onSaveMemory} onToggle={actions.onToggleMemory} onRemove={actions.onRemoveMemory} onExport={actions.onExportMemory} corpusDocuments={state.corpusDocuments} corpusLoading={state.corpusLoading} corpusError={state.corpusError} onSearchCorpus={actions.onSearchCorpus ?? (() => undefined)} onSaveCorpus={actions.onSaveCorpus ?? (async () => false)} onRemoveCorpus={actions.onRemoveCorpus ?? (async () => false)} onImportCorpus={actions.onImportCorpus ?? (() => undefined)} />;
   if (route === "usage") return <UsagePage />;
   return <TerminalPage projects={state.projects} initialProjectId={state.selectedProject?.id} busy={state.terminalBusy} output={state.terminalOutput} exitCode={state.terminalExitCode} sessionId={state.terminalSessionId ?? null} screen={state.terminalScreen ?? null} onRun={actions.onRunProjectCommand} onStartSession={actions.onStartTerminalSession ?? (async () => false)} onWriteSession={actions.onWriteTerminalSession ?? (async () => false)} onRefreshSession={actions.onRefreshTerminalSession ?? (async () => false)} onCloseSession={actions.onCloseTerminalSession ?? (async () => true)} onOpenCoding={() => actions.onNavigate("coding")} />;

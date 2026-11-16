@@ -66,7 +66,7 @@ public sealed class WorkspaceFileEditor
             var previous = currentHash is null ? null : ReadBytesBounded(target, MaxFileBytes);
             EnsureNoLinksInPath(selectedRoot, target);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            var temp = target + ".serverrock-" + Guid.NewGuid().ToString("N") + ".tmp";
+            var temp = target + ".skai-" + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
                 File.WriteAllText(temp, content, new UTF8Encoding(false));
@@ -91,7 +91,7 @@ public sealed class WorkspaceFileEditor
         }
         if (receipt.PreviousContent.Length > MaxFileBytes)
             throw new InvalidDataException("The undo record exceeds the workspace file size limit.");
-        var temp = receipt.TargetPath + ".serverrock-" + Guid.NewGuid().ToString("N") + ".tmp";
+        var temp = receipt.TargetPath + ".skai-" + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             File.WriteAllBytes(temp, receipt.PreviousContent);

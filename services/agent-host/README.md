@@ -16,7 +16,7 @@ launches use the Core application-data path.
 Run it manually:
 
 ```powershell
-dotnet run --project services/agent-host/ServerRock.AgentHost.csproj -- --stdio
+dotnet run --project services/agent-host/SkaiDesktop.AgentHost.csproj -- --stdio
 ```
 
 Then send one JSON request per line:
@@ -26,5 +26,5 @@ Then send one JSON request per line:
 ```
 
 The process is launched by the Electron main process, not the renderer. The
-renderer receives only the narrow `serverRockAgent.request` bridge exposed by the
+renderer receives only the narrow `skaiAgent.request` bridge exposed by the
 preload script.

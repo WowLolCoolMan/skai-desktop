@@ -19,7 +19,7 @@ const items: CatalogItem[] = [
 ];
 
 function request(method: string, params?: Record<string, unknown>): Promise<AgentResponse> {
-  return window.serverRockAgent?.request(method, params) ?? Promise.resolve({ v: 1, id: `marketplace-${method}`, ok: false, error: { code: "BRIDGE_UNAVAILABLE", message: "The Electron agent bridge is unavailable." } });
+  return window.skaiAgent?.request(method, params) ?? Promise.resolve({ v: 1, id: `marketplace-${method}`, ok: false, error: { code: "BRIDGE_UNAVAILABLE", message: "The Electron agent bridge is unavailable." } });
 }
 
 function formatSize(bytes?: number | null) {
@@ -32,14 +32,21 @@ function normalizeSource(value: string) {
   return value.toLowerCase().replace(/[^a-z]/g, "");
 }
 
+function marketplacePreference<T>(key: string, fallback: T): T {
+  try {
+    const value = localStorage.getItem(`skai.marketplace.${key}`);
+    return value === null ? fallback : JSON.parse(value) as T;
+  } catch { return fallback; }
+}
+
 // Embedded in the unified Marketplace catalog (PluginsPage) for the hub sections that catalog
 // does not cover itself: remote model search/install, Diffusers LoRAs and the local inventory.
-const EMBEDDED_SECTIONS: Section[] = ["Models", "Image models", "Installed"];
+const EMBEDDED_SECTIONS: Section[] = ["Models"];
 
 export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSection = "Discover", onBack }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; initialSection?: Section; onBack?: () => void }) {
   const [section, setSection] = useState<Section>(initialSection);
   const [filter, setFilter] = useState<Filter>("All");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => marketplacePreference(`query.${initialSection.toLowerCase()}`, ""));
   const [selectedId, setSelectedId] = useState(items[0].id);
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
   const [catalog, setCatalog] = useState<MarketplaceCatalog | null>(null);
@@ -47,8 +54,12 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const [modelLoading, setModelLoading] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
   const [uncensored, setUncensored] = useState(false);
-  const [provider, setProvider] = useState("All providers");
-  const [size, setSize] = useState("Any size");
+  const [provider, setProvider] = useState(() => marketplacePreference("models.provider", "All providers"));
+  const [size, setSize] = useState(() => marketplacePreference("models.size", "Any size"));
+  const [taskFilter, setTaskFilter] = useState(() => marketplacePreference("models.task", "All tasks"));
+  const [libraryFilter, setLibraryFilter] = useState(() => marketplacePreference("models.library", "All libraries"));
+  const [appFilter, setAppFilter] = useState(() => marketplacePreference("models.app", "All apps"));
+  const [hardwareFilter, setHardwareFilter] = useState(() => marketplacePreference("models.hardware", "Any hardware"));
   const [installing, setInstalling] = useState<string | null>(null);
   const [installStatus, setInstallStatus] = useState<string | null>(null);
   const [installOperationId, setInstallOperationId] = useState<string | null>(null);
@@ -64,6 +75,16 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const [imageAssetsLoading, setImageAssetsLoading] = useState(false);
   const [imageAssetStatus, setImageAssetStatus] = useState<string | null>(null);
   const [airLlmReady, setAirLlmReady] = useState<boolean | null>(null);
+
+  useEffect(() => { localStorage.setItem(`skai.marketplace.query.${section.toLowerCase()}`, JSON.stringify(query)); }, [query, section]);
+  useEffect(() => {
+    localStorage.setItem("skai.marketplace.models.provider", JSON.stringify(provider));
+    localStorage.setItem("skai.marketplace.models.size", JSON.stringify(size));
+    localStorage.setItem("skai.marketplace.models.task", JSON.stringify(taskFilter));
+    localStorage.setItem("skai.marketplace.models.library", JSON.stringify(libraryFilter));
+    localStorage.setItem("skai.marketplace.models.app", JSON.stringify(appFilter));
+    localStorage.setItem("skai.marketplace.models.hardware", JSON.stringify(hardwareFilter));
+  }, [appFilter, hardwareFilter, libraryFilter, provider, size, taskFilter]);
 
   const useAirLlmModel = (model: MarketplaceModel) => {
     if (!model.requiresAirLlm || !onSelectAirLlmModel) return;
@@ -124,7 +145,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
     finally { setInstalledLoading(false); }
   };
 
-  useEffect(() => { if (section === "Installed") void loadInstalledModels(); }, [section]);
+  useEffect(() => { if (section === "Installed" || (onBack && section === "Models")) void loadInstalledModels(); }, [section, onBack]);
   const searchImageAssets = async () => {
     setImageAssetsLoading(true); setImageAssetStatus(null);
     const response = await request("marketplace.image-assets.search", { query });
@@ -158,12 +179,25 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   // Live provider search gets the full width under Models; Discover stays a capability overview.
   const showModels = section === "Models";
+  const modelTags = useMemo(() => [...new Set(models.flatMap((model) => model.tags))].sort((a, b) => a.localeCompare(b)), [models]);
+  const taskOptions = useMemo(() => ["All tasks", ...new Set(modelTags.filter((tag) => /text|chat|code|image|audio|video|vision|speech|embed/i.test(tag)).map((tag) => tag.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())))], [modelTags]);
+  const libraryOptions = useMemo(() => ["All libraries", ...new Set(modelTags.filter((tag) => /transformers|gguf|mlx|pytorch|tensorflow|diffusers|safetensors|jax/i.test(tag)).map((tag) => tag.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())))], [modelTags]);
+  const appOptions = useMemo(() => ["All apps", ...new Set(modelTags.filter((tag) => /ollama|llama\.cpp|lm studio|vllm|jan|localai|airllm/i.test(tag)).map((tag) => tag.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())))], [modelTags]);
   const filteredModels = useMemo(() => models.filter((model) => {
     const matchesProvider = provider === "All providers" || (provider === "AirLLM" ? model.requiresAirLlm === true : model.source === provider && !model.requiresAirLlm);
     const sizeLimit = size === "Any size" ? Number.POSITIVE_INFINITY : Number(size);
     const matchesSize = size === "Any size" || (model.sizeBytes != null && model.sizeBytes <= sizeLimit * 1024 ** 3);
-    return matchesProvider && matchesSize;
-  }), [models, provider, size]);
+    const tags = model.tags.map((tag) => tag.toLowerCase());
+    const normalizedTask = taskFilter === "All tasks" ? "" : taskFilter.toLowerCase();
+    const normalizedLibrary = libraryFilter === "All libraries" ? "" : libraryFilter.toLowerCase();
+    const normalizedApp = appFilter === "All apps" ? "" : appFilter.toLowerCase();
+    const matchesTask = !normalizedTask || tags.some((tag) => tag.includes(normalizedTask));
+    const matchesLibrary = !normalizedLibrary || tags.some((tag) => tag.includes(normalizedLibrary));
+    const matchesApp = !normalizedApp || tags.some((tag) => tag.includes(normalizedApp));
+    const hardwareLimit = hardwareFilter === "Any hardware" ? Number.POSITIVE_INFINITY : Number(hardwareFilter);
+    const matchesHardwareEstimate = model.sizeBytes == null || model.sizeBytes <= hardwareLimit * 1024 ** 3;
+    return matchesProvider && matchesSize && matchesTask && matchesLibrary && matchesApp && matchesHardwareEstimate;
+  }), [appFilter, hardwareFilter, libraryFilter, models, provider, size, taskFilter]);
   const selectedRemoteModel = filteredModels.find((model) => model.id === selectedRemoteModelId) ?? filteredModels[0] ?? null;
 
   async function searchModels(nextQuery = query, nextUncensored = uncensored) {
@@ -270,7 +304,18 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   ];
   const modelResults = <section className="marketplace-remote-results" aria-label="Remote model sources">
     <div className="panel-heading"><div><p className="section-kicker">REMOTE MODEL SOURCES</p><h3>Models for local runtimes</h3><p className="panel-subtitle">GGUF packages install through compatible runtimes. Transformers repositories use the optional AirLLM route and download weights on first use.</p></div><StatusBadge tone={modelError ? "warning" : "success"}>{modelLoading ? "Polling" : modelError ? "Partial" : "Live catalog"}</StatusBadge></div>
-    <div className="marketplace-model-controls"><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}><option>All providers</option><option>Hugging Face</option><option>ModelScope</option><option>AirLLM</option></select></label><label>Maximum size<select value={size} onChange={(event) => setSize(event.target.value)}><option>Any size</option><option value="8">8 GB</option><option value="14">14 GB</option><option value="24">24 GB</option><option value="40">40 GB</option></select></label><label className="settings-toggle"><span><strong>Include abliterated</strong><small>Only show explicit uncensored/abliterated labels.</small></span><input type="checkbox" checked={uncensored} onChange={(event) => { setUncensored(event.target.checked); void searchModels(query, event.target.checked); }} /></label></div>
+    <article className="marketplace-developer-pick">
+      <div className="marketplace-developer-pick-mark" aria-hidden="true"><NavIcon name="activity" /></div>
+      <div className="marketplace-developer-pick-copy"><div className="marketplace-developer-pick-heading"><h4>Sophon-Realtime v1</h4><span className="marketplace-developer-favorite" aria-label="Developer Favorite"><span aria-hidden="true">★</span> Developer Favorite</span></div><p>Open full-duplex speech-to-speech by Adventists.ai. It listens and speaks in real time, with expressive voice and interruption handling.</p><small>Apache-2.0 · Recommended Tag build: about 42 GB and an 80 GB GPU · Self-hosting requires Linux and CUDA; use the official card for hosted API options.</small></div>
+      <Button variant="secondary" type="button" onClick={() => void window.skaiAgent?.updates?.open("https://huggingface.co/adventists-ai/Sophon-Realtime-v1")}>View model card</Button>
+    </article>
+    <article className="marketplace-developer-pick">
+      <div className="marketplace-developer-pick-mark" aria-hidden="true"><NavIcon name="model" /></div>
+      <div className="marketplace-developer-pick-copy"><div className="marketplace-developer-pick-heading"><h4>LFM3-Omni-2B</h4><span className="marketplace-developer-favorite" aria-label="Developer Favorite"><span aria-hidden="true">★</span> Developer Favorite</span></div><p>Compact 2.17B all-in-one model from Liquid AI for text, images, video, and audio, with text or speech output.</p><small>LFM Open License v1.0 · 32K context · GGUF is supported by llama.cpp for local use; Skai can hand off its GGUF download to a configured LM Studio server.</small></div>
+      <div className="marketplace-developer-pick-actions"><Button variant="secondary" type="button" onClick={() => void window.skaiAgent?.updates?.open("https://huggingface.co/LiquidAI/LFM3-Omni-2B")}>View model card</Button><Button variant="primary" type="button" onClick={() => { const nextQuery = "LiquidAI/LFM3-Omni-2B-GGUF"; setQuery(nextQuery); setProvider("All providers"); setSize("Any size"); setSelectedRemoteModelId(null); void searchModels(nextQuery); }}>Find GGUF build</Button></div>
+    </article>
+    <div className="marketplace-model-controls marketplace-model-filters"><label>Task<select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}>{taskOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}><option>All providers</option><option>Hugging Face</option><option>ModelScope</option><option>AirLLM</option></select></label><label>Library<select value={libraryFilter} onChange={(event) => setLibraryFilter(event.target.value)}>{libraryOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>App/runtime<select value={appFilter} onChange={(event) => setAppFilter(event.target.value)}>{appOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Max model size<select value={size} onChange={(event) => setSize(event.target.value)}><option>Any size</option><option value="8">8 GB</option><option value="14">14 GB</option><option value="24">24 GB</option><option value="40">40 GB</option></select></label><label>Hardware estimate<select value={hardwareFilter} onChange={(event) => setHardwareFilter(event.target.value)}><option>Any hardware</option><option value="8">Up to 8 GB model</option><option value="14">Up to 14 GB model</option><option value="24">Up to 24 GB model</option></select></label><label className="settings-toggle"><span><strong>Include abliterated</strong><small>Only show explicit uncensored/abliterated labels.</small></span><input type="checkbox" checked={uncensored} onChange={(event) => { setUncensored(event.target.checked); void searchModels(query, event.target.checked); }} /></label></div>
+    <p className="marketplace-honesty">Task, library, and runtime filters use tags supplied by each model catalog. Hardware filtering is only a model-size estimate; it does not inspect your device or predict exact memory use.</p>
     {modelError && <p className="marketplace-honesty" role="status">{modelError}</p>}
     {installStatus && <div className="marketplace-honesty marketplace-download-status" role="status"><span>{installStatus}</span>{installing && <Button variant="ghost" type="button" onClick={() => void cancelModelInstall()}>Cancel download</Button>}</div>}
     {reviewModel && <div className="marketplace-install-review marketplace-model-review" role="dialog" aria-label={reviewModel.requiresAirLlm ? "Review AirLLM model route" : "Verify model installation"}><p className="section-kicker">{reviewModel.requiresAirLlm ? "AIRLLM ROUTE REVIEW" : "INSTALLATION REVIEW"}</p><strong>{reviewModel.repository}</strong><span>{reviewModel.source} · {formatSize(reviewModel.sizeBytes)} · {reviewModel.downloads.toLocaleString()} downloads</span><span>{reviewModel.requiresAirLlm ? `This Transformers model will use the optional AirLLM route. ${airLlmReady === true ? "AirLLM is ready." : airLlmReady === false ? "Install AirLLM in Settings before using this route." : "Checking AirLLM readiness…"} Model weights download from Hugging Face on first use and may require substantial disk space. Inference can be much slower than Ollama or LM Studio.` : `Skai will use the verified ${reviewModel.installRoute} route. No download starts until you confirm this local installation.`}</span><div className="marketplace-model-actions">{reviewModel.requiresAirLlm && onNavigate && <Button variant="secondary" type="button" onClick={() => { setReviewModel(null); onNavigate("settings"); }}>Manage AirLLM</Button>}<Button variant="ghost" type="button" onClick={() => setReviewModel(null)}>Cancel</Button><Button variant="primary" type="button" disabled={reviewModel.requiresAirLlm ? !onSelectAirLlmModel || airLlmReady !== true : !reviewModel.installable || installing !== null} onClick={() => { const model = reviewModel; setReviewModel(null); if (model.requiresAirLlm) useAirLlmModel(model); else void installModel(model); }}>{reviewModel.requiresAirLlm ? "Use with AirLLM" : "Confirm and install locally"}</Button></div></div>}
@@ -287,7 +332,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
     <div className="feature-page marketplace-page">
       <header className="marketplace-header">
         <div><p className="eyebrow">MARKETPLACE</p><h2>{sectionHeading[section]}</h2><p className="page-description">{sectionDescription[section]}</p></div>
-        <div className="marketplace-header-actions">{onBack && <Button variant="ghost" type="button" onClick={onBack}><NavIcon name="chevron-left" />Marketplace</Button>}{section !== "Installed" && <Button variant="ghost" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}>View installed</Button>}</div>
+        <div className="marketplace-header-actions">{onBack && <Button variant="ghost" type="button" onClick={onBack}><NavIcon name="chevron-left" />Marketplace</Button>}{!onBack && section !== "Installed" && <Button variant="ghost" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}>View installed</Button>}</div>
       </header>
       <div className="marketplace-browser">
         <nav className="marketplace-sections" aria-label="Marketplace sections">
@@ -338,7 +383,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
         ) : (
           <>
             <div className="marketplace-toolbar"><div className="marketplace-search-row"><label className="sr-only" htmlFor="marketplace-search">Search {section.toLowerCase()}</label><input id="marketplace-search" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && showModels) void searchModels(); }} placeholder={showModels ? "Search models by name or provider…" : "Search " + section.toLowerCase() + "…"} />{showModels && <Button variant="secondary" disabled={modelLoading} onClick={() => void searchModels()}>{modelLoading ? "Searching…" : "Search providers"}</Button>}<span>{showModels ? models.length + " remote results" : visible.length + " results"}</span></div></div>
-            {showModels ? <div className="marketplace-models-pane">{modelResults}</div> : (
+            {showModels ? <><div className="marketplace-models-pane">{modelResults}</div>{onBack && <section className="marketplace-installed-inline"><div className="panel-heading"><div><p className="section-kicker">ON THIS DEVICE</p><h3>Installed models</h3></div><StatusBadge tone={installedError ? "warning" : installedLoading ? "neutral" : "success"}>{installedLoading ? "Checking" : installedError ? "Unavailable" : `${installedModels.length} installed`}</StatusBadge></div>{installedError ? <p className="marketplace-honesty" role="status">{installedError}</p> : installedModels.length ? <div className="marketplace-installed-list">{installedModels.filter((item) => (item.model + " " + item.provider + " " + item.capabilities.join(" ")).toLowerCase().includes(query.trim().toLowerCase())).map((item) => <article className="marketplace-installed-model" key={`${item.provider ?? "local"}-${item.model}`}><span className="marketplace-installed-model-icon"><NavIcon name="model" /></span><div className="marketplace-installed-model-copy"><strong>{item.model}</strong><small>{item.provider ?? "Local runtime"} · {item.vision.toLowerCase() === "supported" ? "Vision" : "Text"}</small><span>{item.capabilities.join(" · ") || "Text generation"}</span></div><StatusBadge tone="success">Available locally</StatusBadge></article>)}</div> : <p className="marketplace-honesty">No installed models were reported by the selected local runtime.</p>}</section>}</> : (
               <div className="marketplace-layout">
                 <div className="marketplace-results" aria-label={section + " results"}>
                   {visible.length === 0 ? <EmptyState title={query ? "No matching results" : "Nothing to show yet"} description={query ? "Try another search term." : "This category has no entries in the local catalog yet."} action={query ? <Button variant="ghost" onClick={() => setQuery("")}>Clear search</Button> : undefined} /> : visible.map((item) => (
@@ -357,7 +402,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
                     {installedVoiceModels.some((voice) => voice.lowResource && voice.id !== voiceSettings.primaryModelId) && <label className="settings-toggle"><span><strong>Use low-resource mode</strong><small>Use the separately assigned voice model.</small></span><input type="checkbox" checked={voiceSettings.lowResourceMode} onChange={(event) => updateVoice("lowResourceMode", event.target.checked)} /></label>}
                     <div className="marketplace-voice-actions"><Button variant="secondary" onClick={() => void speakNativeResponse("Skai voice preview. This uses the operating system voice service.", true)}>Preview voice</Button><Button variant="ghost" onClick={stopNativeSpeech}>Stop</Button></div>
                   </div>}
-                  {selected.filter === "Local models" ? <p className="marketplace-honesty" role="status">{installStatus ?? "Review the provider, size, and source before confirming a local model download."}</p> : selected.id === "mcp:rea" ? <div className="marketplace-install-review"><p className="section-kicker">MCP PACKAGE</p><strong>Pinned package · verified before save</strong><span>{mcpMarketplaceStatus ?? "Downloading saves the package only. Connect starts the reviewed local REA stdio server; no arbitrary commands are accepted."}</span><div className="marketplace-model-actions"><Button variant="primary" disabled={mcpMarketplaceBusy} onClick={() => void downloadReaPackage()}>{mcpMarketplaceBusy ? "Working…" : "Download package"}</Button><Button variant="secondary" disabled={mcpMarketplaceBusy} onClick={() => void connectRea()}>{mcpMarketplaceBusy ? "Working…" : "Connect in Skai"}</Button><Button variant="ghost" onClick={() => void window.serverRockAgent?.updates?.open("https://github.com/morluto/rea")}>View source</Button></div></div> : <div className="marketplace-install-review"><p className="section-kicker">INSTALL STATUS</p><strong>{selected.installable ? "Review required" : "No installer connected"}</strong><span>Install actions appear only when a verified local installer is available. Nothing is downloaded from this item.</span></div>}
+                  {selected.filter === "Local models" ? <p className="marketplace-honesty" role="status">{installStatus ?? "Review the provider, size, and source before confirming a local model download."}</p> : selected.id === "mcp:rea" ? <div className="marketplace-install-review"><p className="section-kicker">MCP PACKAGE</p><strong>Pinned package · verified before save</strong><span>{mcpMarketplaceStatus ?? "Downloading saves the package only. Connect starts the reviewed local REA stdio server; no arbitrary commands are accepted."}</span><div className="marketplace-model-actions"><Button variant="primary" disabled={mcpMarketplaceBusy} onClick={() => void downloadReaPackage()}>{mcpMarketplaceBusy ? "Working…" : "Download package"}</Button><Button variant="secondary" disabled={mcpMarketplaceBusy} onClick={() => void connectRea()}>{mcpMarketplaceBusy ? "Working…" : "Connect in Skai"}</Button><Button variant="ghost" onClick={() => void window.skaiAgent?.updates?.open("https://github.com/morluto/rea")}>View source</Button></div></div> : <div className="marketplace-install-review"><p className="section-kicker">INSTALL STATUS</p><strong>{selected.installable ? "Review required" : "No installer connected"}</strong><span>Install actions appear only when a verified local installer is available. Nothing is downloaded from this item.</span></div>}
                 </aside>}
               </div>
             )}

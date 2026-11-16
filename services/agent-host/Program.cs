@@ -1,4 +1,4 @@
-using ServerRock.AgentHost.Protocol;
+using SkaiDesktop.AgentHost.Protocol;
 
 if (!args.Contains("--stdio", StringComparer.Ordinal))
 {

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace ServerRock.AgentHost.Protocol;
+namespace SkaiDesktop.AgentHost.Protocol;
 
 public sealed record AgentRequest(int V, string Id, string Method, JsonElement? Params = null);
 

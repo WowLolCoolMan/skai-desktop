@@ -1,0 +1,68 @@
+- main [ref=f1e2]:
+  - generic "Agar Arena game. Move the pointer to steer; press Space to split." [active] [ref=f1e3]
+  - generic [ref=f1e4]:
+    - link "Agar Arena home" [ref=f1e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=f1e10]:
+        - text: AGAR/ARENA
+        - generic [ref=f1e11]: LOCAL EVOLUTION SIM
+    - generic [ref=f1e12]:
+      - generic [ref=f1e13]:
+        - generic [ref=f1e14]: TIME
+        - strong [ref=f1e15]: 00:00
+      - generic [ref=f1e16]:
+        - generic [ref=f1e17]: CELLS EATEN
+        - strong [ref=f1e18]: "0"
+    - generic [ref=f1e19]:
+      - generic [ref=f1e20]: OFFLINE · LOCAL
+      - button "Pause game" [ref=f1e22] [cursor=pointer]: Ⅱ
+  - generic [ref=f1e23]:
+    - generic [ref=f1e24]: YOUR CELL
+    - strong [ref=f1e27]: Rookie
+    - generic [ref=f1e28]:
+      - strong [ref=f1e29]: "35"
+      - generic [ref=f1e30]: MASS
+    - generic [ref=f1e33]:
+      - generic [ref=f1e34]: "RANK #24"
+      - generic [ref=f1e35]: BEST 63
+    - generic [ref=f1e36]:
+      - generic [ref=f1e37]: ARENA GROWTH
+      - generic [ref=f1e38]: NEXT 50
+  - complementary [ref=f1e39]:
+    - generic [ref=f1e40]:
+      - generic [ref=f1e41]:
+        - text: LIVE ARENA
+        - heading "Top cells" [level=2] [ref=f1e42]
+      - generic [ref=f1e43]: ● LIVE
+    - list [ref=f1e87]:
+      - listitem [ref=f1e88]:
+        - generic [ref=f1e89]: "01"
+        - generic [ref=f1e91]: zest
+        - generic [ref=f1e92]: "66"
+      - listitem [ref=f1e93]:
+        - generic [ref=f1e94]: "02"
+        - generic [ref=f1e96]: sundae
+        - generic [ref=f1e97]: "48"
+      - listitem [ref=f1e98]:
+        - generic [ref=f1e99]: "03"
+        - generic [ref=f1e101]: bean
+        - generic [ref=f1e102]: "47"
+      - listitem [ref=f1e103]:
+        - generic [ref=f1e104]: "04"
+        - generic [ref=f1e106]: moss
+        - generic [ref=f1e107]: "47"
+      - listitem [ref=f1e108]:
+        - generic [ref=f1e109]: "05"
+        - generic [ref=f1e111]: miso
+        - generic [ref=f1e112]: "47"
+    - generic [ref=f1e44]:
+      - generic [ref=f1e45]: AI rivals
+      - generic [ref=f1e47]: 39 online
+  - generic [ref=f1e48]:
+    - generic [ref=f1e50]: ARENA 04
+    - generic [ref=f1e52]: 40 CELLS
+  - generic [ref=f1e53]:
+    - generic [ref=f1e54]: SPACE SPLIT
+    - generic [ref=f1e55]: P PAUSE
+    - button "◖ SOUND OFF" [ref=f1e56] [cursor=pointer]
+  - status

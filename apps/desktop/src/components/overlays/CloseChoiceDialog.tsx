@@ -6,7 +6,7 @@ import { NavIcon } from "../ui/NavIcon";
 // Linux-only: shown when the window manager closes the main window (e.g. a
 // Hyprland/i3 "close window" keybind) and no choice has been remembered.
 export function CloseChoiceDialog() {
-  const bridge = window.serverRockAgent?.window;
+  const bridge = window.skaiAgent?.window;
   const [request, setRequest] = useState<{ trayAvailable: boolean } | null>(null);
   const [remember, setRemember] = useState(false);
   const backgroundRef = useRef<HTMLButtonElement>(null);
@@ -25,7 +25,7 @@ export function CloseChoiceDialog() {
         <span className="close-choice-mark" aria-hidden="true"><NavIcon name="sparkle" /></span>
         <div>
           <h2 id="close-choice-title">Close Skai Desktop?</h2>
-          <p>Skai can keep running in the background so Percy, scheduled work, and the local agent host stay available.</p>
+          <p>Skai can keep running in the background so desktop pets, scheduled work, and the local agent host stay available.</p>
         </div>
       </div>
       <div className="close-choice-options">
@@ -35,7 +35,7 @@ export function CloseChoiceDialog() {
         </button>
         <button type="button" className="close-choice-option" onClick={() => respond("quit")}>
           <strong>Fully close</strong>
-          <small>Stop Skai, Percy, and the local agent host.</small>
+          <small>Stop Skai, all pets, and the local agent host.</small>
         </button>
       </div>
       <label className="close-choice-remember"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>Remember my choice <small>(change it in Settings → General)</small></span></label>

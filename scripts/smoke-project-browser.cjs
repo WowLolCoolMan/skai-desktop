@@ -15,7 +15,7 @@ fs.writeFileSync(path.join(workspace, "README.md"), "safe metadata fixture\n");
 fs.writeFileSync(path.join(workspace, ".env"), "SECRET=must-not-appear\n");
 fs.writeFileSync(path.join(workspace, "node_modules", "ignored.js"), "ignored\n");
 
-const child = spawn("dotnet", ["run", "--project", path.join(root, "services", "agent-host", "ServerRock.AgentHost.csproj"), "--no-build", "--", "--stdio"], {
+const child = spawn("dotnet", ["run", "--project", path.join(root, "services", "agent-host", "SkaiDesktop.AgentHost.csproj"), "--no-build", "--", "--stdio"], {
   cwd: root,
   env: { ...process.env, SRAI_PROJECTS_PATH: path.join(tempRoot, "projects.json") },
   stdio: ["pipe", "pipe", "pipe"],

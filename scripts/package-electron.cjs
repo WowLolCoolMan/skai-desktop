@@ -12,7 +12,7 @@ const hostRoot = path.join(outputRoot, "resources", "agent-host");
 const runtime = process.platform === "win32" ? "win-x64" : process.platform === "linux" ? "linux-x64" : "osx-x64";
 const electronBinary = process.platform === "win32" ? "electron.exe" : "electron";
 const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop";
-const hostBinary = process.platform === "win32" ? "ServerRock.AgentHost.exe" : "ServerRock.AgentHost";
+const hostBinary = process.platform === "win32" ? "SkaiDesktop.AgentHost.exe" : "SkaiDesktop.AgentHost";
 const desktopPackage = JSON.parse(fs.readFileSync(path.join(desktopRoot, "package.json"), "utf8"));
 
 function run(command, args) {
@@ -38,11 +38,15 @@ fs.rmSync(outputRoot, { recursive: true, force: true });
 fs.mkdirSync(appRoot, { recursive: true });
 fs.mkdirSync(hostRoot, { recursive: true });
 
-run("dotnet", ["publish", path.join("services", "agent-host", "ServerRock.AgentHost.csproj"), "-c", "Release", "-r", runtime, "--self-contained", "true", "-p:PublishSingleFile=true", "-p:PublishTrimmed=false", "-o", hostRoot]);
+run("dotnet", ["publish", path.join("services", "agent-host", "SkaiDesktop.AgentHost.csproj"), "-c", "Release", "-r", runtime, "--self-contained", "true", "-p:PublishSingleFile=true", "-p:PublishTrimmed=false", "-o", hostRoot]);
 const airLlmWorkerSource = path.join(root, "services", "airllm");
 const airLlmWorkerTarget = path.join(hostRoot, "airllm");
 if (!fs.existsSync(path.join(airLlmWorkerSource, "skai_airllm.py"))) throw new Error("The AirLLM worker is missing from services/airllm.");
 fs.cpSync(airLlmWorkerSource, airLlmWorkerTarget, { recursive: true, force: true });
+const diffusersWorkerSource = path.join(root, "services", "diffusers");
+const diffusersWorkerTarget = path.join(hostRoot, "diffusers");
+if (!fs.existsSync(path.join(diffusersWorkerSource, "skai_diffusers.py")) || !fs.existsSync(path.join(diffusersWorkerSource, "requirements.txt"))) throw new Error("The optional local image workers are missing from services/diffusers.");
+fs.cpSync(diffusersWorkerSource, diffusersWorkerTarget, { recursive: true, force: true });
 
 fs.cpSync(electronDist, outputRoot, { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "dist"), path.join(appRoot, "dist"), { recursive: true, force: true });
@@ -55,6 +59,7 @@ fs.renameSync(path.join(outputRoot, electronBinary), path.join(outputRoot, packa
 const publishedHost = path.join(hostRoot, hostBinary);
 if (!fs.existsSync(publishedHost)) throw new Error(`The self-contained Agent Host was not published at ${publishedHost}.`);
 if (!fs.existsSync(path.join(airLlmWorkerTarget, "skai_airllm.py"))) throw new Error(`The packaged AirLLM worker was not staged at ${path.join(airLlmWorkerTarget, "skai_airllm.py")}.`);
+if (!fs.existsSync(path.join(diffusersWorkerTarget, "skai_diffusers.py")) || !fs.existsSync(path.join(diffusersWorkerTarget, "skai_pet_background.py"))) throw new Error(`The packaged Diffusers workers were not staged at ${diffusersWorkerTarget}.`);
 const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 fs.writeFileSync(path.join(outputRoot, "artifact-manifest.json"), JSON.stringify({
   product: "Skai Desktop",
@@ -66,6 +71,8 @@ fs.writeFileSync(path.join(outputRoot, "artifact-manifest.json"), JSON.stringify
     executable: sha256(path.join(outputRoot, packagedBinary)),
     agentHost: sha256(publishedHost),
     airLlmWorker: sha256(path.join(airLlmWorkerTarget, "skai_airllm.py")),
+    diffusersWorker: sha256(path.join(diffusersWorkerTarget, "skai_diffusers.py")),
+    petBackgroundWorker: sha256(path.join(diffusersWorkerTarget, "skai_pet_background.py")),
   },
 }, null, 2) + "\n", "utf8");
 // Linux: ship a per-user installer, app-launcher entry and icon alongside the portable folder.
@@ -80,13 +87,13 @@ if (process.platform === "linux") {
 fs.writeFileSync(path.join(outputRoot, "README-release.txt"), [
   "Skai Desktop portable Electron artifact",
   "",
-  `Run ${packagedBinary} from this folder. The bundled Agent Host is in resources/agent-host, including the AirLLM worker contract.`,
+  `Run ${packagedBinary} from this folder. The bundled Agent Host is in resources/agent-host, including optional local model and pet image workers.`,
   ...(process.platform === "linux" ? [
     "",
     "Linux: run ./install.sh to install for your user (no root needed). It adds Skai Desktop to your app",
     "launcher and a `skai-desktop` command. On systems that restrict unprivileged user namespaces",
     "(for example Ubuntu 24.04+) it offers the one sudo step Chromium's sandbox needs. ./uninstall.sh",
-    "removes the app and keeps your chats and settings in ~/.config/ServerRock and ~/.config/skai-desktop.",
+    "removes the app and keeps your chats and settings in ~/.config/SkaiDesktop and ~/.config/skai-desktop.",
   ] : []),
   "This portable artifact is for release validation; signed installers require the release signing gate.",
   "",

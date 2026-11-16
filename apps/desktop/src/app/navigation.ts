@@ -11,18 +11,20 @@ export type NavigationState = {
 
 export function routeFromLocation(): Route {
   const hashRoute = window.location.hash.replace(/^#\/?/, "").split("/")[0];
+  if (hashRoute === "workbench") return "chat";
   if (hashRoute === "plugins") return "marketplace";
   if (isRoute(hashRoute)) return hashRoute;
   const pathSegments = window.location.pathname.split("/").filter(Boolean);
   const route = decodeURIComponent(pathSegments[pathSegments.length - 1] ?? "") as Route;
+  if (route === "workbench") return "chat";
   if (route === "plugins") return "marketplace";
   if (isRoute(route)) return route;
   const storedRoute = localStorage.getItem(STORAGE_KEY) ?? "";
-  return storedRoute === "plugins" ? "marketplace" : (isRoute(storedRoute) ? storedRoute : "chat");
+  return storedRoute === "plugins" || storedRoute === "workbench" ? "chat" : (isRoute(storedRoute) ? storedRoute : "chat");
 }
 
 export function isRoute(value: string): value is Route {
-  return ["chat", "projects", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory", "usage", "pet-workshop"].includes(value);
+  return ["chat", "projects", "coding", "settings", "models", "images", "marketplace", "terminal", "memory", "usage", "pet-workshop", "voice-workbench"].includes(value);
 }
 
 function readHistoryState(): NavigationState | null {

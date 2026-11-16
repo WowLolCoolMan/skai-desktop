@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove=".build\**" />
+    <EmbeddedResource Remove=".build\**" />
+    <None Remove=".build\**" />
     <ProjectReference Include="..\..\native\SkaiDesktop.Core\SkaiDesktop.Core.csproj" />
   </ItemGroup>
 </Project>

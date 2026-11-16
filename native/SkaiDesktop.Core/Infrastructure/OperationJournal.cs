@@ -19,7 +19,7 @@ public sealed class OperationJournal
     {
         _path = path ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
-            "ServerRock", "AI", "operations.json");
+            "SkaiDesktop", "AI", "operations.json");
     }
 
     public OperationJournalSnapshot Load()
@@ -39,7 +39,7 @@ public sealed class OperationJournal
         Validate(new JournalStore(snapshot.Runs, snapshot.Events));
         return JsonSerializer.Serialize(new JournalExport
         {
-            Format = "server-rock-operations-v1",
+            Format = "skai-operations-v1",
             ExportedAtUtc = DateTimeOffset.UtcNow,
             Runs = snapshot.Runs,
             Events = snapshot.Events
@@ -299,7 +299,7 @@ public sealed class OperationJournal
 
     private sealed class JournalExport
     {
-        public string Format { get; set; } = "server-rock-operations-v1";
+        public string Format { get; set; } = "skai-operations-v1";
         public DateTimeOffset ExportedAtUtc { get; set; }
         public List<OperationRun> Runs { get; set; } = [];
         public List<OperationEvent> Events { get; set; } = [];

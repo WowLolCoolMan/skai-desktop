@@ -6,7 +6,7 @@ internal static class AgentTaskArtifactTests
 {
     public static async Task RunAsync()
     {
-        var root = Path.Combine(Path.GetTempPath(), "server-rock-agent-tests-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "skai-agent-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {

@@ -21,7 +21,7 @@ export async function extractVideoFrameAttachments(video: Blob, fileName: string
   if (video.size === 0 || video.size > maxVideoBytes) throw new Error("Videos must be smaller than 20 MB to sample locally.");
   if (!(await hasExpectedSignature(video, mediaType))) throw new Error("The selected video file has an invalid signature.");
 
-  const bridge = window.serverRockAgent?.media;
+  const bridge = window.skaiAgent?.media;
   if (!bridge) throw new Error("Local video decoding is unavailable in this desktop runtime.");
   const objectUrl = await bridge.createLocalUrl(mediaType, await blobToBase64(video));
   const element = document.createElement("video");

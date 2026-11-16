@@ -72,7 +72,7 @@ internal static class GitHubTests
         }
         if (OperatingSystem.IsWindows())
         {
-            var credentialPath = Path.Combine(Path.GetTempPath(), "server-rock-github-credential-" + Guid.NewGuid().ToString("N"), "github-token.bin");
+            var credentialPath = Path.Combine(Path.GetTempPath(), "skai-github-credential-" + Guid.NewGuid().ToString("N"), "github-token.bin");
             var credentialStore = new GitHubCredentialStore(credentialPath);
             await credentialStore.WriteAsync("gho_test-access-token-value");
             Check(File.Exists(credentialPath) && !File.ReadAllText(credentialPath).Contains("gho_test-access-token-value", StringComparison.Ordinal), "Windows GitHub credentials are stored as DPAPI ciphertext");
@@ -159,7 +159,7 @@ internal static class GitHubTests
             Check(true, "GitHub API bounds repository branch identifiers");
         }
 
-        var worktreeFixture = Path.Combine(Path.GetTempPath(), "server-rock-worktree-" + Guid.NewGuid().ToString("N"));
+        var worktreeFixture = Path.Combine(Path.GetTempPath(), "skai-worktree-" + Guid.NewGuid().ToString("N"));
         var isolatedPath = Path.Combine(Path.GetDirectoryName(worktreeFixture)!, Path.GetFileName(worktreeFixture) + "-isolated");
         try
         {

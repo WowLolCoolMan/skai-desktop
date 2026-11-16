@@ -4,3 +4,4 @@ transformers>=4.45,<6
 accelerate>=1.2,<2
 safetensors>=0.4
 torch>=2.1
+rembg[cpu]==2.0.87

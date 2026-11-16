@@ -40,11 +40,11 @@ const categoryIcons: Record<Category, NavIconName> = {
 const categorySearchText: Record<Category, string> = {
   General: "runtime provider model answer local preferred close window background tray quit linux",
   Appearance: "theme color accent density backdrop reduced motion pet companion animation",
-  Pet: "companion Percy sprite sheet character walk wander always on top overlay custom",
+  Pet: "pets companions sprite sheet character walk wander always on top overlay custom",
   "Models & Providers": "endpoint runtime model discover Ollama LM Studio AirLLM provider local context window tokens 1M",
   "Voice & Audio": "voice speech audio low resource profile preview text to speech TTS",
   "Image Generation": "image ComfyUI workflow prompt endpoint generation",
-  Agents: "task developer diagnostics memory prompts planning",
+  Agents: "task developer diagnostics memory prompts planning smart rewrite reengineering",
   Integrations: "GitHub local services ComfyUI integrations repository",
   "Privacy & Security": "privacy security local storage memory credentials data boundary",
   Storage: "export backup data workspace local memory",
@@ -63,6 +63,7 @@ const builtInPetPreviews: Record<string, string> = {
   percy: new URL("../../../../../assets/pets/generated/percy-idle-frames.png", import.meta.url).href,
   byte: new URL("../../../../../assets/pets/generated/byte-idle-frames.png", import.meta.url).href,
   ember: new URL("../../../../../assets/pets/generated/ember-idle-frames.png", import.meta.url).href,
+  blaze: new URL("../../../../../assets/pets/generated/ember-idle-frames.png", import.meta.url).href,
   nova: new URL("../../../../../assets/pets/generated/nova-idle-frames.png", import.meta.url).href,
   rocky: new URL("../../../../../assets/pets/generated/rocky-idle-frames.png", import.meta.url).href,
   sprout: new URL("../../../../../assets/pets/generated/sprout-idle-frames.png", import.meta.url).href,
@@ -86,6 +87,7 @@ type SettingsProps = {
   petSpriteDataUrl: string;
   developerMode: boolean;
   memoryInjectionEnabled: boolean;
+  smartPromptRewritingEnabled: boolean;
   imageEndpoint: string;
   imageWorkflow: string;
   onChange: (key: string, value: string | boolean) => void;
@@ -116,7 +118,7 @@ export function SettingsPage(props: SettingsProps) {
     if (nextCategory) setActiveCategory(nextCategory);
   }, [activeCategory, normalizedQuery, visibleCategories]);
   useEffect(() => {
-    const updates = window.serverRockAgent?.updates;
+    const updates = window.skaiAgent?.updates;
     if (!updates) return;
     void updates.check().then(setUpdateState);
     return updates.onAvailable(setUpdateState);
@@ -130,7 +132,7 @@ export function SettingsPage(props: SettingsProps) {
     if (checkingAirLlm) return;
     setCheckingAirLlm(true);
     try {
-      const response: AgentResponse | undefined = await window.serverRockAgent?.request("airllm.status");
+      const response: AgentResponse | undefined = await window.skaiAgent?.request("airllm.status");
       setAirLlmStatus(response?.ok ? response.result as AirLlmRuntimeStatus : { workerAvailable: false, dependenciesAvailable: false, pythonCommand: "", status: "unavailable", message: response?.error?.message ?? "The local Agent Host is unavailable." });
     } catch (error) {
       setAirLlmStatus({ workerAvailable: false, dependenciesAvailable: false, pythonCommand: "", status: "unavailable", message: error instanceof Error ? error.message : "AirLLM status could not be checked." });
@@ -141,13 +143,13 @@ export function SettingsPage(props: SettingsProps) {
     setStartingAirLlmInstall(true);
     setAirLlmInstall(null);
     try {
-      const response = await window.serverRockAgent?.request("airllm.install.start");
+      const response = await window.skaiAgent?.request("airllm.install.start");
       if (!response?.ok) throw new Error(response?.error?.message ?? "AirLLM setup could not start.");
       let session = response.result as AirLlmInstallSession;
       setAirLlmInstall(session);
       while (session.status === "running") {
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
-        const status = await window.serverRockAgent?.request("airllm.install.status", { id: session.id });
+        const status = await window.skaiAgent?.request("airllm.install.status", { id: session.id });
         if (!status?.ok) throw new Error(status?.error?.message ?? "AirLLM setup status could not be read.");
         session = status.result as AirLlmInstallSession;
         setAirLlmInstall(session);
@@ -159,14 +161,14 @@ export function SettingsPage(props: SettingsProps) {
   };
   const cancelAirLlmInstall = async () => {
     if (!airLlmInstall?.id || airLlmInstall.status !== "running") return;
-    const response = await window.serverRockAgent?.request("airllm.install.cancel", { id: airLlmInstall.id });
+    const response = await window.skaiAgent?.request("airllm.install.cancel", { id: airLlmInstall.id });
     if (response?.ok) setAirLlmInstall(response.result as AirLlmInstallSession);
   };
   const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled", value: string | boolean) => { saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
   const checkUpdates = async () => {
-    if (checkingUpdates || !window.serverRockAgent?.updates) return;
+    if (checkingUpdates || !window.skaiAgent?.updates) return;
     setCheckingUpdates(true);
-    setUpdateState(await window.serverRockAgent.updates.check());
+    setUpdateState(await window.skaiAgent.updates.check());
     setCheckingUpdates(false);
   };
   const selectedProviderId = localProviderOrFallback(props.provider);
@@ -192,7 +194,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Image Generation" && <><div className="settings-field"><label>ComfyUI endpoint<input value={props.imageEndpoint} onChange={(event) => props.onImageChange("endpoint", event.target.value)} placeholder="http://127.0.0.1:8188" /></label><label>Workflow JSON<input value={props.imageWorkflow} onChange={(event) => props.onImageChange("workflow", event.target.value)} placeholder="Paste a ComfyUI workflow JSON" /></label></div><p className="settings-help">Image Studio offers direct local Stable Diffusion Turbo generation after you install its optional runtime. ComfyUI remains available for custom workflows and image editing.</p></>}
 
-        {activeCategory === "Agents" && <><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Use saved memory in prompts" detail="Inject enabled memory entries into local conversations." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><div className="settings-callout"><strong>Safe by default</strong><span>Agent tasks are proposed before they run, and the selected environment is shown before execution.</span></div></>}
+        {activeCategory === "Agents" && <><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Use saved memory in prompts" detail="Inject enabled memory entries into local conversations." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><Toggle label="Rewrite typed prompts before sending" detail="Use the selected local model to improve a draft. Skai shows an editable preview; choose the rewrite, the original, or cancel before anything is sent." checked={props.smartPromptRewritingEnabled} onChange={(value) => change("smartPromptRewritingEnabled", value)} /><div className="settings-callout"><strong>Review stays in your hands</strong><span>Prompt rewriting uses the active local model and never replaces or sends your draft without your choice.</span></div><div className="settings-callout"><strong>Safe by default</strong><span>Agent tasks are proposed before they run, and the selected environment is shown before execution.</span></div></>}
 
         {activeCategory === "Integrations" && <><Integration title="GitHub project workflow" detail="Available from the Coding workspace through your local GitHub CLI session. Skai does not collect a separate token here." status="Available" /><Integration title="Local services" detail="Ollama, LM Studio, AirLLM, OS speech, and ComfyUI use local endpoints." status={localRoute ? "Available" : "Needs setup"} /></>}
 
@@ -200,7 +202,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Storage" && <><div className="settings-callout"><strong>Workspace data is local</strong><span>Conversations, task plans, memory, and preferences are stored in the local Skai data directory.</span></div><div className="settings-model-actions"><Button variant="secondary" onClick={props.onExportMemory}>Export memory backup</Button><span>Exports a portable JSON backup without deleting anything.</span></div><p className="settings-help">There is no destructive “clear everything” button in the release candidate.</p></>}
 
-        {activeCategory === "Updates" && <><div className="settings-callout"><strong>Automatic update checks</strong><span>Skai checks the official GitHub release channel when it starts and every six hours. Downloads always open from the verified project release page so you can review the version before replacing the portable app.</span></div><div className="settings-provider-list"><div className="settings-provider-row"><span><strong>Installed version</strong><small>{updateState?.currentVersion ?? "Checking…"}</small></span><StatusBadge tone="neutral">Electron</StatusBadge></div><div className="settings-provider-row"><span><strong>Update status</strong><small>{updateState?.error ?? updateState?.message ?? "Checking the stable release channel…"}</small></span><StatusBadge tone={updateState?.available ? "success" : updateState?.error ? "warning" : "neutral"}>{updateState?.available ? `v${updateState.version} ready` : updateState ? "Up to date" : "Checking"}</StatusBadge></div></div><div className="settings-model-actions"><Button variant="secondary" disabled={checkingUpdates} onClick={() => void checkUpdates()}>{checkingUpdates ? "Checking…" : "Check for updates"}</Button>{updateState?.available && updateState.downloadUrl && <Button variant="primary" onClick={() => void window.serverRockAgent?.updates?.open(updateState.downloadUrl!)}>Review download</Button>}</div><p className="settings-help">Portable Windows and Linux builds are delivered as signed release archives. Skai never installs an unverified artifact or runs a downloaded executable in the background.</p></>}
+        {activeCategory === "Updates" && <><div className="settings-callout"><strong>Automatic update checks</strong><span>Skai checks the official GitHub release channel when it starts and every six hours. Downloads always open from the verified project release page so you can review the version before replacing the portable app.</span></div><div className="settings-provider-list"><div className="settings-provider-row"><span><strong>Installed version</strong><small>{updateState?.currentVersion ?? "Checking…"}</small></span><StatusBadge tone="neutral">Electron</StatusBadge></div><div className="settings-provider-row"><span><strong>Update status</strong><small>{updateState?.error ?? updateState?.message ?? "Checking the stable release channel…"}</small></span><StatusBadge tone={updateState?.available ? "success" : updateState?.error ? "warning" : "neutral"}>{updateState?.available ? `v${updateState.version} ready` : updateState ? "Up to date" : "Checking"}</StatusBadge></div></div><div className="settings-model-actions"><Button variant="secondary" disabled={checkingUpdates} onClick={() => void checkUpdates()}>{checkingUpdates ? "Checking…" : "Check for updates"}</Button>{updateState?.available && updateState.downloadUrl && <Button variant="primary" onClick={() => void window.skaiAgent?.updates?.open(updateState.downloadUrl!)}>Review download</Button>}</div><p className="settings-help">Portable Windows and Linux builds are delivered as signed release archives. Skai never installs an unverified artifact or runs a downloaded executable in the background.</p></>}
 
         {activeCategory === "Advanced" && <><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Reduced motion" detail="Also controls pet wandering defaults and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /><p className="settings-help">Provider routing remains local-only. Diagnostics and motion settings apply across the workspace.</p></>}
 
@@ -211,13 +213,13 @@ export function SettingsPage(props: SettingsProps) {
 }
 
 function categoryDescription(category: Category) {
-  const descriptions: Record<Category, string> = { General: "Choose the local runtime and model Skai should use first.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize Percy as a separate desktop companion window.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review the local data boundary and storage controls.", Storage: "Back up local workspace data without destructive shortcuts.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
+  const descriptions: Record<Category, string> = { General: "Choose the local runtime and model Skai should use first.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize your desktop pets.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, prompt rewriting, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review the local data boundary and storage controls.", Storage: "Back up local workspace data without destructive shortcuts.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
   return descriptions[category];
 }
 
 // Linux only: what closing the main window does (see electron/main.cjs). Saved immediately in the shell.
 function CloseBehaviorSetting() {
-  const bridge = window.serverRockAgent?.window;
+  const bridge = window.skaiAgent?.window;
   const [behavior, setBehavior] = useState<CloseBehavior | null>(null);
   useEffect(() => { if (bridge?.platform === "linux") void bridge.getCloseBehavior().then(setBehavior); }, [bridge]);
   if (!bridge || bridge.platform !== "linux" || behavior === null) return null;
@@ -264,14 +266,14 @@ function PetSettings({ props, change }: { props: SettingsProps; change: (key: st
   };
   const setWorkshop = (enabled: boolean) => { setWorkshopEnabled(enabled); localStorage.setItem("skai.pet.workshop.enabled", String(enabled)); window.dispatchEvent(new Event("skai:pet-workshop-setting")); };
   return <>
-    <div className="settings-callout"><strong>Separate desktop companion</strong><span>Percy is its own transparent, always-on-top window. It can be dragged anywhere and stays independent from the Skai workspace.</span></div>
-    <Toggle label="Show Percy" detail="Open the companion above your other windows." checked={props.petVisible} onChange={(value) => change("petVisible", value)} />
-    <Toggle label="Let Percy walk around" detail="Allow gentle ambient movement while Percy is idle. Dragging always pauses movement." checked={props.petWander} onChange={(value) => change("petWander", value)} />
+    <div className="settings-callout"><strong>Desktop pets</strong><span>Pets appear in a separate transparent, always-on-top window. Choose which pet appears below; visibility controls all pets together.</span></div>
+    <Toggle label="Show all pets" detail="Show or hide desktop pets together above your other windows." checked={props.petVisible} onChange={(value) => change("petVisible", value)} />
+    <Toggle label="Let the active pet walk around" detail="Allow gentle ambient movement while the selected pet is idle. Dragging always pauses movement." checked={props.petWander} onChange={(value) => change("petWander", value)} />
     <Toggle label="Show Pet Workshop" detail="Add Pet Workshop to Extras (Quick Actions) for sprite drawing and companion behavior." checked={workshopEnabled} onChange={setWorkshop} />
     {workshopEnabled && <div className="settings-field"><Button variant="secondary" onClick={() => props.onNavigate("pet-workshop")}>Open Pet Workshop</Button></div>}
-    <Toggle label="DEMO - More Interaction" detail={window.serverRockAgent?.pet?.interactionDemoAvailable ? "Occasionally perch on visible window tops and walk along the taskbar edge. Dragging pauses movement." : "Extra surface interactions are unavailable on this platform. Regular walking still works."} checked={props.petInteractionDemo} disabled={!window.serverRockAgent?.pet?.interactionDemoAvailable || !props.petWander} onChange={(value) => change("petInteractionDemo", value)} />
-    <div className="settings-field"><label>Companion<select value={character} onChange={(event) => chooseCharacter(event.target.value)}><option value="percy">Percy · Skai wolf</option><option value="byte">Byte · neon bot</option><option value="ember">Ember · ember fox</option><option value="nova">Nova · star cat</option><option value="rocky">Rocky · pocket rock</option><option value="sprout">Sprout · tiny plant</option>{profiles.map((profile) => <option key={profile.id} value={`custom:${profile.id}`}>{profile.name} · custom</option>)}</select></label><div className="pet-settings-preview"><img src={activeProfile?.strips.idle?.dataUrl || builtInPetPreviews[character] || builtInPetPreviews.percy} alt="" /><span>{activeProfile ? `${activeProfile.name} · custom profile` : "Built-in sprite set"}</span></div></div>
-    {activeProfile && <div className="settings-callout"><strong>{activeProfile.name}</strong><span>Use Pet Workshop to draw ten-frame animation strips and customize this companion’s behavior. Legacy six-frame artwork remains stored until replaced.</span></div>}
+    <Toggle label="DEMO - More Interaction" detail={window.skaiAgent?.pet?.interactionDemoAvailable ? "Occasionally perch on visible window tops and walk along the taskbar edge. Dragging pauses movement." : "Extra surface interactions are unavailable on this platform. Regular walking still works."} checked={props.petInteractionDemo} disabled={!window.skaiAgent?.pet?.interactionDemoAvailable || !props.petWander} onChange={(value) => change("petInteractionDemo", value)} />
+    <div className="settings-field"><label>Companion<select value={character} onChange={(event) => chooseCharacter(event.target.value)}><option value="percy">Percy · Skai wolf</option><option value="byte">Byte · neon bot</option><option value="ember">Ember · ember fox</option><option value="blaze">Blaze · fire companion</option><option value="nova">Nova · star cat</option><option value="rocky">Rocky · pocket rock</option><option value="sprout">Sprout · tiny plant</option>{profiles.map((profile) => <option key={profile.id} value={`custom:${profile.id}`}>{profile.name} · custom</option>)}</select></label><div className="pet-settings-preview"><img src={activeProfile?.strips.idle?.dataUrl || builtInPetPreviews[character] || builtInPetPreviews.percy} alt="" /><span>{activeProfile ? `${activeProfile.name} · custom profile` : character === "blaze" ? "All attack behaviors enabled" : "Built-in sprite set"}</span></div></div>
+    {activeProfile && <div className="settings-callout"><strong>{activeProfile.name}</strong><span>Use Pet Workshop to draw 11-frame animation strips and customize this companion’s behavior. Legacy six- and ten-frame artwork remains stored until replaced.</span></div>}
     {profileError && <p className="form-error" role="alert">{profileError}</p>}
   </>;
 }

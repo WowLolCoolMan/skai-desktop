@@ -16,7 +16,7 @@ public sealed class WorkspaceUndoStore
 
     public WorkspaceUndoStore(string? path = null)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "workspace-undo.json");
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create), "SkaiDesktop", "AI", "workspace-undo.json");
     }
 
     public List<WorkspaceUndoEntry> Load()

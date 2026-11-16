@@ -6,8 +6,8 @@ internal static class WorkflowRunServiceTests
 {
     public static void Run()
     {
-        var definitionPath = Path.Combine(Path.GetTempPath(), $"server-rock-workflow-def-{Guid.NewGuid():N}.json");
-        var runPath = Path.Combine(Path.GetTempPath(), $"server-rock-workflow-run-{Guid.NewGuid():N}.json");
+        var definitionPath = Path.Combine(Path.GetTempPath(), $"skai-workflow-def-{Guid.NewGuid():N}.json");
+        var runPath = Path.Combine(Path.GetTempPath(), $"skai-workflow-run-{Guid.NewGuid():N}.json");
         var definition = new WorkflowDefinition
         {
             Id = "safe-flow", Title = "Safe flow", Version = 1,
@@ -54,7 +54,7 @@ internal static class WorkflowRunServiceTests
             catch (InvalidOperationException error) { refused = error.Message.Contains("condition", StringComparison.OrdinalIgnoreCase); }
             Check(refused, "unsupported workflow node execution is capability-gated");
 
-            var workspaceRoot = Path.Combine(Path.GetTempPath(), $"server-rock-workflow-read-{Guid.NewGuid():N}");
+            var workspaceRoot = Path.Combine(Path.GetTempPath(), $"skai-workflow-read-{Guid.NewGuid():N}");
             Directory.CreateDirectory(workspaceRoot);
             try
             {

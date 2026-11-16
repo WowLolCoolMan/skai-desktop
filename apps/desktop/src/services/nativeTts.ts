@@ -49,7 +49,7 @@ export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResou
 }
 
 export function stopNativeSpeech() {
-  void window.serverRockAgent?.request("voice.stop");
+  void window.skaiAgent?.request("voice.stop");
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
@@ -59,7 +59,7 @@ export async function waitForLocalSpeechToFinish(maxWaitMs = 120_000) {
   while (Date.now() < deadline) {
     let nativeSpeaking = false;
     try {
-      const response = await window.serverRockAgent?.request("voice.status");
+      const response = await window.skaiAgent?.request("voice.status");
       if (response?.ok) nativeSpeaking = Boolean((response.result as { speaking?: unknown } | undefined)?.speaking);
     } catch {
       // The system speech process may not be available in this runtime.
@@ -76,7 +76,7 @@ export async function speakNativeResponse(text: string, force = false) {
   if (!force && !settings.voiceOutputEnabled) return false;
   const profile = voiceProfiles.find((item) => item.id === settings.profileId) ?? voiceProfiles[0];
   try {
-    const native = await window.serverRockAgent?.request("voice.speak", { text, profileId: profile.id, rate: profile.rate });
+    const native = await window.skaiAgent?.request("voice.speak", { text, profileId: profile.id, rate: profile.rate });
     if (native?.ok) return true;
   } catch { /* Browser preview fallback below. */ }
   if (!("speechSynthesis" in window)) return false;

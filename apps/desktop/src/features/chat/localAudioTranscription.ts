@@ -31,7 +31,7 @@ export async function transcribeLocalAudioFile(file: File, signal: AbortSignal) 
   const mediaType = audioTypes[extension];
   if (!mediaType || !isLocalAudioFile(file)) throw new Error("Choose an MP3, M4A, OGG, or WAV audio file.");
   if (!file.size || file.size > maxAudioBytes) throw new Error("Audio files must be smaller than 20 MB to transcribe locally.");
-  const bridge = window.serverRockAgent?.media;
+  const bridge = window.skaiAgent?.media;
   if (!bridge) throw new Error("Local audio processing is unavailable in this desktop runtime.");
   const speechWindow = window as Window & { SpeechRecognition?: RecognitionConstructor; webkitSpeechRecognition?: RecognitionConstructor };
   const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;

@@ -6,7 +6,7 @@ internal static class OperationJournalTests
 {
     public static void Run()
     {
-        var path = Path.Combine(Path.GetTempPath(), "server-rock-operation-journal-" + Guid.NewGuid().ToString("N"), "operations.json");
+        var path = Path.Combine(Path.GetTempPath(), "skai-operation-journal-" + Guid.NewGuid().ToString("N"), "operations.json");
         try
         {
             var journal = new OperationJournal(path);
@@ -38,7 +38,7 @@ internal static class OperationJournalTests
             journal.Transition(run.RunId, OperationRunStatuses.Cancelled);
             Check(new OperationJournal(path).Load().Runs[0].Status == OperationRunStatuses.Cancelled, "reconciled operations can be explicitly cancelled");
             var export = journal.ExportJson();
-            Check(export.Contains("server-rock-operations-v1", StringComparison.Ordinal) && export.Contains(run.RunId, StringComparison.Ordinal) && export.Contains("run.needs_reconciliation", StringComparison.Ordinal), "operation export is a validated local evidence bundle");
+            Check(export.Contains("skai-operations-v1", StringComparison.Ordinal) && export.Contains(run.RunId, StringComparison.Ordinal) && export.Contains("run.needs_reconciliation", StringComparison.Ordinal), "operation export is a validated local evidence bundle");
             Check(journal.Search("workspace-1").Single().RunId == run.RunId && journal.Search("missing-operation").Count == 0, "operation search is bounded and matches local provenance");
         }
         finally

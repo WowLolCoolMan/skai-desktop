@@ -9,7 +9,7 @@ const readline = require("node:readline");
 
 const root = path.resolve(__dirname, "..");
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-pdf-smoke-"));
-const child = spawn("dotnet", ["run", "--project", path.join(root, "services", "agent-host", "ServerRock.AgentHost.csproj"), "--no-build", "--", "--stdio"], {
+const child = spawn("dotnet", ["run", "--project", path.join(root, "services", "agent-host", "SkaiDesktop.AgentHost.csproj"), "--no-build", "--", "--stdio"], {
   cwd: root,
   env: { ...process.env, SRAI_SETTINGS_PATH: path.join(tempRoot, "settings.json") },
   stdio: ["pipe", "pipe", "pipe"],

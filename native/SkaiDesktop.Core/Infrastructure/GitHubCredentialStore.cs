@@ -15,11 +15,13 @@ public sealed record GitHubCredentialStorageStatus(bool Available, string Method
 public sealed class GitHubCredentialStore(string? windowsCredentialPath = null, string? secretToolPath = null)
 {
     private const int MaxStoredCredentialBytes = 64 * 1024;
-    private const string ServiceAttribute = "serverrock-ai";
+    private const string ServiceAttribute = "skaidesktop";
     private const string AccountAttribute = "github-user-token";
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes(ProductIdentity.GitHubCredentialEntropy);
+    private static readonly byte[] PreviousEntropy = Convert.FromBase64String("U2VydmVyIFJvY2sgQUkgR2l0SHViIGNyZWRlbnRpYWwgdjE=");
+    private static readonly string PreviousServiceAttribute = Encoding.UTF8.GetString(Convert.FromBase64String("c2VydmVyb2NrLWFp"));
     private readonly string _windowsCredentialPath = windowsCredentialPath ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "ServerRock", "AI", "github-user-token.bin");
+        ProductIdentity.DataDirectory(Environment.SpecialFolder.LocalApplicationData), "github-user-token.bin");
     private readonly string? _secretToolPath = secretToolPath ?? FindExecutable("secret-tool");
 
     public GitHubCredentialStorageStatus GetStatus()
@@ -45,7 +47,21 @@ public sealed class GitHubCredentialStore(string? windowsCredentialPath = null, 
                 if (new FileInfo(_windowsCredentialPath).Length > MaxStoredCredentialBytes)
                     throw new InvalidDataException("The saved GitHub credential is unexpectedly large. Reconnect GitHub to replace it.");
                 var ciphertext = await ReadBytesBoundedAsync(_windowsCredentialPath, MaxStoredCredentialBytes, cancellationToken).ConfigureAwait(false);
-                var plaintext = ProtectedData.Unprotect(ciphertext, Entropy, DataProtectionScope.CurrentUser);
+                byte[] plaintext;
+                try { plaintext = ProtectedData.Unprotect(ciphertext, Entropy, DataProtectionScope.CurrentUser); }
+                catch (CryptographicException)
+                {
+                    plaintext = ProtectedData.Unprotect(ciphertext, PreviousEntropy, DataProtectionScope.CurrentUser);
+                    var previousValue = Encoding.UTF8.GetString(plaintext);
+                    try
+                    {
+                        if (previousValue.Length is < 1 or > 32_768 || previousValue.Any(char.IsControl))
+                            throw new InvalidDataException("The saved GitHub credential has an invalid format. Reconnect GitHub to replace it.");
+                        await WriteAsync(previousValue, cancellationToken).ConfigureAwait(false);
+                        return previousValue;
+                    }
+                    finally { CryptographicOperations.ZeroMemory(plaintext); }
+                }
                 try
                 {
                     var value = Encoding.UTF8.GetString(plaintext);
@@ -62,6 +78,18 @@ public sealed class GitHubCredentialStore(string? windowsCredentialPath = null, 
         }
 
         var result = await RunSecretToolAsync(["lookup", "application", ServiceAttribute, "account", AccountAttribute], null, cancellationToken).ConfigureAwait(false);
+        if (result.ExitCode == 1 && result.StandardError.Length == 0)
+        {
+            var previous = await RunSecretToolAsync(["lookup", "application", PreviousServiceAttribute, "account", AccountAttribute], null, cancellationToken).ConfigureAwait(false);
+            if (previous.ExitCode == 0)
+            {
+                var previousValue = previous.StandardOutput.TrimEnd('\r', '\n');
+                await WriteAsync(previousValue, cancellationToken).ConfigureAwait(false);
+                return previousValue;
+            }
+            if (previous.ExitCode != 1 || previous.StandardError.Length != 0)
+                throw new InvalidOperationException(DescribeSecretToolFailure(previous, "GitHub credential lookup failed."));
+        }
         if (result.ExitCode == 0) return result.StandardOutput.TrimEnd('\r', '\n');
         if (result.ExitCode == 1 && result.StandardError.Length == 0) return null;
         throw new InvalidOperationException(DescribeSecretToolFailure(result, "GitHub credential lookup failed."));
@@ -115,6 +143,8 @@ public sealed class GitHubCredentialStore(string? windowsCredentialPath = null, 
         }
         var result = await RunSecretToolAsync(["clear", "application", ServiceAttribute, "account", AccountAttribute], null, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode is not (0 or 1)) throw new InvalidOperationException(DescribeSecretToolFailure(result, "GitHub credential could not be removed from the desktop keyring."));
+        var previous = await RunSecretToolAsync(["clear", "application", PreviousServiceAttribute, "account", AccountAttribute], null, cancellationToken).ConfigureAwait(false);
+        if (previous.ExitCode is not (0 or 1)) throw new InvalidOperationException(DescribeSecretToolFailure(previous, "GitHub credential could not be removed from the desktop keyring."));
     }
 
     private async Task<(int ExitCode, string StandardOutput, string StandardError)> RunSecretToolAsync(

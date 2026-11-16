@@ -1,30 +1,36 @@
 # Companion sprite sheets
 
-The runtime format is one independent generated strip per pet and state in `generated/`:
-`<pet>-<state>-frames.png` is a 2560×256 transparent image with ten 256×256 frames. Frame 0 is
-the pet's idle rest pose, and frame 9 repeats it to close the cycle. The states
-are `idle`, `walk`, `thinking`, `coding`, `coding_malicious`, `stuck`, `success`, and `error`.
-The Electron companion loads the matching strip directly and only plays `walk` while the native
-window is actually moving.
+The runtime loads one generated strip per pet and state from `generated/`:
+`<pet>-<state>-frames.png` is a transparent 2816×256 image with eleven 256×256
+cells. Cell 0 is the neutral rest pose, cells 1–9 animate, and cell 10 is an exact
+copy of cell 0. The matching endpoint gives every loop a clean seam. States are
+`idle`, `walk`, `thinking`, `coding`, `coding_malicious`, `stuck`, `success`, and
+`error`. Blink strips are separate four-cell (1024×256) images.
 
-The older source sheets that used to live in `archive/legacy-sheets/` were removed during the asset
-de-bloat. They were never loaded by the production companion; restore them from git history
-(the parent of the `chore(debloat): step 4` commit) if the archived tools in `archive/legacy-tools/` are ever needed again.
+To rebuild walk artwork, put source walk strips in `generated/`, run
+`pwsh -NoProfile -ExecutionPolicy Bypass -File assets/pets/normalize-pet-animations.ps1`,
+then run `python assets/pets/build-blaze-assets.py` and
+`python assets/pets/convert-pet-strips-to-eleven.py`, followed by
+`python assets/pets/rebuild-blink-strips.py` to regenerate blink strips from the
+current idle rest poses. Blink endpoints copy idle rest exactly, and all blink
+frames retain its visible bounds so changing sheets cannot resize or shift a pet.
+The converter accepts
+six-, ten-, and eleven-cell input strips. It keeps the rest pose at both endpoints
+and resamples the authored middle cells to nine animation cells. Original idle
+motion source strips live in `source/`, so rebuilding does not turn idle into a
+frozen pose. Run
+`npm run check:pet-assets` to verify all built-in strip dimensions and exact loop
+seams, changing idle/motion frames, blink, and Blaze's independent artwork; Python
+Pillow is required for the pixel comparison.
 
-To rebuild walk artwork, place source walk strips in `generated/`, run
-`pwsh -NoProfile -ExecutionPolicy Bypass -File assets/pets/normalize-pet-animations.ps1`, then run
-`python assets/pets/convert-six-to-ten.py`. The first pass crops by alpha, rejects missing/invalid
-frames, preserves aspect ratio, and keeps the authored gait poses. The conversion pass closes each
-loop with the matching idle rest pose and expands legacy six-cel strips to ten cels. It accepts
-already converted strips too, so rerunning it is safe. Pass `-InputDirectory` to the PowerShell
-normalizer to copy replacement strips in from somewhere else.
+Pet Workshop draws eleven-cell strips and keeps legacy six- and ten-cell custom
+profiles intact until they are explicitly redrawn or replaced.
 
-Custom companion profiles live on the device. Use Pet Workshop to draw ten-frame PNG strips or
-import/export companion profiles; legacy six-frame strips remain viewable until they are redrawn.
+Byte, Nova, and Rocky use hand-tuned walk strips that are not made from their walk
+sources, so the rebuild script leaves those strips alone. Edit them directly.
 
-Byte, Nova and Rocky use hand-tuned walk strips that weren't made from their walk sources, so the rebuild
-script leaves their `walk` strip alone. Edit those strips directly.
-
-Percy is the official Skai Desktop mascot and the default companion for new profiles. The walk
-source strips in `generated/` are the editable inputs for Percy, Ember and Sprout (Byte, Nova and Rocky's
-are kept for reference). No atlas is required or loaded by the renderer.
+Percy is the default companion. Blaze is the attack-focused fire companion, ships
+with approach, pounce, and fire-breath behavior enabled, and has original dragon
+art from `blaze-source-rest.png` and `blaze-source-walk.png`; its strips are built
+by `build-blaze-assets.py`. Cursor attacks only read cursor coordinates and never
+move or click the cursor. No atlas is loaded by the renderer.

@@ -61,12 +61,15 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       if (conversationResponse.ok) {
         const loaded = (conversationResponse.result as DesktopConversation[]) ?? [];
         setConversations(loaded);
-        const first = loaded.find((conversation) => (conversation.mode ?? "ChatBot") === modeRef.current);
+        const savedConversationId = localStorage.getItem("skai.conversation.active");
+        const first = loaded.find((conversation) => conversation.id === savedConversationId) ?? loaded.find((conversation) => (conversation.mode ?? "ChatBot") === modeRef.current);
         if (first) {
           setConversationId(first.id);
+          localStorage.setItem("skai.conversation.active", first.id);
           setMessages(first.messages.filter((item) => item.role !== "system") as Message[]);
         } else {
           setConversationId(null);
+          localStorage.removeItem("skai.conversation.active");
           setMessages([]);
         }
       } else onError(conversationResponse.error?.message ?? "Conversations could not be loaded.");
@@ -82,6 +85,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (!response.ok) { onError(response.error?.message ?? "Conversation could not be saved."); return id; }
     const savedId = (response.result as { id: string }).id;
     setConversationId(savedId);
+    localStorage.setItem("skai.conversation.active", savedId);
     return savedId;
   };
 
@@ -91,12 +95,75 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const next = [...messages, { role: "user" as const, content: text || "Attached files", attachments: messageAttachments.length ? messageAttachments : undefined }];
     setMessages(next); setAttachments([]); setBusy(true); onError(null);
     const savedId = temporary ? null : await saveConversation(next);
+    if (mode === "Coding Agent") {
+      try {
+        const planned = await request("tasks.plan", {
+          title: text.slice(0, 200) || "Coding task",
+          instruction: project?.instructions ? `${text}\n\nProject instructions:\n${project.instructions}` : text,
+          environment: "local",
+          projectId: project?.id ?? null,
+          conversationId: savedId,
+        });
+        if (!planned.ok) throw new Error(planned.error?.message ?? "The coding task could not be created.");
+        const taskId = (planned.result as { id: string }).id;
+        const queued = await request("tasks.queue", { id: taskId });
+        if (!queued.ok) throw new Error(queued.error?.message ?? "The coding task could not be queued.");
+        const started = await request("tasks.execute", { id: taskId });
+        if (!started.ok) throw new Error(started.error?.message ?? "The coding task could not start.");
+        setBusy(false);
+        return;
+      } catch (error) {
+        setBusy(false);
+        onError(error instanceof Error ? error.message : "The coding task could not start.");
+        return;
+      }
+    }
     const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
     if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
     await speakNativeResponse(completed.at(-1)?.content ?? "", speakReply);
     setBusy(false);
+  };
+
+  const rewritePrompt = async (draft: string): Promise<string | null> => {
+    const original = draft.trim();
+    if (!original || original.length > 120_000) {
+      onError("Enter a prompt under 120,000 characters before rewriting it.");
+      return null;
+    }
+    if (!isLocalEndpoint(endpoint)) {
+      onError(LOCAL_ENDPOINT_ERROR);
+      return null;
+    }
+    const context = messages
+      .filter((message) => message.role === "user" || message.role === "assistant")
+      .slice(-16)
+      .map((message) => ({
+        role: message.role,
+        content: message.content.length > 12_000 ? `${message.content.slice(0, 12_000)}\n[context truncated]` : message.content,
+      }));
+    const rewriteMessages = [
+      {
+        role: "system" as const,
+        content: "Rewrite the user's latest draft as a clear, specific, actionable prompt for the selected AI. Preserve the full intent, requested operation, names, paths, examples, constraints, tone, uncertainty, and technical details. Do not add requirements, facts, safety rules, refusals, or claims that work was done. Do not omit content because it is technical or risky. Keep the original language and return only the rewritten prompt. If the draft is already clear, return it unchanged.",
+      },
+      ...context,
+      { role: "user" as const, content: original },
+    ];
+    onError(null);
+    try {
+      const response = await request("chat.complete", { provider, endpoint, model, messages: rewriteMessages });
+      if (!response.ok) throw new Error(response.error?.message ?? "The selected model could not rewrite this prompt.");
+      const candidate = (response.result as { content?: unknown }).content;
+      if (typeof candidate !== "string" || candidate.trim().length < 2 || candidate.trim().length > 24_000) {
+        throw new Error("The model returned an empty or oversized rewrite. Your original draft is unchanged.");
+      }
+      return candidate.trim();
+    } catch (error) {
+      onError(error instanceof Error ? `Prompt rewrite failed. Your original draft is unchanged. ${error.message}` : "Prompt rewrite failed. Your original draft is unchanged.");
+      return null;
+    }
   };
 
   const retryMessage = async (messageIndex: number) => {
@@ -226,16 +293,17 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     else onError(refreshed.error?.message ?? "Conversations could not be refreshed.");
   };
 
-  const startNewChat = () => { setConversationId(null); setMessages([]); setAttachments([]); onError(null); };
+  const startNewChat = () => { setConversationId(null); localStorage.removeItem("skai.conversation.active"); setMessages([]); setAttachments([]); onError(null); };
   const selectConversation = (id: string) => {
     const selected = conversations.find((conversation) => conversation.id === id);
     if (!selected) return;
     setConversationId(selected.id);
+    localStorage.setItem("skai.conversation.active", selected.id);
     setMessages(selected.messages.filter((item) => item.role !== "system") as Message[]);
     setAttachments([]);
     onError(null);
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, queuedMessages, busy, activeConversation, setAttachments, sendMessage, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
+  return { messages, conversationId, attachments, conversations, queuedMessages, busy, activeConversation, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
 }

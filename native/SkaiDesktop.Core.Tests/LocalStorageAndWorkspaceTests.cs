@@ -14,7 +14,7 @@ internal static class LocalStorageAndWorkspaceTests
     {
         // Same fixture file that ConversationArchiveTests reads.
         var electronExportPath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "electron-localstorage-export.json");
-        var settingsDirectory = Path.Combine(Path.GetTempPath(), "server-rock-core-check-" + Guid.NewGuid().ToString("N"));
+        var settingsDirectory = Path.Combine(Path.GetTempPath(), "skai-core-check-" + Guid.NewGuid().ToString("N"));
         try
         {
             var settingsStore = new JsonSettingsStore(Path.Combine(settingsDirectory, "settings.json"));
@@ -270,7 +270,7 @@ internal static class LocalStorageAndWorkspaceTests
             var gitReviewPath = Path.Combine(settingsDirectory, "git-review");
             Directory.CreateDirectory(gitReviewPath);
             RunGit(gitReviewPath, "init", "-b", "main");
-            RunGit(gitReviewPath, "config", "user.email", "server-rock-tests@example.invalid");
+            RunGit(gitReviewPath, "config", "user.email", "skai-tests@example.invalid");
             RunGit(gitReviewPath, "config", "user.name", "Skai Desktop Tests");
             RunGit(gitReviewPath, "remote", "add", "origin", "https://github.com/owner/project.git");
             File.WriteAllText(Path.Combine(gitReviewPath, "README.md"), "Original README\n");
@@ -330,7 +330,7 @@ internal static class LocalStorageAndWorkspaceTests
             {
                 Check(true, "project command rejects sub-second timeouts");
             }
-            const string secretEnvironmentName = "SERVER_ROCK_TEST_SECRET";
+            const string secretEnvironmentName = "SKAI_DESKTOP_TEST_SECRET";
             var previousSecretEnvironment = Environment.GetEnvironmentVariable(secretEnvironmentName);
             Environment.SetEnvironmentVariable(secretEnvironmentName, "must-not-leak");
             try
@@ -345,9 +345,9 @@ internal static class LocalStorageAndWorkspaceTests
                 Environment.SetEnvironmentVariable(secretEnvironmentName, previousSecretEnvironment);
             }
             var commandResult = await commandRunner.RunAsync(workspacePath, "src",
-                OperatingSystem.IsWindows() ? "Write-Output server-rock-command-ok" : "printf server-rock-command-ok",
+                OperatingSystem.IsWindows() ? "Write-Output skai-command-ok" : "printf skai-command-ok",
                 TimeSpan.FromSeconds(10));
-            Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("server-rock-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
+            Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
             Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
             var timedCommand = await commandRunner.RunAsync(workspacePath, ".",
                 OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",
@@ -374,13 +374,13 @@ internal static class LocalStorageAndWorkspaceTests
             {
                 await terminalSession.StartAsync(workspacePath, shell: OperatingSystem.IsWindows() ? "Command Prompt" : null);
                 var terminalCommand = OperatingSystem.IsWindows()
-                    ? "echo server-rock-pty-ok & exit"
-                    : "printf 'server-rock-pty-ok\\n'; exit";
+                    ? "echo skai-pty-ok & exit"
+                    : "printf 'skai-pty-ok\\n'; exit";
                 await terminalSession.SendTextAsync(terminalCommand + "\r");
                 var terminalExitCode = await terminalSession.Completion.WaitAsync(TimeSpan.FromSeconds(15));
                 var terminalScreen = terminalSession.ScreenText;
                 // On failure, include the exit code and screen so CI shows why (it only said "Check failed").
-                var terminalPassed = terminalExitCode == 0 && terminalScreen.Split('\n').Any(line => line.Trim() == "server-rock-pty-ok");
+                var terminalPassed = terminalExitCode == 0 && terminalScreen.Split('\n').Any(line => line.Trim() == "skai-pty-ok");
                 Check(terminalPassed, terminalPassed
                     ? "interactive project terminal accepts input and renders a real PTY response"
                     : $"interactive project terminal accepts input and renders a real PTY response (exit code: {terminalExitCode?.ToString() ?? "none"}; screen: {terminalScreen.Trim().Replace("\n", " | ")})");
@@ -554,7 +554,7 @@ internal static class LocalStorageAndWorkspaceTests
         }
 
         // Path comparison (moved from the former desktop shell into Core).
-        var comparedRoot = Path.Combine(Path.GetTempPath(), "server-rock-same-path");
+        var comparedRoot = Path.Combine(Path.GetTempPath(), "skai-same-path");
         Check(WorkspacePath.AreSame(comparedRoot, comparedRoot + Path.DirectorySeparatorChar)
             && !WorkspacePath.AreSame(comparedRoot, comparedRoot + "-other"),
             "workspace path comparison ignores a trailing separator and tells folders apart");

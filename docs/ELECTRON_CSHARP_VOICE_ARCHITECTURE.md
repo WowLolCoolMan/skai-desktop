@@ -7,7 +7,7 @@ the rest of the desktop app:
 ```text
 React renderer
   ├─ local Web Speech Recognition (`processLocally = true`)
-  └─ window.serverRockAgent.request("voice.*")
+  └─ window.skaiAgent.request("voice.*")
        └─ Electron main-process IPC allowlist
             └─ Skai Desktop C# agent host
                  └─ Windows Speech or Linux espeak-ng, espeak, or spd-say

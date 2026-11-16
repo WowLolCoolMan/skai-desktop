@@ -515,7 +515,7 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
         var root = new UriBuilder(configured) { Path = "", Query = "", Fragment = "" }.Uri;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromHours(6));
-        var temporaryDirectory = Path.Combine(Path.GetTempPath(), "server-rock-modelscope-" + Guid.NewGuid().ToString("N"));
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), "skai-modelscope-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporaryDirectory);
         try
         {

@@ -5,7 +5,7 @@ internal static class MemoryStoreTests
 {
     public static void Run()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "server-rock-memory-" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(Path.GetTempPath(), "skai-memory-" + Guid.NewGuid().ToString("N"));
         var path = Path.Combine(directory, "memory.json");
         try
         {
@@ -18,7 +18,7 @@ internal static class MemoryStoreTests
             var reloaded = new MemoryStore(path);
             Check(reloaded.Load().Single().Content.Contains("signed releases", StringComparison.Ordinal), "memory edits survive reload");
             var backup = reloaded.ExportJson();
-            Check(backup.Contains("server-rock-memory-v1", StringComparison.Ordinal) && backup.Contains("signed releases", StringComparison.Ordinal) && backup.Contains("\"enabled\": false", StringComparison.Ordinal), "memory export is a validated local backup");
+            Check(backup.Contains("skai-memory-v1", StringComparison.Ordinal) && backup.Contains("signed releases", StringComparison.Ordinal) && backup.Contains("\"enabled\": false", StringComparison.Ordinal), "memory export is a validated local backup");
             var importPath = Path.Combine(directory, "imported-memory.json");
             var importedStore = new MemoryStore(importPath);
             var plan = importedStore.PlanImport(backup);

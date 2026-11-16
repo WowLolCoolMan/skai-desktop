@@ -31,7 +31,7 @@ if (!fs.existsSync(artifactManifestPath)) {
 }
 const artifactManifest = JSON.parse(fs.readFileSync(artifactManifestPath, "utf8"));
 const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
-if (artifactManifest.executable !== path.basename(executable) || artifactManifest.files?.executable !== sha256(executable) || artifactManifest.files?.agentHost !== sha256(path.join(artifactRoot, "resources", "agent-host", process.platform === "win32" ? "ServerRock.AgentHost.exe" : "ServerRock.AgentHost")) || artifactManifest.files?.airLlmWorker !== sha256(packagedAirLlmWorker)) {
+if (artifactManifest.executable !== path.basename(executable) || artifactManifest.files?.executable !== sha256(executable) || artifactManifest.files?.agentHost !== sha256(path.join(artifactRoot, "resources", "agent-host", process.platform === "win32" ? "SkaiDesktop.AgentHost.exe" : "SkaiDesktop.AgentHost")) || artifactManifest.files?.airLlmWorker !== sha256(packagedAirLlmWorker)) {
   console.error(`Packaged artifact manifest does not match the staged files: ${artifactManifestPath}`);
   process.exit(1);
 }

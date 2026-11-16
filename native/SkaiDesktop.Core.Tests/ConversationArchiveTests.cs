@@ -27,7 +27,7 @@ internal static class ConversationArchiveTests
         Check(markdown.Contains("# Chat export", StringComparison.Ordinal) && markdown.Contains("## Portable conversation", StringComparison.Ordinal) && markdown.Contains("`notes.md`", StringComparison.Ordinal), "Markdown chat export includes metadata, messages, and attachment names");
         var markdownFileName = ConversationMarkdownExporter.FileNameFor(new ChatSession { Id = "unsafe-id", Title = "Unsafe:/ title?" });
         Check(markdownFileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) && !markdownFileName.Contains(':') && !markdownFileName.Contains('/'), "Markdown directory export produces a safe per-conversation file name");
-        var markdownDirectory = Directory.CreateTempSubdirectory("server-rock-markdown-");
+        var markdownDirectory = Directory.CreateTempSubdirectory("skai-markdown-");
         try
         {
             var written = await ConversationMarkdownExporter.WriteDirectoryAsync([portableChat, new ChatSession { Id = "second", Title = "Second chat", Messages = [new ChatMessage("user", "Hello folder")] }], markdownDirectory.FullName);
@@ -43,7 +43,7 @@ internal static class ConversationArchiveTests
         using (var electronExportDocument = System.Text.Json.JsonDocument.Parse(electronState))
         {
             var electronExportRoot = electronExportDocument.RootElement;
-            Check(electronExportRoot.GetProperty("format").GetString() == "server-rock-electron-localstorage-v1" &&
+            Check(electronExportRoot.GetProperty("format").GetString() == "skai-electron-localstorage-v1" &&
                 electronExportRoot.GetProperty("exportedAt").ValueKind == System.Text.Json.JsonValueKind.String &&
                 electronExportRoot.GetProperty("chats").ValueKind == System.Text.Json.JsonValueKind.Array,
                 "Electron migration fixture matches the desktop export envelope");
@@ -82,7 +82,7 @@ internal static class ConversationArchiveTests
         {
             Check(true, "malformed or unsupported Electron messages are rejected before import planning");
         }
-        var consentHistoryPath = Path.Combine(Path.GetTempPath(), "server-rock-import-consent-" + Guid.NewGuid().ToString("N") + ".json");
+        var consentHistoryPath = Path.Combine(Path.GetTempPath(), "skai-import-consent-" + Guid.NewGuid().ToString("N") + ".json");
         try
         {
             var consentHistory = new ConversationStore(consentHistoryPath);

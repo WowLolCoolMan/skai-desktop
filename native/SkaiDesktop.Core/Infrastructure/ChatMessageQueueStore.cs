@@ -14,7 +14,7 @@ public sealed class ChatMessageQueueStore
     {
         _path = path ?? Environment.GetEnvironmentVariable("SRAI_QUEUE_PATH") ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create),
-            "ServerRock", "AI", "queued-messages.json");
+            "SkaiDesktop", "AI", "queued-messages.json");
     }
 
     public IReadOnlyList<QueuedChatRequest> Load()

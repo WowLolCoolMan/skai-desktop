@@ -7,7 +7,7 @@ export function UpdateNotice() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const updates = window.serverRockAgent?.updates;
+    const updates = window.skaiAgent?.updates;
     if (!updates) return;
     let mounted = true;
     void updates.check().then((result) => { if (mounted && result.available) { setUpdate(result); setOpen(true); } }).catch(() => {});
@@ -16,7 +16,7 @@ export function UpdateNotice() {
   }, []);
 
   if (!open || !update?.available) return null;
-  const openRelease = () => { if (update.downloadUrl) void window.serverRockAgent?.updates?.open(update.downloadUrl); };
+  const openRelease = () => { if (update.downloadUrl) void window.skaiAgent?.updates?.open(update.downloadUrl); };
   return <div className="update-overlay" role="presentation"><section className="update-card" role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-description">
     <button className="update-close" type="button" onClick={() => setOpen(false)} aria-label="Dismiss update notification">×</button>
     <h2 id="update-title">Update ready</h2>
