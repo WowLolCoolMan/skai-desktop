@@ -26,10 +26,10 @@ Status: **not ready to publish as the first major release**.
 
 ## Documentation site
 
-GitHub Pages is configured to deploy from GitHub Actions. The public site last
-returned HTTP 200 on 2026-11-15. The updated pet documentation and feature card
-in this checkout still need to be pushed to `main` and deployed before they are
-live. See [GitHub Pages setup](GITHUB_PAGES.md).
+GitHub Pages is configured to deploy from GitHub Actions. The public site
+returned HTTP 200 on 2026-11-16 and served the updated companion feature card and
+documentation link after commit `21cb70f8` was pushed to `main`. See
+[GitHub Pages setup](GITHUB_PAGES.md).
 
 ## Release blockers
 

@@ -15,12 +15,11 @@ manual run is also available from the Actions tab. The deployment uses the
 The repository's **Settings → Pages** publishing source is **GitHub Actions**.
 This owner-level repository setting cannot be changed by the workflow token.
 The public site is
-`https://wowlolcoolman.github.io/skai-desktop/`; on 2026-11-15, a live check
-returned HTTP 200 and the custom title **Skai Desktop — Your local AI
-workspace**, confirming that `docs/index.html` is being served. A manually
-requested **Deploy project site** run for commit `101cd2bf` is also in progress
-after the source was corrected. Pushes to `main` that change `docs/`, branding
-assets, or this workflow should deploy automatically.
+`https://wowlolcoolman.github.io/skai-desktop/`; after commit `21cb70f8` reached
+`main` on 2026-11-16, the Pages workflow deployed successfully and a live check
+returned HTTP 200 with the new companion feature card and pet documentation
+link. Pushes to `main` that change `docs/`, branding assets, or this workflow
+should deploy automatically.
 
 ## Content maintenance
 
