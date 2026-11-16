@@ -24,6 +24,7 @@ type ChatComposerProps = {
   onNavigate: (route: Route) => void;
   onToggleDocumentsOnly: () => void;
   onVoiceTranscript: (transcript: string) => boolean;
+  onAudioTranscript: (fileName: string, transcript: string) => void;
 };
 
 type SpeechRecognitionResultEvent = Event & { resultIndex: number; results: { [index: number]: { [index: number]: { transcript: string }; isFinal: boolean }; length: number } };
@@ -44,7 +45,7 @@ type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
 };
 type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
@@ -212,10 +213,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     setVoicePackNeeded(false);
     try {
       const transcript = await transcribeLocalAudioFile(file, controller.signal);
-      const currentDraft = draftRef.current.trim();
-      const nextDraft = `${currentDraft}${currentDraft ? " " : ""}${transcript}`;
-      draftRef.current = nextDraft;
-      onDraftChange(nextDraft);
+      const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "-").replace(/-+/g, "-").slice(0, 120) || "audio";
+      onAudioTranscript(safeName, transcript);
       setAudioTranscriptReady(true);
     } catch (error) {
       const failure = error instanceof Error ? error : new Error("Local audio transcription failed.");
