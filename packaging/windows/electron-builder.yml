@@ -1,0 +1,22 @@
+appId: com.skai.desktop
+productName: Skai Desktop
+directories:
+  output: dist/installer/win-x64
+win:
+  icon: ../../assets/branding/skai-desktop.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  forceCodeSigning: true
+nsis:
+  installerIcon: ../../assets/branding/skai-desktop.ico
+  uninstallerIcon: ../../assets/branding/skai-desktop.ico
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+  runAfterFinish: false
+artifactName: Skai-Desktop-${version}-Setup-${arch}.${ext}

@@ -2,14 +2,14 @@
 
 Last audited: 2026-11-16
 
-Status: **not ready to publish as the first major release**.
+Target release: **0.1.4**. Status: **not ready to publish**.
 
 ## Ready now
 
 - Electron renderer typecheck and production build pass.
 - The persistent Agent Host builds cleanly and its protocol smoke passes.
 - Core tests pass, including AirLLM fallback policy and the pet behavior logic.
-- The packaged Windows Electron artifact builds and passes bounded startup smoke, including the host-backed Marketplace catalog/search/install contract and AirLLM worker staging.
+- The packaged Windows Electron artifact builds and passes bounded startup smoke, including the host-backed Marketplace catalog/search/install contract and AirLLM worker staging. The 0.1.4 per-user NSIS installer configuration and install/upgrade/uninstall smoke are prepared; local lifecycle evidence used unsigned development artifacts only.
 - The packaged voice smoke verifies that Electron exposes on-device recognition APIs and reports the expected privacy-preserving error when the en-US pack is unavailable; microphone acceptance still requires an installed pack.
 - The Windows smoke gate passed all 19 staged checks on 2026-11-16, including core tests, Electron-only architecture/release audits, packaged companion/AirLLM verification, themes, task replanning, and responsive overflow coverage.
 - The full packaged UI matrix passed on 2026-11-16: 14 routes × 5 supported window sizes × 4 theme/sidebar variants.
@@ -37,6 +37,4 @@ documentation link after commit `21cb70f8` was pushed to `main`. See
 1. A signed Electron installer/release asset and clean-machine install/upgrade/uninstall evidence are not available in this checkout. The release workflow now packages and smoke-tests Electron for Windows and Linux, but remains fail-closed until signing material and lifecycle evidence are supplied.
 2. Complete exact-artifact keyboard, accessibility, Linux compositor, and platform acceptance. Cloud model routing is deliberately outside the product boundary and is not a release blocker.
 
-The Windows smoke suite, pet-focused checks, and packaged UI matrix pass, but
-this is not an honest candidate for a public release until signing/lifecycle
-and platform acceptance blockers above are closed.
+The Windows smoke suite, pet-focused checks, and packaged UI matrix pass. Release 0.1.4 is still blocked until signed lifecycle evidence is produced, the current automated contrast failures are fixed, and the remaining live platform/accessibility acceptance is recorded.

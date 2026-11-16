@@ -34,7 +34,7 @@ export function Toolbar({ route, connection, canGoBack, canGoForward, onBack, on
   ];
   const navigate = (nextRoute: Route) => () => onNavigate(nextRoute);
   return <header className={`app-toolbar ${windowsTitleBarOverlay ? "is-titlebar-overlay" : ""}`}>
-    <div className="toolbar-brand" aria-label={PRODUCT_DISPLAY_NAME}><img src={SKAI_WOLF_ICON} alt="" aria-hidden="true" /></div>
+    <div className="toolbar-brand" role="img" aria-label={PRODUCT_DISPLAY_NAME}><img src={SKAI_WOLF_ICON} alt="" aria-hidden="true" /></div>
     <nav className="app-menu-bar" aria-label="Application menu">
       <AppMenu label="File" items={[{ label: "New chat", shortcut: "Ctrl+N", onSelect: onNewChat }, { label: "Projects", onSelect: navigate("projects"), separatorBefore: true }, { label: "Coding workspace", shortcut: "Ctrl+2", onSelect: navigate("coding") }]} />
       <AppMenu label="Edit" items={editItems} />

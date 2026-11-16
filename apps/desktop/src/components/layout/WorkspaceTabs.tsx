@@ -14,9 +14,9 @@ export function WorkspaceTabs({ tabs, activeId, onSelect, onClose, onNew }: { ta
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeId, onClose, onNew, onSelect, tabs]);
-  return <div className="workspace-tab-strip" role="tablist" aria-label="Open chats and projects">
+  return <div className="workspace-tab-strip" role="group" aria-label="Open chats and projects">
     <div className="workspace-tab-list">{tabs.map((tab) => <div className={`workspace-tab${tab.id === activeId ? " is-active" : ""}`} key={tab.id}>
-      <button className="workspace-tab-select" type="button" role="tab" aria-selected={tab.id === activeId} title={tab.title} onClick={() => onSelect(tab)}><NavIcon name={tab.projectId ? "project" : "chat"} /><span>{tab.title}</span></button>
+      <button className="workspace-tab-select" type="button" aria-current={tab.id === activeId ? "page" : undefined} title={tab.title} onClick={() => onSelect(tab)}><NavIcon name={tab.projectId ? "project" : "chat"} /><span>{tab.title}</span></button>
       <button className="workspace-tab-close" type="button" aria-label={`Close ${tab.title}`} title="Close tab" onClick={() => onClose(tab.id)}>×</button>
     </div>)}</div>
     <button className="workspace-tab-new" type="button" aria-label="New tab" title="New tab (Ctrl+T)" onClick={onNew}><NavIcon name="plus" /></button>

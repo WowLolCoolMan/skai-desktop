@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-16
+
 ### Added
 
+- Added a branded per-user Windows NSIS installer with a data-preserving upgrade
+  path and an automated clean install, 0.1.3-to-0.1.4 upgrade, and uninstall
+  lifecycle smoke.
 - Added local MP4 and WebM chat input that samples four timestamped frames into
   JPEG attachments, with bounded size and duration, private temporary storage,
   and packaged Electron smoke coverage for WebM and H.264 MP4.
@@ -33,6 +38,9 @@
 - Hardened Agent Host writes against a closed Electron stdin pipe and made
   concurrent legacy-data migration tolerate another app instance winning the
   first-run file creation race.
+
+- Added a pinned Electron installer toolchain and a patched minimatch override
+  for a zero-vulnerability desktop dependency audit.
 
 ### Updated
 
@@ -86,3 +94,4 @@
 
 [0.1.2]: https://github.com/WowLolCoolMan/skai-desktop/compare/v0.1.1...v0.1.2
 [0.1.3]: https://github.com/WowLolCoolMan/skai-desktop/compare/v0.1.2...v0.1.3
+[0.1.4]: https://github.com/WowLolCoolMan/skai-desktop/compare/v0.1.3...v0.1.4
