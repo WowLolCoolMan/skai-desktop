@@ -66,7 +66,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Coding-agent model integrations, including Claude Code and Codex.
 - [ ] AI planning mode: plan, execute, verify, iterate, retry, and pause for human decisions.
 - [ ] Auto mode for unattended agent execution.
-- [ ] Background tasks.
+- [x] Background tasks. (Queued local coding tasks now auto-dispatch through a conservative single-run scheduler, preserve queued/running/cancelled state, and start the next task when the current one finishes. Capacity-derived parallel execution remains open.)
 - [ ] Learning loop from past interactions.
 - [ ] Dispatch tasks from a phone to the desktop.
 - [ ] Nested sessions for subtasks.

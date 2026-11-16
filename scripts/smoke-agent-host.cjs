@@ -228,6 +228,45 @@ async function run() {
     if (terminalTask && ["completed", "failed", "cancelled", "blocked"].includes(terminalTask.status)) break;
   }
   if (!terminalTask || terminalTask.status !== "failed" || !terminalTask.resultSummary) throw new Error("tasks.execute did not persist a terminal local-model failure.");
+  let queueRequests = 0;
+  const queueModelServer = http.createServer((request, response) => {
+    queueRequests += 1;
+    request.resume();
+    request.on("end", () => {
+      setTimeout(() => {
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ action: "done", summary: "Queued smoke task completed." }) } }] })}\n\ndata: [DONE]\n\n`);
+      }, 750);
+    });
+  });
+  await new Promise(resolve => queueModelServer.listen(0, "127.0.0.1", resolve));
+  const queueModelPort = queueModelServer.address().port;
+  const queueSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "queue-smoke-model", provider: "Ollama" });
+  if (!queueSettings.ok) throw new Error("settings.save could not prepare the queued task smoke endpoint.");
+  const firstQueued = await request("tasks.plan", { title: "First queued task", instruction: "Complete the first queued smoke task.", environment: "local" });
+  const secondQueued = await request("tasks.plan", { title: "Second queued task", instruction: "Complete the second queued smoke task.", environment: "local" });
+  if (!firstQueued.ok || !secondQueued.ok) throw new Error("tasks.plan could not create the queued task pair.");
+  for (const task of [firstQueued, secondQueued]) {
+    const queuedTask = await request("tasks.queue", { id: task.result.id });
+    if (!queuedTask.ok || queuedTask.result?.status !== "queued") throw new Error("tasks.queue did not queue the task pair.");
+  }
+  const firstExecution = await request("tasks.execute", { id: firstQueued.result.id });
+  const secondExecution = await request("tasks.execute", { id: secondQueued.result.id });
+  if (!firstExecution.ok || firstExecution.result?.status !== "running") throw new Error(`First queued task did not start immediately: ${JSON.stringify(firstExecution)}`);
+  if (!secondExecution.ok || secondExecution.result?.status !== "queued") throw new Error(`Second queued task did not wait for the shared execution slot: ${JSON.stringify(secondExecution)}`);
+  let firstTerminal = null;
+  let secondTerminal = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error("tasks.list failed while observing queued task dispatch.");
+    firstTerminal = snapshot.result.find(item => item.id === firstQueued.result.id) ?? null;
+    secondTerminal = snapshot.result.find(item => item.id === secondQueued.result.id) ?? null;
+    if ([firstTerminal, secondTerminal].every(task => task && ["completed", "failed", "cancelled", "blocked"].includes(task.status))) break;
+  }
+  await new Promise(resolve => queueModelServer.close(resolve));
+  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2)
+    throw new Error(`Queued task dispatch did not run both tasks serially: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests })}`);
   const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
   if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Only the Local environment")) throw new Error("tasks.plan accepted an unsupported environment.");
   const scheduled = await request("scheduled.create", { prompt: "Run the local review", dueAt: new Date(Date.now() + 60_000).toISOString(), repeatEveryMinutes: 60 });

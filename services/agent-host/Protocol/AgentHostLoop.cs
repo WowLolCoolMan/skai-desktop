@@ -11,6 +11,9 @@ public static class AgentHostLoop
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Dictionary<string, ActiveTaskExecution> ActiveTaskExecutions = new(StringComparer.Ordinal);
     private static readonly object ActiveTaskExecutionsGate = new();
+    // Local providers do not expose enough allocation telemetry to admit parallel
+    // coding runs safely yet. Keep one shared slot and let durable tasks queue.
+    private static readonly SemaphoreSlim LocalTaskExecutionSlot = new(1, 1);
     private static readonly Dictionary<string, WorkspaceTerminalSession> TerminalSessions = new(StringComparer.Ordinal);
     private static readonly object TerminalSessionsGate = new();
     private static readonly Dictionary<string, ModelPullOperation> ModelPulls = new(StringComparer.Ordinal);
@@ -1373,18 +1376,54 @@ public static class AgentHostLoop
                 throw new InvalidOperationException("The task is already executing.");
 
             var execution = new ActiveTaskExecution(new CancellationTokenSource());
-            execution.Task = Task.Run(() => ExecuteLocalModelTaskAsync(taskId, execution.Cancellation.Token));
+            execution.Task = Task.Run(() => ExecuteQueuedLocalModelTaskAsync(taskId, execution));
             ActiveTaskExecutions[taskId] = execution;
-            _ = execution.Task.ContinueWith(_ =>
-            {
-                lock (ActiveTaskExecutionsGate)
-                {
-                    if (ActiveTaskExecutions.Remove(taskId, out var finished)) finished.Cancellation.Dispose();
-                }
-            }, TaskScheduler.Default);
         }
 
-        return new(ProtocolVersion, request.Id, true, new { id = taskId, status = AgentTaskStatuses.Running, execution = "local-model" });
+        var status = LocalTaskExecutionSlot.CurrentCount > 0 ? AgentTaskStatuses.Running : AgentTaskStatuses.Queued;
+        return new(ProtocolVersion, request.Id, true, new { id = taskId, status, execution = "local-queue" });
+    }
+
+    private static async Task ExecuteQueuedLocalModelTaskAsync(string taskId, ActiveTaskExecution execution)
+    {
+        var acquired = false;
+        try
+        {
+            await LocalTaskExecutionSlot.WaitAsync(execution.Cancellation.Token).ConfigureAwait(false);
+            acquired = true;
+            var store = CreateTaskStore();
+            if (execution.Cancellation.IsCancellationRequested || store.Get(taskId).Status != AgentTaskStatuses.Queued)
+            {
+                if (execution.Cancellation.IsCancellationRequested)
+                {
+                    try
+                    {
+                        if (store.Get(taskId).Status == AgentTaskStatuses.Queued) store.CancelPlanned(taskId, "Cancelled while waiting for the local execution slot.");
+                    }
+                    catch (Exception error) when (error is KeyNotFoundException or InvalidOperationException) { }
+                }
+                return;
+            }
+            lock (ActiveTaskExecutionsGate) execution.Started = true;
+            await ExecuteLocalModelTaskAsync(taskId, execution.Cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (execution.Cancellation.IsCancellationRequested)
+        {
+            var store = CreateTaskStore();
+            try
+            {
+                if (store.Get(taskId).Status == AgentTaskStatuses.Queued) store.CancelPlanned(taskId, "Cancelled while waiting for the local execution slot.");
+            }
+            catch (Exception error) when (error is KeyNotFoundException or InvalidOperationException) { }
+        }
+        finally
+        {
+            if (acquired) LocalTaskExecutionSlot.Release();
+            lock (ActiveTaskExecutionsGate)
+            {
+                if (ActiveTaskExecutions.Remove(taskId, out var finished)) finished.Cancellation.Dispose();
+            }
+        }
     }
 
     private static async Task ExecuteLocalModelTaskAsync(string taskId, CancellationToken cancellationToken)
@@ -1493,6 +1532,10 @@ public static class AgentHostLoop
                 if (ActiveTaskExecutions.TryGetValue(id, out var active))
                 {
                     active.Cancellation.Cancel();
+                    if (!active.Started)
+                    {
+                        return new(ProtocolVersion, request.Id, true, new { id, status = AgentTaskStatuses.Queued, cancellationRequested = true });
+                    }
                     return new(ProtocolVersion, request.Id, true, new { id, status = AgentTaskStatuses.Running, cancellationRequested = true });
                 }
             }
@@ -1513,6 +1556,7 @@ public static class AgentHostLoop
     {
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public Task Task { get; set; } = Task.CompletedTask;
+        public bool Started { get; set; }
     }
 
     private static AgentResponse ListScheduledTasks(AgentRequest request)
