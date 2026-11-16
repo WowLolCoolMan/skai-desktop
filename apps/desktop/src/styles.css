@@ -238,6 +238,19 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 
 /* The shell keeps its proportions while letting users give the workspace more or less room. */
 .app-sidebar { position: relative; min-width: 0; }
+
+/* Nested project browser rows preserve the compact explorer density while making path structure scannable. */
+.project-file-list[role="tree"] { display: block; padding: 2px 4px 2px 0; }
+.project-file-tree-row { display: flex !important; align-items: center; gap: 7px !important; min-height: 29px; padding: 4px 7px 4px calc(7px + (var(--tree-depth, 0) * 14px)) !important; border-radius: 6px !important; }
+.project-file-tree-row:focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: -2px; }
+.project-file-tree-chevron { display: grid; flex: 0 0 12px; place-items: center; color: var(--skai-color-text-muted); font-size: 14px; line-height: 1; }
+.project-file-tree-icon { display: grid; flex: 0 0 14px; place-items: center; color: color-mix(in srgb, var(--skai-color-accent) 75%, var(--skai-color-text)); font-size: 10px; }
+.project-file-document-icon { font-size: 22px; line-height: 8px; }
+.project-file-tree-name { min-width: 0; overflow: hidden; color: var(--skai-color-text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.project-file-tree-row small { flex: 0 0 auto; margin-left: auto; color: var(--skai-color-text-muted); font-size: 9px; }
+.project-file-folder .project-file-tree-name { font-weight: 600; }
+.project-file-tree-spacer { visibility: hidden; }
+.project-file-directory-children { display: grid; }
 .sidebar-resize-handle { position: absolute; z-index: 3; top: 0; right: -5px; bottom: 0; width: 10px; cursor: col-resize; }
 .sidebar-resize-handle::after { position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; content: ""; transition: background var(--skai-duration-fast) var(--skai-ease-standard); }
 .sidebar-resize-handle:hover::after, .sidebar-resize-handle:focus-visible::after, .app-sidebar.is-resizing .sidebar-resize-handle::after { background: var(--skai-color-accent); }

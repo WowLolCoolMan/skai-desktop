@@ -13,7 +13,9 @@ const hostAssembly = ensureSmokeAgentHostBuild(root);
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-project-browser-smoke-"));
 const workspace = path.join(tempRoot, "workspace");
 fs.mkdirSync(path.join(workspace, "node_modules"), { recursive: true });
+fs.mkdirSync(path.join(workspace, "src", "features", "coding"), { recursive: true });
 fs.writeFileSync(path.join(workspace, "README.md"), "safe metadata fixture\n");
+fs.writeFileSync(path.join(workspace, "src", "features", "coding", "page.tsx"), "export const page = true;\n");
 fs.writeFileSync(path.join(workspace, ".env"), "SECRET=must-not-appear\n");
 fs.writeFileSync(path.join(workspace, "node_modules", "ignored.js"), "ignored\n");
 
@@ -50,7 +52,9 @@ async function run() {
   if (!saved.ok || typeof saved.result?.id !== "string") throw new Error("project.save did not create the disposable project.");
   const browser = await request("project.files", { id: saved.result.id });
   const files = browser.result?.files ?? [];
-  if (!browser.ok || files.length !== 1 || files[0].relativePath !== "README.md") throw new Error("project.files did not preserve safe filtering.");
+  const paths = files.map(file => file.relativePath.replaceAll("\\", "/"));
+  if (!browser.ok || files.length !== 2 || !paths.includes("README.md") || !paths.includes("src/features/coding/page.tsx"))
+    throw new Error("project.files did not preserve nested relative paths and safe filtering.");
   if (browser.result.protectedFilesSkipped < 1 || browser.result.excludedDirectoriesSkipped < 1)
     throw new Error("project.files did not report protected/dependency exclusions.");
   if (Object.values(files[0]).some(value => String(value).includes("SECRET"))) throw new Error("project browser leaked protected content.");

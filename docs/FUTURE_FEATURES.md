@@ -88,7 +88,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Multiple document-extraction engines.
 - [ ] Agentic retrieval that browses documentation.
 - [x] Full-text context injection. (Explicit Advanced generation option for bounded text/PDF attachment content; query-ranked retrieval remains the default.)
-- [ ] Nested file browser with preview. (Bounded local project-folder browser with relative paths, filtering, text/image/PDF preview exists; full tree, mutation, and packaged acceptance remain open.)
+- [ ] Nested file browser with preview. (The bounded local browser now renders a collapsible directory tree, preserves safe relative paths, and auto-expands matching search results; text editing/preview remains in the project workspace. Image/PDF preview, file mutation, and packaged acceptance remain open.)
 - [ ] Projects that group chats, shared knowledge, and context.
 - [ ] Saved environments for reusable folders, SSH hosts, and cloud contexts.
 - [x] File connectors that open, edit, and save files directly. (Bounded local project browser and approved file operations are implemented.)
