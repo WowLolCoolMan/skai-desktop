@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
 import type { Route } from "../../app/types";
 import type { AgentRequest } from "../../services/agentClient";
+import { loadProjectEditorDraft, removeProjectEditorDraft, saveProjectEditorDraft } from "./projectEditorDraftStore";
 
 type CodingWorkspaceOptions = {
   request: AgentRequest;
@@ -37,6 +38,42 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   const [gitPushBusy, setGitPushBusy] = useState(false);
   const [gitPullRequestBusy, setGitPullRequestBusy] = useState(false);
   const fileReadRequestId = useRef(0);
+  const localFileDrafts = useRef(new Map<string, string>());
+  const fileDraftSaveTimer = useRef<number | null>(null);
+
+  const projectDraftKey = (projectId: string, path: string) => `${projectId}:${path}`;
+  const persistProjectDraftNow = (projectId: string, path: string, content: string) => {
+    if (fileDraftSaveTimer.current !== null) window.clearTimeout(fileDraftSaveTimer.current);
+    fileDraftSaveTimer.current = null;
+    void saveProjectEditorDraft(projectId, path, content);
+  };
+  const persistCurrentProjectDraft = () => {
+    if (!selectedProject || !selectedFile) return;
+    const key = projectDraftKey(selectedProject.id, selectedFile);
+    const cached = localFileDrafts.current.get(key);
+    if (cached === undefined && (fileHash === null || fileDraft === fileOriginal)) return;
+    persistProjectDraftNow(selectedProject.id, selectedFile, cached ?? fileDraft);
+  };
+  const updateFileDraft = (content: string) => {
+    setFileDraft(content);
+    if (!selectedProject || !selectedFile) return;
+    const key = projectDraftKey(selectedProject.id, selectedFile);
+    if (content === fileOriginal) {
+      localFileDrafts.current.delete(key);
+      if (fileDraftSaveTimer.current !== null) window.clearTimeout(fileDraftSaveTimer.current);
+      fileDraftSaveTimer.current = null;
+      void removeProjectEditorDraft(selectedProject.id, selectedFile);
+      return;
+    }
+    localFileDrafts.current.set(key, content);
+    if (fileDraftSaveTimer.current !== null) window.clearTimeout(fileDraftSaveTimer.current);
+    const projectId = selectedProject.id;
+    const path = selectedFile;
+    fileDraftSaveTimer.current = window.setTimeout(() => {
+      fileDraftSaveTimer.current = null;
+      void saveProjectEditorDraft(projectId, path, localFileDrafts.current.get(projectDraftKey(projectId, path)) ?? content);
+    }, 250);
+  };
 
   useEffect(() => {
     if (connection !== "ready") return;
@@ -72,6 +109,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   };
 
   const selectProject = async (project: DesktopProject, navigateToProject = true) => {
+    persistCurrentProjectDraft();
     fileReadRequestId.current += 1;
     localStorage.setItem("skai.selectedProject", project.id);
     setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); setGitStatus(null); setGitDiff(null);
@@ -138,8 +176,9 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     return true;
   };
 
-  const openProjectFile = async (relativePath: string) => {
+  const openProjectFile = async (relativePath: string, preserveCurrentDraft = true) => {
     if (!selectedProject) return;
+    if (selectedFile && preserveCurrentDraft) persistCurrentProjectDraft();
     const requestId = ++fileReadRequestId.current;
     setSelectedFile(relativePath); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null);
     const kind = projectFiles.find((file) => file.relativePath === relativePath)?.kind ?? "text";
@@ -156,10 +195,16 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     if (requestId !== fileReadRequestId.current) return;
     if (!response.ok) { onError(response.error?.message ?? "File preview failed."); return; }
     const result = response.result as { content: string; hash: string };
-    setFileDraft(result.content); setFileOriginal(result.content); setFileHash(result.hash);
+    const draftKey = projectDraftKey(selectedProject.id, relativePath);
+    const savedDraft = localFileDrafts.current.has(draftKey) ? localFileDrafts.current.get(draftKey)! : await loadProjectEditorDraft(selectedProject.id, relativePath);
+    if (requestId !== fileReadRequestId.current) return;
+    const content = savedDraft ?? result.content;
+    if (savedDraft !== null && savedDraft !== undefined) localFileDrafts.current.set(draftKey, savedDraft);
+    else localFileDrafts.current.delete(draftKey);
+    setFileDraft(content); setFileOriginal(result.content); setFileHash(result.hash);
   };
 
-  const closeProjectFile = () => { fileReadRequestId.current += 1; setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); };
+  const closeProjectFile = () => { persistCurrentProjectDraft(); fileReadRequestId.current += 1; setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); };
 
   const saveProjectFile = async () => {
     if (!selectedProject || !selectedFile || !fileHash || fileBusy) return;
@@ -168,7 +213,14 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setFileBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "File edit was rejected."); return; }
     const result = response.result as { hash: string; undoId: string };
-    setFileHash(result.hash); setFileOriginal(fileDraft); setFileUndoId(result.undoId); onError(null);
+    setFileHash(result.hash); setFileOriginal(fileDraft); setFileUndoId(result.undoId);
+    if (selectedProject && selectedFile) {
+      if (fileDraftSaveTimer.current !== null) window.clearTimeout(fileDraftSaveTimer.current);
+      fileDraftSaveTimer.current = null;
+      localFileDrafts.current.delete(projectDraftKey(selectedProject.id, selectedFile));
+      void removeProjectEditorDraft(selectedProject.id, selectedFile);
+    }
+    onError(null);
   };
 
   const undoProjectFile = async () => {
@@ -178,7 +230,15 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setFileBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Undo was rejected."); return; }
     setFileUndoId(null);
-    if (selectedFile) await openProjectFile(selectedFile);
+    if (selectedProject && selectedFile) {
+      if (fileDraftSaveTimer.current !== null) window.clearTimeout(fileDraftSaveTimer.current);
+      fileDraftSaveTimer.current = null;
+      localFileDrafts.current.delete(projectDraftKey(selectedProject.id, selectedFile));
+      await removeProjectEditorDraft(selectedProject.id, selectedFile);
+      setFileHash(null);
+      setFileDraft("");
+    }
+    if (selectedFile) await openProjectFile(selectedFile, false);
   };
 
   const runTerminal = async (projectId: string, command: string, cwd: string) => {
@@ -223,5 +283,5 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setTerminalSessionId(null); setTerminalScreen(null); setTerminalExitCode(null); return true;
   };
 
-  return { projects, projectsLoaded, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest };
+  return { projects, projectsLoaded, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest };
 }

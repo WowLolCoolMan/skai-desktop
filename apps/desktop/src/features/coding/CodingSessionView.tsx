@@ -15,6 +15,10 @@ function openTabsStorageKey(projectId: string) {
   return `skai.coding.openTabs.${projectId}`;
 }
 
+function activeFileStorageKey(projectId: string) {
+  return `skai.coding.activeFile.${projectId}`;
+}
+
 function languageForPath(path: string | null) {
   const extension = path?.split(".").pop()?.toLowerCase();
   const languages: Record<string, string> = {
@@ -63,6 +67,7 @@ type CodingSessionViewProps = {
 
 export function CodingSessionView({ conversation, projects, selectedProject, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onPushGitChanges, onCreateGitPullRequest, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal, onNavigate }: CodingSessionViewProps) {
   const [openTabs, setOpenTabs] = useState<string[]>([]);
+  const [openTabsLoadedProject, setOpenTabsLoadedProject] = useState<string | null>(null);
   const [fileQuery, setFileQuery] = useState("");
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<"editor" | "diff">("editor");
@@ -71,6 +76,7 @@ export function CodingSessionView({ conversation, projects, selectedProject, pro
   const [pullRequestTitle, setPullRequestTitle] = useState("Review local project changes");
   const [pullRequestBody, setPullRequestBody] = useState("Please review the local changes and validation evidence.");
   const loadedTabsProjectRef = useRef<string | null>(null);
+  const activeFileRestoreRef = useRef<string | null>(null);
   const skipTabPersistenceRef = useRef(false);
   const hasChanges = Boolean(selectedFile && fileDraft !== fileOriginal);
   const selectedKind = projectFiles.find((file) => file.relativePath === selectedFile)?.kind ?? "text";
@@ -90,8 +96,10 @@ export function CodingSessionView({ conversation, projects, selectedProject, pro
       restoredTabs = [];
     }
     loadedTabsProjectRef.current = selectedProject.id;
+    activeFileRestoreRef.current = null;
     skipTabPersistenceRef.current = true;
     setOpenTabs(restoredTabs);
+    setOpenTabsLoadedProject(selectedProject.id);
     setFileQuery("");
     setTerminalOpen(localStorage.getItem(terminalStorageKey(selectedProject.id)) === "true");
   }, [selectedProject.id]);
@@ -127,8 +135,19 @@ export function CodingSessionView({ conversation, projects, selectedProject, pro
 
   const openFile = (path: string) => {
     setOpenTabs((current) => current.includes(path) ? current : [...current, path]);
+    localStorage.setItem(activeFileStorageKey(selectedProject.id), path);
+    activeFileRestoreRef.current = `${selectedProject.id}:${path}`;
     onOpenFile(path);
   };
+
+  useEffect(() => {
+    if (openTabsLoadedProject !== selectedProject.id) return;
+    const path = localStorage.getItem(activeFileStorageKey(selectedProject.id));
+    if (!path || activeFileRestoreRef.current === `${selectedProject.id}:${path}` || !projectFiles.some((file) => file.relativePath === path)) return;
+    activeFileRestoreRef.current = `${selectedProject.id}:${path}`;
+    setOpenTabs((current) => current.includes(path) ? current : [...current, path]);
+    onOpenFile(path);
+  }, [onOpenFile, openTabsLoadedProject, projectFiles, selectedProject.id]);
 
   const focusTab = (index: number) => {
     const path = openTabs[index];
@@ -149,13 +168,13 @@ export function CodingSessionView({ conversation, projects, selectedProject, pro
   };
 
   const closeTab = (path: string) => {
-    if (path === selectedFile && hasChanges) return;
     const index = openTabs.indexOf(path);
     const next = openTabs.filter((item) => item !== path);
     setOpenTabs(next);
     if (path === selectedFile) {
       const nextActive = next[index] ?? next[index - 1];
-      if (nextActive) onOpenFile(nextActive); else onCloseFile();
+      if (nextActive) openFile(nextActive);
+      else { localStorage.removeItem(activeFileStorageKey(selectedProject.id)); activeFileRestoreRef.current = null; onCloseFile(); }
     }
   };
 
@@ -169,7 +188,7 @@ export function CodingSessionView({ conversation, projects, selectedProject, pro
       <div className="project-file-layout">
         <div className="project-file-explorer"><div className="file-list-toolbar"><input ref={fileSearchRef} value={fileQuery} onChange={(event) => setFileQuery(event.target.value)} placeholder="Filter files…" aria-label="Filter project files" /><kbd>Ctrl P</kbd></div>{projectFiles.length === 0 ? <EmptyState title="No readable files" description="Protected names and unsupported files are hidden." /> : filteredFiles.length === 0 ? <EmptyState title="No matching files" description="Try a shorter path or filename." /> : <ProjectFileTree key={selectedProject.id} files={filteredFiles} query={fileQuery} selectedFile={selectedFile} onOpenFile={openFile} />}</div>
         <div className="file-editor-panel">
-          {openTabs.length > 0 && <div className="file-tabs" role="tablist" aria-orientation="horizontal" aria-label="Open project files">{openTabs.map((path, index) => <div className={`file-tab ${selectedFile === path ? "is-active" : ""}`} key={path}><button id={`coding-file-tab-${index}`} type="button" role="tab" tabIndex={selectedFile === path || (!selectedFile && index === 0) ? 0 : -1} aria-selected={selectedFile === path} aria-controls="coding-file-editor" onClick={() => openFile(path)} onKeyDown={(event) => onTabKeyDown(event, index)}><span>{path}</span>{selectedFile === path && hasChanges ? <i aria-label="Unsaved changes">•</i> : null}</button><button className="file-tab-close" type="button" onClick={() => closeTab(path)} disabled={selectedFile === path && hasChanges} aria-label={`Close ${path}`}>×</button></div>)}</div>}
+          {openTabs.length > 0 && <div className="file-tabs" role="tablist" aria-orientation="horizontal" aria-label="Open project files">{openTabs.map((path, index) => <div className={`file-tab ${selectedFile === path ? "is-active" : ""}`} key={path}><button id={`coding-file-tab-${index}`} type="button" role="tab" tabIndex={selectedFile === path || (!selectedFile && index === 0) ? 0 : -1} aria-selected={selectedFile === path} aria-controls="coding-file-editor" onClick={() => openFile(path)} onKeyDown={(event) => onTabKeyDown(event, index)}><span>{path}</span>{selectedFile === path && hasChanges ? <i aria-label="Unsaved changes">•</i> : null}</button><button className="file-tab-close" type="button" onClick={() => closeTab(path)} aria-label={`Close ${path}`}>×</button></div>)}</div>}
           {selectedFile ? <>{selectedKind === "text" ? <><div id="coding-file-editor" className="file-editor-heading"><span>{selectedFile} · {languageForPath(selectedFile)}</span><div><Button variant={panelMode === "editor" ? "secondary" : "ghost"} onClick={() => setPanelMode("editor")}>Editor</Button><Button variant={panelMode === "diff" ? "secondary" : "ghost"} disabled={!hasChanges} onClick={() => setPanelMode("diff")}>Review diff</Button><Button variant="ghost" disabled={fileBusy || !fileUndoAvailable} title={fileUndoAvailable ? "Undo the last saved edit" : "No saved edit to undo"} onClick={onUndoFile}>Undo</Button><Button variant="primary" disabled={fileBusy || !hasChanges} onClick={onSaveFile}>{fileBusy ? "Saving…" : "Save edit"}</Button></div></div>{panelMode === "diff" ? <div className="monaco-diff-shell" aria-label="Local diff preview"><DiffEditor original={fileOriginal} modified={fileDraft} language={languageForPath(selectedFile)} theme="vs-dark" options={{ automaticLayout: true, minimap: { enabled: false }, readOnly: true, renderSideBySide: true, scrollBeyondLastLine: false, wordWrap: "on" }} /></div> : <div className="monaco-editor-shell" aria-label={`Edit ${selectedFile}`}><Editor value={fileDraft} language={languageForPath(selectedFile)} theme="vs-dark" onChange={(value) => onDraftChange(value ?? "")} options={{ automaticLayout: true, fontSize: 13, folding: true, lineNumbers: "on", minimap: { enabled: true }, padding: { top: 12, bottom: 12 }, scrollBeyondLastLine: false, tabSize: 2, wordWrap: "off" }} /></div>}</> : <div className="project-file-preview">{filePreview ? filePreview.kind === "image" ? <img src={`data:${filePreview.mediaType};base64,${filePreview.content}`} alt={selectedFile} /> : <><div className="project-pdf-preview-label">Selectable text extracted locally · original PDF stays in the project</div><pre>{filePreview.content || "No selectable text was found in this PDF."}</pre></> : <p aria-live="polite">{filePreviewError ? `Preview unavailable: ${filePreviewError}` : "Loading safe preview…"}</p>}</div>}</> : <EmptyState title="Select a file" description="Choose a readable file to preview or edit it with guarded write-back." />}
         </div>
       </div>

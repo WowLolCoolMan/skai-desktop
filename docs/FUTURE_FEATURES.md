@@ -130,6 +130,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Native multi-session sidebar with drag-and-drop panes.
 - [x] Persist composer drafts and attachments per workspace tab, with a bounded recently closed tab list and restore action.
 - [x] Resume the active persisted chat or project workspace session after startup, preferring its conversation/project over the legacy global selection and preserving the user's last non-workspace destination.
+- [x] Restore the active project file tab and keep unsaved editor drafts per project/file in bounded local storage; closing an editor tab retains its draft for reopening.
 
 ## Models, runtime, and extensibility
 
