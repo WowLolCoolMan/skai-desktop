@@ -137,7 +137,7 @@ export type ScheduledTaskDraft = {
   prompt: string;
   dueAt: string;
   repeatEveryMinutes?: number | null;
-  workspaceMode?: "chat" | "coding-agent";
+  workspaceMode?: "ChatBot" | "Coding Agent";
 };
 
 export type DesktopQueuedMessage = {
