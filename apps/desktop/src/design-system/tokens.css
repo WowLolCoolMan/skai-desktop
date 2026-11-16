@@ -10,10 +10,32 @@
   --skai-space-6: 24px;
   --skai-space-8: 32px;
   --skai-space-10: 40px;
-  --skai-radius-sm: 6px;
-  --skai-radius-md: 9px;
-  --skai-radius-lg: 12px;
-  --skai-radius-xl: 16px;
+  /* Theme: corner scale. --skai-radius-scale is the "corner style" knob
+     (0 = square, 1 = default, >1 = rounder); pill stays a pill. */
+  --skai-radius-scale: 1;
+  --skai-radius-xs: calc(4px * var(--skai-radius-scale));
+  --skai-radius-sm: calc(6px * var(--skai-radius-scale));
+  --skai-radius-md: calc(8px * var(--skai-radius-scale));
+  --skai-radius-lg: calc(10px * var(--skai-radius-scale));
+  --skai-radius-xl: calc(12px * var(--skai-radius-scale));
+  --skai-radius-2xl: calc(16px * var(--skai-radius-scale));
+  --skai-radius-3xl: calc(20px * var(--skai-radius-scale));
+  --skai-radius-pill: 999px;
+  /* Theme: type scale. --skai-text-scale is the "text size" knob. */
+  --skai-text-scale: 1;
+  --skai-text-3xs: calc(8px * var(--skai-text-scale));
+  --skai-text-2xs: calc(9px * var(--skai-text-scale));
+  --skai-text-xs: calc(10px * var(--skai-text-scale));
+  --skai-text-sm: calc(11px * var(--skai-text-scale));
+  --skai-text-md: calc(12px * var(--skai-text-scale));
+  --skai-text-base: calc(13px * var(--skai-text-scale));
+  --skai-text-lg: calc(14px * var(--skai-text-scale));
+  --skai-text-xl: calc(16px * var(--skai-text-scale));
+  --skai-text-2xl: calc(18px * var(--skai-text-scale));
+  --skai-text-3xl: calc(20px * var(--skai-text-scale));
+  --skai-text-4xl: calc(24px * var(--skai-text-scale));
+  --skai-text-5xl: calc(28px * var(--skai-text-scale));
+  --skai-text-6xl: calc(34px * var(--skai-text-scale));
   --skai-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --skai-duration-fast: 140ms;
   --skai-duration-standard: 220ms;

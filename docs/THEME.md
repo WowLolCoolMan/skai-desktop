@@ -157,3 +157,24 @@ Round 1 was committed as 6b16659 and pushed to main in the merge acbccbb.
   at most 0.4% of sampled bytes changed. Light checkerboards are now light.
 - **Found for later:** in light, the accent `#b39af5` is used as text (eyebrows, the selected chip)
   at about 2.2:1 on white, below AA. Fix in the contrast pass (light accent plus white on-accent).
+
+### Round 3: type and corner scales (Phase 2, part 2)
+
+Round 2 was committed as 17bb50e and pushed to main in the merge 8cce092.
+
+- **Type scale:** all 420 px font sizes in `styles.css` and `pluginsMcpHealth.css` now use 13 steps,
+  `--skai-text-3xs` (8px) through `--skai-text-6xl` (34px). Each step is
+  `calc(Npx * var(--skai-text-scale))`, so Phase 7's text-size setting only sets
+  `--skai-text-scale`. In-between sizes snap to the nearest step (ties round up): 15→16, 17→18, 19/21→20,
+  22/23/25→24, 26→28.
+- **Corner scale:** all 229 px radii (multi-value ones too) use `--skai-radius-xs` (4px) through
+  `--skai-radius-3xl` (20px) plus `--skai-radius-pill`, each multiplied by `--skai-radius-scale` (the
+  Phase 7 corner-style knob). 9px snapped to 10px; 50% circles stay 50%. The six old
+  `--skai-radius-lg` (12px) uses became `--skai-radius-xl`, which keeps them at 12px.
+- **Fonts:** the two hard-coded monospace stacks now use `--skai-font-mono`. Font roles and weights are
+  Phase 4.
+- **Shadows:** all 40 now take their color from `--skai-color-shadow` (round 2), so themes control them.
+  Their geometry stays per component.
+- **Audit:** `audit:theme-tokens` also fails on px `font-size` and px radii in CSS (both baselines are 0).
+- **Screens** (`.theme-shots/r3-after`): 0.1–3% of sampled bytes changed against round 2. The
+  only visible change is a few headings 1px larger (17→18px).
