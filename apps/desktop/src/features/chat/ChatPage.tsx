@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
+import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
 import type { Message, Model, Route } from "../../app/types";
 import { Button, Card, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
@@ -8,6 +8,7 @@ import { ModelPicker } from "../../components/ui/ModelPicker";
 import { ChatMessage } from "./ChatMessage";
 import { ChatComposer } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";
+import { ChatSchedulesPanel } from "./ChatSchedulesPanel";
 import type { TaskEnvironment } from "../../../shared/contracts";
 import type { ChatResponseMode } from "./useChatWorkspace";
 import { loadChatDraft, saveChatDraft } from "./chatDraftStore";
@@ -61,6 +62,7 @@ type ChatPageProps = {
   busy: boolean;
   taskBusy: string | null;
   tasks: DesktopTask[];
+  scheduledTasks: DesktopScheduledTask[];
   attachments: ChatAttachment[];
   queuedMessages: DesktopQueuedMessage[];
   conversationId: string | null;
@@ -91,10 +93,12 @@ type ChatPageProps = {
   onArchive: () => void;
   onRenameConversation: (title: string) => Promise<boolean>;
   onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, conversationId?: string | null) => Promise<boolean>;
+  onScheduleTask: (draft: import("../../../shared/contracts").ScheduledTaskDraft) => Promise<boolean>;
+  onTransitionScheduledTask: (id: string, operation: "pause" | "resume" | "cancel" | "runNow") => Promise<boolean>;
   workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ workspaceTabId, capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, workspaceMode = "conversation" }: ChatPageProps) {
+export function ChatPage({ workspaceTabId, capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onTransitionScheduledTask, workspaceMode = "conversation" }: ChatPageProps) {
   const capacityEstimate = estimateModelCapacity(models.find((item) => item.model === model), capacity);
   const [draft, setDraft] = useState(() => readChatDraft(workspaceTabId, conversationId));
   const latestDraftRef = useRef(draft);
@@ -281,6 +285,7 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
           )}
         </section>
         <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment) => onPlanTask(title, instruction, environment, conversationId)} />
+        <ChatSchedulesPanel conversationId={conversationId} scheduled={scheduledTasks} busyTask={taskBusy} onSchedule={onScheduleTask} onTransition={onTransitionScheduledTask} />
         {draftPersistenceWarning && <p className="chat-draft-save-warning" role="status">{draftPersistenceWarning}</p>}
         <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={updateDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} onAudioTranscript={(fileName, transcript) => onSetAttachments([...attachments, { fileName: `${fileName}.audio-transcript.txt`, mediaType: "text/plain", content: transcript }].slice(0, 5))} />
       </main>

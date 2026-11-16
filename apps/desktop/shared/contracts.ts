@@ -138,6 +138,7 @@ export type TaskEnvironment = "local" | "worktree";
 
 export type DesktopScheduledTask = {
   id: string;
+  conversationId?: string | null;
   prompt: string;
   workspaceMode: string;
   dueAt: string;
@@ -148,6 +149,7 @@ export type DesktopScheduledTask = {
 
 export type ScheduledTaskDraft = {
   prompt: string;
+  conversationId?: string | null;
   dueAt: string;
   repeatEveryMinutes?: number | null;
   workspaceMode?: "ChatBot" | "Coding Agent";

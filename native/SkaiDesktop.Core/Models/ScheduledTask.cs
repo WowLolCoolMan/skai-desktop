@@ -17,6 +17,7 @@ public sealed class ScheduledTask
     public const int MaxRepeatEveryMinutes = 7 * 24 * 60;
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Prompt { get; set; } = string.Empty;
+    public string? ConversationId { get; set; }
     public string WorkspaceMode { get; set; } = WorkspaceModes.Chat;
     public DateTimeOffset DueAtUtc { get; set; }
     public int? RepeatEveryMinutes { get; set; }
