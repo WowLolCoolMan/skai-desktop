@@ -17,12 +17,13 @@ internal static class ConversationArchiveTests
         {
             Title = "Portable conversation",
             Mode = "Coding Agent",
+            ResponseMode = ChatResponseModes.Security,
             ProjectName = "Sample project",
             ProjectInstructions = "Keep changes focused.",
             Messages = [new ChatMessage("user", "Review this file", [new ChatAttachment("notes.md", "A local note")]), new ChatMessage("assistant", "Here is a review.")]
         };
         var portableArchive = ConversationArchive.Parse(ConversationArchive.Serialize([portableChat]));
-        Check(portableArchive.Count == 1 && portableArchive[0].Mode == "Coding Agent" && portableArchive[0].ProjectInstructions == "Keep changes focused." && portableArchive[0].Messages[0].Attachments?[0].Content == "A local note", "conversation archive round-trips local project context and attachments");
+        Check(portableArchive.Count == 1 && portableArchive[0].Mode == "Coding Agent" && portableArchive[0].ResponseMode == ChatResponseModes.Security && portableArchive[0].ProjectInstructions == "Keep changes focused." && portableArchive[0].Messages[0].Attachments?[0].Content == "A local note", "conversation archive round-trips response mode, local project context, and attachments");
         var markdown = ConversationMarkdownExporter.Serialize([portableChat]);
         Check(markdown.Contains("# Chat export", StringComparison.Ordinal) && markdown.Contains("## Portable conversation", StringComparison.Ordinal) && markdown.Contains("`notes.md`", StringComparison.Ordinal), "Markdown chat export includes metadata, messages, and attachment names");
         var markdownFileName = ConversationMarkdownExporter.FileNameFor(new ChatSession { Id = "unsafe-id", Title = "Unsafe:/ title?" });

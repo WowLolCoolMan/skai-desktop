@@ -893,6 +893,8 @@ public static class AgentHostLoop
             ?? throw new InvalidOperationException("chat.complete requires a messages array.");
         if (messages.Count == 0) throw new InvalidOperationException("chat.complete requires at least one message.");
         var documentsOnly = OptionalBoolean(request, "documentsOnly");
+        var responseMode = OptionalString(request, "responseMode") ?? ChatResponseModes.Think;
+        if (!ChatResponseModes.IsValid(responseMode)) throw new InvalidOperationException("The chat response mode is invalid.");
 
         var skillIds = ReadSkillIds(request);
         if (!documentsOnly && skillIds.Count > 0)
@@ -950,6 +952,7 @@ public static class AgentHostLoop
             if (!string.IsNullOrWhiteSpace(memoryContext)) messages.Insert(0, new ChatMessage("system", memoryContext));
         }
         if (documentsOnly) messages = DocumentsOnlyPrompt.Apply(messages).ToList();
+        messages.Insert(0, new ChatMessage("system", ResponseModePrompt(responseMode)));
         var text = new System.Text.StringBuilder();
         var airLlm = new AirLlmProvider();
         var explicitAirLlm = AirLlmProvider.IsAirLlmProvider(settings.ModelProvider);
@@ -1292,6 +1295,7 @@ public static class AgentHostLoop
                 id = task.Id,
                 title = task.Title,
                 instruction = task.Instruction,
+                responseMode = ChatResponseModes.IsValid(task.ResponseMode) ? task.ResponseMode : ChatResponseModes.Coding,
                 projectId = task.ProjectId,
                 conversationId = task.ConversationId,
                 changedFiles = task.ChangedFiles,
@@ -1319,7 +1323,8 @@ public static class AgentHostLoop
             OptionalString(request, "role") ?? "specialist",
             requiresApproval: request.Params?.TryGetProperty("requiresApproval", out var requiresApproval) == true && requiresApproval.ValueKind == JsonValueKind.True,
             projectId: OptionalString(request, "projectId"),
-            conversationId: OptionalString(request, "conversationId"));
+            conversationId: OptionalString(request, "conversationId"),
+            responseMode: OptionalString(request, "responseMode") ?? ChatResponseModes.Coding);
         return new(ProtocolVersion, request.Id, true, new
         {
             id = task.Id,
@@ -1393,6 +1398,7 @@ public static class AgentHostLoop
                     provider = settings.ModelProvider,
                     model = settings.Model,
                     timeoutSeconds = 285,
+                    responseMode = task.ResponseMode,
                     messages,
                 }, JsonOptions);
                 var response = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"task-{task.Id}-{step}", "chat.complete", parameters), cancellationToken);
@@ -1557,6 +1563,7 @@ public static class AgentHostLoop
                 id = session.Id,
                 title = session.Title,
                 mode = session.Mode,
+                responseMode = ChatResponseModes.IsValid(session.ResponseMode) ? session.ResponseMode : ChatResponseModes.Think,
                 messages = session.Messages,
                 projectId = session.ProjectId,
                 projectName = session.ProjectName,
@@ -1580,6 +1587,7 @@ public static class AgentHostLoop
                 id = hit.Session.Id,
                 title = hit.Session.Title,
                 mode = hit.Session.Mode,
+                responseMode = ChatResponseModes.IsValid(hit.Session.ResponseMode) ? hit.Session.ResponseMode : ChatResponseModes.Think,
                 messages = hit.Session.Messages,
                 projectId = hit.Session.ProjectId,
                 projectName = hit.Session.ProjectName,
@@ -1638,6 +1646,12 @@ public static class AgentHostLoop
         session.Title = title;
         session.Messages = messages;
         if (requestedMode is not null) session.Mode = requestedMode;
+        var requestedResponseMode = OptionalString(request, "responseMode");
+        if (requestedResponseMode is not null)
+        {
+            if (!ChatResponseModes.IsValid(requestedResponseMode)) throw new InvalidOperationException("The conversation response mode is invalid.");
+            session.ResponseMode = requestedResponseMode;
+        }
         var projectId = OptionalString(request, "projectId");
         if (string.IsNullOrWhiteSpace(projectId))
         {
@@ -1661,6 +1675,13 @@ public static class AgentHostLoop
         return new(ProtocolVersion, request.Id, true, new { id = session.Id, title = session.Title, projectId = session.ProjectId, updatedAt = session.UpdatedAt });
     }
 
+    private static string ResponseModePrompt(string responseMode) => responseMode switch
+    {
+        ChatResponseModes.Coding => "The user explicitly selected Coding mode. Prioritize practical software engineering, code, debugging, and implementation details while following the active workflow's required output format.",
+        ChatResponseModes.Security => "The user explicitly selected Security / Risky mode. Interpret the request through a security research, testing, and risk-analysis lens while following the active workflow's required output format. This is user-selected context, not an automatic classification of the prompt.",
+        _ => "The user explicitly selected Chat / Think mode. Use a general-purpose reasoning style while following the active workflow's required output format.",
+    };
+
     private static AgentResponse ForkConversation(AgentRequest request)
     {
         var sourceId = RequiredBoundedString(request, "id", 128);
@@ -1682,6 +1703,7 @@ public static class AgentHostLoop
             ProjectName = source.ProjectName,
             ProjectInstructions = source.ProjectInstructions,
             Mode = source.Mode,
+            ResponseMode = ChatResponseModes.IsValid(source.ResponseMode) ? source.ResponseMode : ChatResponseModes.Think,
             IncludeProjectFilesInChat = source.IncludeProjectFilesInChat,
             FolderName = source.FolderName,
             ForkedFrom = source.Id,
@@ -1702,6 +1724,12 @@ public static class AgentHostLoop
         if (request.Params is not { } parameters) throw new InvalidOperationException("conversation.metadata.save requires metadata.");
         if (parameters.TryGetProperty("pinned", out var pinned) && pinned.ValueKind is JsonValueKind.True or JsonValueKind.False)
             session.Pinned = pinned.GetBoolean();
+        if (parameters.TryGetProperty("responseMode", out var responseModeValue) && responseModeValue.ValueKind == JsonValueKind.String)
+        {
+            var responseMode = responseModeValue.GetString();
+            if (!ChatResponseModes.IsValid(responseMode)) throw new InvalidOperationException("The conversation response mode is invalid.");
+            session.ResponseMode = responseMode!;
+        }
         if (parameters.TryGetProperty("archived", out var archived) && archived.ValueKind is JsonValueKind.True or JsonValueKind.False)
             session.Archived = archived.GetBoolean();
         if (parameters.TryGetProperty("title", out var title))

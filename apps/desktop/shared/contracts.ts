@@ -78,6 +78,7 @@ export type DesktopConversation = {
   id: string;
   title: string;
   mode?: "ChatBot" | "Coding Agent";
+  responseMode?: "think" | "coding" | "security";
   messages: Array<{ role: "user" | "assistant" | "system"; content: string; attachments?: ChatAttachment[] }>;
   projectId?: string | null;
   projectName?: string | null;
@@ -99,6 +100,7 @@ export type DesktopTask = {
   id: string;
   title: string;
   instruction: string;
+  responseMode?: "think" | "coding" | "security";
   projectId?: string | null;
   conversationId?: string | null;
   changedFiles?: string[];

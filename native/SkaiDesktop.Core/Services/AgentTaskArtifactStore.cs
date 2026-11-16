@@ -40,13 +40,14 @@ public sealed class AgentTaskArtifactStore
         }
     }
 
-    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null)
+    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null, string responseMode = ChatResponseModes.Coding)
     {
         var now = DateTimeOffset.UtcNow;
         var task = new AgentTaskArtifact
         {
             Title = Normalize(title, MaxTitleCharacters, "task title"),
             Instruction = Normalize(instruction, MaxInstructionCharacters, "task instruction"),
+            ResponseMode = ChatResponseModes.IsValid(responseMode) ? responseMode : throw new ArgumentException("The response mode is invalid.", nameof(responseMode)),
             Role = Normalize(role, MaxRoleCharacters, "task role"),
             RequiresApproval = requiresApproval,
             ParentRunId = NormalizeOptional(parentRunId, 128, "parent run ID"),
@@ -289,6 +290,7 @@ public sealed class AgentTaskArtifactStore
         {
             Normalize(task.Title, MaxTitleCharacters, "task title");
             Normalize(task.Instruction, MaxInstructionCharacters, "task instruction");
+            if (!ChatResponseModes.IsValid(task.ResponseMode)) task.ResponseMode = ChatResponseModes.Coding;
             Normalize(task.Role, MaxRoleCharacters, "task role");
             NormalizeOptional(task.ParentRunId, 128, "parent run ID");
             NormalizeOptional(task.ProjectId, 128, "project ID");
@@ -342,6 +344,7 @@ public sealed class AgentTaskArtifactStore
         ConversationId = source.ConversationId,
         Title = source.Title,
         Instruction = source.Instruction,
+        ResponseMode = source.ResponseMode,
         Role = source.Role,
         Status = source.Status,
         RequiresApproval = source.RequiresApproval,

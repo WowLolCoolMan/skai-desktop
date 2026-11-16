@@ -86,6 +86,7 @@ public static class ConversationArchive
             if (string.IsNullOrWhiteSpace(session.Title)) session.Title = "Imported chat";
             if (session.Title.Length > 200) session.Title = session.Title[..200];
             if (session.Mode is not (WorkspaceModes.Chat or WorkspaceModes.CodingAgent)) session.Mode = WorkspaceModes.Chat;
+            if (!ChatResponseModes.IsValid(session.ResponseMode)) session.ResponseMode = ChatResponseModes.Think;
             if (session.FolderName?.Length > 80) session.FolderName = session.FolderName[..80];
             session.Tags ??= [];
             if (session.Tags.Count > 8 || session.Tags.Any(tag => string.IsNullOrWhiteSpace(tag) || tag.Length > 32 || tag.Any(char.IsControl)))

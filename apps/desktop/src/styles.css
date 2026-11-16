@@ -1431,3 +1431,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .rewrite-prompt-dialog { padding: 24px; max-height: calc(100vh - 32px); overflow-y: auto; }
 .rewrite-prompt-fields { display: grid; gap: 12px; margin: 16px 0; }
 .rewrite-prompt-fields textarea { width: 100%; min-height: 90px; box-sizing: border-box; resize: vertical; font: inherit; line-height: 1.5; }
+.chat-response-mode { display: grid; min-width: 130px; gap: 2px; padding: 3px 8px; border: 1px solid var(--skai-color-border); border-radius: 8px; background: var(--skai-color-surface); }
+.chat-response-mode > span { color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: 8px; letter-spacing: .09em; }
+.chat-response-mode select { width: 100%; border: 0; outline: 0; color: var(--skai-color-text); background: transparent; font-size: 10px; }
+.chat-response-mode:focus-within { border-color: var(--skai-color-accent); }

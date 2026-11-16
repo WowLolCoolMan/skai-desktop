@@ -17,6 +17,12 @@ type ChatWorkspaceOptions = {
   onError: (message: string | null) => void;
 };
 
+export type ChatResponseMode = "think" | "coding" | "security";
+const CHAT_RESPONSE_MODES: ChatResponseMode[] = ["think", "coding", "security"];
+function normalizeResponseMode(value: unknown): ChatResponseMode {
+  return CHAT_RESPONSE_MODES.includes(value as ChatResponseMode) ? value as ChatResponseMode : "think";
+}
+
 function readFileAsBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -54,6 +60,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   const [conversations, setConversations] = useState<DesktopConversation[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<DesktopQueuedMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [responseMode, setResponseModeState] = useState<ChatResponseMode>(() => normalizeResponseMode(localStorage.getItem("skai.chat.responseMode")));
 
   useEffect(() => {
     if (connection !== "ready") return;
@@ -67,6 +74,8 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
           setConversationId(first.id);
           localStorage.setItem("skai.conversation.active", first.id);
           setMessages(first.messages.filter((item) => item.role !== "system") as Message[]);
+          setResponseModeState(normalizeResponseMode(first.responseMode));
+          localStorage.setItem("skai.chat.responseMode", normalizeResponseMode(first.responseMode));
         } else {
           setConversationId(null);
           localStorage.removeItem("skai.conversation.active");
@@ -81,7 +90,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   const saveConversation = async (nextMessages: Message[], id = conversationId) => {
     const existingTitle = id ? conversations.find((conversation) => conversation.id === id)?.title : undefined;
     const title = existingTitle || nextMessages.find((item) => item.role === "user")?.content.slice(0, 80) || "New chat";
-    const response = await request("conversation.save", { id: id ?? undefined, title, mode, messages: nextMessages, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) });
+    const response = await request("conversation.save", { id: id ?? undefined, title, mode, responseMode, messages: nextMessages, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) });
     if (!response.ok) { onError(response.error?.message ?? "Conversation could not be saved."); return id; }
     const savedId = (response.result as { id: string }).id;
     setConversationId(savedId);
@@ -103,6 +112,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
           environment: "local",
           projectId: project?.id ?? null,
           conversationId: savedId,
+          responseMode,
         });
         if (!planned.ok) throw new Error(planned.error?.message ?? "The coding task could not be created.");
         const taskId = (planned.result as { id: string }).id;
@@ -118,7 +128,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         return;
       }
     }
-    const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
+    const response = await request("chat.complete", { provider, endpoint, model, messages: next, responseMode, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
     if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
@@ -174,7 +184,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (messages[messageIndex]?.role !== "assistant" || !prefix.some((message) => message.role === "user")) return;
     stopNativeSpeech();
     setMessages(prefix); setBusy(true); onError(null);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: prefix, skills: skillMentions(prefix) });
+    const response = await request("chat.complete", { provider, endpoint, model, messages: prefix, responseMode, skills: skillMentions(prefix) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content }];
@@ -192,7 +202,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const next = [...prefix, edited];
     stopNativeSpeech();
     setMessages(next); setBusy(true); onError(null);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: next, skills: skillMentions(next) });
+    const response = await request("chat.complete", { provider, endpoint, model, messages: next, responseMode, skills: skillMentions(next) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The edited message could not be completed."); return false; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
@@ -300,10 +310,23 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     setConversationId(selected.id);
     localStorage.setItem("skai.conversation.active", selected.id);
     setMessages(selected.messages.filter((item) => item.role !== "system") as Message[]);
+    const selectedResponseMode = normalizeResponseMode(selected.responseMode);
+    setResponseModeState(selectedResponseMode);
+    localStorage.setItem("skai.chat.responseMode", selectedResponseMode);
     setAttachments([]);
     onError(null);
   };
+  const setResponseMode = (nextValue: ChatResponseMode) => {
+    const next = normalizeResponseMode(nextValue);
+    setResponseModeState(next);
+    localStorage.setItem("skai.chat.responseMode", next);
+    if (!conversationId) return;
+    void request("conversation.metadata.save", { id: conversationId, responseMode: next }).then((result) => {
+      if (!result.ok) { onError(result.error?.message ?? "Response mode could not be saved."); return; }
+      setConversations((current) => current.map((conversation) => conversation.id === conversationId ? { ...conversation, responseMode: next } : conversation));
+    }).catch(() => onError("Response mode could not be saved."));
+  };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, queuedMessages, busy, activeConversation, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
+  return { messages, conversationId, attachments, conversations, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
 }

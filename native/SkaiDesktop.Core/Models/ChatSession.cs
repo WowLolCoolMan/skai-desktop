@@ -15,6 +15,7 @@ public sealed class ChatSession
     public string? ProjectName { get; set; }
     public string? ProjectInstructions { get; set; }
     public string Mode { get; set; } = WorkspaceModes.Chat;
+    public string ResponseMode { get; set; } = ChatResponseModes.Think;
     public bool IncludeProjectFilesInChat { get; set; }
     public string? FolderName { get; set; }
     /// <summary>Whether this chat is pinned above other chats in its list.</summary>
@@ -35,4 +36,13 @@ public sealed class ChatSession
     public string? ImportSource { get; set; }
     /// <summary>The original conversation identifier in the imported source.</summary>
     public string? ImportSourceId { get; set; }
+}
+
+public static class ChatResponseModes
+{
+    public const string Think = "think";
+    public const string Coding = "coding";
+    public const string Security = "security";
+
+    public static bool IsValid(string? value) => value is Think or Coding or Security;
 }

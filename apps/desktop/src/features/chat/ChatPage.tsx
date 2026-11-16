@@ -9,6 +9,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatComposer } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";
 import type { TaskEnvironment } from "../../../shared/contracts";
+import type { ChatResponseMode } from "./useChatWorkspace";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 const CHAT_SCROLL_KEY_PREFIX = "skai.chat.scroll.";
@@ -47,6 +48,8 @@ type ChatPageProps = {
   recentConversations: DesktopConversation[];
   provider: string;
   model: string;
+  responseMode: ChatResponseMode;
+  onResponseModeChange: (mode: ChatResponseMode) => void;
   endpoint: string;
   models: Model[];
   messages: Message[];
@@ -85,7 +88,7 @@ type ChatPageProps = {
   workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ capacity, recentConversations, provider, model, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, workspaceMode = "conversation" }: ChatPageProps) {
+export function ChatPage({ capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, workspaceMode = "conversation" }: ChatPageProps) {
   const [draft, setDraft] = useState(() => readChatDraft(conversationId));
   const [documentsOnly, setDocumentsOnly] = useState(false);
   const [temporaryChat, setTemporaryChat] = useState(false);
@@ -208,7 +211,7 @@ export function ChatPage({ capacity, recentConversations, provider, model, endpo
   return <div className={`feature-page chat-page ${workspaceMode === "project" ? "project-task-chat" : ""}`}>
     <div className="chat-context-bar">
       <div><p className="section-kicker">{temporaryChat ? "TEMPORARY CHAT" : "CONVERSATION"}</p><strong>{conversationId ? conversationTitle : "New chat"}</strong><span>{temporaryChat ? "This chat stays in memory only and won’t appear in Recents." : `${provider} · saved on this device · keep the thread focused, then turn work into a reviewed task when needed.`}</span></div>
-      <div className="chat-header-actions"><ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><details className="capacity-popover"><summary><StatusBadge tone={capacity?.gpu?.availableBytes != null || capacity?.ramAvailableBytes != null ? "success" : "neutral"}>Device capacity</StatusBadge></summary><div className="capacity-popover-content"><strong>Local device · measurements stay here</strong><span>Available RAM: {formatCapacityBytes(capacity?.ramAvailableBytes)}</span><span>CPU load: {capacity?.cpuUtilizationPercent == null ? "Unknown" : `${capacity.cpuUtilizationPercent.toFixed(0)}%`}</span><span>GPU: {capacity?.gpu?.name ?? "Not detected"}</span><span>GPU memory: {formatCapacityBytes(capacity?.gpu?.availableBytes)}</span>{capacity?.measurementNote && <small>{capacity.measurementNote}</small>}</div></details><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>
+      <div className="chat-header-actions"><label className="chat-response-mode"><span>MODE</span><select value={responseMode} onChange={(event) => onResponseModeChange(event.target.value as ChatResponseMode)} aria-label="Conversation response mode"><option value="think">Chat / Think</option><option value="coding">Coding</option><option value="security">Security / Risky</option></select></label><ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><details className="capacity-popover"><summary><StatusBadge tone={capacity?.gpu?.availableBytes != null || capacity?.ramAvailableBytes != null ? "success" : "neutral"}>Device capacity</StatusBadge></summary><div className="capacity-popover-content"><strong>Local device · measurements stay here</strong><span>Available RAM: {formatCapacityBytes(capacity?.ramAvailableBytes)}</span><span>CPU load: {capacity?.cpuUtilizationPercent == null ? "Unknown" : `${capacity.cpuUtilizationPercent.toFixed(0)}%`}</span><span>GPU: {capacity?.gpu?.name ?? "Not detected"}</span><span>GPU memory: {formatCapacityBytes(capacity?.gpu?.availableBytes)}</span>{capacity?.measurementNote && <small>{capacity.measurementNote}</small>}</div></details><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>
     </div>
     <div className={`chat-layout${messages.length === 0 ? " is-start-screen" : ""}`}>
       <main className="chat-column">

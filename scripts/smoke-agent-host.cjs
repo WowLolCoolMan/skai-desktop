@@ -8,6 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 const readline = require("node:readline");
+const http = require("node:http");
 const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -80,6 +81,23 @@ function request(method, params) {
 }
 
 async function run() {
+  let capturedModelRequest = null;
+  const modelServer = http.createServer((request, response) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", chunk => { body += chunk; });
+    request.on("end", () => {
+      capturedModelRequest = JSON.parse(body);
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end('data: {"choices":[{"delta":{"content":"mode smoke reply"}}]}\n\ndata: [DONE]\n\n');
+    });
+  });
+  await new Promise(resolve => modelServer.listen(0, "127.0.0.1", resolve));
+  const modelPort = modelServer.address().port;
+  const modeReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${modelPort}/v1`, model: "mode-smoke-model", responseMode: "security", messages: [{ role: "user", content: "Review a local security test." }] });
+  await new Promise(resolve => modelServer.close(resolve));
+  if (!modeReply.ok || modeReply.result?.content !== "mode smoke reply" || !capturedModelRequest?.messages?.some(message => message.role === "system" && message.content.includes("Security / Risky")))
+    throw new Error("chat.complete did not forward the user-selected response mode to the selected local model.");
   const health = await request("runtime.health");
   if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
@@ -165,10 +183,17 @@ async function run() {
   const before = await request("conversations.list");
   if (!before.ok || !Array.isArray(before.result) || before.result.length !== 0)
     throw new Error("Disposable conversation history was not empty.");
-  const saved = await request("conversation.save", { title: "Protocol smoke", messages: [{ role: "user", content: "hello" }, { role: "assistant", content: "world" }] });
+  const saved = await request("conversation.save", { title: "Protocol smoke", responseMode: "security", messages: [{ role: "user", content: "hello" }, { role: "assistant", content: "world" }] });
   if (!saved.ok || typeof saved.result?.id !== "string") throw new Error("conversation.save did not return a local identity.");
   const after = await request("conversations.list");
-  if (!after.ok || after.result.length !== 1 || after.result[0].title !== "Protocol smoke") throw new Error("conversation persistence round-trip failed.");
+  if (!after.ok || after.result.length !== 1 || after.result[0].title !== "Protocol smoke" || after.result[0].responseMode !== "security") throw new Error("conversation response mode persistence round-trip failed.");
+  const changedMode = await request("conversation.metadata.save", { id: saved.result.id, responseMode: "coding" });
+  if (!changedMode.ok) throw new Error("conversation.metadata.save could not change response mode.");
+  const forkedMode = await request("conversation.fork", { id: saved.result.id });
+  const forkedList = await request("conversations.list");
+  if (!forkedMode.ok || !forkedList.ok || forkedList.result.find(item => item.id === forkedMode.result.id)?.responseMode !== "coding") throw new Error("conversation fork did not preserve response mode.");
+  const invalidMode = await request("conversation.metadata.save", { id: saved.result.id, responseMode: "automatic-classifier" });
+  if (invalidMode.ok) throw new Error("conversation metadata accepted an unsupported response mode.");
   const settings = await request("settings.get");
   if (!settings.ok || typeof settings.result?.endpoint !== "string") throw new Error("settings.get did not return bounded settings.");
   const savedSettings = await request("settings.save", { endpoint: settings.result.endpoint, model: settings.result.model });
@@ -177,7 +202,7 @@ async function run() {
   if (remoteSettings.ok || !remoteSettings.error?.message.includes("local loopback")) throw new Error("settings.save accepted a non-local model endpoint.");
   const restoredSettings = await request("settings.save", { endpoint: settings.result.endpoint, model: settings.result.model, provider: "Ollama" });
   if (!restoredSettings.ok) throw new Error("settings.save could not restore the disposable local profile.");
-  const planned = await request("tasks.plan", { title: "Protocol smoke task", instruction: "Review the local task workflow.", environment: "local" });
+  const planned = await request("tasks.plan", { title: "Protocol smoke task", instruction: "Review the local task workflow.", environment: "local", responseMode: "security" });
   if (!planned.ok || planned.result?.status !== "proposed") throw new Error("tasks.plan did not create a proposed local task.");
   const approvalTask = await request("tasks.plan", { title: "Approval smoke task", instruction: "Wait for explicit approval.", environment: "local", requiresApproval: true });
   if (!approvalTask.ok || approvalTask.result?.status !== "proposed" || approvalTask.result?.requiresApproval !== true) throw new Error("tasks.plan did not persist the approval requirement.");
@@ -187,7 +212,7 @@ async function run() {
   if (!approved.ok || approved.result?.status !== "queued") throw new Error("tasks.approve did not release the task to the local queue.");
   const tasks = await request("tasks.list");
   const plannedTask = tasks.result?.find(task => task.id === planned.result.id);
-  if (!tasks.ok || plannedTask?.title !== "Protocol smoke task" || plannedTask.instruction !== "Review the local task workflow." || !Array.isArray(plannedTask.artifactLabels)) throw new Error("tasks.plan persistence round-trip failed.");
+  if (!tasks.ok || plannedTask?.title !== "Protocol smoke task" || plannedTask.instruction !== "Review the local task workflow." || plannedTask.responseMode !== "security" || !Array.isArray(plannedTask.artifactLabels)) throw new Error("tasks.plan response mode persistence round-trip failed.");
   const queued = await request("tasks.queue", { id: planned.result.id });
   if (!queued.ok || queued.result?.status !== "queued") throw new Error("tasks.queue did not queue the local task.");
   const isolatedModelSettings = await request("settings.save", { endpoint: "http://127.0.0.1:1/v1", model: "protocol-smoke-model", provider: "Ollama" });

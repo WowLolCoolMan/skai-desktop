@@ -22,6 +22,7 @@ public sealed class AgentTaskArtifact
     public string? ConversationId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Instruction { get; set; } = string.Empty;
+    public string ResponseMode { get; set; } = ChatResponseModes.Coding;
     public string Role { get; set; } = "specialist";
     public string Status { get; set; } = AgentTaskStatuses.Proposed;
     public bool RequiresApproval { get; set; }

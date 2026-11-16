@@ -1,4 +1,5 @@
 import type { ChatAttachment, DesktopConversation, DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, ScheduledTaskDraft, TaskEnvironment } from "../../shared/contracts";
+import type { ChatResponseMode } from "../features/chat/useChatWorkspace";
 import type { CorpusDocument, MemoryEntry, Message, Model, Route, ThemeMode } from "./types";
 import { ChatPage } from "../features/chat/ChatPage";
 import { CodingPage } from "../features/coding/CodingPage";
@@ -16,6 +17,7 @@ export type AppRouteState = {
   conversations: DesktopConversation[];
   provider: string;
   model: string;
+  responseMode: ChatResponseMode;
   capacity: LocalCapacitySnapshot | null;
   ollamaContextWindowTokens?: number;
   models: Model[];
@@ -95,6 +97,7 @@ export type AppRouteActions = {
   onFilesDropped: (files: File[]) => void;
   onRemoveAttachment: (index: number) => void;
   onModelChange: (model: Model) => void;
+  onResponseModeChange: (mode: ChatResponseMode) => void;
   onProviderChange: (provider: string) => void;
   onExportConversations: () => void;
   onFork: () => void;
@@ -154,7 +157,7 @@ export type AppRouteActions = {
 
 export function AppRouteView({ state, actions }: { state: AppRouteState; actions: AppRouteActions }) {
   const { route } = state;
-  const chat = (workspaceMode: "conversation" | "project" = "conversation") => <ChatPage capacity={state.capacity} recentConversations={state.conversations} onSelectConversation={actions.onSelectConversation} onNewWorkspaceTab={actions.onNewWorkspaceTab} provider={state.provider} model={state.model} endpoint={state.endpoint} models={state.models} messages={state.messages} busy={state.busy} taskBusy={state.taskBusy} tasks={state.tasks} attachments={state.attachments} queuedMessages={state.queuedMessages} conversationId={state.conversationId} conversationTitle={state.conversationTitle} pinned={state.pinned} archived={state.archived} smartPromptRewritingEnabled={state.smartPromptRewritingEnabled} onRewritePrompt={actions.onRewritePrompt} onSend={actions.onSend} onStartTemporaryChat={actions.onStartTemporaryChat} onQueue={actions.onQueue} onRemoveQueued={actions.onRemoveQueued} onAttach={actions.onAttach} onFilesDropped={actions.onFilesDropped} onRemoveAttachment={actions.onRemoveAttachment} onModelChange={actions.onModelChange} onNavigate={actions.onNavigate} onTaskAction={actions.onTaskAction} onPlanTask={actions.onPlanTask} onExport={actions.onExportConversations} onFork={actions.onFork} onForkFromMessage={actions.onForkFromMessage} onRetryMessage={actions.onRetryMessage} onEditMessage={actions.onEditMessage} onTogglePinned={actions.onTogglePinned} onArchive={actions.onArchive} onRenameConversation={actions.onRenameConversation} workspaceMode={workspaceMode} />;
+  const chat = (workspaceMode: "conversation" | "project" = "conversation") => <ChatPage capacity={state.capacity} recentConversations={state.conversations} onSelectConversation={actions.onSelectConversation} onNewWorkspaceTab={actions.onNewWorkspaceTab} provider={state.provider} model={state.model} responseMode={state.responseMode} onResponseModeChange={actions.onResponseModeChange} endpoint={state.endpoint} models={state.models} messages={state.messages} busy={state.busy} taskBusy={state.taskBusy} tasks={state.tasks} attachments={state.attachments} queuedMessages={state.queuedMessages} conversationId={state.conversationId} conversationTitle={state.conversationTitle} pinned={state.pinned} archived={state.archived} smartPromptRewritingEnabled={state.smartPromptRewritingEnabled} onRewritePrompt={actions.onRewritePrompt} onSend={actions.onSend} onStartTemporaryChat={actions.onStartTemporaryChat} onQueue={actions.onQueue} onRemoveQueued={actions.onRemoveQueued} onAttach={actions.onAttach} onFilesDropped={actions.onFilesDropped} onRemoveAttachment={actions.onRemoveAttachment} onModelChange={actions.onModelChange} onNavigate={actions.onNavigate} onTaskAction={actions.onTaskAction} onPlanTask={actions.onPlanTask} onExport={actions.onExportConversations} onFork={actions.onFork} onForkFromMessage={actions.onForkFromMessage} onRetryMessage={actions.onRetryMessage} onEditMessage={actions.onEditMessage} onTogglePinned={actions.onTogglePinned} onArchive={actions.onArchive} onRenameConversation={actions.onRenameConversation} workspaceMode={workspaceMode} />;
   if (route === "chat") return chat();
   if (route === "coding" || route === "projects") {
     const editor = <CodingPage conversation={route === "coding" && state.selectedProject ? chat("project") : undefined} projectDirectory={route === "projects"} projects={state.projects} selectedProject={state.selectedProject} projectFiles={state.projectFiles} selectedFile={state.selectedFile} fileDraft={state.fileDraft} fileOriginal={state.fileOriginal} fileSummary={state.fileSummary} fileBusy={state.fileBusy} fileUndoAvailable={state.fileUndoAvailable} terminalBusy={state.terminalBusy} terminalOutput={state.terminalOutput} terminalExitCode={state.terminalExitCode} gitStatus={state.gitStatus} gitBusy={state.gitBusy} gitDiff={state.gitDiff} gitDiffBusy={state.gitDiffBusy} gitCommitBusy={state.gitCommitBusy} gitPushBusy={state.gitPushBusy ?? false} gitPullRequestBusy={state.gitPullRequestBusy ?? false} onRefreshGitStatus={actions.onRefreshGitStatus} onLoadGitDiff={actions.onLoadGitDiff} onCommitGitChanges={actions.onCommitGitChanges} onPushGitChanges={actions.onPushGitChanges ?? (async () => false)} onCreateGitPullRequest={actions.onCreateGitPullRequest ?? (async () => false)} onPickFolder={actions.onPickFolder} onSaveProject={actions.onSaveProject} onOpenProject={actions.onOpenProject} onOpenFile={actions.onOpenFile} onCloseFile={actions.onCloseFile} onDraftChange={actions.onDraftChange} onSaveFile={actions.onSaveFile} onUndoFile={actions.onUndoFile} onRunTerminal={actions.onRunTerminal} onNavigate={actions.onNavigate} />;
