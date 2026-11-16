@@ -1125,6 +1125,12 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .marketplace-installed-pane .panel-subtitle { margin: 5px 0 0; max-width: 48ch; line-height: 1.5; }
 .marketplace-installed-search input { min-height: 40px; border-radius: 9px; }
 .marketplace-installed-list { gap: 8px; padding: 2px; }
+.marketplace-tools-subnav { display: flex; gap: 6px; padding: 8px 0 12px; border-bottom: 1px solid var(--skai-color-border); }
+.marketplace-tools-subnav button { padding: 6px 10px; border: 1px solid var(--skai-color-border); border-radius: 7px; color: var(--skai-color-text-muted); background: var(--skai-color-surface-raised); font-size: 11px; cursor: pointer; }
+.marketplace-tools-subnav button.is-active { color: var(--skai-color-text); border-color: color-mix(in srgb, var(--skai-color-accent) 48%, var(--skai-color-border)); background: color-mix(in srgb, var(--skai-color-accent) 14%, var(--skai-color-surface-raised)); }
+.marketplace-installed-group { display: grid; gap: 7px; margin-top: 20px; }
+.marketplace-installed-group h4 { display: flex; align-items: baseline; gap: 7px; margin: 0; }
+.marketplace-installed-group h4 span { color: var(--skai-color-text-muted); font-size: 10px; font-weight: 500; }
 .marketplace-installed-model {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto;

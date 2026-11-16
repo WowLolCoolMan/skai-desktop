@@ -136,6 +136,8 @@ cancellation, permission review, and local credential handling.
 
 ## Models, runtime, and extensibility
 
+- [x] Marketplace → Tools → Installed inventory. (Searchable local inventory groups discovered models, configured MCP servers, Skai built-ins, installed skills, local voice profiles, and image assets; discovery remains in its catalog sections.)
+
 - [x] Presets bundling prompts, tools, and knowledge. (Bounded local AI presets can bundle user-authored instructions, explicitly marked reference knowledge, and descriptive tool guidance; activation is explicit and tool guidance never grants permissions.)
 - [x] Dynamic variables such as `{{USER_NAME}}` and `{{DATE}}`.
 - [x] Lazy-loaded Markdown instruction-pack skills with `$` mentions. (Built-in and enabled local Markdown skills resolve only when explicitly mentioned in a chat request; instructions are bounded and never grant permissions.)
