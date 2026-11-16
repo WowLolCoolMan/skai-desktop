@@ -152,8 +152,9 @@ async function main() {
     if (popupState.problems.length) throw new Error(`Select popups are unthemed or unreadable in ${theme}/${backdrop}: ${popupState.problems.join("; ")}`);
     parsed.nativeDark = popupState.nativeDark;
     fs.mkdirSync(outputDir, { recursive: true });
-    const screenshot = await devtools.send("Page.captureScreenshot", { format: "png" });
-    fs.writeFileSync(path.join(outputDir, `${theme}-${backdrop}.png`), Buffer.from(screenshot.data, "base64"));
+    // Best effort: screenshots are evidence, not assertions, and on a busy desktop the
+    // compositor sometimes doesn't hand over a frame within the DevTools timeout.
+    await devtools.send("Page.captureScreenshot", { format: "png" }).then((screenshot) => fs.writeFileSync(path.join(outputDir, `${theme}-${backdrop}.png`), Buffer.from(screenshot.data, "base64"))).catch(() => console.warn(`Screenshot skipped for ${theme}/${backdrop}.`));
     return parsed;
   };
 

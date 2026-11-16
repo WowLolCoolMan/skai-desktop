@@ -4,9 +4,9 @@ Skai Desktop's look comes from theme files: plain JSON you can open, copy and ed
 The schema is `docs/theme.schema.json`; most editors use it for completion when the file's
 `$schema` points at a copy of it (Export puts one next to your themes).
 
-> Status: theme files, light/dark picks, the themes folder and live reload work (theme work,
-> Phase 3). Edit, Duplicate, Import Base16/Base24, Export and Reset come next; gradients and
-> fonts in theme files are validated now and applied in Phases 4–5.
+> Status: theme files, light/dark picks, the themes folder, live reload, Edit, Duplicate,
+> Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Gradients and fonts in
+> theme files are validated now and applied in Phases 4–5.
 
 ## Using a theme
 
@@ -19,6 +19,48 @@ Skai watches the folder: saving a theme file updates the app straight away. **Re
 re-reads everything by hand. A file with mistakes doesn't block anything: the problems are listed
 under the buttons (file, key, what's wrong), and a theme that was already working stays as it was
 until the file is fixed. Your picks are saved in `appearance.json`.
+
+## Appearance buttons (also in the command palette, under "Theme:")
+
+| Button | What it does |
+|---|---|
+| Open themes folder | Opens `<userData>/themes/` in your file manager |
+| Edit current theme | Opens the active theme's file in your default editor (your own themes; built-ins are read-only) |
+| Duplicate as my theme | Copies the active theme to `my-<name>.json`, switches to the copy and opens it for editing |
+| Import Base16/Base24… | Converts a [Tinted Theming](https://github.com/tinted-theming/schemes) `.yaml` scheme into a theme file and switches to it |
+| Export current theme… | Saves the active theme as a standalone JSON file anywhere |
+| Reload themes | Re-reads the folder (it's also watched automatically) |
+| Reset to default | Switches back to Skai Light and Skai Dark (your files are kept) |
+
+`theme.schema.json` is written into the themes folder, and new theme files point their `$schema` at it.
+
+## Base16 / Base24 mapping
+
+Imported schemes use the Base16 styling guidelines. Base24 adds real bright ANSI colors.
+
+| Base | Skai keys |
+|---|---|
+| base00 | `canvas`, `terminal-surface`, `ansi-black` |
+| base01 | `surface`, `sidebar`, `code-surface`, `checker-a` |
+| base02 | `surface-raised`, hover fills, `user-bubble`, `checker-b` |
+| base03 | `border-strong` (and `border` at 55%), `syntax-comment`, `ansi-bright-black`, scrollbar |
+| base04 | `text-muted`, sidebar muted/icon text, `terminal-muted` |
+| base05 | `text`, `code-text`, `sidebar-text`, `terminal-text`, `ansi-white` |
+| base06 | `sidebar-strong` |
+| base07 | `ansi-bright-white` |
+| base08 | `danger`, `diff-removed-*`, `ansi-red`, `syntax-variable` |
+| base09 | `syntax-number` |
+| base0A | `warning`, `ansi-yellow`, `syntax-type` |
+| base0B | `success`, `diff-added-*`, `ansi-green`, `syntax-string` |
+| base0C | `info`, `inline-code-text`, `attachment-text`, `ansi-cyan` |
+| base0D | `accent`, `link`, `focus-ring`, selection, sidebar active, `brand-mark`, `ansi-blue`, `syntax-function` |
+| base0E | `accent-strong`, `ansi-magenta`, `syntax-keyword` |
+| base0F | `favorite` |
+| base12–base17 (Base24) | `ansi-bright-red`, `-yellow`, `-green`, `-cyan`, `-blue`, `-magenta` (Base16 reuses the normal ones) |
+
+`on-accent` is whichever of base00, base07, white or black contrasts most with base0D. Light or dark
+comes from the scheme's `variant`, or from base00's brightness. Check the scheme's own license
+before you share an imported theme.
 
 ## Where themes live
 

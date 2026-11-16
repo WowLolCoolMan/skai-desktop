@@ -231,3 +231,33 @@ Round 4 was committed and pushed in the merge e13a3ab.
   best-effort, because on the real desktop the compositor sometimes doesn't hand over a frame (the
   same steps on the private display screenshot fine).
 - **Docs:** `THEMING.md` gained "Using a theme".
+
+### Round 6: Edit, Duplicate, Import Base16/Base24, Export, Reset, palette (Phase 3, part 3)
+
+Round 5 was pushed as 60f8861. On its last push attempt the push wasn't gated on the checks, so it went
+out after a `Page.captureScreenshot` timeout in the smoke test. The same tree then passed the smoke test
+3 out of 3 times. Pushes are now gated on every check in the same command.
+
+- **Main:** `theme-service.cjs` gained the shell-handled methods `appearance.editTheme` (user themes only;
+  the id must name a plain `.json` file in the folder, so traversal and the schema file are refused),
+  `appearance.duplicateTheme`, `appearance.importBase16` (open dialog; `.yaml`/`.yml` up to 64 KB) and
+  `appearance.exportTheme` (save dialog). Anything written is re-validated first and refused if any value
+  would be dropped. New files never overwrite (`wx`, unique `-2`, `-3` names). `theme.schema.json` is
+  written into the themes folder, and the folder scan skips it.
+- **Base16/Base24:** `electron/theme-base16.cjs` reads the flat Tinted Theming shape (quoted or not,
+  `palette:` or top-level, `#` comments) with a line parser, so there's no YAML dependency, and only
+  6-digit hex values are accepted. The mapping table is in `THEMING.md`. On-accent is picked by contrast,
+  and light or dark comes from `variant` or base00's brightness.
+- **Renderer:** `themeEngine` gained `editCurrent`, `duplicateCurrent` (switches to the copy and opens
+  it), `importBase16` (switches to the import), `exportCurrent` and `resetToDefault`, each with a
+  dismissible notice. Appearance shows the seven buttons; Edit is disabled for built-ins with a tooltip
+  that says why.
+- **Command palette:** commands can now run an action as well as navigate (`run?`), and seven "Theme: …"
+  entries come from `src/theme/themeCommands.ts`. This is a small edit to `CommandPalette.tsx`.
+- **Schema** generation moved into `theme-files.cjs` (`buildSchema`), so the app can write it. The output
+  is byte-identical.
+- **Tests:** 16 groups now: Base16 conversion with no dropped values, the old unquoted format, Base24 brights,
+  light detection, refused incomplete or oversized schemes, and service tests on a temp folder (schema
+  copy, duplicate naming, unsafe definitions refused, built-in edit refused, traversal ids refused, edit
+  opens the right file).
+- **Smoke:** per-theme screenshots are now best-effort too (they're evidence, not assertions).

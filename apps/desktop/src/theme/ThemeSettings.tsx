@@ -28,9 +28,15 @@ export function ThemeSettings() {
       <div className="settings-field">{picker("lightTheme", "light", "Light theme")}{picker("darkTheme", "dark", "Dark theme")}</div>
       <div className="theme-settings-actions">
         <Button type="button" onClick={() => void themeEngine.openFolder()}>Open themes folder</Button>
+        <Button type="button" onClick={() => void themeEngine.editCurrent()} disabled={!state.active?.id.startsWith("user:")} title={state.active?.id.startsWith("user:") ? "Open this theme's file in your editor" : "Built-in themes are read-only: duplicate first"}>Edit current theme</Button>
+        <Button type="button" onClick={() => void themeEngine.duplicateCurrent()}>Duplicate as my theme</Button>
+        <Button type="button" onClick={() => void themeEngine.importBase16()}>Import Base16/Base24…</Button>
+        <Button type="button" onClick={() => void themeEngine.exportCurrent()}>Export current theme…</Button>
         <Button type="button" variant="ghost" onClick={() => void themeEngine.reload()}>Reload themes</Button>
-        {state.themesDir && <span className="theme-settings-path" title={state.themesDir}>{state.themesDir}</span>}
+        <Button type="button" variant="ghost" onClick={() => void themeEngine.resetToDefault()}>Reset to default</Button>
       </div>
+      {state.themesDir && <span className="theme-settings-path" title={state.themesDir}>{state.themesDir}</span>}
+      {state.notice && <div className={`theme-settings-notice is-${state.notice.tone}`} role="status"><span>{state.notice.text}</span><button type="button" onClick={() => themeEngine.dismissNotice()} aria-label="Dismiss">×</button></div>}
       {state.problems.length > 0 && (
         <div className="theme-settings-problems" role="status">
           <strong>Some theme files have problems. Everything else still works.</strong>

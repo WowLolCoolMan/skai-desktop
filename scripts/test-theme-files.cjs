@@ -5,6 +5,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const themes = require("../apps/desktop/electron/theme-files.cjs");
+const os = require("node:os");
+const { base16ToFamily, parseScheme } = require("../apps/desktop/electron/theme-base16.cjs");
+const { createThemeService } = require("../apps/desktop/electron/theme-service.cjs");
 const { buildSkaiFamily, buildSchema, serialize, presetPath, schemaPath } = require("./theme-generate.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -86,4 +89,65 @@ test("every shipped preset is valid with no problems and has a license", () => {
   }
 });
 
-console.log(`Theme file tests passed: ${passed} groups.`);
+const base16 = (extra = "") => [
+  'system: "base16"', 'name: "Test Scheme"', 'author: "Someone <a@b.c>"', 'variant: "dark"', "palette:",
+  ...Array.from({ length: 16 }, (_, i) => `  base0${i.toString(16).toUpperCase()}: "${["#101010", "#202020", "#303030", "#505050", "#a0a0a0", "#d0d0d0", "#e0e0e0", "#f0f0f0", "#ff5555", "#ffaa55", "#ffdd55", "#55ff88", "#55ddff", "#5599ff", "#cc77ff", "#aa7755"][i]}"  # comment`),
+  extra,
+].join("\n");
+
+test("base16: converts to a valid family with no dropped values", () => {
+  const converted = base16ToFamily(base16());
+  assert.equal(converted.name, "Test Scheme");
+  assert.equal(converted.themes[0].appearance, "dark");
+  assert.equal(converted.themes[0].colors.accent, "#5599ff");
+  assert.equal(converted.themes[0].colors["ansi-bright-red"], "#ff5555");
+  const { family: result, problems } = themes.validateThemeFamily(converted, "scheme.yaml");
+  assert.ok(result);
+  assert.deepEqual(problems, []);
+});
+
+test("base16: old unquoted format, base24 brights, light detection", () => {
+  const old = ['scheme: "Old"', ...Array.from({ length: 16 }, (_, i) => `base0${i.toString(16).toUpperCase()}: "${(i < 2 ? "f8f8f8" : i < 8 ? "777777" : "336699")}"`), 'base12: "ff0000"', 'base13: "ffff00"', 'base14: "00ff00"', 'base15: "00ffff"', 'base16: "0000ff"', 'base17: "ff00ff"'].join("\n");
+  const converted = base16ToFamily(old);
+  assert.equal(converted.themes[0].appearance, "light");
+  assert.equal(converted.themes[0].colors["ansi-bright-magenta"], "#ff00ff");
+  assert.match(converted.license, /Base24/);
+});
+
+test("base16: incomplete or junk schemes are refused", () => {
+  assert.throws(() => parseScheme("name: x\nbase00: \"101010\""), /missing/);
+  assert.throws(() => parseScheme("x".repeat(70 * 1024)), /64 KB/);
+  assert.throws(() => base16ToFamily(base16().replace("#5599ff", "url(x)")), /missing base0D/i);
+});
+
+async function serviceTests() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-theme-test-"));
+  const opened = [];
+  const service = createThemeService({ userDataPath: dir, getWindow: () => null, shell: { openPath: async (file) => { opened.push(file); return ""; } }, dialog: {} });
+  try {
+    service.start();
+    assert.ok(fs.existsSync(path.join(dir, "themes", "theme.schema.json")), "schema copy is written next to themes");
+    const skaiDark = buildSkaiFamily().themes[0];
+    const definition = { name: skaiDark.name, appearance: "dark", colors: Object.fromEntries(Object.entries(skaiDark.colors).map(([key, value]) => [themes.tokenForColorKey(key), value])), gradients: {}, fonts: {} };
+    const duplicated = await service.handle("appearance.duplicateTheme", { theme: definition });
+    assert.equal(duplicated.ok, true);
+    assert.equal(duplicated.result.file, "my-skai-dark.json");
+    const snapshot = await service.snapshot();
+    assert.equal(snapshot.problems.length, 0, JSON.stringify(snapshot.problems));
+    assert.equal(snapshot.families[0].themes[0].id, "user:my-skai-dark.json/Skai Dark (mine)");
+    assert.equal((await service.handle("appearance.duplicateTheme", { theme: definition })).result.file, "my-skai-dark-2.json");
+    const bad = await service.handle("appearance.duplicateTheme", { theme: { ...definition, colors: { "--skai-color-canvas": "url(https://example.com/x)" } } }).catch((error) => error);
+    assert.ok(bad instanceof Error, "a definition with an unsafe value is not written");
+    assert.equal((await service.handle("appearance.editTheme", { id: "builtin:Skai/Skai Dark" })).ok, false);
+    for (const id of ["user:../../etc/passwd.json/x", "user:..\\x.json/x", "user:theme.schema.json/x"]) assert.equal((await service.handle("appearance.editTheme", { id })).ok, false, id);
+    assert.equal((await service.handle("appearance.editTheme", { id: "user:my-skai-dark.json/Skai Dark (mine)" })).ok, true);
+    assert.deepEqual(opened, [path.join(dir, "themes", "my-skai-dark.json")]);
+    assert.equal(await service.handle("appearance.unknown", {}), null);
+  } finally {
+    service.stop();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  passed += 1;
+}
+
+serviceTests().then(() => console.log(`Theme file tests passed: ${passed} groups.`)).catch((error) => { console.error(error); process.exitCode = 1; });

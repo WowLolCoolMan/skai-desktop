@@ -6,13 +6,15 @@
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
-const { parseThemeFile, MAX_FILE_BYTES } = require("./theme-files.cjs");
+const { parseThemeFile, validateThemeFamily, buildSchema, colorKeyForToken, MAX_FILE_BYTES } = require("./theme-files.cjs");
+const { base16ToFamily } = require("./theme-base16.cjs");
 
 const MAX_THEME_FILES = 64;
 const MAX_ID = 200;
+const SCHEMA_FILE = "theme.schema.json";
 const DEFAULT_PICKS = { lightTheme: "builtin:Skai/Skai Light", darkTheme: "builtin:Skai/Skai Dark" };
 
-function createThemeService({ userDataPath, getWindow, shell }) {
+function createThemeService({ userDataPath, getWindow, shell, dialog }) {
   const themesDir = path.join(userDataPath, "themes");
   const appearancePath = path.join(userDataPath, "appearance.json");
   const lastGood = new Map(); // file name -> last valid family, kept while the file is broken
@@ -37,7 +39,7 @@ function createThemeService({ userDataPath, getWindow, shell }) {
     const problems = [];
     let names = [];
     try {
-      names = (await fsp.readdir(themesDir, { withFileTypes: true })).filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".json")).map((entry) => entry.name).sort();
+      names = (await fsp.readdir(themesDir, { withFileTypes: true })).filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".json") && entry.name !== SCHEMA_FILE).map((entry) => entry.name).sort();
     } catch (error) {
       if (error?.code !== "ENOENT") problems.push({ file: "themes", key: "(folder)", problem: "could not be read" });
     }
@@ -86,6 +88,8 @@ function createThemeService({ userDataPath, getWindow, shell }) {
   function start() {
     stop();
     fs.mkdirSync(themesDir, { recursive: true });
+    // A schema copy next to the themes gives editors completion ("$schema": "./theme.schema.json").
+    try { fs.writeFileSync(path.join(themesDir, SCHEMA_FILE), `${JSON.stringify(buildSchema(), null, 2)}\n`); } catch { /* optional */ }
     try { watchers.push(fs.watch(themesDir, scheduleReload)); } catch { /* no live reload; Reload themes still works */ }
     try { watchers.push(fs.watch(userDataPath, (_event, name) => { if (name === "appearance.json") scheduleReload(); })); } catch { /* ignore */ }
   }
@@ -112,8 +116,81 @@ function createThemeService({ userDataPath, getWindow, shell }) {
     return picks;
   }
 
+  // Theme: turn a renderer theme definition (tokens) back into theme-file JSON.
+  // Everything is re-validated before it touches the disk.
+  function familyFromDefinition(definition, familyName, nameOverride) {
+    if (!definition || typeof definition !== "object") throw new Error("A theme is required.");
+    const colors = {};
+    for (const [token, value] of Object.entries(definition.colors ?? {})) {
+      const key = colorKeyForToken(token);
+      if (key) colors[key] = value;
+    }
+    const gradients = {};
+    for (const [surface, gradient] of Object.entries(definition.gradients ?? {})) gradients[surface] = gradient?.gradient === "solid" ? gradient.color : gradient;
+    const theme = { name: nameOverride ?? definition.name, appearance: definition.appearance, colors, gradients, fonts: definition.fonts ?? {} };
+    const { family, problems } = validateThemeFamily({ name: familyName, author: "", license: "", themes: [theme] }, "theme");
+    // Strict: write only if every value passed validation (nothing silently dropped).
+    if (!family || problems.length) throw new Error(problems[0] ? `${problems[0].key} ${problems[0].problem}` : "The theme is not valid.");
+    return { $schema: `./${SCHEMA_FILE}`, name: family.name, author: "", license: "Your own theme", themes: [{ ...theme, colors, gradients }] };
+  }
+
+  const slug = (text) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "theme";
+  async function uniqueFile(base) {
+    for (let index = 1; index < 1000; index += 1) {
+      const name = `${base}${index === 1 ? "" : `-${index}`}.json`;
+      try { await fsp.access(path.join(themesDir, name)); } catch { return name; }
+    }
+    throw new Error("Too many theme files with that name.");
+  }
+  async function writeNewFamily(family, base) {
+    await fsp.mkdir(themesDir, { recursive: true });
+    const file = await uniqueFile(base);
+    await fsp.writeFile(path.join(themesDir, file), `${JSON.stringify(family, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    scheduleReload();
+    return { file, id: `user:${file}/${family.themes[0].name}` };
+  }
+  // A user theme id is "user:<file>/<theme name>"; the file must be a plain name in the folder.
+  function userFile(id) {
+    const match = /^user:([^/\\]+\.json)\//.exec(String(id ?? ""));
+    if (!match || match[1] !== path.basename(match[1]) || match[1] === SCHEMA_FILE) return null;
+    return path.join(themesDir, match[1]);
+  }
+
   // Shell-handled bridge methods (see main.cjs agent:request).
   async function handle(method, params) {
+    if (method === "appearance.editTheme") {
+      const file = userFile(params?.id);
+      if (!file) return { v: 1, ok: false, error: { code: "BUILT_IN_THEME", message: "Built-in themes are read-only. Duplicate it as your theme first." } };
+      const error = await shell.openPath(file);
+      return error ? { v: 1, ok: false, error: { code: "OPEN_FAILED", message: error } } : { v: 1, ok: true, result: { path: file } };
+    }
+    if (method === "appearance.duplicateTheme") {
+      const name = `${String(params?.theme?.name ?? "Theme").slice(0, 52)} (mine)`;
+      const family = familyFromDefinition(params?.theme, name, name);
+      return { v: 1, ok: true, result: await writeNewFamily(family, `my-${slug(params?.theme?.name)}`) };
+    }
+    if (method === "appearance.importBase16") {
+      const window = getWindow();
+      const picked = await dialog.showOpenDialog(window, { title: "Import a Base16 or Base24 scheme", properties: ["openFile"], filters: [{ name: "Base16/Base24 scheme", extensions: ["yaml", "yml"] }] });
+      if (picked.canceled || !picked.filePaths[0]) return { v: 1, ok: true, result: null };
+      const stat = await fsp.stat(picked.filePaths[0]);
+      if (stat.size > 64 * 1024) return { v: 1, ok: false, error: { code: "TOO_LARGE", message: "The scheme file is larger than 64 KB." } };
+      let family;
+      try { family = base16ToFamily(await fsp.readFile(picked.filePaths[0], "utf8")); } catch (error) { return { v: 1, ok: false, error: { code: "INVALID_SCHEME", message: error.message } }; }
+      const checked = validateThemeFamily(family, path.basename(picked.filePaths[0]));
+      if (!checked.family || checked.problems.length) return { v: 1, ok: false, error: { code: "INVALID_SCHEME", message: checked.problems[0]?.problem ?? "The scheme could not be converted." } };
+      return { v: 1, ok: true, result: await writeNewFamily({ $schema: `./${SCHEMA_FILE}`, ...family }, slug(family.name)) };
+    }
+    if (method === "appearance.exportTheme") {
+      const family = familyFromDefinition(params?.theme, String(params?.familyName ?? params?.theme?.name ?? "Theme").slice(0, 64));
+      family.license = String(params?.license ?? "").slice(0, 160) || family.license;
+      const window = getWindow();
+      const saved = await dialog.showSaveDialog(window, { title: "Export theme", defaultPath: `${slug(params?.theme?.name)}.json`, filters: [{ name: "Skai theme", extensions: ["json"] }] });
+      if (saved.canceled || !saved.filePath) return { v: 1, ok: true, result: null };
+      delete family.$schema;
+      await fsp.writeFile(saved.filePath, `${JSON.stringify(family, null, 2)}\n`, "utf8");
+      return { v: 1, ok: true, result: { path: saved.filePath } };
+    }
     if (method === "appearance.getThemes") return { v: 1, ok: true, result: await snapshot() };
     if (method === "appearance.saveThemeSelection") return { v: 1, ok: true, result: await savePicks(params) };
     if (method === "appearance.openThemesFolder") {

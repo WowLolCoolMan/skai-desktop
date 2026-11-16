@@ -1415,10 +1415,10 @@ app.whenReady().then(() => {
   });
   if (!process.env.SKAI_DESKTOP_RENDERER_URL) applyProductionContentSecurityPolicy();
   // Theme: user theme files and picks (<userData>/themes, appearance.json), watched for live reload.
-  const themeService = createThemeService({ userDataPath: app.getPath("userData"), getWindow: () => mainWindow, shell });
+  const themeService = createThemeService({ userDataPath: app.getPath("userData"), getWindow: () => mainWindow, shell, dialog });
   themeService.start();
   ipcMain.handle("agent:request", async (event, method, params) => {
-    if (method === "appearance.getThemes" || method === "appearance.saveThemeSelection" || method === "appearance.openThemesFolder") return themeService.handle(method, params);
+    if (method === "appearance.getThemes" || method === "appearance.saveThemeSelection" || method === "appearance.openThemesFolder" || method === "appearance.editTheme" || method === "appearance.duplicateTheme" || method === "appearance.importBase16" || method === "appearance.exportTheme") return themeService.handle(method, params);
     // Theme: follow the app's Light/Dark/System choice instead of the OS, so native
     // pieces (select popups, scrollbars, file dialogs, tray menu, window frame) match.
     if (method === "appearance.setNativeTheme") {

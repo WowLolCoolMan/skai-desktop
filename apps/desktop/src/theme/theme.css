@@ -6,3 +6,6 @@
 .theme-settings-problems strong { color: var(--skai-color-danger-strong); }
 .theme-settings-problems ul { display: grid; gap: var(--skai-space-1); margin: 0; padding-left: var(--skai-space-4); }
 .theme-settings-problems code { font-family: var(--skai-font-mono); }
+.theme-settings-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--skai-space-2); padding: var(--skai-space-2) var(--skai-space-3); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font-size: var(--skai-text-md); }
+.theme-settings-notice.is-error { border-color: color-mix(in srgb, var(--skai-color-danger) 40%, transparent); color: var(--skai-color-danger-text); }
+.theme-settings-notice button { border: 0; color: inherit; background: transparent; font-size: var(--skai-text-lg); cursor: pointer; }

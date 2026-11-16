@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import type { Route } from "../../app/types";
 import { ModalDialog } from "../ui/ModalDialog";
 import { NavIcon } from "../ui/NavIcon";
+import { themeCommands } from "../../theme/themeCommands";
 
-type Command = { id: string; label: string; detail: string; route: Route };
+type Command = { id: string; label: string; detail: string; route?: Route; run?: () => void };
 const commands: Command[] = [
   { id: "chat", label: "Open Chat", detail: "Start or continue a conversation", route: "chat" },
   { id: "projects", label: "Open Projects", detail: "Browse and choose a local workspace", route: "projects" },
@@ -16,6 +17,7 @@ const commands: Command[] = [
   { id: "voice-workbench", label: "Open Voice Workbench", detail: "Customize Kokoro and local voice profiles", route: "marketplace" },
   { id: "memory", label: "Open Memory", detail: "Review approved local memory", route: "memory" },
   { id: "settings", label: "Open Settings", detail: "Appearance and workspace preferences", route: "settings" },
+  ...themeCommands,
 ];
 
 export function CommandPalette({ open, onClose, onNavigate }: { open: boolean; onClose: () => void; onNavigate: (route: Route) => void }) {
@@ -31,7 +33,7 @@ export function CommandPalette({ open, onClose, onNavigate }: { open: boolean; o
     setActiveIndex(0);
   }, [open]);
   useEffect(() => { setActiveIndex((current) => Math.min(current, Math.max(0, matches.length - 1))); }, [matches.length]);
-  const openCommand = (command: Command) => { onNavigate(command.route); onClose(); };
+  const openCommand = (command: Command) => { if (command.run) command.run(); else if (command.route) onNavigate(command.route); onClose(); };
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
     if (event.key === "ArrowDown" && matches.length > 0) { event.preventDefault(); setActiveIndex((current) => (current + 1) % matches.length); return; }

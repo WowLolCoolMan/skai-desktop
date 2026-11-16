@@ -44,9 +44,10 @@ export type ThemeState = {
   scheme: "light" | "dark";
   active: ThemeDefinition | null;
   loaded: boolean;
+  notice: { tone: "info" | "error"; text: string } | null;
 };
 
-let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", scheme: "dark", active: null, loaded: false };
+let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", scheme: "dark", active: null, loaded: false, notice: null };
 const listeners = new Set<() => void>();
 let applied: string[] = [];
 let request: Request | null = null;
@@ -120,4 +121,49 @@ export const themeEngine = {
   async openFolder() {
     if (request && window.skaiAgent) await request("appearance.openThemesFolder").catch(() => undefined);
   },
+  // Open the active theme's file in the default editor (user themes only).
+  async editCurrent() {
+    const response = await call("appearance.editTheme", { id: state.active?.id });
+    if (response && !response.ok) notify("error", response.error?.message ?? "The theme could not be opened.");
+  },
+  // Copy the active theme into the themes folder, switch to the copy, and open it for editing.
+  async duplicateCurrent() {
+    if (!state.active) return;
+    const response = await call("appearance.duplicateTheme", { theme: state.active });
+    if (!response?.ok) { notify("error", response?.error?.message ?? "The theme could not be duplicated."); return; }
+    const { id, file } = response.result as { id: string; file: string };
+    await themeEngine.select(state.scheme === "light" ? "lightTheme" : "darkTheme", id);
+    notify("info", `Saved as ${file} in your themes folder.`);
+    await call("appearance.editTheme", { id });
+  },
+  async importBase16() {
+    const response = await call("appearance.importBase16");
+    if (!response?.ok) { notify("error", response?.error?.message ?? "The scheme could not be imported."); return; }
+    if (!response.result) return;
+    const { id, file } = response.result as { id: string; file: string };
+    await themeEngine.reload();
+    const imported = allThemes().find((entry) => entry.theme.id === id)?.theme;
+    if (imported) await themeEngine.select(imported.appearance === "light" ? "lightTheme" : "darkTheme", id);
+    notify("info", `Imported as ${file}.`);
+  },
+  async exportCurrent() {
+    if (!state.active) return;
+    const family = allThemes().find((entry) => entry.theme.id === state.active?.id)?.family;
+    const response = await call("appearance.exportTheme", { theme: state.active, familyName: family?.name, license: family?.license });
+    if (!response?.ok) notify("error", response?.error?.message ?? "The theme could not be exported.");
+    else if (response.result) notify("info", `Exported to ${(response.result as { path: string }).path}.`);
+  },
+  async resetToDefault() {
+    await themeEngine.select("lightTheme", DEFAULT_PICKS.lightTheme);
+    await themeEngine.select("darkTheme", DEFAULT_PICKS.darkTheme);
+    notify("info", "Back to the default Skai themes.");
+  },
+  dismissNotice() { update({ notice: null }); },
 };
+
+async function call(method: string, params?: Record<string, unknown>): Promise<AgentResponse | null> {
+  if (!request || !window.skaiAgent) return null;
+  return request(method, params).catch((error: unknown): AgentResponse => ({ v: 1, id: method, ok: false, error: { code: "FAILED", message: error instanceof Error ? error.message : String(error) } }));
+}
+
+function notify(tone: "info" | "error", text: string) { update({ notice: { tone, text } }); }
