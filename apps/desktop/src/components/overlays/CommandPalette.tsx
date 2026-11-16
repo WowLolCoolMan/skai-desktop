@@ -10,7 +10,6 @@ const commands: Command[] = [
   { id: "projects", label: "Open Projects", detail: "Browse and choose a local workspace", route: "projects" },
   { id: "coding", label: "Open Coding Workspace", detail: "Projects, files, terminal, and edits", route: "coding" },
   { id: "terminal", label: "Open Terminal", detail: "Run a bounded command in a selected project", route: "terminal" },
-  { id: "agents", label: "Open Agent Workbench", detail: "Review task progress and recovery", route: "workbench" },
   { id: "models", label: "Open Models", detail: "Discover and select a provider model", route: "models" },
   { id: "images", label: "Open Image Studio", detail: "Create with a local workflow", route: "images" },
   { id: "marketplace", label: "Open Marketplace", detail: "Find models, voices, tools, and skills", route: "marketplace" },

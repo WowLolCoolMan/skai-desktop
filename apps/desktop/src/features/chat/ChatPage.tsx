@@ -90,7 +90,7 @@ type ChatPageProps = {
   onTogglePinned: () => void;
   onArchive: () => void;
   onRenameConversation: (title: string) => Promise<boolean>;
-  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment) => Promise<boolean>;
+  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, conversationId?: string | null) => Promise<boolean>;
   workspaceMode?: "conversation" | "project";
 };
 
@@ -280,7 +280,7 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
             <><div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={index} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>{showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>Jump to latest ↓</Button></div>}</>
           )}
         </section>
-        <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={onPlanTask} />
+        <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment) => onPlanTask(title, instruction, environment, conversationId)} />
         {draftPersistenceWarning && <p className="chat-draft-save-warning" role="status">{draftPersistenceWarning}</p>}
         <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={updateDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} onAudioTranscript={(fileName, transcript) => onSetAttachments([...attachments, { fileName: `${fileName}.audio-transcript.txt`, mediaType: "text/plain", content: transcript }].slice(0, 5))} />
       </main>
