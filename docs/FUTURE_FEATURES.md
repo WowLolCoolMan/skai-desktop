@@ -98,7 +98,7 @@ cancellation, permission review, and local credential handling.
 
 ## Workspace and desktop experience
 
-- [ ] Capacity-aware concurrent local runs. (The chat header compares known model size plus rough startup headroom against measured available RAM, reports context and GPU memory separately, and clearly labels the estimate as advisory. Durable local coding tasks now use conservative live RAM/GPU/CPU-derived admission with a four-slot cap, optional persisted RAM/VRAM budgets, a reported limiting resource, and model-specific size/context estimates with an explicit AirLLM-compatible lower estimate when selected; runtime-specific loaded-model accounting and actual AirLLM readiness/install checks remain open.)
+- [ ] Capacity-aware concurrent local runs. (The chat header compares known model size plus rough startup headroom against measured available RAM, reports context and GPU memory separately, and clearly labels the estimate as advisory. Durable local coding tasks now use conservative live RAM/GPU/CPU-derived admission with a four-slot cap, optional persisted RAM/VRAM budgets, a reported limiting resource, model-specific size/context estimates, verified AirLLM readiness, and bounded Ollama loaded-model accounting; provider-specific KV-cache/offload formulas and loaded-model accounting for other runtimes remain open.)
 
 - [ ] Interactive artifacts for code, HTML, and diagrams. (The project workspace now provides sandboxed, draft-aware HTML and SVG/diagram previews without script or Electron privileges; richer interactive artifacts remain open.)
 - [ ] Tabs beside chat for files, terminals, and previews.

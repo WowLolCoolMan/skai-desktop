@@ -15,7 +15,9 @@ export type ModelCapacityEstimate = {
 export function estimateModelCapacity(model: Model | undefined, capacity: LocalCapacitySnapshot | null): ModelCapacityEstimate {
   const modelBytes = Number.isFinite(model?.sizeBytes) && (model?.sizeBytes ?? 0) > 0 ? model!.sizeBytes! : null;
   const startupRamBytes = modelBytes === null ? null : Math.ceil(modelBytes * 1.25);
-  const availableRamBytes = Number.isFinite(capacity?.ramAvailableBytes) ? capacity!.ramAvailableBytes : null;
+  const measuredRamBytes = Number.isFinite(capacity?.ramAvailableBytes) ? capacity!.ramAvailableBytes : null;
+  const loadedRamBytes = capacity?.runtime?.loadedModelsKnown ? capacity.runtime.loadedRamBytes : 0;
+  const availableRamBytes = measuredRamBytes === null ? null : Math.max(0, measuredRamBytes! - loadedRamBytes);
   const state = startupRamBytes === null || availableRamBytes === null
     ? "unknown"
     : availableRamBytes >= startupRamBytes ? "room" : "tight";
@@ -27,6 +29,17 @@ export function estimateModelCapacity(model: Model | undefined, capacity: LocalC
     state,
     contextLength: Number.isFinite(model?.contextLength) && (model?.contextLength ?? 0) > 0 ? model!.contextLength! : null,
     gpuAvailableBytes: Number.isFinite(capacity?.gpu?.availableBytes) ? capacity!.gpu!.availableBytes : null,
-    note: "Rough startup RAM floor uses model size plus 25% headroom. Context cache, runtime allocation, GPU offload, and other active processes are not reliably attributable; this advisory cannot guarantee a run will fit.",
+    note: capacity?.runtime?.loadedModelsKnown
+      ? `Rough startup RAM floor uses model size plus 25% headroom and subtracts ${formatBytes(loadedRamBytes)} reported by the local runtime for loaded models. Context cache and other allocations remain approximate.`
+      : "Rough startup RAM floor uses model size plus 25% headroom. Loaded-model allocation is unavailable from this runtime, so context cache and other allocations remain approximate.",
   };
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
 }
