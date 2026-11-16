@@ -98,6 +98,8 @@ cancellation, permission review, and local credential handling.
 
 ## Workspace and desktop experience
 
+- [ ] Capacity-aware concurrent local runs. (First UI slice implemented: the chat header now compares known model size plus rough startup headroom against measured available RAM, reports context and GPU memory separately, and clearly labels the estimate as advisory. Runtime-specific context allocation, loaded model accounting, hardware budgets, AirLLM-aware scheduling, and queue dispatch remain open.)
+
 - [ ] Interactive artifacts for code, HTML, and diagrams.
 - [ ] Tabs beside chat for files, terminals, and previews.
 - [ ] In-browser terminal.
