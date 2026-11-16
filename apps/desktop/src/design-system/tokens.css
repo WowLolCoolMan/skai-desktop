@@ -42,9 +42,72 @@
   --skai-color-sidebar-active-border: rgba(179, 154, 245, 0.27);
   --skai-color-sidebar-border: rgba(255, 255, 255, 0.09);
   --skai-shadow-panel: 0 12px 32px rgba(0, 0, 0, 0.12);
+
+  /* Theme: semantic tokens added in Phase 2 so no component hard-codes a color.
+     Light values live in the [data-scheme="light"] block below. */
+  --skai-color-on-accent: #17131f;
+  --skai-color-focus-ring: var(--skai-color-accent);
+  --skai-color-selection: color-mix(in srgb, var(--skai-color-accent) 32%, transparent);
+  --skai-color-link: var(--skai-color-accent);
+  --skai-color-scrollbar-thumb: color-mix(in srgb, var(--skai-color-text) 22%, transparent);
+  --skai-color-scrollbar-track: transparent;
+  --skai-color-success: #5ee0ad;
+  --skai-color-warning: #e6c56c;
+  --skai-color-info: #74d8ff;
+  --skai-color-danger-text: #ffb4be;
+  --skai-color-danger-strong: #ffd0d6;
+  --skai-color-favorite: #f0c45a;
+  --skai-color-overlay: rgba(3, 5, 14, 0.72);
+  --skai-color-shadow: #000000;
+  --skai-shadow-popover: 0 16px 44px color-mix(in srgb, var(--skai-color-shadow) 34%, transparent);
+  --skai-shadow-dialog: 0 32px 100px color-mix(in srgb, var(--skai-color-shadow) 58%, transparent);
+  --skai-color-user-bubble: rgba(183, 145, 57, 0.14);
+  --skai-color-user-bubble-border: rgba(225, 189, 104, 0.35);
+  --skai-color-inline-code-text: #bcecf0;
+  --skai-color-attachment-text: #9bdce4;
+  --skai-color-brand-mark: #7863b3;
+  --skai-color-on-brand-mark: #f4efff;
+  --skai-color-checker-a: #20242a;
+  --skai-color-checker-b: #292e36;
+  --skai-color-document-page: #ffffff;
+  --skai-color-diff-added-surface: rgba(88, 214, 145, 0.12);
+  --skai-color-diff-added-text: #9ce8b8;
+  --skai-color-diff-removed-surface: rgba(255, 141, 156, 0.12);
+  --skai-color-diff-removed-text: #ffb4be;
+  --skai-color-terminal-surface: #070a16;
+  --skai-color-terminal-text: #bcecf0;
+  --skai-color-terminal-muted: #8090aa;
+  /* Terminal ANSI 16 (xterm-style order). */
+  --skai-ansi-black: #1b1e28;
+  --skai-ansi-red: #ff7b8a;
+  --skai-ansi-green: #7ee2a8;
+  --skai-ansi-yellow: #f0cf7a;
+  --skai-ansi-blue: #82aaff;
+  --skai-ansi-magenta: #c3a6ff;
+  --skai-ansi-cyan: #7fdbe6;
+  --skai-ansi-white: #d0d0d6;
+  --skai-ansi-bright-black: #6b7086;
+  --skai-ansi-bright-red: #ffa2ad;
+  --skai-ansi-bright-green: #a5f0c5;
+  --skai-ansi-bright-yellow: #f8e2a6;
+  --skai-ansi-bright-blue: #a9c4ff;
+  --skai-ansi-bright-magenta: #dac8ff;
+  --skai-ansi-bright-cyan: #a8ecf3;
+  --skai-ansi-bright-white: #f4f4f7;
+  /* Code syntax colors. */
+  --skai-syntax-keyword: #c3a6ff;
+  --skai-syntax-string: #9ce8b8;
+  --skai-syntax-number: #f0cf7a;
+  --skai-syntax-comment: #8a8f9e;
+  --skai-syntax-function: #82aaff;
+  --skai-syntax-type: #7fdbe6;
+  --skai-syntax-variable: #d0d0d6;
+  --skai-syntax-punctuation: #a0a1a8;
 }
 
-[data-theme="light"] {
+/* Theme: light palette. src/theme sets data-scheme to the resolved light/dark
+   choice (System follows the OS live), so the light values are written once. */
+[data-scheme="light"] {
   color-scheme: light;
   --skai-color-canvas: #f5f7fb;
   --skai-color-surface: #ffffff;
@@ -54,6 +117,9 @@
   --skai-color-border-strong: rgba(24, 35, 60, 0.22);
   --skai-color-text: #18213a;
   --skai-color-text-muted: #5b6680;
+  --skai-color-code-surface: #eef1f7;
+  --skai-color-code-text: #1f2a44;
+  --skai-color-danger: #b4233a;
   --skai-color-sidebar: #eef1f6;
   --skai-color-sidebar-text: #263044;
   --skai-color-sidebar-strong: #18213a;
@@ -66,32 +132,51 @@
   --skai-color-sidebar-active-border: rgba(39, 145, 154, 0.28);
   --skai-color-sidebar-border: rgba(24, 33, 58, 0.12);
   --skai-shadow-panel: 0 24px 80px rgba(28, 42, 72, 0.12);
-}
-
-@media (prefers-color-scheme: light) {
-  [data-theme="system"] {
-    color-scheme: light;
-    --skai-color-canvas: #f5f7fb;
-    --skai-color-surface: #ffffff;
-    --skai-color-surface-raised: #eef2f8;
-    --skai-color-surface-soft: rgba(24, 35, 60, 0.06);
-    --skai-color-border: rgba(24, 35, 60, 0.14);
-    --skai-color-border-strong: rgba(24, 35, 60, 0.22);
-    --skai-color-text: #18213a;
-    --skai-color-text-muted: #5b6680;
-    --skai-color-sidebar: #eef1f6;
-    --skai-color-sidebar-text: #263044;
-    --skai-color-sidebar-strong: #18213a;
-    --skai-color-sidebar-muted: #66748b;
-    --skai-color-sidebar-subtle: #61708a;
-    --skai-color-sidebar-icon: #61718b;
-    --skai-color-sidebar-hover: rgba(24, 33, 58, 0.06);
-    --skai-color-sidebar-history-hover: rgba(24, 33, 58, 0.05);
-    --skai-color-sidebar-active: rgba(39, 145, 154, 0.12);
-    --skai-color-sidebar-active-border: rgba(39, 145, 154, 0.28);
-    --skai-color-sidebar-border: rgba(24, 33, 58, 0.12);
-    --skai-shadow-panel: 0 24px 80px rgba(28, 42, 72, 0.12);
-  }
+  --skai-color-success: #11734a;
+  --skai-color-warning: #8a5a00;
+  --skai-color-info: #0b6a8a;
+  --skai-color-danger-text: #a01d33;
+  --skai-color-danger-strong: #7d1424;
+  --skai-color-favorite: #8a5a00;
+  --skai-color-overlay: rgba(24, 33, 58, 0.38);
+  --skai-color-shadow: rgba(28, 42, 72, 0.55);
+  --skai-color-user-bubble: rgba(183, 145, 57, 0.12);
+  --skai-color-user-bubble-border: rgba(150, 110, 30, 0.35);
+  --skai-color-inline-code-text: #0b5f6b;
+  --skai-color-attachment-text: #0b5f6b;
+  --skai-color-checker-a: #e4e8ef;
+  --skai-color-checker-b: #f4f6fa;
+  --skai-color-diff-added-surface: rgba(26, 127, 55, 0.12);
+  --skai-color-diff-added-text: #116329;
+  --skai-color-diff-removed-surface: rgba(207, 34, 46, 0.1);
+  --skai-color-diff-removed-text: #a40e26;
+  --skai-color-terminal-surface: #f3f5fa;
+  --skai-color-terminal-text: #1b2a3f;
+  --skai-color-terminal-muted: #5b6680;
+  --skai-ansi-black: #24292f;
+  --skai-ansi-red: #b4233a;
+  --skai-ansi-green: #116329;
+  --skai-ansi-yellow: #7a5200;
+  --skai-ansi-blue: #0550ae;
+  --skai-ansi-magenta: #7c3aad;
+  --skai-ansi-cyan: #0b6a7a;
+  --skai-ansi-white: #57606a;
+  --skai-ansi-bright-black: #4b535d;
+  --skai-ansi-bright-red: #a40e26;
+  --skai-ansi-bright-green: #1a7f37;
+  --skai-ansi-bright-yellow: #633c01;
+  --skai-ansi-bright-blue: #0969da;
+  --skai-ansi-bright-magenta: #8250df;
+  --skai-ansi-bright-cyan: #1b7c83;
+  --skai-ansi-bright-white: #6e7781;
+  --skai-syntax-keyword: #7c3aad;
+  --skai-syntax-string: #116329;
+  --skai-syntax-number: #7a5200;
+  --skai-syntax-comment: #5f6878;
+  --skai-syntax-function: #0550ae;
+  --skai-syntax-type: #0b6a7a;
+  --skai-syntax-variable: #1f2a44;
+  --skai-syntax-punctuation: #57606a;
 }
 
 /* Theme: native <select> popups. On Linux Chromium paints an <option> with a

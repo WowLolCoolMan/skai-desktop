@@ -125,3 +125,35 @@ highlighted-row color and native frames/dialogs. Without syncing it, a light app
 
 **After** (`.theme-shots/after/`): themed popups in dark, light and system. The dark highlight is
 Chromium's light blue with dark text (readable).
+
+### Round 2: tokens, scheme attribute, color audit (Phase 2, part 1)
+
+Round 1 was committed as 6b16659 and pushed to main in the merge acbccbb.
+
+- **Inventory:** `styles.css` had about 200 color literals (40 of them pet-window art), 420 px font sizes,
+  229 px radii and 40 shadows. It had no light-theme overrides, so every literal looked the same in light mode.
+  The **Accent** setting (Cyan/Violet/Amber/Rose) sets `data-accent`, but no CSS reads it, so
+  it does nothing yet (Phase 7, accent override).
+- **New tokens** (`tokens.css`, dark in `:root`, light in one block): on-accent, focus ring, selection, link,
+  scrollbar thumb and track, success, warning (it was referenced but never defined), info, danger text and
+  danger strong, favorite, overlay, shadow color plus popover and dialog shadows, user bubble and its
+  border, inline-code text, attachment text, brand mark, transparency checkerboard, document page,
+  diff added/removed (surface + text), terminal surface/text/muted, ANSI 16, and 8 syntax colors.
+  Light now has its own danger, code surface and code text (it used the dark values before).
+- **One light palette:** `src/theme` sets `<html data-scheme="light|dark">` from the theme mode
+  (System follows the OS live through `matchMedia`). `tokens.css` now has a single
+  `[data-scheme="light"]` block instead of a light block plus a duplicate inside
+  `@media (prefers-color-scheme: light)`.
+- **Migration:** 140 literals in `styles.css` became tokens or `color-mix()` tints of tokens. Accent,
+  danger, success and info tints keep their alpha as a percentage; shadows use `--skai-color-shadow`;
+  dialog backdrops use `--skai-color-overlay`. The migration is a re-runnable script, so a conflict with
+  the owner's edits can be re-applied to his version.
+- **Audit:** `scripts/audit-theme-tokens.cjs` (`npm run audit:theme-tokens`, also run by
+  `check:syntax`) fails when a file gains a color literal outside `tokens.css` and
+  `src/theme/presets/`. It's a ratchet: `scripts/theme-token-baseline.json` holds what's left
+  (56 in pet-window and backdrop art, 3 paint colors in the pet pixel editor), and counts can
+  only go down (`--update` lowers them). Checked that it fails when a literal is added.
+- **Screens:** before/after CDP screenshots of 10 routes in dark and light (`.theme-shots/r2-*`):
+  at most 0.4% of sampled bytes changed. Light checkerboards are now light.
+- **Found for later:** in light, the accent `#b39af5` is used as text (eyebrows, the selected chip)
+  at about 2.2:1 on white, below AA. Fix in the contrast pass (light accent plus white on-accent).
