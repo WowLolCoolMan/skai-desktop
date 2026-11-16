@@ -290,6 +290,8 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .git-change-summary li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 7px; min-width: 0; color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: 9px; }
 .git-change-summary li b { color: var(--skai-color-accent); }
 .git-change-summary li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-change-list li label { display: grid; grid-template-columns: auto 28px minmax(0, 1fr); align-items: center; gap: 7px; min-width: 0; cursor: pointer; }
+.git-change-list li input { margin: 0; accent-color: var(--skai-color-accent); }
 .git-change-summary.has-conflicts { border-color: color-mix(in srgb, var(--skai-color-danger) 40%, var(--skai-color-border)); }
 .git-change-summary.has-conflicts li b, .git-change-summary.has-conflicts > small { color: var(--skai-color-danger); }
 .git-review-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

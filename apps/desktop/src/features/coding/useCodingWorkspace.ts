@@ -133,20 +133,23 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     onError(null);
   };
 
-  const loadGitDiff = async () => {
+  const loadGitDiff = async (selectedPaths?: string[]) => {
     if (!selectedProject || !gitStatus?.changes.length || gitDiffBusy) return;
+    const paths = selectedPaths?.length ? selectedPaths : gitStatus.changes.map((change) => change.path);
     setGitDiffBusy(true);
-    const response = await request("project.git.diff", { id: selectedProject.id, paths: gitStatus.changes.map((change) => change.path) });
+    const response = await request("project.git.diff", { id: selectedProject.id, paths });
     setGitDiffBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Git diff could not be loaded."); return; }
     setGitDiff(response.result as DesktopGitDiff);
     onError(null);
   };
 
-  const commitGitChanges = async (message: string) => {
+  const commitGitChanges = async (message: string, selectedPaths?: string[]) => {
     if (!selectedProject || !gitStatus?.changes.length || !message.trim() || gitCommitBusy) return false;
+    const paths = (selectedPaths?.length ? selectedPaths : gitStatus.changes.map((change) => change.path)).filter((path, index, all) => all.indexOf(path) === index);
+    if (!paths.length) return false;
     setGitCommitBusy(true);
-    const response = await request("project.git.commit", { id: selectedProject.id, paths: gitStatus.changes.map((change) => change.path), message: message.trim() });
+    const response = await request("project.git.commit", { id: selectedProject.id, paths, message: message.trim() });
     setGitCommitBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Local Git commit was rejected."); return false; }
     setGitDiff(null);

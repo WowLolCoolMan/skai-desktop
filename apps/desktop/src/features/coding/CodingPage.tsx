@@ -31,8 +31,8 @@ type CodingPageProps = {
   gitPushBusy: boolean;
   gitPullRequestBusy: boolean;
   onRefreshGitStatus: () => void;
-  onLoadGitDiff: () => void;
-  onCommitGitChanges: (message: string) => Promise<boolean>;
+  onLoadGitDiff: (paths?: string[]) => void;
+  onCommitGitChanges: (message: string, paths?: string[]) => Promise<boolean>;
   onPushGitChanges: () => Promise<boolean>;
   onCreateGitPullRequest: (title: string, body: string) => Promise<boolean>;
   onPickFolder: () => Promise<string | null>;

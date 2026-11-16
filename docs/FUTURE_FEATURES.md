@@ -93,7 +93,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Saved environments for reusable folders, SSH hosts, and cloud contexts.
 - [x] File connectors that open, edit, and save files directly. (Bounded local project browser and approved file operations are implemented.)
 - [x] Integrated file editor that writes approved changes back to disk. (Review, save, undo, and bounded path checks are implemented.)
-- [x] Visual diff review. (Project Git diff inspection is implemented; selective staging remains open.)
+- [x] Visual diff review. (Project Git diff inspection is implemented; the project workspace now supports bounded per-file selection for diff review and commits. Interactive hunk/line staging remains open.)
 - [x] Memory management UI for viewing and editing remembered information. (Local search, edit, enable/disable, export, and safe import are implemented.)
 
 ## Workspace and desktop experience
