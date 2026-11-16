@@ -3,9 +3,8 @@ param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot "generated")
 )
 
-# Keeps the runtime deliberately simple: one transparent 6-frame horizontal
-# strip per pet/state. Walk source art may have a larger generated canvas; this
-# pass crops each frame by alpha, preserves aspect ratio, and locks its baseline.
+# Normalizes the authored six-pose walk source into intermediate strips. Run
+# convert-six-to-ten.py afterward to make the closed ten-frame runtime loops.
 Add-Type -AssemblyName System.Drawing.Common
 
 $frameSize = 256
@@ -76,4 +75,4 @@ foreach ($pet in $pets) {
         }
     }
 }
-Write-Output "Built $($pets.Count * $states.Count) independent six-frame pet strips in $OutputDirectory."
+Write-Output "Normalized $($pets.Count * $states.Count) independent walk/state strips in $OutputDirectory; run convert-six-to-ten.py next."

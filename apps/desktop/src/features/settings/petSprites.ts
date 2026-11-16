@@ -153,7 +153,7 @@ export async function deletePetSpriteProfile(id: string): Promise<void> {
   }
 }
 
-export async function validatePetStrip(file: File, allowLegacySixFrames = false): Promise<PetStrip> {
+export async function validatePetStrip(file: File, allowLegacySixFrames = false, legacyFrameWidth?: number): Promise<PetStrip> {
   if (!(file.type === "image/png" || file.type === "image/webp")) throw new Error("Choose a PNG or WebP sprite strip.");
   if (file.size > 5 * 1024 * 1024) throw new Error("Each sprite strip must be 5 MB or smaller.");
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -168,7 +168,8 @@ export async function validatePetStrip(file: File, allowLegacySixFrames = false)
     decoded.onerror = () => reject(new Error("This image could not be decoded."));
     decoded.src = dataUrl;
   });
-  const frameCount = image.naturalWidth % PET_FRAME_COUNT === 0 ? PET_FRAME_COUNT : allowLegacySixFrames && image.naturalWidth % 6 === 0 ? 6 : 0;
+  const matchesLegacyWidth = allowLegacySixFrames && Number.isFinite(legacyFrameWidth) && image.naturalWidth === Number(legacyFrameWidth) * 6;
+  const frameCount = matchesLegacyWidth ? 6 : image.naturalWidth % PET_FRAME_COUNT === 0 ? PET_FRAME_COUNT : allowLegacySixFrames && image.naturalWidth % 6 === 0 ? 6 : 0;
   if (!frameCount || image.naturalWidth < frameCount || image.naturalHeight < 1)
     throw new Error("The strip must have ten equal-width frames in one horizontal row. Frame 0 is the resting pose.");
   const frameWidth = image.naturalWidth / frameCount;
@@ -222,7 +223,8 @@ export async function validatePetProfileImport(file: File): Promise<PetSpritePro
     try { blob = await (await fetch(dataUrl)).blob(); }
     catch { throw new Error(`${animation.label} could not be read from the profile.`); }
     if (blob.size > 5 * 1024 * 1024) throw new Error(`${animation.label} is larger than 5 MB.`);
-    strips[animation.id] = await validatePetStrip(new File([blob], `${animation.id}.${blob.type === "image/webp" ? "webp" : "png"}`, { type: blob.type }), true);
+    const storedStrip = raw as { frameWidth?: unknown };
+    strips[animation.id] = await validatePetStrip(new File([blob], `${animation.id}.${blob.type === "image/webp" ? "webp" : "png"}`, { type: blob.type }), true, Number(storedStrip.frameWidth));
   }
   return { id: crypto.randomUUID(), name: candidate.name.trim(), strips, behavior: normalizePetBehavior(candidate.behavior, candidate.name) };
 }

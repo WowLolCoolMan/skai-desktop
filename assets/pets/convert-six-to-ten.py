@@ -12,15 +12,17 @@ for pet in PETS:
     idle_path = ROOT / f"{pet}-idle-frames.png"
     with Image.open(idle_path) as image:
         idle = image.convert("RGBA")
-    if idle.width % 6:
+    source_frame_count = 10 if idle.width % 10 == 0 else 6 if idle.width % 6 == 0 else 0
+    if not source_frame_count:
         raise ValueError(f"Unexpected source width: {idle_path}")
-    frame_width = idle.width // 6
+    frame_width = idle.width // source_frame_count
     rest = idle.crop((0, 0, frame_width, idle.height))
 
     for path in (item for item in STRIPS if item.name.startswith(f"{pet}-")):
         with Image.open(path) as image:
             source = image.convert("RGBA")
-        if source.width != frame_width * 6 or source.height != idle.height:
+        source_frame_count = 10 if source.width == frame_width * 10 else 6 if source.width == frame_width * 6 else 0
+        if not source_frame_count or source.height != idle.height:
             raise ValueError(f"Unexpected source dimensions: {path}")
 
         output = Image.new("RGBA", (frame_width * 10, source.height), (0, 0, 0, 0))
@@ -29,7 +31,7 @@ for pet in PETS:
             if frame in (0, 9) or idle_strip:
                 cell = rest
             else:
-                source_index = min(5, (frame - 1) * 6 // 8)
+                source_index = frame if source_frame_count == 10 else min(5, (frame - 1) * 6 // 8)
                 cell = source.crop((source_index * frame_width, 0, (source_index + 1) * frame_width, source.height))
             output.alpha_composite(cell, (frame * frame_width, 0))
 

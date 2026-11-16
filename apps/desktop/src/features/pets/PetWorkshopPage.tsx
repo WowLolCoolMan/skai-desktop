@@ -263,6 +263,11 @@ export function PetWorkshopPage() {
     } catch (error) { setLoadError(error instanceof Error ? error.message : "The companion could not be saved."); }
     finally { setSaving(false); }
   };
+  const activateProfile = (id: string) => {
+    setSelectedId(id);
+    localStorage.setItem("skai.pet.character", `custom:${id}`);
+    window.dispatchEvent(new StorageEvent("storage", { key: "skai.pet.character", newValue: `custom:${id}` }));
+  };
   const createProfile = async () => {
     const name = newName.trim().slice(0, 48);
     if (!name) { setLoadError("Name the companion first."); return; }
@@ -284,7 +289,7 @@ export function PetWorkshopPage() {
       const imported = await validatePetProfileImport(file);
       await savePetSpriteProfile(imported);
       setProfiles((current) => [...current, imported]);
-      setSelectedId(imported.id);
+      activateProfile(imported.id);
       setLoadError(null);
     } catch (error) { setLoadError(error instanceof Error ? error.message : "The profile could not be imported."); }
   };
@@ -331,7 +336,7 @@ export function PetWorkshopPage() {
     <div className="pet-workshop-layout">
       <aside className="pet-workshop-library">
         <div className="pet-workshop-create"><label htmlFor="pet-workshop-name">New companion</label><input id="pet-workshop-name" value={newName} onChange={(event) => setNewName(event.target.value)} maxLength={48} placeholder="Name your pet" /><Button variant="primary" onClick={() => void createProfile()}>Create pet</Button><label className="ui-button ui-button-secondary pet-workshop-import"><span>Import profile</span><input type="file" accept="application/json,.json" onChange={(event) => { void importProfile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div>
-        <div className="pet-workshop-profile-list" role="listbox" aria-label="Custom companions">{profiles.map((item) => <button key={item.id} type="button" className={item.id === selectedId ? "is-active" : ""} role="option" aria-selected={item.id === selectedId} onClick={() => setSelectedId(item.id)}><span className="pet-workshop-profile-avatar">{item.strips.idle ? <i style={stripPreviewStyle(item.strips.idle)} /> : "✦"}</span><span><strong>{item.name}</strong><small>{Object.keys(item.strips).length} animations · custom pet</small></span><b>›</b></button>)}{profiles.length === 0 && <p className="pet-workshop-empty">Create a pet or import a profile to start drawing.</p>}</div>
+        <div className="pet-workshop-profile-list" role="listbox" aria-label="Custom companions">{profiles.map((item) => <button key={item.id} type="button" className={item.id === selectedId ? "is-active" : ""} role="option" aria-selected={item.id === selectedId} onClick={() => activateProfile(item.id)}><span className="pet-workshop-profile-avatar">{item.strips.idle ? <i style={stripPreviewStyle(item.strips.idle)} /> : "✦"}</span><span><strong>{item.name}</strong><small>{Object.keys(item.strips).length} animations · custom pet</small></span><b>›</b></button>)}{profiles.length === 0 && <p className="pet-workshop-empty">Create a pet or import a profile to start drawing.</p>}</div>
       </aside>
       <main className="pet-workshop-main">
         {profile && behaviorPreview ? <>

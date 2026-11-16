@@ -27,10 +27,8 @@ function randomAttackSequence(settings, random = Math.random) {
   if (available.length === 0) return [];
   const selected = available.filter(() => random() < 0.66);
   if (selected.length === 0) selected.push(available[Math.floor(random() * available.length)]);
-  if (selected.some((action) => action === "pounce" || action === "fire-breath") && !selected.includes("approach-cursor")) {
-    selected.unshift("approach-cursor");
-  }
-  return selected;
+  const needsApproach = selected.includes("approach-cursor") || selected.some((action) => action === "pounce" || action === "fire-breath");
+  return needsApproach ? ["approach-cursor", ...selected.filter((action) => action !== "approach-cursor")] : selected;
 }
 
 module.exports = { normalizePetBehaviorSettings, randomAttackSequence };

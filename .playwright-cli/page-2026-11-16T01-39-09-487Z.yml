@@ -1,0 +1,98 @@
+- generic [ref=f4e3]:
+  - link "Skip to content" [ref=f4e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary "Global navigation" [ref=f4e5]:
+    - navigation "Primary navigation" [ref=f4e6]:
+      - button "Home" [ref=f4e7] [cursor=pointer]
+      - button "Images" [ref=f4e11] [cursor=pointer]
+      - button "Usage" [ref=f4e16] [cursor=pointer]
+      - button "Marketplace" [ref=f4e19] [cursor=pointer]
+      - button "Quick actions" [ref=f4e25] [cursor=pointer]
+    - button "Settings" [ref=f4e31] [cursor=pointer]
+  - complementary "Threads and projects" [ref=f4e35]:
+    - generic [ref=f4e39]:
+      - paragraph [ref=f4e40]: WORKSPACE
+      - strong [ref=f4e41]: Skai Desktop
+    - generic [ref=f4e42]:
+      - button "New chat" [ref=f4e43] [cursor=pointer]
+      - button "Collapse sidebar" [ref=f4e47] [cursor=pointer]
+    - navigation "Projects" [ref=f4e50]:
+      - generic [ref=f4e51]:
+        - paragraph [ref=f4e52]: PROJECTS
+        - button "Create project" [ref=f4e53] [cursor=pointer]
+      - button "No local projects yet Browse or create a project" [ref=f4e56] [cursor=pointer]:
+        - strong [ref=f4e57]: No local projects yet
+        - generic [ref=f4e58]: Browse or create a project
+    - generic [ref=f4e59]:
+      - generic [ref=f4e60]:
+        - paragraph [ref=f4e61]: RECENT CHATS
+        - button "Start a new chat" [ref=f4e62] [cursor=pointer]
+      - textbox "Search chats" [ref=f4e65]:
+        - /placeholder: Search chats…
+      - generic "Recent conversations" [ref=f4e66]:
+        - paragraph [ref=f4e67]: No saved chats yet.
+    - region "Active session" [ref=f4e68]
+    - separator "Resize sidebar" [ref=f4e69]
+  - main [ref=f4e70]:
+    - generic [ref=f4e72]:
+      - generic [ref=f4e73]: Offline
+      - button "Retry connection" [ref=f4e75] [cursor=pointer]
+    - generic [active] [ref=f4e76]:
+      - generic [ref=f4e77]:
+        - generic [ref=f4e78]:
+          - generic [ref=f4e79]:
+            - paragraph [ref=f4e80]: IMAGE STUDIO
+            - heading "Create visual work" [level=1] [ref=f4e81]
+            - paragraph [ref=f4e82]: A creative local workspace for prompts, saved workflows, and generated outputs.
+          - generic [ref=f4e83]: Prompt required
+        - generic [ref=f4e86]:
+          - generic [ref=f4e87]:
+            - generic [ref=f4e88]:
+              - generic [ref=f4e89]:
+                - paragraph [ref=f4e90]: LOCAL IMAGE WORKSPACE
+                - heading "Create or edit an image" [level=3] [ref=f4e91]
+              - generic [ref=f4e92]:
+                - text: Image engine
+                - combobox "Image engine" [ref=f4e93]:
+                  - option "Stable Diffusion Turbo · built in" [selected]
+                  - option "ComfyUI · workflow"
+            - generic [ref=f4e94]:
+              - generic [ref=f4e95]:
+                - text: Prompt
+                - textbox "Prompt Use a recipe below as a starting point, then make it yours." [ref=f4e96]:
+                  - /placeholder: Describe what you want to create…
+                - generic [ref=f4e97]: Use a recipe below as a starting point, then make it yours.
+              - generic "Prompt recipes" [ref=f4e98]:
+                - generic [ref=f4e99]: START WITH A RECIPE
+                - generic [ref=f4e100]:
+                  - button "Product scene" [ref=f4e101] [cursor=pointer]
+                  - button "Character portrait" [ref=f4e102] [cursor=pointer]
+                  - button "Concept landscape" [ref=f4e103] [cursor=pointer]
+              - generic [ref=f4e104]:
+                - strong [ref=f4e105]: Stable Diffusion Turbo · local inference
+                - generic [ref=f4e106]: Checking the optional image runtime… The first generation downloads model weights (about 5.2 GB); generation runs on this computer. CPU generation is supported but may be slow.
+                - generic [ref=f4e107]:
+                  - generic [ref=f4e108]: Checking
+                  - button "Check runtime" [ref=f4e110] [cursor=pointer]
+                  - button "Install optional runtime" [ref=f4e111] [cursor=pointer]
+              - generic [ref=f4e112]:
+                - generic [ref=f4e113]: Optional source image for editing
+                - button "Choose image" [ref=f4e114] [cursor=pointer]
+            - generic [ref=f4e115]:
+              - generic [ref=f4e116]: Prompt required
+              - generic [ref=f4e118]: Describe the image you want to create.
+            - generic [ref=f4e119]:
+              - generic [ref=f4e120]: First generation downloads the selected model locally.
+              - button "Generate image" [disabled] [ref=f4e121] [cursor=pointer]
+          - generic [ref=f4e122]:
+            - generic [ref=f4e123]:
+              - generic [ref=f4e124]:
+                - paragraph [ref=f4e125]: GENERATION HISTORY
+                - heading "Recent outputs" [level=3] [ref=f4e126]
+              - generic [ref=f4e127]: "0"
+            - generic [ref=f4e128]:
+              - strong [ref=f4e133]: No generated images
+              - paragraph [ref=f4e134]: Your local outputs will appear here after a successful generation.
+      - alert [ref=f4e135]:
+        - generic [ref=f4e136]: The Electron agent bridge is unavailable.
+        - button "Dismiss notification" [ref=f4e137] [cursor=pointer]: Dismiss

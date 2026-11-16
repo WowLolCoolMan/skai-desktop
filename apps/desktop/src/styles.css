@@ -1092,51 +1092,51 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .pet-workshop-library { position: sticky; top: 20px; padding: 16px; }
 .pet-workshop-create { display: grid; gap: 9px; padding-bottom: 15px; border-bottom: 1px solid var(--skai-color-border); }
 .pet-workshop-create > label:first-child { font-size: 12px; font-weight: 700; }
-.pet-workshop-create input:not([type=file]), .pet-workshop-profile-heading input, .pet-workshop-interval input { min-width: 0; border: 1px solid var(--skai-color-border); border-radius: 9px; padding: 9px 11px; background: var(--skai-color-background); color: inherit; }
+.pet-workshop-create input:not([type=file]), .pet-workshop-profile-heading input, .pet-workshop-interval input { min-width: 0; border: 1px solid var(--skai-color-border); border-radius: 9px; padding: 9px 11px; background: var(--skai-color-surface-soft); color: inherit; }
 .pet-workshop-import, .pet-workshop-import-strip { position: relative; overflow: hidden; }
 .pet-workshop-import input, .pet-workshop-import-strip input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .pet-workshop-profile-list { display: grid; gap: 7px; padding-top: 13px; }
 .pet-workshop-profile-list > button { display: flex; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 12px; padding: 9px; text-align: left; color: inherit; background: transparent; cursor: pointer; }
 .pet-workshop-profile-list > button.is-active { border-color: color-mix(in srgb, var(--skai-color-accent) 45%, transparent); background: color-mix(in srgb, var(--skai-color-accent) 10%, transparent); }
 .pet-workshop-profile-list > button > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; flex: 1; }
-.pet-workshop-profile-list small, .pet-workshop-profile-list > button > b { color: var(--skai-color-muted); font-size: 11px; }
+.pet-workshop-profile-list small, .pet-workshop-profile-list > button > b { color: var(--skai-color-text-muted); font-size: 11px; }
 .pet-workshop-profile-avatar { display: grid; width: 46px; height: 46px; flex: 0 0 auto; place-items: center; overflow: hidden; border-radius: 10px; background: repeating-conic-gradient(#171a21 0 25%, #20242d 0 50%) 0 / 12px 12px; }
 .pet-workshop-profile-avatar i { width: 100%; height: 100%; background-repeat: no-repeat; }
 .pet-workshop-main { overflow: hidden; }
 .pet-workshop-profile-heading, .pet-workshop-section-heading, .pet-workshop-editor-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
 .pet-workshop-profile-heading { padding: 22px 24px; border-bottom: 1px solid var(--skai-color-border); }
 .pet-workshop-profile-heading input { width: min(400px, 100%); font-size: 22px; font-weight: 750; }
-.pet-workshop-profile-heading p, .pet-workshop-section-heading p, .pet-workshop-editor-heading p { margin: 6px 0 0; color: var(--skai-color-muted); font-size: 12px; }
+.pet-workshop-profile-heading p, .pet-workshop-section-heading p, .pet-workshop-editor-heading p { margin: 6px 0 0; color: var(--skai-color-text-muted); font-size: 12px; }
 .pet-workshop-profile-heading > div:last-child { display: flex; gap: 8px; }
 .pet-workshop-behavior, .pet-workshop-animation-section { padding: 22px 24px; border-bottom: 1px solid var(--skai-color-border); }
 .pet-workshop-section-heading h2 { margin: 3px 0 0; font-size: 19px; }
-.pet-workshop-switch { display: flex; align-items: center; gap: 8px; color: var(--skai-color-muted); font-size: 12px; white-space: nowrap; }
+.pet-workshop-switch { display: flex; align-items: center; gap: 8px; color: var(--skai-color-text-muted); font-size: 12px; white-space: nowrap; }
 .pet-workshop-switch input { accent-color: var(--skai-color-accent); }
-.pet-workshop-behavior-options { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; margin-top: 18px; color: var(--skai-color-muted); font-size: 12px; }
+.pet-workshop-behavior-options { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; margin-top: 18px; color: var(--skai-color-text-muted); font-size: 12px; }
 .pet-workshop-behavior-options > label { display: flex; align-items: center; gap: 7px; }
 .pet-workshop-behavior-options input[type=checkbox] { accent-color: var(--skai-color-accent); }
 .pet-workshop-interval input { width: 66px; padding: 7px; }
 .pet-workshop-actions-heading { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-top: 21px; }
 .pet-workshop-actions-heading > div, .pet-workshop-action-list article > span:nth-child(2) { display: grid; gap: 4px; }
-.pet-workshop-actions-heading small, .pet-workshop-action-list small { color: var(--skai-color-muted); font-size: 11px; }
-.pet-workshop-actions-heading label { display: grid; gap: 5px; font-size: 11px; color: var(--skai-color-muted); }
-.pet-workshop-actions-heading select { border: 1px solid var(--skai-color-border); border-radius: 8px; padding: 7px 9px; color: inherit; background: var(--skai-color-background); }
+.pet-workshop-actions-heading small, .pet-workshop-action-list small { color: var(--skai-color-text-muted); font-size: 11px; }
+.pet-workshop-actions-heading label { display: grid; gap: 5px; font-size: 11px; color: var(--skai-color-text-muted); }
+.pet-workshop-actions-heading select { border: 1px solid var(--skai-color-border); border-radius: 8px; padding: 7px 9px; color: inherit; background: var(--skai-color-surface-soft); }
 .pet-workshop-action-list { display: grid; gap: 7px; margin-top: 10px; }
 .pet-workshop-action-list article { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--skai-color-border); border-radius: 10px; }
 .pet-workshop-action-number { color: var(--skai-color-accent); font: 700 11px ui-monospace, monospace; }
 .pet-workshop-action-list article > span:nth-child(2) { flex: 1; }
 .pet-workshop-action-list article > div { display: flex; gap: 4px; }
-.pet-workshop-action-list article button, .pet-workshop-tools > button { border: 1px solid var(--skai-color-border); border-radius: 7px; padding: 5px 8px; color: inherit; background: var(--skai-color-background); cursor: pointer; }
-.pet-workshop-safety-note { margin: 12px 0 0; color: var(--skai-color-muted); font-size: 11px; }
+.pet-workshop-action-list article button, .pet-workshop-tools > button { border: 1px solid var(--skai-color-border); border-radius: 7px; padding: 5px 8px; color: inherit; background: var(--skai-color-surface-soft); cursor: pointer; }
+.pet-workshop-safety-note { margin: 12px 0 0; color: var(--skai-color-text-muted); font-size: 11px; }
 .pet-workshop-animation-section > .pet-workshop-section-heading { align-items: end; }
 .pet-workshop-animation-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 18px 0; padding-bottom: 4px; }
-.pet-workshop-animation-tabs button { display: grid; flex: 0 0 auto; gap: 4px; border: 1px solid var(--skai-color-border); border-radius: 9px; padding: 8px 10px; text-align: left; color: inherit; background: var(--skai-color-background); cursor: pointer; font-size: 11px; }
+.pet-workshop-animation-tabs button { display: grid; flex: 0 0 auto; gap: 4px; border: 1px solid var(--skai-color-border); border-radius: 9px; padding: 8px 10px; text-align: left; color: inherit; background: var(--skai-color-surface-soft); cursor: pointer; font-size: 11px; }
 .pet-workshop-animation-tabs button.is-active { border-color: var(--skai-color-accent); color: var(--skai-color-accent); }
-.pet-workshop-animation-tabs small { color: var(--skai-color-muted); font-size: 9px; }
-.pet-workshop-editor { border: 1px solid var(--skai-color-border); border-radius: 14px; padding: 16px; background: color-mix(in srgb, var(--skai-color-background) 75%, transparent); }
+.pet-workshop-animation-tabs small { color: var(--skai-color-text-muted); font-size: 9px; }
+.pet-workshop-editor { border: 1px solid var(--skai-color-border); border-radius: 14px; padding: 16px; background: color-mix(in srgb, var(--skai-color-surface-soft) 75%, transparent); }
 .pet-workshop-editor-heading h3 { margin: 0; font-size: 16px; }
 .pet-workshop-legacy { display: grid; grid-template-columns: auto 1fr 100px; align-items: center; gap: 12px; margin: 14px 0; border: 1px solid color-mix(in srgb, #e6a342 45%, transparent); border-radius: 10px; padding: 10px; font-size: 11px; }
-.pet-workshop-legacy > span { color: var(--skai-color-muted); }
+.pet-workshop-legacy > span { color: var(--skai-color-text-muted); }
 .pet-workshop-legacy-preview { height: 48px; background-repeat: no-repeat; }
 .pet-workshop-drawing-layout { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(170px, 220px); gap: 14px; margin-top: 16px; }
 .pet-workshop-canvas-wrap { display: grid; justify-items: center; gap: 12px; min-width: 0; }
@@ -1151,15 +1151,15 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .pet-workshop-color input { width: 24px; height: 20px; padding: 0; border: 0; background: transparent; }
 .pet-workshop-brush input { width: 68px; }
 .pet-workshop-frame-rail { min-width: 0; }
-.pet-workshop-frame-rail > p { margin: 0 0 8px; color: var(--skai-color-muted); font-size: 11px; }
+.pet-workshop-frame-rail > p { margin: 0 0 8px; color: var(--skai-color-text-muted); font-size: 11px; }
 .pet-workshop-frame-rail > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.pet-workshop-frame-rail button { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 7px; min-width: 0; border: 1px solid var(--skai-color-border); border-radius: 8px; padding: 4px; color: inherit; background: var(--skai-color-background); cursor: pointer; }
+.pet-workshop-frame-rail button { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 7px; min-width: 0; border: 1px solid var(--skai-color-border); border-radius: 8px; padding: 4px; color: inherit; background: var(--skai-color-surface-soft); cursor: pointer; }
 .pet-workshop-frame-rail button.is-active { border-color: var(--skai-color-accent); }
 .pet-workshop-frame-rail button > span { display: grid; width: 40px; height: 40px; place-items: center; overflow: hidden; background: repeating-conic-gradient(#20232b 0 25%, #292d36 0 50%) 0 / 10px 10px; }
 .pet-workshop-frame-rail button img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .pet-workshop-frame-rail button > span > i { width: 5px; height: 5px; border-radius: 50%; background: var(--skai-color-accent); }
 .pet-workshop-frame-rail small { font-size: 10px; }
-.pet-workshop-empty, .pet-workshop-welcome { color: var(--skai-color-muted); }
+.pet-workshop-empty, .pet-workshop-welcome { color: var(--skai-color-text-muted); }
 .pet-workshop-welcome { display: grid; justify-items: center; max-width: 440px; margin: 100px auto; padding: 28px; text-align: center; }
 .pet-workshop-welcome h2 { margin: 4px 0; color: var(--skai-color-text); }
 .pet-workshop-welcome-mark { display: grid; width: 52px; height: 52px; place-items: center; border: 1px solid var(--skai-color-border); border-radius: 16px; color: var(--skai-color-accent); font-size: 24px; }
