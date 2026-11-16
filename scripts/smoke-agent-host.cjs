@@ -293,16 +293,36 @@ async function run() {
     throw new Error(`Queued task cancellation did not stop the waiting task before execution: ${JSON.stringify({ cancelledTask, queueRequests })}`);
   const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
   if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Only the Local environment")) throw new Error("tasks.plan accepted an unsupported environment.");
-  const scheduled = await request("scheduled.create", { prompt: "Run the local review", dueAt: new Date(Date.now() + 60_000).toISOString(), repeatEveryMinutes: 60 });
+  let scheduledRequests = 0;
+  const scheduledModelServer = http.createServer((request, response) => {
+    scheduledRequests += 1;
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.end('data: {"choices":[{"delta":{"content":"scheduled smoke reply"}}]}\n\ndata: [DONE]\n\n');
+  });
+  await new Promise(resolve => scheduledModelServer.listen(0, "127.0.0.1", resolve));
+  const scheduledPort = scheduledModelServer.address().port;
+  const scheduledSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${scheduledPort}/v1`, model: "scheduled-smoke-model", provider: "Ollama" });
+  if (!scheduledSettings.ok) throw new Error("settings.save could not prepare the unattended scheduler endpoint.");
+  const scheduled = await request("scheduled.create", { prompt: "Run the local review", dueAt: new Date(Date.now() + 60_000).toISOString(), repeatEveryMinutes: 1 });
   if (!scheduled.ok || scheduled.result?.status !== "scheduled") throw new Error("scheduled.create did not persist a scheduled run.");
   const runNow = await request("scheduled.runNow", { id: scheduled.result.id });
   if (!runNow.ok || runNow.result?.id !== scheduled.result.id) throw new Error("scheduled.runNow did not update the scheduled run.");
+  let completedScheduled = null;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("scheduled.list");
+    completedScheduled = snapshot.result?.find(item => item.id === scheduled.result.id) ?? null;
+    if (completedScheduled?.status === "scheduled" && completedScheduled.outcome?.includes("scheduled smoke reply")) break;
+  }
+  if (!completedScheduled || completedScheduled.status !== "scheduled" || !completedScheduled.outcome?.includes("scheduled smoke reply") || scheduledRequests !== 1)
+    throw new Error(`Unattended scheduled execution did not complete and reschedule exactly once: ${JSON.stringify({ completedScheduled, scheduledRequests })}`);
   const paused = await request("scheduled.pause", { id: scheduled.result.id });
   if (!paused.ok || paused.result?.status !== "paused") throw new Error("scheduled.pause did not pause the scheduled run.");
   const resumed = await request("scheduled.resume", { id: scheduled.result.id });
   if (!resumed.ok || resumed.result?.status !== "scheduled") throw new Error("scheduled.resume did not resume the scheduled run.");
   const cancelled = await request("scheduled.cancel", { id: scheduled.result.id });
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
+  await new Promise(resolve => scheduledModelServer.close(resolve));
   console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, local task planning, scheduled automation lifecycle, and direct host lifecycle.");
 }
 

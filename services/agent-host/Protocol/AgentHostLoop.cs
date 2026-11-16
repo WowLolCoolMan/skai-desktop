@@ -31,6 +31,7 @@ public static class AgentHostLoop
 
     public static async Task RunAsync(Stream input, Stream output, CancellationToken cancellationToken = default)
     {
+        using var hostCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         if (!bool.TryParse(Environment.GetEnvironmentVariable("SKAI_SKIP_LEGACY_DATA_MIGRATION"), out var skipLegacyMigration) || !skipLegacyMigration)
             LegacyDataMigration.MigrateLocalData();
         using var reader = new StreamReader(input);
@@ -40,35 +41,101 @@ public static class AgentHostLoop
         // durable result is written. Reconcile that state before advertising
         // the host as ready; never silently resume or re-run local work.
         CreateTaskStore().ReconcileAfterRestart();
+        var scheduledDispatcher = Task.Run(() => RunScheduledDispatcherAsync(hostCancellation.Token), hostCancellation.Token);
 
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
-            if (line is null) break;
-            if (string.IsNullOrWhiteSpace(line)) continue;
+            while (!hostCancellation.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(hostCancellation.Token);
+                if (line is null) break;
+                if (string.IsNullOrWhiteSpace(line)) continue;
 
-            AgentResponse response;
-            AgentRequest? parsedRequest = null;
-            try
-            {
-                parsedRequest = JsonSerializer.Deserialize<AgentRequest>(line, JsonOptions);
-                var request = parsedRequest
-                    ?? throw new InvalidOperationException("Request body was empty.");
-                response = Handle(request, voice);
-            }
-            catch (JsonException ex)
-            {
-                response = new(ProtocolVersion, parsedRequest?.Id ?? string.Empty, false, Error: new("INVALID_JSON", ex.Message));
-            }
-            catch (Exception ex)
-            {
-                response = new(ProtocolVersion, parsedRequest?.Id ?? string.Empty, false, Error: new("REQUEST_FAILED", ex.Message));
-            }
+                AgentResponse response;
+                AgentRequest? parsedRequest = null;
+                try
+                {
+                    parsedRequest = JsonSerializer.Deserialize<AgentRequest>(line, JsonOptions);
+                    var request = parsedRequest
+                        ?? throw new InvalidOperationException("Request body was empty.");
+                    response = Handle(request, voice);
+                }
+                catch (JsonException ex)
+                {
+                    response = new(ProtocolVersion, parsedRequest?.Id ?? string.Empty, false, Error: new("INVALID_JSON", ex.Message));
+                }
+                catch (Exception ex)
+                {
+                    response = new(ProtocolVersion, parsedRequest?.Id ?? string.Empty, false, Error: new("REQUEST_FAILED", ex.Message));
+                }
 
-            await writer.WriteLineAsync(JsonSerializer.Serialize(response, JsonOptions));
+                await writer.WriteLineAsync(JsonSerializer.Serialize(response, JsonOptions));
+            }
+        }
+        catch (OperationCanceledException) when (hostCancellation.IsCancellationRequested)
+        {
+            // Normal shutdown; the dispatcher is cancelled below.
+        }
+        finally
+        {
+            hostCancellation.Cancel();
+            try { await scheduledDispatcher.ConfigureAwait(false); }
+            catch (OperationCanceledException) when (hostCancellation.IsCancellationRequested) { }
         }
         await DisposeTerminalSessionsAsync().ConfigureAwait(false);
         await DisposeMcpClientsAsync().ConfigureAwait(false);
+    }
+
+    private static async Task RunScheduledDispatcherAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+        {
+            ScheduledTask? task;
+            try { task = CreateScheduledTaskStore().TryClaimDue(); }
+            catch { continue; }
+            if (task is null) continue;
+
+            try
+            {
+                var settings = CreateSettingsStore().Load();
+                var parameters = JsonSerializer.SerializeToElement(new
+                {
+                    endpoint = settings.Endpoint,
+                    provider = settings.ModelProvider,
+                    model = settings.Model,
+                    timeoutSeconds = 285,
+                    responseMode = task.WorkspaceMode == WorkspaceModes.CodingAgent ? ChatResponseModes.Coding : ChatResponseModes.Think,
+                    messages = new[]
+                    {
+                        new ChatMessage("system", "You are Skai's scheduled local assistant. Complete the scheduled request using only the configured local model and report the result concisely."),
+                        new ChatMessage("user", task.Prompt),
+                    },
+                }, JsonOptions);
+                var response = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"scheduled-{task.Id}", "chat.complete", parameters), cancellationToken).ConfigureAwait(false);
+                if (!response.Ok) throw new InvalidOperationException(response.Error?.Message ?? "The local model could not complete the scheduled request.");
+                var responseJson = JsonSerializer.SerializeToElement(response.Result, JsonOptions);
+                var content = responseJson.TryGetProperty("content", out var contentValue) ? contentValue.GetString() : null;
+                if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException("The local model returned an empty scheduled result.");
+                CreateScheduledTaskStore().Complete(task.Id, succeeded: true, TrimScheduledOutcome(content));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception error)
+            {
+                try { CreateScheduledTaskStore().Complete(task.Id, succeeded: false, TrimScheduledOutcome(error.Message)); }
+                catch { /* Preserve the host protocol if scheduler persistence is unavailable. */ }
+            }
+        }
+    }
+
+    private static string TrimScheduledOutcome(string value)
+    {
+        var outcome = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (outcome.Length == 0) return "Scheduled run completed without a summary.";
+        return outcome.Length <= ScheduledTaskStore.MaxOutcomeCharacters ? outcome : outcome[..ScheduledTaskStore.MaxOutcomeCharacters];
     }
 
     private static AgentResponse Handle(AgentRequest request, OsNativeTtsService voice)
