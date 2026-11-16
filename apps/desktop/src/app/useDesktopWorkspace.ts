@@ -10,7 +10,7 @@ import { useChatWorkspace } from "../features/chat/useChatWorkspace";
 import { removeChatDraft } from "../features/chat/chatDraftStore";
 import { useCodingWorkspace } from "../features/coding/useCodingWorkspace";
 import { loadImageHistory, saveImageHistory, type ImageHistoryEntry } from "../features/catalog/imageHistory";
-import { useNativeThemeSync } from "../theme/useNativeThemeSync";
+import { useThemeEngine } from "../theme/useThemeEngine";
 
 export type DesktopWorkspace = {
   routeState: AppRouteState;
@@ -373,7 +373,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
   useEffect(() => { window.requestAnimationFrame(() => document.getElementById("main-content")?.focus()); }, [route]);
-  useNativeThemeSync(request, themeMode);
+  useThemeEngine(request, themeMode);
   useEffect(() => { document.title = `${PRODUCT_DISPLAY_NAME} · ${route}`; document.documentElement.dataset.theme = themeMode; document.documentElement.dataset.accent = accentColor; document.documentElement.dataset.density = density; document.documentElement.dataset.backdrop = backdrop; document.documentElement.dataset.reduceMotion = reduceMotion ? "true" : "false"; }, [route, themeMode, accentColor, density, backdrop, reduceMotion]);
   useEffect(() => { localStorage.setItem("skai.sidebar.collapsed", String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); }, [sidebarWidth]);

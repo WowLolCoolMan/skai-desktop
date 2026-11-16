@@ -1,0 +1,8 @@
+/* ===== Theme settings (Appearance) ===== */
+.theme-settings { display: grid; gap: var(--skai-space-3); }
+.theme-settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--skai-space-2); }
+.theme-settings-path { overflow: hidden; min-width: 0; max-width: 100%; color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.theme-settings-problems { display: grid; gap: var(--skai-space-2); padding: var(--skai-space-3); border: 1px solid color-mix(in srgb, var(--skai-color-danger) 35%, transparent); border-radius: var(--skai-radius-lg); color: var(--skai-color-danger-text); background: color-mix(in srgb, var(--skai-color-danger) 8%, transparent); font-size: var(--skai-text-md); }
+.theme-settings-problems strong { color: var(--skai-color-danger-strong); }
+.theme-settings-problems ul { display: grid; gap: var(--skai-space-1); margin: 0; padding-left: var(--skai-space-4); }
+.theme-settings-problems code { font-family: var(--skai-font-mono); }

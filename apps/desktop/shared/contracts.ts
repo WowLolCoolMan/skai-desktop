@@ -243,6 +243,19 @@ export interface PluginDownloadsBridge {
   openFolder(): Promise<boolean>;
 }
 
+// Theme: validated theme data sent by the main process (electron/theme-service.cjs).
+export type ThemeGradient = { gradient: "solid"; color: string } | { gradient: "linear" | "radial" | "conic"; angle: number; stops: { color: string; at: number }[] };
+export type ThemeFont = { family?: string[]; size?: number; weight?: number; lineHeight?: number; letterSpacing?: number };
+export type ThemeDefinition = { id: string; name: string; appearance: "light" | "dark"; colors: Record<string, string>; gradients: Record<string, ThemeGradient>; fonts: Record<string, ThemeFont> };
+export type ThemeFamily = { name: string; author: string; license: string; file?: string; themes: ThemeDefinition[] };
+export type ThemeProblem = { file: string; key: string; problem: string };
+export type ThemePicks = { lightTheme: string; darkTheme: string };
+export type ThemeSnapshot = { families: ThemeFamily[]; problems: ThemeProblem[]; picks: ThemePicks; themesDir: string };
+
+export interface AppearanceBridge {
+  onChanged(handler: (snapshot: ThemeSnapshot) => void): () => void;
+}
+
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
   media?: {
@@ -255,6 +268,7 @@ export interface AgentBridge {
   window?: WindowBridge;
   updates?: UpdatesBridge;
   pluginDownloads?: PluginDownloadsBridge;
+  appearance?: AppearanceBridge;
 }
 
 declare global {

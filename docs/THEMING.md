@@ -4,9 +4,21 @@ Skai Desktop's look comes from theme files: plain JSON you can open, copy and ed
 The schema is `docs/theme.schema.json`; most editors use it for completion when the file's
 `$schema` points at a copy of it (Export puts one next to your themes).
 
-> Status: the format and validator are done (theme work, Phase 3). The themes folder, live
-> reload and the Appearance buttons (Open themes folder, Edit, Duplicate, Import Base16,
-> Export, Reload, Reset) come in the next rounds; this page will cover them as they land.
+> Status: theme files, light/dark picks, the themes folder and live reload work (theme work,
+> Phase 3). Edit, Duplicate, Import Base16/Base24, Export and Reset come next; gradients and
+> fonts in theme files are validated now and applied in Phases 4–5.
+
+## Using a theme
+
+1. Settings → Appearance → **Open themes folder**.
+2. Save a `.json` theme family there (see below), or copy one and edit it.
+3. Pick it under **Light theme** or **Dark theme**. **Color theme** (Light / Dark / System) decides
+   which of the two is shown; System follows your OS as it changes.
+
+Skai watches the folder: saving a theme file updates the app straight away. **Reload themes**
+re-reads everything by hand. A file with mistakes doesn't block anything: the problems are listed
+under the buttons (file, key, what's wrong), and a theme that was already working stays as it was
+until the file is fixed. Your picks are saved in `appearance.json`.
 
 ## Where themes live
 

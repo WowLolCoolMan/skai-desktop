@@ -203,3 +203,31 @@ Round 3 was committed and pushed as 01fbbc3.
   maps to a real token; `skai.json` and the schema in sync; every shipped preset valid with a license.
 - **Next:** load user themes from `<userData>/themes`, watch and live-reload them, bridge the validated
   themes to the renderer, apply tokens live, and add theme picks and folder actions in Appearance.
+
+### Round 5: user themes, live reload, theme picks (Phase 3, part 2)
+
+Round 4 was committed and pushed in the merge e13a3ab.
+
+- **Main process:** `electron/theme-service.cjs` (new) reads `<userData>/themes/*.json` (up to 64 files;
+  symlinks and oversized files are refused) and the picks in `<userData>/appearance.json`, and validates
+  them with `theme-files.cjs`. It keeps each file's **last good** version while the file is broken,
+  watches the folder and `appearance.json` (200 ms debounce), and pushes the validated snapshot over
+  `appearance:changed`. The changes to `main.cjs` are one `require`, two setup lines and one dispatch line for
+  the shell-handled methods `appearance.getThemes`, `appearance.saveThemeSelection` and
+  `appearance.openThemesFolder`. `preload.cjs` gained `appearance.onChanged`.
+- **Renderer:** `src/theme/themeEngine.ts` (new) merges the built-in presets (bundled through
+  `import.meta.glob`) with the user's families. It resolves the light or dark pick for the current
+  scheme (missing pick → Skai default) and applies its colors as inline `--skai-*` properties on
+  `<html>`, after re-checking each value against a plain-color pattern. The built-in Skai family applies
+  nothing inline: `tokens.css` already defines it, and inline values would override the per-backdrop
+  accents. `useThemeEngine` (renamed from `useNativeThemeSync`) starts the engine and feeds it the
+  resolved scheme.
+- **Appearance:** `src/theme/ThemeSettings.tsx` adds **Light theme** and **Dark theme** pickers (grouped by
+  family, with the file name for user themes), **Open themes folder**, **Reload themes**, the folder path, and a
+  non-blocking problem list. It's one line in `SettingsPage.tsx`, with styles in `src/theme/theme.css` (tokens only).
+- **Smoke test:** `smoke:electron:themes` now writes a theme into the isolated profile's `themes/` folder,
+  picks it, edits it while the app runs (live reload), and breaks it. It then checks the last good version
+  stays and a problem is shown, and that the pick was saved to `appearance.json`. The final screenshot is
+  best-effort, because on the real desktop the compositor sometimes doesn't hand over a frame (the
+  same steps on the private display screenshot fine).
+- **Docs:** `THEMING.md` gained "Using a theme".

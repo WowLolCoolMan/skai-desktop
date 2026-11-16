@@ -162,8 +162,35 @@ async function main() {
   await devtools.send("Emulation.setDeviceMetricsOverride", { width: 960, height: 640, deviceScaleFactor: 1, mobile: false });
   const constrained = await setAppearance("light", "deep-space");
   await devtools.send("Emulation.clearDeviceMetricsOverride");
+
+  // Theme files: drop a user theme into <userData>/themes, pick it, edit it while the
+  // app runs (live reload), then break it (the last good version must stay applied
+  // and a problem must be shown), and check the pick was saved to appearance.json.
+  const themesDir = path.join(smokeUserDataDir, "themes");
+  const themeFile = path.join(themesDir, "smoke.json");
+  const writeTheme = (canvas) => fs.writeFileSync(themeFile, JSON.stringify({ name: "Smoke", license: "CC0-1.0", themes: [{ name: "Smoke Dark", appearance: "dark", colors: { canvas } }] }));
+  const canvasToken = "getComputedStyle(document.documentElement).getPropertyValue('--skai-color-canvas').trim()";
+  await setAppearance("dark", "none");
+  fs.mkdirSync(themesDir, { recursive: true });
+  writeTheme("#102030");
+  await waitFor(devtools.evaluate, "[...document.querySelectorAll('.settings-content option')].some((option) => option.value === 'user:smoke.json/Smoke Dark')", Boolean, "user theme to load from the themes folder");
+  const picked = await devtools.callFunction("function (id) { const select = [...document.querySelectorAll('.settings-content label')].find((label) => label.textContent?.startsWith('Dark theme'))?.querySelector('select'); if (!select) return false; select.value = id; select.dispatchEvent(new Event('change', { bubbles: true })); return true; }", ["user:smoke.json/Smoke Dark"]);
+  if (!picked) throw new Error("The Dark theme picker was not found on Appearance.");
+  await waitFor(devtools.evaluate, canvasToken, (value) => value === "#102030", "picked user theme to apply");
+  writeTheme("#203040");
+  await waitFor(devtools.evaluate, canvasToken, (value) => value === "#203040", "edited theme file to live-reload");
+  fs.writeFileSync(themeFile, "{ broken");
+  await waitFor(devtools.evaluate, "document.querySelector('.theme-settings-problems')?.textContent || ''", (value) => value.includes("smoke.json"), "problem report for a broken theme file");
+  const keptCanvas = await devtools.evaluate(canvasToken);
+  if (keptCanvas !== "#203040") throw new Error(`A broken theme file replaced the last good theme (canvas ${keptCanvas}).`);
+  const savedPicks = JSON.parse(fs.readFileSync(path.join(smokeUserDataDir, "appearance.json"), "utf8"));
+  if (savedPicks.darkTheme !== "user:smoke.json/Smoke Dark") throw new Error(`The theme pick was not saved to appearance.json: ${JSON.stringify(savedPicks)}`);
+  fs.mkdirSync(outputDir, { recursive: true });
+  // Best effort: on a busy desktop the compositor may not hand over a frame in time.
+  await devtools.send("Page.captureScreenshot", { format: "png" }).then((shot) => fs.writeFileSync(path.join(outputDir, "user-theme-problem.png"), Buffer.from(shot.data, "base64"))).catch(() => {});
+
   devtools.close();
-  console.log(`Packaged theme acceptance passed: ${JSON.stringify({ states, constrained })}`);
+  console.log(`Packaged theme acceptance passed: ${JSON.stringify({ states, constrained, userTheme: { liveReload: true, keptLastGood: keptCanvas } })}`);
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => {

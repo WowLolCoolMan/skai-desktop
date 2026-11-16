@@ -36,6 +36,14 @@ contextBridge.exposeInMainWorld("skaiAgent", {
       return () => ipcRenderer.removeListener("updates:available", listener);
     },
   },
+  // Theme: validated theme families and picks pushed by the main process on live reload.
+  appearance: {
+    onChanged: (handler) => {
+      const listener = (_event, snapshot) => handler(snapshot);
+      ipcRenderer.on("appearance:changed", listener);
+      return () => ipcRenderer.removeListener("appearance:changed", listener);
+    },
+  },
   pluginDownloads: {
     openFolder: () => ipcRenderer.invoke("plugins:open-downloads"),
   },
