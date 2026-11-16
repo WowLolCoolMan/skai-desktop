@@ -99,8 +99,9 @@ expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("ma
 expect(packageJson.scripts["smoke:electron:themes"] === "node scripts/smoke-electron-themes.cjs" && themeSmokeScript.includes("Emulation.setDeviceMetricsOverride") && themeSmokeScript.includes("Page.captureScreenshot") && themeSmokeScript.includes("deep-space"), "Packaged Electron theme acceptance must exercise constrained rendering and capture appearance states");
 expect(packageJson.scripts["smoke:electron:overflow"] === "node scripts/smoke-electron-overflow.cjs" && overflowSmokeScript.includes("1920") && overflowSmokeScript.includes("routes") && overflowSmokeScript.includes("getBoundingClientRect"), "Packaged Electron overflow acceptance must exercise every route across supported viewport widths");
 expect(workspace.includes('request("tasks.list")') && workspace.includes("window.setInterval(refresh, 2000)"), "Workbench must refresh task state while local execution is active");
-const workbenchDetails = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "agents", "WorkbenchTaskDetails.tsx"), "utf8");
-expect(workbenchDetails.includes('task.status === "running" || task.status === "verifying"') && workbenchDetails.includes('onTransition(task.id, "cancel")') && workbenchDetails.includes("Stop run"), "Workbench must expose cancellation for active local task execution");
+// Task cards in the conversation thread replaced the Agent Workbench (a944933): Stop must stay available there.
+const threadTaskCards = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "ChatPage.tsx"), "utf8");
+expect(threadTaskCards.includes('["queued", "running", "verifying"].includes(task.status)') && threadTaskCards.includes('onTaskAction(task.id, "cancel")') && threadTaskCards.includes(">Stop</Button>"), "Conversation task cards must expose cancellation for active local task execution");
 const alternateDesktopFiles = findAlternateDesktopFiles(root);
 expect(alternateDesktopFiles.length === 0, `alternate desktop UI files must not return to the project: ${alternateDesktopFiles.join(", ")}`);
 
