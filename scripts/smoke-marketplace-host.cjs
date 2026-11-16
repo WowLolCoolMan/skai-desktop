@@ -8,6 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const readline = require("node:readline");
+const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
 const root = path.resolve(__dirname, "..");
 const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-marketplace-smoke-"));
@@ -21,13 +22,9 @@ const env = {
   SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
   SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
 };
-const hostOutput = path.join(root, ".tmp", "agent-host-smoke");
-const hostProgram = process.platform === "win32" ? path.join(hostOutput, "SkaiDesktop.AgentHost.exe") : "dotnet";
-const hostArgs = process.platform === "win32" ? ["--stdio"] : [path.join(hostOutput, "SkaiDesktop.AgentHost.dll"), "--stdio"];
-if (!require("node:fs").existsSync(path.join(hostOutput, "SkaiDesktop.AgentHost.dll"))) {
-  console.error("The Agent Host has not been built. Run npm run agent-host:build first.");
-  process.exit(1);
-}
+const hostAssembly = ensureSmokeAgentHostBuild(root);
+const hostProgram = process.platform === "win32" ? hostAssembly.replace(/\.dll$/i, ".exe") : "dotnet";
+const hostArgs = process.platform === "win32" ? ["--stdio"] : [hostAssembly, "--stdio"];
 const child = spawn(hostProgram, hostArgs, { cwd: root, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
 const reader = readline.createInterface({ input: child.stdout });
 const pending = new Map();
