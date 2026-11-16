@@ -258,6 +258,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .project-file-directory-children { display: grid; }
 .project-file-preview { display: grid; align-content: start; justify-items: center; gap: 10px; min-height: 330px; height: 100%; overflow: auto; padding: 14px; border: 1px solid var(--skai-color-border); border-radius: 9px; background: var(--skai-color-code-surface); }
 .project-file-preview > img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.project-pdf-preview-frame { width: 100%; min-height: 560px; flex: 1; border: 1px solid var(--skai-color-border); border-radius: 7px; background: #fff; }
 .project-file-preview > p { align-self: center; margin: 0; color: var(--skai-color-text-muted); font-size: 11px; }
 .project-pdf-preview-label { width: 100%; color: var(--skai-color-text-muted); font-size: 10px; }
 .project-file-preview > pre { width: 100%; margin: 0; color: var(--skai-color-text); font-family: var(--skai-font-mono); font-size: 11px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }

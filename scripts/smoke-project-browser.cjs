@@ -21,6 +21,7 @@ fs.writeFileSync(path.join(workspace, "src", "features", "coding", "page.tsx"), 
 fs.writeFileSync(path.join(workspace, "assets", "pixel.png"), makePng());
 fs.writeFileSync(path.join(workspace, "assets", "invalid.png"), "not an image");
 fs.writeFileSync(path.join(workspace, "assets", "guide.pdf"), makePdf("Safe PDF Preview Text"));
+fs.writeFileSync(path.join(workspace, "assets", "large-guide.pdf"), Buffer.concat([makePdf("Safe large PDF fallback text"), Buffer.alloc(8 * 1024 * 1024)]));
 fs.writeFileSync(path.join(workspace, ".env"), "SECRET=must-not-appear\n");
 fs.writeFileSync(path.join(workspace, "node_modules", "ignored.js"), "ignored\n");
 
@@ -103,10 +104,11 @@ async function run() {
   const browser = await request("project.files", { id: saved.result.id });
   const files = browser.result?.files ?? [];
   const paths = files.map(file => file.relativePath.replaceAll("\\", "/"));
-  if (!browser.ok || files.length !== 5 || !paths.includes("README.md") || !paths.includes("src/features/coding/page.tsx")
+  if (!browser.ok || files.length !== 6 || !paths.includes("README.md") || !paths.includes("src/features/coding/page.tsx")
     || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/pixel.png" && file.kind === "image")
     || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/invalid.png" && file.kind === "image")
-    || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/guide.pdf" && file.kind === "pdf"))
+    || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/guide.pdf" && file.kind === "pdf")
+    || !files.some(file => file.relativePath.replaceAll("\\", "/") === "assets/large-guide.pdf" && file.kind === "pdf"))
     throw new Error(`project.files did not preserve nested paths, safe filtering, and visual preview kinds: ${JSON.stringify(files)}`);
   if (browser.result.protectedFilesSkipped < 1 || browser.result.excludedDirectoriesSkipped < 1)
     throw new Error("project.files did not report protected/dependency exclusions.");
@@ -115,8 +117,11 @@ async function run() {
   if (!image.ok || image.result?.kind !== "image" || image.result.mediaType !== "image/png" || !image.result.content)
     throw new Error("project.preview.read did not return a validated local PNG preview.");
   const pdf = await request("project.preview.read", { id: saved.result.id, relativePath: "assets/guide.pdf" });
-  if (!pdf.ok || pdf.result?.kind !== "pdf" || !pdf.result.content.includes("Safe PDF Preview Text"))
-    throw new Error("project.preview.read did not return bounded locally extracted PDF text.");
+  if (!pdf.ok || pdf.result?.kind !== "pdf" || pdf.result.mediaType !== "application/pdf" || !pdf.result.content)
+    throw new Error("project.preview.read did not return the bounded inline PDF payload.");
+  const largePdf = await request("project.preview.read", { id: saved.result.id, relativePath: "assets/large-guide.pdf" });
+  if (!largePdf.ok || largePdf.result?.kind !== "pdf" || largePdf.result.mediaType !== "text/plain" || !largePdf.result.content.includes("Safe large PDF fallback text"))
+    throw new Error("project.preview.read did not preserve the selectable-text fallback for a large PDF.");
   const protectedPreview = await request("project.preview.read", { id: saved.result.id, relativePath: ".env" });
   if (protectedPreview.ok) throw new Error("project.preview.read opened a protected file.");
   const malformedImage = await request("project.preview.read", { id: saved.result.id, relativePath: "assets/invalid.png" });

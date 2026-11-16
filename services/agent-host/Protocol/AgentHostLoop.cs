@@ -1152,8 +1152,10 @@ public static class AgentHostLoop
                 throw new InvalidDataException("The selected image has an unsupported or invalid file signature.");
             return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "image", mediaType, content = Convert.ToBase64String(bytes) });
         }
+        if (bytes.Length <= WorkspaceFileContext.MaxInlinePdfPreviewBytes)
+            return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = "application/pdf", content = Convert.ToBase64String(bytes) });
         var text = PdfAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
-        return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = (string?)null, content = text });
+        return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = "text/plain", content = text });
     }
 
     private static AgentResponse WriteProjectFile(AgentRequest request)
