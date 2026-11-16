@@ -114,6 +114,8 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
   const stickToLatestRef = useRef(true);
   const draftTabRef = useRef(workspaceTabId);
   const draftHydrationRef = useRef("");
+  const latestAttachmentsRef = useRef(attachments);
+  latestAttachmentsRef.current = attachments;
   const threadTasks = tasks.filter((task) => task.conversationId === conversationId);
   useEffect(() => {
     if (draftTabRef.current !== workspaceTabId) {
@@ -128,14 +130,12 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
     const startingDraft = readChatDraft(workspaceTabId, conversationId);
     void loadChatDraft(workspaceTabId).then((record) => {
       if (!active || draftTabRef.current !== workspaceTabId) return;
-      if (record) {
-        if (latestDraftRef.current === startingDraft) updateDraft(record.draft);
-        onSetAttachments(record.attachments);
-      }
+      const restoredDraft = localStorage.getItem(chatDraftKey(workspaceTabId)) ?? record?.draft ?? latestDraftRef.current;
+      if (latestDraftRef.current === startingDraft) updateDraft(restoredDraft);
+      if (record) onSetAttachments(record.attachments);
       draftHydrationRef.current = workspaceTabId;
-      const restoredDraft = record?.draft ?? latestDraftRef.current;
       localStorage.setItem(chatDraftKey(workspaceTabId), restoredDraft);
-      void saveChatDraft({ tabId: workspaceTabId, draft: restoredDraft, attachments: record?.attachments ?? attachments, updatedAt: Date.now() }).then((saved) => {
+      void saveChatDraft({ tabId: workspaceTabId, draft: restoredDraft, attachments: record?.attachments ?? latestAttachmentsRef.current, updatedAt: Date.now() }).then((saved) => {
         if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
       });
     });
@@ -146,10 +146,19 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
   useEffect(() => {
     localStorage.setItem(chatDraftKey(workspaceTabId), draft);
     if (draftHydrationRef.current !== workspaceTabId) return;
-    void saveChatDraft({ tabId: workspaceTabId, draft, attachments, updatedAt: Date.now() }).then((saved) => {
+    const timer = window.setTimeout(() => {
+      void saveChatDraft({ tabId: workspaceTabId, draft: latestDraftRef.current, attachments: latestAttachmentsRef.current, updatedAt: Date.now() }).then((saved) => {
+        if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
+      });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [draft, workspaceTabId]);
+  useEffect(() => {
+    if (draftHydrationRef.current !== workspaceTabId) return;
+    void saveChatDraft({ tabId: workspaceTabId, draft: latestDraftRef.current, attachments, updatedAt: Date.now() }).then((saved) => {
       if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
     });
-  }, [attachments, draft, workspaceTabId]);
+  }, [attachments, workspaceTabId]);
   useEffect(() => { if (!renameOpen) setRenameDraft(conversationTitle); }, [conversationTitle, renameOpen]);
   useEffect(() => { setDocumentsOnly(false); }, [conversationId]);
   useEffect(() => {

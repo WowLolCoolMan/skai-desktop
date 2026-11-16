@@ -8,16 +8,19 @@ const storeName = "drafts";
 const maxDraftCharacters = 24_000;
 const maxAttachments = 5;
 const maxAttachmentCharacters = 20 * 1024 * 1024;
+let databasePromise: Promise<IDBDatabase> | null = null;
 
 function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (databasePromise) return databasePromise;
+  databasePromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(databaseName, databaseVersion);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(storeName)) request.result.createObjectStore(storeName, { keyPath: "tabId" });
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("Chat draft storage could not be opened."));
+    request.onerror = () => { databasePromise = null; reject(request.error ?? new Error("Chat draft storage could not be opened.")); };
   });
+  return databasePromise;
 }
 
 function validate(record: ChatDraftRecord): boolean {
@@ -37,7 +40,7 @@ export async function loadChatDraft(tabId: string): Promise<ChatDraftRecord | nu
         request.onerror = () => reject(request.error);
       });
       return record && validate(record) ? record : null;
-    } finally { database.close(); }
+    } finally { /* Keep the connection open for responsive composer saves. */ }
   } catch { return null; }
 }
 
@@ -54,7 +57,7 @@ export async function saveChatDraft(record: ChatDraftRecord): Promise<boolean> {
         transaction.onabort = () => reject(transaction.error);
       });
       return true;
-    } finally { database.close(); }
+    } finally { /* Keep the connection open for responsive composer saves. */ }
   } catch { return false; }
 }
 
@@ -69,6 +72,6 @@ export async function removeChatDraft(tabId: string): Promise<void> {
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error);
       });
-    } finally { database.close(); }
+    } finally { /* Keep the connection open for responsive composer saves. */ }
   } catch { /* Draft cleanup must never block navigation. */ }
 }
