@@ -251,7 +251,8 @@ public static class AgentHostLoop
     {
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
         var tasks = CreateTaskStore().Load();
-        var decision = LocalExecutionCapacityPolicy.Decide(snapshot);
+        var settings = CreateSettingsStore().Load();
+        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
         var queuedTaskCount = tasks.Count(task => task.Status == AgentTaskStatuses.Queued);
@@ -1472,7 +1473,8 @@ public static class AgentHostLoop
         }
 
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
-        var decision = LocalExecutionCapacityPolicy.Decide(snapshot);
+        var settings = CreateSettingsStore().Load();
+        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
         var status = activeTaskCount < decision.SlotLimit ? AgentTaskStatuses.Running : AgentTaskStatuses.Queued;
@@ -1533,7 +1535,8 @@ public static class AgentHostLoop
         while (true)
         {
             var snapshot = await new LocalCapacityProbe().GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
-            var decision = LocalExecutionCapacityPolicy.Decide(snapshot);
+            var settings = CreateSettingsStore().Load();
+            var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes);
             lock (LocalExecutionGate)
             {
                 if (LocalAdmittedTaskCount < decision.SlotLimit)
@@ -2070,6 +2073,8 @@ public static class AgentHostLoop
             model = settings.Model,
             provider = settings.ModelProvider,
             ollamaContextWindowTokens = settings.OllamaContextWindowTokens,
+            localRamBudgetBytes = settings.LocalRamBudgetBytes,
+            localGpuBudgetBytes = settings.LocalGpuBudgetBytes,
             themeMode = settings.ThemeMode,
             accentColor = settings.AccentColor,
             interfaceDensity = settings.InterfaceDensity,
@@ -2105,6 +2110,16 @@ public static class AgentHostLoop
                     throw new InvalidOperationException("The Ollama context window must be Auto, 32K, 128K, or 1M tokens.");
                 settings.OllamaContextWindowTokens = contextTokens;
             }
+            if (parameters.TryGetProperty("localRamBudgetBytes", out var ramBudget) && ramBudget.TryGetInt64(out var ramBytes))
+            {
+                if (ramBytes is < 0 or > (1L << 50)) throw new InvalidOperationException("The RAM budget must be between 0 and 1024 GiB.");
+                settings.LocalRamBudgetBytes = ramBytes;
+            }
+            if (parameters.TryGetProperty("localGpuBudgetBytes", out var gpuBudget) && gpuBudget.TryGetInt64(out var gpuBytes))
+            {
+                if (gpuBytes is < 0 or > (1L << 50)) throw new InvalidOperationException("The VRAM budget must be between 0 and 1024 GiB.");
+                settings.LocalGpuBudgetBytes = gpuBytes;
+            }
             if (parameters.TryGetProperty("themeMode", out var theme) && theme.ValueKind == JsonValueKind.String)
                 settings.ThemeMode = theme.GetString() ?? settings.ThemeMode;
             if (parameters.TryGetProperty("accentColor", out var accent) && accent.ValueKind == JsonValueKind.String)
@@ -2123,7 +2138,7 @@ public static class AgentHostLoop
                 settings.ReduceMotion = reduceMotion.GetBoolean();
         }
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled });
+        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled });
     }
 
     private static async Task<AgentResponse> RemovePetBackgroundAsync(AgentRequest request)

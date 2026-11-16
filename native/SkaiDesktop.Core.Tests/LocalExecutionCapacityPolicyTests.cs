@@ -19,5 +19,8 @@ internal static class LocalExecutionCapacityPolicyTests
 
         var capped = LocalExecutionCapacityPolicy.Decide(new(DateTimeOffset.UtcNow, 128L << 30, 80L << 30, 20, null, null));
         Check(capped.SlotLimit == LocalExecutionCapacityPolicy.MaximumSlots, "capacity policy never exceeds the scheduler cap");
+
+        var budgeted = LocalExecutionCapacityPolicy.Decide(new(DateTimeOffset.UtcNow, 64L << 30, 40L << 30, 20, null, null), 48L << 30);
+        Check(budgeted.SlotLimit == 2 && budgeted.LimitingResource == "RAM headroom", "explicit RAM budget limits admission without exceeding remaining headroom");
     }
 }
