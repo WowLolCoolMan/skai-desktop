@@ -129,6 +129,7 @@ export function SettingsPage(props: SettingsProps) {
   const change = (key: string, value: string | boolean) => { setSaveState("idle"); props.onChange(key, value); };
   const selectedOllamaModel = props.models.find((entry) => entry.model === props.model && (entry.provider ?? "").toLowerCase() === "ollama");
   const contextSupport = selectedOllamaModel?.contextLength == null ? "unknown" : selectedOllamaModel.contextLength >= 1_048_576 ? "supported" : "unsupported";
+  const contextMismatch = props.provider === "Ollama" && props.ollamaContextWindowTokens > 0 && selectedOllamaModel?.contextLength != null && props.ollamaContextWindowTokens > selectedOllamaModel.contextLength;
   const save = async () => { if (saveState === "saving") return; setSaveState("saving"); try { setSaveState(await props.onSave() ? "saved" : "idle"); } catch { setSaveState("idle"); } };
   const discoverModels = async () => { if (discoveringModels) return; setDiscoveringModels(true); await props.onDiscoverModels(); setDiscoveringModels(false); };
   const checkAirLlm = async () => {
@@ -209,6 +210,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Advanced" && <><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Reduced motion" detail="Also controls pet wandering defaults and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /><p className="settings-help">Provider routing remains local-only. Diagnostics and motion settings apply across the workspace.</p></>}
 
+        {activeCategory === "Models & Providers" && contextMismatch && <div className="settings-callout settings-callout-warning" role="alert"><strong>Selected context exceeds this model</strong><span>{props.model} advertises a {selectedOllamaModel?.contextLength?.toLocaleString()}-token context, but this setting requests {props.ollamaContextWindowTokens.toLocaleString()} tokens. Choose a smaller window or a compatible model before sending.</span></div>}
         <div className="settings-footer"><span className={`settings-save-status settings-save-${saveState}`} role="status">{saveState === "saving" ? "Saving changes…" : saveState === "saved" ? "Saved locally" : "Changes apply across the workspace."}</span><Button variant="primary" disabled={saveState === "saving"} onClick={() => void save()}>{saveState === "saving" ? "Saving…" : "Save settings"}</Button></div>
       </main>
     </div>
