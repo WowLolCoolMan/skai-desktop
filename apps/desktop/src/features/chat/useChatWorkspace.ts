@@ -313,7 +313,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const selectedResponseMode = normalizeResponseMode(selected.responseMode);
     setResponseModeState(selectedResponseMode);
     localStorage.setItem("skai.chat.responseMode", selectedResponseMode);
-    setAttachments([]);
+    if (selected.id !== conversationId) setAttachments([]);
     onError(null);
   };
   const setResponseMode = (nextValue: ChatResponseMode) => {

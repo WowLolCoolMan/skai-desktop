@@ -10,6 +10,7 @@ import { ChatComposer } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";
 import type { TaskEnvironment } from "../../../shared/contracts";
 import type { ChatResponseMode } from "./useChatWorkspace";
+import { loadChatDraft, saveChatDraft } from "./chatDraftStore";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 const CHAT_SCROLL_KEY_PREFIX = "skai.chat.scroll.";
@@ -26,17 +27,19 @@ function chatScrollKey(conversationId: string | null) {
   return `${CHAT_SCROLL_KEY_PREFIX}${conversationId ?? "new"}`;
 }
 
-function chatDraftKey(conversationId: string | null) {
-  return `${CHAT_DRAFT_KEY_PREFIX}${conversationId ?? "new"}`;
+function chatDraftKey(tabId: string) {
+  return `${CHAT_DRAFT_KEY_PREFIX}tab.${tabId}`;
 }
 
-function readChatDraft(conversationId: string | null) {
-  const scopedKey = chatDraftKey(conversationId);
+function readChatDraft(tabId: string, conversationId: string | null) {
+  const scopedKey = chatDraftKey(tabId);
   const scoped = localStorage.getItem(scopedKey);
   if (scoped !== null) return scoped;
-  const legacy = localStorage.getItem(LEGACY_CHAT_DRAFT_KEY);
+  const legacyKey = `${CHAT_DRAFT_KEY_PREFIX}${conversationId ?? "new"}`;
+  const legacy = localStorage.getItem(legacyKey) ?? localStorage.getItem(LEGACY_CHAT_DRAFT_KEY);
   if (legacy !== null) {
     localStorage.setItem(scopedKey, legacy);
+    if (legacyKey !== scopedKey) localStorage.removeItem(legacyKey);
     localStorage.removeItem(LEGACY_CHAT_DRAFT_KEY);
     return legacy;
   }
@@ -44,6 +47,7 @@ function readChatDraft(conversationId: string | null) {
 }
 
 type ChatPageProps = {
+  workspaceTabId: string;
   capacity: LocalCapacitySnapshot | null;
   recentConversations: DesktopConversation[];
   provider: string;
@@ -71,6 +75,7 @@ type ChatPageProps = {
   onAttach: () => void;
   onFilesDropped: (files: File[]) => void;
   onRemoveAttachment: (index: number) => void;
+  onSetAttachments: (attachments: ChatAttachment[]) => void;
   onModelChange: (model: Model) => void;
   onNavigate: (route: Route) => void;
   onSelectConversation: (id: string) => void;
@@ -88,8 +93,11 @@ type ChatPageProps = {
   workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, workspaceMode = "conversation" }: ChatPageProps) {
-  const [draft, setDraft] = useState(() => readChatDraft(conversationId));
+export function ChatPage({ workspaceTabId, capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, workspaceMode = "conversation" }: ChatPageProps) {
+  const [draft, setDraft] = useState(() => readChatDraft(workspaceTabId, conversationId));
+  const latestDraftRef = useRef(draft);
+  const updateDraft = (value: string) => { latestDraftRef.current = value; setDraft(value); };
+  const [draftPersistenceWarning, setDraftPersistenceWarning] = useState<string | null>(null);
   const [documentsOnly, setDocumentsOnly] = useState(false);
   const [temporaryChat, setTemporaryChat] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState<number | null>(null);
@@ -104,16 +112,44 @@ export function ChatPage({ capacity, recentConversations, provider, model, respo
   const previousConversationIdRef = useRef(conversationId);
   const restoreScrollPendingRef = useRef(false);
   const stickToLatestRef = useRef(true);
-  const draftConversationRef = useRef(conversationId);
+  const draftTabRef = useRef(workspaceTabId);
+  const draftHydrationRef = useRef("");
   const threadTasks = tasks.filter((task) => task.conversationId === conversationId);
   useEffect(() => {
-    if (draftConversationRef.current !== conversationId) {
-      draftConversationRef.current = conversationId;
-      setDraft(readChatDraft(conversationId));
-      return;
+    if (draftTabRef.current !== workspaceTabId) {
+      draftTabRef.current = workspaceTabId;
+      draftHydrationRef.current = "";
+      const tabDraft = readChatDraft(workspaceTabId, conversationId);
+      latestDraftRef.current = tabDraft;
+      setDraft(tabDraft);
+      onSetAttachments([]);
     }
-    localStorage.setItem(chatDraftKey(conversationId), draft);
-  }, [conversationId, draft]);
+    let active = true;
+    const startingDraft = readChatDraft(workspaceTabId, conversationId);
+    void loadChatDraft(workspaceTabId).then((record) => {
+      if (!active || draftTabRef.current !== workspaceTabId) return;
+      if (record) {
+        if (latestDraftRef.current === startingDraft) updateDraft(record.draft);
+        onSetAttachments(record.attachments);
+      }
+      draftHydrationRef.current = workspaceTabId;
+      const restoredDraft = record?.draft ?? latestDraftRef.current;
+      localStorage.setItem(chatDraftKey(workspaceTabId), restoredDraft);
+      void saveChatDraft({ tabId: workspaceTabId, draft: restoredDraft, attachments: record?.attachments ?? attachments, updatedAt: Date.now() }).then((saved) => {
+        if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
+      });
+    });
+    return () => { active = false; };
+  // Hydrate only when the workspace tab changes. Draft/attachment edits are persisted below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceTabId]);
+  useEffect(() => {
+    localStorage.setItem(chatDraftKey(workspaceTabId), draft);
+    if (draftHydrationRef.current !== workspaceTabId) return;
+    void saveChatDraft({ tabId: workspaceTabId, draft, attachments, updatedAt: Date.now() }).then((saved) => {
+      if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
+    });
+  }, [attachments, draft, workspaceTabId]);
   useEffect(() => { if (!renameOpen) setRenameDraft(conversationTitle); }, [conversationTitle, renameOpen]);
   useEffect(() => { setDocumentsOnly(false); }, [conversationId]);
   useEffect(() => {
@@ -158,7 +194,7 @@ export function ChatPage({ capacity, recentConversations, provider, model, respo
 
   const sendDraft = (text: string) => {
     onSend(text, attachments, documentsOnly, false, temporaryChat);
-    setDraft("");
+    updateDraft("");
     setDocumentsOnly(false);
     setRewritePreview(null);
   };
@@ -174,7 +210,7 @@ export function ChatPage({ capacity, recentConversations, provider, model, respo
       }).finally(() => setRewriteBusy(false));
       return;
     } else { sendDraft(text); return; }
-    setDraft("");
+    updateDraft("");
     setDocumentsOnly(false);
   };
 
@@ -183,7 +219,7 @@ export function ChatPage({ capacity, recentConversations, provider, model, respo
     const text = `${currentDraft}${currentDraft ? " " : ""}${transcript}`.trim();
     if (busy || !text || (documentsOnly && attachments.length === 0)) return false;
     onSend(text, attachments, documentsOnly, true, temporaryChat);
-    setDraft("");
+    updateDraft("");
     setDocumentsOnly(false);
     return true;
   };
@@ -234,7 +270,8 @@ export function ChatPage({ capacity, recentConversations, provider, model, respo
           )}
         </section>
         <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={onPlanTask} />
-        <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={setDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} />
+        {draftPersistenceWarning && <p className="chat-draft-save-warning" role="status">{draftPersistenceWarning}</p>}
+        <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={updateDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} />
       </main>
       <aside className="chat-rail">{messages.length === 0 ? <Card className="rail-card"><p className="section-kicker">QUICK START</p><button onClick={() => onNavigate("coding")} type="button"><strong>Build in a project</strong><span>Open files, terminal, and agent tasks</span></button><button onClick={() => onNavigate("images")} type="button"><strong>Create an image</strong><span>Use a local image workflow</span></button><button onClick={() => onNavigate("marketplace")} type="button"><strong>Find a model or tool</strong><span>Browse voices, image models, skills, and runtimes</span></button></Card> : <Card className="rail-card chat-thread-summary"><p className="section-kicker">ACTIVE THREAD</p><strong>{conversationTitle}</strong><span>{messages.length} messages · {model}</span><small>Saved locally on this device.</small></Card>}</aside>
     </div>

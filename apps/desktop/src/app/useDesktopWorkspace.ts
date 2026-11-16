@@ -7,6 +7,7 @@ import type { ConnectionState, CorpusDocument, MemoryEntry, Model, Route, ThemeM
 import { createAgentClient } from "../services/agentClient";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR, localEndpointOrFallback, localProviderOrFallback } from "../services/localOnly";
 import { useChatWorkspace } from "../features/chat/useChatWorkspace";
+import { removeChatDraft } from "../features/chat/chatDraftStore";
 import { useCodingWorkspace } from "../features/coding/useCodingWorkspace";
 import { loadImageHistory, saveImageHistory, type ImageHistoryEntry } from "../features/catalog/imageHistory";
 
@@ -16,10 +17,12 @@ export type DesktopWorkspace = {
   route: Route;
   settingsReturnRoute: Route;
   workspaceTabs: WorkspaceSessionTab[];
+  canRestoreWorkspaceTab: boolean;
   activeWorkspaceTabId: string;
   openNewWorkspaceTab: () => void;
   selectWorkspaceTab: (tab: WorkspaceSessionTab) => void;
   closeWorkspaceTab: (tabId: string) => void;
+  restoreWorkspaceTab: () => void;
   connection: ConnectionState;
   health: RuntimeHealth | null;
   error: string | null;
@@ -63,6 +66,7 @@ const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 360;
 const WORKSPACE_TABS_KEY = "skai.workspace.tabs.v1";
 const ACTIVE_WORKSPACE_TAB_KEY = "skai.workspace.activeTab.v1";
+const CLOSED_WORKSPACE_TABS_KEY = "skai.workspace.closedTabs.v1";
 
 function readWorkspaceTabs(): WorkspaceSessionTab[] {
   try {
@@ -71,6 +75,13 @@ function readWorkspaceTabs(): WorkspaceSessionTab[] {
     const tabs = stored.filter((item): item is WorkspaceSessionTab => item && typeof item.id === "string" && typeof item.title === "string" && (item.route === "chat" || item.route === "coding") && (item.conversationId === null || typeof item.conversationId === "string") && (item.projectId === null || typeof item.projectId === "string")).slice(0, 16);
     return tabs.length ? tabs : [{ id: "workspace-home", title: "New chat", route: "chat", conversationId: null, projectId: null }];
   } catch { return [{ id: "workspace-home", title: "New chat", route: "chat", conversationId: null, projectId: null }]; }
+}
+
+function readClosedWorkspaceTabs(): WorkspaceSessionTab[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CLOSED_WORKSPACE_TABS_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored.filter((item): item is WorkspaceSessionTab => item && typeof item.id === "string" && typeof item.title === "string" && (item.route === "chat" || item.route === "coding") && (item.conversationId === null || typeof item.conversationId === "string") && (item.projectId === null || typeof item.projectId === "string")).slice(0, 10) : [];
+  } catch { return []; }
 }
 
 function newTabId() { return globalThis.crypto?.randomUUID?.() ?? `workspace-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -106,6 +117,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [route, setRoute] = useState<Route>(routeFromLocation);
   const [settingsReturnRoute, setSettingsReturnRoute] = useState<Route>(() => routeFromLocation() === "settings" ? "chat" : routeFromLocation());
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readWorkspaceTabs);
+  const [closedWorkspaceTabs, setClosedWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readClosedWorkspaceTabs);
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState(() => localStorage.getItem(ACTIVE_WORKSPACE_TAB_KEY) ?? readWorkspaceTabs()[0].id);
   const [navigation, setNavigation] = useState<NavigationState>(() => readNavigationState(routeFromLocation()));
   const [commandOpen, setCommandOpen] = useState(false);
@@ -239,6 +251,12 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     onNavigate(tab.route);
   }, [chat, coding, onNavigate]);
   const closeWorkspaceTab = useCallback((tabId: string) => {
+    const closingTab = workspaceTabs.find((item) => item.id === tabId);
+    if (closingTab) {
+      const next = [closingTab, ...closedWorkspaceTabs.filter((item) => item.id !== tabId)];
+      for (const evicted of next.slice(10)) void removeChatDraft(evicted.id);
+      setClosedWorkspaceTabs(next.slice(0, 10));
+    }
     if (workspaceTabs.length <= 1) {
       const replacement: WorkspaceSessionTab = { id: newTabId(), title: "New chat", route: "chat", conversationId: null, projectId: null };
       setWorkspaceTabs([replacement]); setActiveWorkspaceTabId(replacement.id); chat.startNewChat(); onNavigate("chat"); return;
@@ -247,7 +265,15 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     const remaining = workspaceTabs.filter((item) => item.id !== tabId);
     setWorkspaceTabs(remaining);
     if (activeWorkspaceTabId === tabId) selectWorkspaceTab(remaining[Math.min(Math.max(index, 0), remaining.length - 1)]);
-  }, [activeWorkspaceTabId, chat, onNavigate, selectWorkspaceTab, workspaceTabs]);
+  }, [activeWorkspaceTabId, chat, closedWorkspaceTabs, onNavigate, selectWorkspaceTab, workspaceTabs]);
+  const restoreWorkspaceTab = useCallback(() => {
+    const [tab, ...remainingClosed] = closedWorkspaceTabs;
+    if (!tab) return;
+    setClosedWorkspaceTabs(remainingClosed);
+    setWorkspaceTabs((current) => [...current.filter((item) => item.id !== tab.id), tab].slice(-16));
+    setActiveWorkspaceTabId(tab.id);
+    selectWorkspaceTab(tab);
+  }, [closedWorkspaceTabs, selectWorkspaceTab]);
   const openProjectTab = useCallback((project: import("../../shared/contracts").DesktopProject) => {
     const existingTab = workspaceTabs.find((tab) => tab.projectId === project.id);
     if (existingTab) { selectWorkspaceTab(existingTab); return; }
@@ -265,6 +291,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     localStorage.setItem(WORKSPACE_TABS_KEY, JSON.stringify(workspaceTabs));
     localStorage.setItem(ACTIVE_WORKSPACE_TAB_KEY, activeWorkspaceTabId);
   }, [activeWorkspaceTabId, workspaceTabs]);
+  useEffect(() => { localStorage.setItem(CLOSED_WORKSPACE_TABS_KEY, JSON.stringify(closedWorkspaceTabs)); }, [closedWorkspaceTabs]);
   useEffect(() => {
     if (route !== "chat" && route !== "coding") return;
     setWorkspaceTabs((current) => current.map((tab) => tab.id !== activeWorkspaceTabId ? tab : {
@@ -370,7 +397,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   };
   const pickImageSource = async () => { const response = await request("workspace.pickFiles"); if (!response.ok) throw new Error(response.error?.message ?? "Image selection failed."); const attachments = (response.result as { attachments?: import("../../shared/contracts").ChatAttachment[] }).attachments ?? []; const source = attachments.find((item) => item.mediaType === "image/png" || item.mediaType === "image/jpeg"); if (!source) return null; return source; };
   const importImageWorkflow = async () => { const response = await request("workspace.pickFiles"); if (!response.ok) throw new Error(response.error?.message ?? "A local workflow file could not be selected."); const attachments = (response.result as { attachments?: Array<{ fileName: string; content: string }> }).attachments ?? []; const workflowFile = attachments.find((attachment) => /\.(json|json5)$/i.test(attachment.fileName)); if (!workflowFile) throw new Error("Choose a ComfyUI API workflow file (.json or .json5)."); let parsed: unknown; try { parsed = JSON.parse(workflowFile.content); } catch { throw new Error("The selected workflow is not valid JSON."); } if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("The selected workflow must be a JSON object."); return { name: workflowFile.fileName.replace(/\.(json|json5)$/i, ""), workflow: JSON.stringify(parsed, null, 2) }; };
-  const routeState: AppRouteState = { route: route === "settings" ? settingsReturnRoute : route, conversations: chat.conversations, provider, model, responseMode: chat.responseMode, capacity, models, ollamaContextWindowTokens, endpoint, messages: chat.messages, busy: chat.busy, attachments: chat.attachments, queuedMessages: chat.queuedMessages, conversationId: chat.conversationId, conversationTitle: chat.activeConversation?.title ?? "New chat", pinned: chat.activeConversation?.pinned ?? false, archived: chat.activeConversation?.archived ?? false, projects: coding.projects, selectedProject: coding.selectedProject, projectFiles: coding.projectFiles, selectedFile: coding.selectedFile, filePreview: coding.filePreview, filePreviewError: coding.filePreviewError, fileDraft: coding.fileDraft, fileOriginal: coding.fileOriginal, fileSummary: coding.fileSummary, fileBusy: coding.fileBusy, fileUndoAvailable: coding.fileUndoAvailable, terminalBusy: coding.terminalBusy, terminalOutput: coding.terminalOutput, terminalExitCode: coding.terminalExitCode, gitStatus: coding.gitStatus, gitBusy: coding.gitBusy, gitDiff: coding.gitDiff, gitDiffBusy: coding.gitDiffBusy, gitCommitBusy: coding.gitCommitBusy, gitPullRequestBusy: coding.gitPullRequestBusy, themeMode, accentColor, density, backdrop, reduceMotion, petVisible, petWander, petInteractionDemo, petCharacter, petSpriteDataUrl, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled, imageProvider, imageEndpoint, imagePrompt, imageWorkflow, imageBusy, generatedImages, tasks, scheduledTasks, taskBusy, tasksLoading, tasksError, memoryEntries, memoryBusy, memoryLoading, memoryError, corpusDocuments, corpusLoading, corpusError };
+  const routeState: AppRouteState = { route: route === "settings" ? settingsReturnRoute : route, workspaceTabId: activeWorkspaceTabId, conversations: chat.conversations, provider, model, responseMode: chat.responseMode, capacity, models, ollamaContextWindowTokens, endpoint, messages: chat.messages, busy: chat.busy, attachments: chat.attachments, queuedMessages: chat.queuedMessages, conversationId: chat.conversationId, conversationTitle: chat.activeConversation?.title ?? "New chat", pinned: chat.activeConversation?.pinned ?? false, archived: chat.activeConversation?.archived ?? false, projects: coding.projects, selectedProject: coding.selectedProject, projectFiles: coding.projectFiles, selectedFile: coding.selectedFile, filePreview: coding.filePreview, filePreviewError: coding.filePreviewError, fileDraft: coding.fileDraft, fileOriginal: coding.fileOriginal, fileSummary: coding.fileSummary, fileBusy: coding.fileBusy, fileUndoAvailable: coding.fileUndoAvailable, terminalBusy: coding.terminalBusy, terminalOutput: coding.terminalOutput, terminalExitCode: coding.terminalExitCode, gitStatus: coding.gitStatus, gitBusy: coding.gitBusy, gitDiff: coding.gitDiff, gitDiffBusy: coding.gitDiffBusy, gitCommitBusy: coding.gitCommitBusy, gitPullRequestBusy: coding.gitPullRequestBusy, themeMode, accentColor, density, backdrop, reduceMotion, petVisible, petWander, petInteractionDemo, petCharacter, petSpriteDataUrl, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled, imageProvider, imageEndpoint, imagePrompt, imageWorkflow, imageBusy, generatedImages, tasks, scheduledTasks, taskBusy, tasksLoading, tasksError, memoryEntries, memoryBusy, memoryLoading, memoryError, corpusDocuments, corpusLoading, corpusError };
   const selectModel = (nextModel: Model) => {
     const selectedProvider = nextModel.provider === "AirLLM" ? "AirLLM" : nextModel.provider === "LM Studio" ? "LM Studio" : nextModel.provider === "Ollama" ? "Ollama" : "Local API";
     setModel(nextModel.model);
@@ -381,7 +408,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       setEndpoint(nextModel.endpoint);
       localStorage.setItem("skai.endpoint", nextModel.endpoint);
     }
-  };  const routeActions: AppRouteActions = { onNavigate, onSelectConversation: selectConversation, onNewWorkspaceTab: openNewWorkspaceTab, onSend: chat.sendMessage, onRewritePrompt: chat.rewritePrompt, onStartTemporaryChat: chat.startNewChat, onQueue: chat.queueMessage, onRemoveQueued: chat.removeQueuedMessage, onAttach: chat.pickAttachments, onFilesDropped: chat.importDroppedFiles, onRemoveAttachment: (index) => chat.setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index)), onModelChange: selectModel, onResponseModeChange: chat.setResponseMode, onProviderChange: (nextProvider) => { const selectedProvider = localProviderOrFallback(nextProvider); setProvider(selectedProvider); localStorage.setItem("skai.provider", selectedProvider); if (!isLocalEndpoint(endpoint)) setEndpoint(defaultEndpoint); }, onExportConversations: chat.exportConversations, onFork: () => void chat.forkConversation(), onForkFromMessage: (index) => void chat.forkConversation(index), onRetryMessage: (index) => void chat.retryMessage(index), onEditMessage: chat.editMessage, onTogglePinned: () => void chat.updateConversationMetadata({ pinned: !(chat.activeConversation?.pinned ?? false) }), onArchive: () => void chat.updateConversationMetadata({ archived: !(chat.activeConversation?.archived ?? false) }), onRenameConversation: (title) => chat.updateConversationMetadata({ title }), onPickFolder: coding.pickProjectFolder, onSaveProject: coding.saveProject, onOpenProject: openProjectTab, onOpenFile: (path) => void coding.openProjectFile(path), onCloseFile: () => void coding.closeProjectFile(), onDraftChange: coding.setFileDraft, onSaveFile: () => void coding.saveProjectFile(), onUndoFile: () => void coding.undoProjectFile(), onRunTerminal: (projectId, command, cwd) => void coding.runTerminal(projectId, command, cwd), onRefreshGitStatus: () => void coding.refreshGitStatus(), onLoadGitDiff: () => void coding.loadGitDiff(), onCommitGitChanges: coding.commitGitChanges, onPlanTask: planTask, onTaskAction: (id, operation) => void transitionTask(id, operation), onSettingsChange: (key, value) => { if (key === "themeMode") setThemeMode(value as ThemeMode); if (key === "accentColor") setAccentColor(String(value)); if (key === "density") setDensity(String(value)); if (key === "backdrop") setBackdrop(String(value)); if (key === "reduceMotion") setReduceMotion(Boolean(value)); if (key === "petVisible") setPetVisible(Boolean(value)); if (key === "petWander") setPetWander(Boolean(value)); if (key === "petInteractionDemo") setPetInteractionDemo(Boolean(value)); if (key === "petSpriteDataUrl") { setPetSpriteDataUrl(String(value)); localStorage.setItem("skai.pet.sprite", String(value)); } if (key === "developerMode") setDeveloperMode(Boolean(value)); if (key === "memoryInjectionEnabled") setMemoryInjectionEnabled(Boolean(value)); if (key === "smartPromptRewritingEnabled") setSmartPromptRewritingEnabled(Boolean(value)); if (key === "provider") setProvider(localProviderOrFallback(String(value))); if (key === "model") setModel(String(value)); if (key === "endpoint") { setEndpoint(String(value)); localStorage.setItem("skai.endpoint", String(value)); } if (key === "ollamaContextWindowTokens") { const parsed = Number(value); if ([0, 32768, 131072, 1048576].includes(parsed)) setOllamaContextWindowTokens(parsed); } }, onSaveSettings: saveSettings, onDiscoverModels: () => void discoverModels(), onPullModel: pullModel, onSelectModel: (nextModel) => { selectModel(nextModel); onNavigate("chat"); }, onImageChange: (key, value) => { if (key === "provider") { const next = value === "diffusers" ? "diffusers" : "comfyui"; setImageProvider(next); localStorage.setItem("skai.imageProvider", next); } if (key === "endpoint") setImageEndpoint(value); if (key === "prompt") setImagePrompt(value); if (key === "workflow") setImageWorkflow(value); }, onGenerateImage: (source) => void generateImage(source), onRetryWorkbench: () => void loadWorkbench(), onTransitionTask: (id, operation) => void transitionTask(id, operation), onExecuteTask: (id) => void executeTask(id), onScheduleTask: scheduleTask, onTransitionScheduledTask: transitionScheduledTask, onRetryMemory: () => void loadMemory(), onSearchMemory: (query) => void loadMemory(query), onSaveMemory: saveMemory, onToggleMemory: (entry) => void toggleMemory(entry), onRemoveMemory: removeMemory, onExportMemory: () => void exportMemory(), onRunProjectCommand: (projectId, command, cwd) => void coding.runTerminal(projectId, command, cwd) };
+  };  const routeActions: AppRouteActions = { onNavigate, onSelectConversation: selectConversation, onNewWorkspaceTab: openNewWorkspaceTab, onSend: chat.sendMessage, onRewritePrompt: chat.rewritePrompt, onStartTemporaryChat: chat.startNewChat, onQueue: chat.queueMessage, onRemoveQueued: chat.removeQueuedMessage, onAttach: chat.pickAttachments, onFilesDropped: chat.importDroppedFiles, onRemoveAttachment: (index) => chat.setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index)), onSetAttachments: (attachments) => chat.setAttachments(attachments), onModelChange: selectModel, onResponseModeChange: chat.setResponseMode, onProviderChange: (nextProvider) => { const selectedProvider = localProviderOrFallback(nextProvider); setProvider(selectedProvider); localStorage.setItem("skai.provider", selectedProvider); if (!isLocalEndpoint(endpoint)) setEndpoint(defaultEndpoint); }, onExportConversations: chat.exportConversations, onFork: () => void chat.forkConversation(), onForkFromMessage: (index) => void chat.forkConversation(index), onRetryMessage: (index) => void chat.retryMessage(index), onEditMessage: chat.editMessage, onTogglePinned: () => void chat.updateConversationMetadata({ pinned: !(chat.activeConversation?.pinned ?? false) }), onArchive: () => void chat.updateConversationMetadata({ archived: !(chat.activeConversation?.archived ?? false) }), onRenameConversation: (title) => chat.updateConversationMetadata({ title }), onPickFolder: coding.pickProjectFolder, onSaveProject: coding.saveProject, onOpenProject: openProjectTab, onOpenFile: (path) => void coding.openProjectFile(path), onCloseFile: () => void coding.closeProjectFile(), onDraftChange: coding.setFileDraft, onSaveFile: () => void coding.saveProjectFile(), onUndoFile: () => void coding.undoProjectFile(), onRunTerminal: (projectId, command, cwd) => void coding.runTerminal(projectId, command, cwd), onRefreshGitStatus: () => void coding.refreshGitStatus(), onLoadGitDiff: () => void coding.loadGitDiff(), onCommitGitChanges: coding.commitGitChanges, onPlanTask: planTask, onTaskAction: (id, operation) => void transitionTask(id, operation), onSettingsChange: (key, value) => { if (key === "themeMode") setThemeMode(value as ThemeMode); if (key === "accentColor") setAccentColor(String(value)); if (key === "density") setDensity(String(value)); if (key === "backdrop") setBackdrop(String(value)); if (key === "reduceMotion") setReduceMotion(Boolean(value)); if (key === "petVisible") setPetVisible(Boolean(value)); if (key === "petWander") setPetWander(Boolean(value)); if (key === "petInteractionDemo") setPetInteractionDemo(Boolean(value)); if (key === "petSpriteDataUrl") { setPetSpriteDataUrl(String(value)); localStorage.setItem("skai.pet.sprite", String(value)); } if (key === "developerMode") setDeveloperMode(Boolean(value)); if (key === "memoryInjectionEnabled") setMemoryInjectionEnabled(Boolean(value)); if (key === "smartPromptRewritingEnabled") setSmartPromptRewritingEnabled(Boolean(value)); if (key === "provider") setProvider(localProviderOrFallback(String(value))); if (key === "model") setModel(String(value)); if (key === "endpoint") { setEndpoint(String(value)); localStorage.setItem("skai.endpoint", String(value)); } if (key === "ollamaContextWindowTokens") { const parsed = Number(value); if ([0, 32768, 131072, 1048576].includes(parsed)) setOllamaContextWindowTokens(parsed); } }, onSaveSettings: saveSettings, onDiscoverModels: () => void discoverModels(), onPullModel: pullModel, onSelectModel: (nextModel) => { selectModel(nextModel); onNavigate("chat"); }, onImageChange: (key, value) => { if (key === "provider") { const next = value === "diffusers" ? "diffusers" : "comfyui"; setImageProvider(next); localStorage.setItem("skai.imageProvider", next); } if (key === "endpoint") setImageEndpoint(value); if (key === "prompt") setImagePrompt(value); if (key === "workflow") setImageWorkflow(value); }, onGenerateImage: (source) => void generateImage(source), onRetryWorkbench: () => void loadWorkbench(), onTransitionTask: (id, operation) => void transitionTask(id, operation), onExecuteTask: (id) => void executeTask(id), onScheduleTask: scheduleTask, onTransitionScheduledTask: transitionScheduledTask, onRetryMemory: () => void loadMemory(), onSearchMemory: (query) => void loadMemory(query), onSaveMemory: saveMemory, onToggleMemory: (entry) => void toggleMemory(entry), onRemoveMemory: removeMemory, onExportMemory: () => void exportMemory(), onRunProjectCommand: (projectId, command, cwd) => void coding.runTerminal(projectId, command, cwd) };
 
   routeActions.onImportCorpus = () => void importCorpus();
   routeActions.onPickImageSource = pickImageSource;
@@ -394,5 +421,5 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   routeActions.onCloseTerminalSession = coding.closeTerminalSession;
   routeActions.onDiscoverModels = discoverModels;
   routeActions.onImportWorkflow = importImageWorkflow;
-  return { routeState, routeActions, route, settingsReturnRoute, workspaceTabs, activeWorkspaceTabId, openNewWorkspaceTab, selectWorkspaceTab, closeWorkspaceTab, connection, health, error, dismissError, retryConnection, conversations: chat.conversations, agentMode, setAgentMode, conversationQuery, setConversationQuery, sidebarCollapsed, sidebarWidth, toggleSidebar, resizeSidebar, commandOpen, openCommandPalette, closeCommandPalette, startNewChat, selectConversation, updateConversationMetadata: (id, patch) => chat.updateConversationMetadata(patch, id), onNavigate, canGoBack: navigation.index > 0, canGoForward: navigation.index < navigation.length - 1, goBack, goForward, petVisible, petWander, petInteractionDemo, setPetVisible, setPetWander };
+  return { routeState, routeActions, route, settingsReturnRoute, workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, selectWorkspaceTab, closeWorkspaceTab, restoreWorkspaceTab, connection, health, error, dismissError, retryConnection, conversations: chat.conversations, agentMode, setAgentMode, conversationQuery, setConversationQuery, sidebarCollapsed, sidebarWidth, toggleSidebar, resizeSidebar, commandOpen, openCommandPalette, closeCommandPalette, startNewChat, selectConversation, updateConversationMetadata: (id, patch) => chat.updateConversationMetadata(patch, id), onNavigate, canGoBack: navigation.index > 0, canGoForward: navigation.index < navigation.length - 1, goBack, goForward, petVisible, petWander, petInteractionDemo, setPetVisible, setPetWander };
 }

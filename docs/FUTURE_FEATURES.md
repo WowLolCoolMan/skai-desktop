@@ -128,6 +128,7 @@ cancellation, permission review, and local credential handling.
 - [x] Developer mode. (Persisted local-only diagnostics toggle with bounded runtime inspection.)
 - [ ] Global quick-AI fallback for non-command input.
 - [ ] Native multi-session sidebar with drag-and-drop panes.
+- [x] Persist composer drafts and attachments per workspace tab, with a bounded recently closed tab list and restore action.
 
 ## Models, runtime, and extensibility
 
