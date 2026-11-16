@@ -391,6 +391,28 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .chat-page .composer-card .attachment-list-composer .attachment-card { min-width: 190px; padding: 6px; border-radius: var(--skai-radius-lg); }
 .chat-page .composer-card .composer-hint[role="status"], .chat-page .composer-card .composer-voice-status { margin: 0 16px 8px; }
 .chat-page .composer-card .voice-mode-panel { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 16px 8px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 36%, transparent); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 9%, var(--skai-color-surface)); }
+.omni-input-dialog { width: min(560px, calc(100vw - 32px)); }
+.omni-input-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.omni-input-options button { display: grid; gap: 5px; min-height: 116px; padding: 16px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); color: var(--skai-color-text); background: var(--skai-color-surface-soft); text-align: left; cursor: pointer; }
+.omni-input-options button:hover:not(:disabled), .omni-input-options button:focus-visible { border-color: var(--skai-color-accent); background: color-mix(in srgb, var(--skai-color-accent) 9%, var(--skai-color-surface-soft)); outline: none; }
+.omni-input-options button:disabled { cursor: not-allowed; opacity: .5; }
+.omni-input-options strong { font-size: var(--skai-text-md); }
+.omni-input-options span, .omni-input-options small { color: var(--skai-color-text-muted); line-height: 1.4; }
+.voice-mode-dialog { width: min(430px, calc(100vw - 32px)); }
+.voice-mode-session { display: grid; justify-items: center; gap: 12px; padding: 24px 16px 16px; text-align: center; }
+.voice-mode-session h3 { margin: 0; color: var(--skai-color-text); font-size: var(--skai-text-2xl); }
+.voice-mode-session p { margin: 0; }
+.voice-mode-state { color: var(--skai-color-text); font-size: var(--skai-text-lg); font-weight: 700; }
+.voice-mode-detail { max-width: 320px; color: var(--skai-color-text-muted); line-height: 1.5; }
+.voice-mode-orb { display: flex; align-items: center; justify-content: center; gap: 5px; width: 112px; height: 112px; margin-bottom: 4px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--skai-color-accent) 88%, white), var(--skai-color-accent-strong)); box-shadow: 0 0 0 12px color-mix(in srgb, var(--skai-color-accent) 10%, transparent), 0 0 48px color-mix(in srgb, var(--skai-color-accent) 35%, transparent); }
+.voice-mode-orb span { display: block; width: 5px; height: 18px; border-radius: 999px; background: white; opacity: .8; }
+.voice-mode-orb.is-listening span { animation: skai-voice-wave 850ms ease-in-out infinite alternate; }
+.voice-mode-orb.is-listening span:nth-child(2) { animation-delay: 120ms; }
+.voice-mode-orb.is-listening span:nth-child(3) { animation-delay: 240ms; }
+.voice-mode-orb.is-speaking { animation: skai-voice-pulse 1.25s ease-in-out infinite; }
+.voice-mode-orb.is-preparing { opacity: .75; }
+@keyframes skai-voice-wave { from { height: 12px; transform: scaleY(.7); } to { height: 32px; transform: scaleY(1); } }
+@keyframes skai-voice-pulse { 50% { transform: scale(1.05); box-shadow: 0 0 0 20px color-mix(in srgb, var(--skai-color-accent) 10%, transparent), 0 0 62px color-mix(in srgb, var(--skai-color-accent) 42%, transparent); } }
 .chat-page .composer-card .voice-mode-panel > div { display: grid; gap: 2px; min-width: 0; }
 .chat-page .composer-card .voice-mode-panel strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
 .chat-page .composer-card .voice-mode-panel span { overflow: hidden; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); text-overflow: ellipsis; white-space: nowrap; }
