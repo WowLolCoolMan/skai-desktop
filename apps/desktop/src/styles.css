@@ -120,66 +120,6 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .pet-window-root:active { cursor: grabbing; }
 .pet-window-sprite { width: 128px; height: 128px; background-position: 0 0; background-repeat: no-repeat; background-size: 768px 128px; image-rendering: auto; filter: drop-shadow(0 8px 9px rgba(1, 7, 22, .34)); -webkit-app-region: no-drag; }
 .pet-window-sprite.is-facing-left { transform: scaleX(-1); }
-.pet-window-root:has(.pet-rig) .pet-window-sprite { display: none; }
-.pet-rig { width: 180px; height: 170px; overflow: visible; filter: drop-shadow(0 8px 9px rgba(1, 7, 22, .34)); cursor: grab; }
-.pet-rig.is-facing-left { transform: scaleX(-1); }
-.pet-rig path, .pet-rig circle, .pet-rig rect { vector-effect: non-scaling-stroke; }
-.rig-shadow { fill: rgba(1, 7, 22, .28); stroke: none; }
-.rig-body { transform-origin: 112px 120px; animation: skai-rig-breathe 1500ms ease-in-out infinite; }
-.pet-rig .rig-body > path, .pet-rig .rig-head, .pet-rig .rig-laptop { transform-box: fill-box; transform-origin: center; }
-.pet-rig-walk .rig-arm-left, .pet-rig-walk .rig-leg-right { animation: skai-rig-swing-left 520ms ease-in-out infinite alternate; }
-.pet-rig-walk .rig-arm-right, .pet-rig-walk .rig-leg-left { animation: skai-rig-swing-right 520ms ease-in-out infinite alternate; }
-.pet-rig-thinking .rig-head { animation: skai-rig-look 1200ms ease-in-out infinite alternate; }
-.pet-rig-coding .rig-arm-left, .pet-rig-coding .rig-arm-right { animation: skai-rig-type-arms 360ms ease-in-out infinite alternate; }
-.pet-rig-coding .rig-laptop { animation: skai-rig-laptop 900ms ease-in-out infinite alternate; }
-.pet-rig-success .rig-arm-left { animation: skai-rig-cheer-left 500ms ease-in-out infinite alternate; }
-.pet-rig-success .rig-arm-right { animation: skai-rig-cheer-right 500ms ease-in-out infinite alternate; }
-.rig-head { fill: url(#skai-rig-glow); stroke: #f5fbff; stroke-width: 5; }
-.rig-neck, .rig-torso, .rig-arm, .rig-leg { fill: none; stroke: #f5fbff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
-.rig-neck, .rig-torso { stroke: #dfe9ff; }
-.rig-joint { fill: #ff625d; stroke: #241e42; stroke-width: 2; }
-.rig-joint-accent { fill: #ffc34d; }
-.rig-face path, .rig-face circle { fill: none; stroke: #18213a; stroke-width: 2.5; stroke-linecap: round; }
-.rig-face circle { fill: #18213a; stroke: none; }
-.rig-laptop rect { fill: #202b4e; stroke: #63d9e9; stroke-width: 2; }
-.rig-laptop path { fill: #63d9e9; stroke: none; }
-.rig-effect path, .rig-beam path { fill: none; stroke: #63d9e9; stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 5px #63d9e9); animation: skai-rig-zap 650ms ease-in-out infinite alternate; }
-.rig-effect circle, .rig-confetti path { fill: none; stroke: #ffc34d; stroke-width: 3; stroke-linecap: round; }
-.rig-confetti path { animation: skai-rig-pop 800ms ease-in-out infinite alternate; }
-.pet-rig-thinking .rig-body { animation: skai-rig-think 1800ms ease-in-out infinite; }
-.pet-rig-coding .rig-body { animation: skai-rig-type 700ms ease-in-out infinite alternate; }
-.pet-rig-success .rig-body { animation: skai-rig-cheer 700ms ease-in-out infinite alternate; }
-.pet-rig-error .rig-body, .pet-rig-stuck .rig-body, .pet-rig-needs-attention .rig-body { animation: skai-rig-sad 1300ms ease-in-out infinite; }
-.pet-rig { width: 184px; height: 176px; filter: drop-shadow(0 10px 12px rgba(1, 7, 22, .38)); }
-.pet-rig.is-facing-left { transform: scaleX(-1); }
-.pet-rig .rig-segments line, .pet-rig .rig-segments path { fill: none; stroke: #eff7ff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.pet-rig .rig-segments line:nth-child(-n + 4) { stroke: #d8e6ff; stroke-width: 9; }
-.pet-rig .rig-joints circle { fill: #ff625d; stroke: #25213d; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.pet-rig .rig-joints .rig-head { fill: #79dbe7; stroke: #f7fcff; stroke-width: 4; }
-.pet-rig .rig-face { pointer-events: none; }
-.pet-rig .rig-face path { fill: none; stroke: #17223b; stroke-width: 2.6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.pet-rig .rig-face circle { fill: #17223b; stroke: none; }
-.pet-rig .rig-laptop rect { fill: #27365a; stroke: #8de7ef; stroke-width: 2; }
-.pet-rig .rig-laptop path { fill: #8de7ef; stroke: none; }
-.pet-rig .rig-laptop .rig-screen { fill: #13243b; stroke: #62d6e5; stroke-width: 1; }
-.pet-rig .rig-shadow { fill: rgba(1, 7, 22, .3); stroke: none; }
-.pet-rig .rig-beam path { fill: none; stroke: #79e7ee; stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 5px #79e7ee); animation: skai-rig-zap 500ms ease-in-out infinite alternate; }
-.pet-rig .rig-beam circle { fill: #ffc34d; stroke: none; animation: skai-rig-pop 500ms ease-in-out infinite alternate; }
-.pet-rig .rig-confetti path { fill: none; stroke: #ffc34d; stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; animation: skai-rig-pop 700ms ease-in-out infinite alternate; }
-@keyframes skai-rig-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-@keyframes skai-rig-think { 0%, 100% { transform: rotate(0deg) translateY(0); } 50% { transform: rotate(-3deg) translateY(-2px); } }
-@keyframes skai-rig-type { from { transform: translateY(1px) rotate(-1deg); } to { transform: translateY(-1px) rotate(1deg); } }
-@keyframes skai-rig-cheer { from { transform: translateY(1px) rotate(-4deg); } to { transform: translateY(-7px) rotate(4deg); } }
-@keyframes skai-rig-sad { 0%, 100% { transform: translateY(1px) rotate(2deg); } 50% { transform: translateY(4px) rotate(-2deg); } }
-@keyframes skai-rig-zap { from { opacity: .55; } to { opacity: 1; } }
-@keyframes skai-rig-pop { from { opacity: .45; } to { opacity: 1; } }
-@keyframes skai-rig-swing-left { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
-@keyframes skai-rig-swing-right { from { transform: rotate(9deg); } to { transform: rotate(-9deg); } }
-@keyframes skai-rig-look { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
-@keyframes skai-rig-type-arms { from { transform: rotate(-5deg) translateY(1px); } to { transform: rotate(7deg) translateY(-2px); } }
-@keyframes skai-rig-laptop { from { transform: translateY(0); } to { transform: translateY(-3px); } }
-@keyframes skai-rig-cheer-left { from { transform: rotate(12deg); } to { transform: rotate(-25deg); } }
-@keyframes skai-rig-cheer-right { from { transform: rotate(-12deg); } to { transform: rotate(25deg); } }
 .pet-window-sprite-walk { animation: pet-window-walk 1080ms steps(1, end) infinite; }
 .pet-window-sprite-idle { animation: pet-window-idle 1400ms steps(5, end) infinite; }
 .pet-window-sprite-thinking, .pet-window-sprite-coding, .pet-window-sprite-coding_malicious, .pet-window-sprite-stuck, .pet-window-sprite-needs-attention { animation: pet-window-idle 1100ms steps(5, end) infinite; }

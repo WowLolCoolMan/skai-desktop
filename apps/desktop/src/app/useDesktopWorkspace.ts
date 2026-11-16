@@ -109,7 +109,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [reduceMotion, setReduceMotion] = useState(() => readStoredBoolean("skai.reduceMotion", false));
   const [petVisible, setPetVisible] = useState(localStorage.getItem("skai.pet.visible") !== "false");
   const [petWander, setPetWander] = useState(localStorage.getItem("skai.pet.wander") !== "false");
-  const [petCharacter, setPetCharacter] = useState(() => localStorage.getItem("skai.pet.character") ?? "percy");
+  const [petCharacter, setPetCharacter] = useState(() => { const saved = localStorage.getItem("skai.pet.character"); return saved && (["percy", "byte", "ember", "nova", "rocky", "sprout"].includes(saved) || saved.startsWith("custom:")) ? saved : "percy"; });
   const [petSpriteDataUrl, setPetSpriteDataUrl] = useState(() => localStorage.getItem("skai.pet.sprite") ?? "");
   const [developerMode, setDeveloperMode] = useState(false);
   const [memoryInjectionEnabled, setMemoryInjectionEnabled] = useState(false);
