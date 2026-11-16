@@ -127,6 +127,30 @@ async function main() {
     const state = await waitFor(devtools.evaluate, "JSON.stringify((() => { const root = document.documentElement; const styles = getComputedStyle(root); return { theme: root.dataset.theme, backdrop: root.dataset.backdrop, canvas: styles.getPropertyValue('--skai-color-canvas').trim(), accent: styles.getPropertyValue('--skai-color-accent').trim(), overflow: Math.max(root.scrollWidth, document.body.scrollWidth) <= window.innerWidth + 1, width: window.innerWidth }; })())", (value) => { try { const parsed = JSON.parse(value); return parsed.theme === theme && parsed.backdrop === backdrop; } catch { return false; } }, `${theme}/${backdrop} state`);
     const parsed = JSON.parse(state);
     if (!parsed.overflow || !parsed.canvas || !parsed.accent) throw new Error(`Appearance state overflowed or lacked tokens: ${state}`);
+    // Theme: native popups. Linux draws <select> popups from each <option>'s own colors
+    // (a transparent option paints white), and nativeTheme decides the native scheme.
+    // Fail when an option is unthemed or unreadable, or the native scheme disagrees with
+    // the app (light/dark only: "system" follows the OS on purpose).
+    const popups = await waitFor(devtools.evaluate, `JSON.stringify((() => {
+      const channels = (value) => (value.match(/[\\d.]+/g) || []).map(Number);
+      const luminance = ([r, g, b]) => [r, g, b].map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }).reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+      const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+      const problems = [];
+      for (const option of document.querySelectorAll('select option, select optgroup')) {
+        const styles = getComputedStyle(option);
+        const background = channels(styles.backgroundColor);
+        const name = '"' + (option.label || option.textContent || '').trim() + '"';
+        if (background.length === 4 && background[3] < 1) { problems.push('transparent ' + option.tagName.toLowerCase() + ' ' + name); continue; }
+        const ratio = contrast(channels(styles.color), background);
+        if (ratio < 4.5) problems.push(name + ' contrast ' + ratio.toFixed(2));
+      }
+      return { options: document.querySelectorAll('select option').length, nativeDark: matchMedia('(prefers-color-scheme: dark)').matches, problems };
+    })())`, (value) => { try { const probe = JSON.parse(value); return theme === "system" || probe.nativeDark === (theme === "dark"); } catch { return false; } }, `${theme} native color scheme`).catch(() => null);
+    if (!popups) throw new Error(`The native color scheme did not follow the ${theme} theme (nativeTheme.themeSource is out of sync).`);
+    const popupState = JSON.parse(popups);
+    if (!popupState.options) throw new Error(`No <option> elements were found on Appearance for ${theme}/${backdrop}.`);
+    if (popupState.problems.length) throw new Error(`Select popups are unthemed or unreadable in ${theme}/${backdrop}: ${popupState.problems.join("; ")}`);
+    parsed.nativeDark = popupState.nativeDark;
     fs.mkdirSync(outputDir, { recursive: true });
     const screenshot = await devtools.send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(outputDir, `${theme}-${backdrop}.png`), Buffer.from(screenshot.data, "base64"));

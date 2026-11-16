@@ -76,6 +76,7 @@
     --skai-color-surface-raised: #eef2f8;
     --skai-color-surface-soft: rgba(24, 35, 60, 0.06);
     --skai-color-border: rgba(24, 35, 60, 0.14);
+    --skai-color-border-strong: rgba(24, 35, 60, 0.22);
     --skai-color-text: #18213a;
     --skai-color-text-muted: #5b6680;
     --skai-color-sidebar: #eef1f6;
@@ -91,6 +92,15 @@
     --skai-color-sidebar-border: rgba(24, 33, 58, 0.12);
     --skai-shadow-panel: 0 24px 80px rgba(28, 42, 72, 0.12);
   }
+}
+
+/* Theme: native <select> popups. On Linux Chromium paints an <option> with a
+   transparent background as white whatever color-scheme says, so dark themes
+   showed near-white text on a white popup. Give options a themed surface. */
+option,
+optgroup {
+  color: var(--skai-color-text);
+  background-color: var(--skai-color-surface);
 }
 
 [data-backdrop="deep-sea"] {

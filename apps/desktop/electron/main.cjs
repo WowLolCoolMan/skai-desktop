@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, session, shell, systemPreferences, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, screen, session, shell, systemPreferences, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -1414,6 +1414,14 @@ app.whenReady().then(() => {
   });
   if (!process.env.SKAI_DESKTOP_RENDERER_URL) applyProductionContentSecurityPolicy();
   ipcMain.handle("agent:request", async (event, method, params) => {
+    // Theme: follow the app's Light/Dark/System choice instead of the OS, so native
+    // pieces (select popups, scrollbars, file dialogs, tray menu, window frame) match.
+    if (method === "appearance.setNativeTheme") {
+      const mode = params?.mode;
+      if (mode !== "light" && mode !== "dark" && mode !== "system") return { v: 1, ok: false, error: { code: "INVALID_PARAMS", message: "Theme mode must be light, dark, or system." } };
+      nativeTheme.themeSource = mode;
+      return { v: 1, ok: true, result: { mode, dark: nativeTheme.shouldUseDarkColors } };
+    }
     if (method === "workspace.pickFolder") {
       const window = BrowserWindow.fromWebContents(event.sender);
       const result = await dialog.showOpenDialog(window, { properties: ["openDirectory"] });
