@@ -404,8 +404,8 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .voice-mode-session p { margin: 0; }
 .voice-mode-state { color: var(--skai-color-text); font-size: var(--skai-text-lg); font-weight: 700; }
 .voice-mode-detail { max-width: 320px; color: var(--skai-color-text-muted); line-height: 1.5; }
-.voice-mode-orb { display: flex; align-items: center; justify-content: center; gap: 5px; width: 112px; height: 112px; margin-bottom: 4px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--skai-color-accent) 88%, white), var(--skai-color-accent-strong)); box-shadow: 0 0 0 12px color-mix(in srgb, var(--skai-color-accent) 10%, transparent), 0 0 48px color-mix(in srgb, var(--skai-color-accent) 35%, transparent); }
-.voice-mode-orb span { display: block; width: 5px; height: 18px; border-radius: 999px; background: white; opacity: .8; }
+.voice-mode-orb { display: flex; align-items: center; justify-content: center; gap: 5px; width: 112px; height: 112px; margin-bottom: 4px; border-radius: var(--skai-radius-pill); background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--skai-color-accent) 88%, white), var(--skai-color-accent-strong)); box-shadow: 0 0 0 12px color-mix(in srgb, var(--skai-color-accent) 10%, transparent), 0 0 48px color-mix(in srgb, var(--skai-color-accent) 35%, transparent); }
+.voice-mode-orb span { display: block; width: 5px; height: 18px; border-radius: var(--skai-radius-pill); background: white; opacity: .8; }
 .voice-mode-orb.is-listening span { animation: skai-voice-wave 850ms ease-in-out infinite alternate; }
 .voice-mode-orb.is-listening span:nth-child(2) { animation-delay: 120ms; }
 .voice-mode-orb.is-listening span:nth-child(3) { animation-delay: 240ms; }
