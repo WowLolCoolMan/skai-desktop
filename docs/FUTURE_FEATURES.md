@@ -129,6 +129,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Global quick-AI fallback for non-command input.
 - [ ] Native multi-session sidebar with drag-and-drop panes.
 - [x] Persist composer drafts and attachments per workspace tab, with a bounded recently closed tab list and restore action.
+- [x] Resume the active persisted chat or project workspace session after startup, preferring its conversation/project over the legacy global selection and preserving the user's last non-workspace destination.
 
 ## Models, runtime, and extensibility
 

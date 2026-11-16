@@ -12,6 +12,7 @@ type CodingWorkspaceOptions = {
 
 export function useCodingWorkspace({ request, connection, onError, onNavigate }: CodingWorkspaceOptions) {
   const [projects, setProjects] = useState<DesktopProject[]>([]);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [selectedProject, setSelectedProject] = useState<DesktopProject | null>(null);
   const [projectFiles, setProjectFiles] = useState<DesktopProjectFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     void request("projects.list").then((response) => {
       if (!response.ok) { onError(response.error?.message ?? "Projects could not be loaded."); return; }
       setProjects((response.result as DesktopProject[]) ?? []);
+      setProjectsLoaded(true);
     }).catch(() => onError("Projects could not be loaded."));
   }, [connection, onError, request]);
 
@@ -69,18 +71,18 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     return createdProject;
   };
 
-  const selectProject = async (project: DesktopProject) => {
+  const selectProject = async (project: DesktopProject, navigateToProject = true) => {
     fileReadRequestId.current += 1;
     localStorage.setItem("skai.selectedProject", project.id);
     setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); setGitStatus(null); setGitDiff(null);
     const response = await request("project.files", { id: project.id });
-    if (!response.ok) { setSelectedProject(null); setProjectFiles([]); localStorage.removeItem("skai.selectedProject"); onError(`${response.error?.message ?? "Project folder is unavailable."} Reconnect its folder in Projects.`); onNavigate("projects"); return; }
+    if (!response.ok) { setSelectedProject(null); setProjectFiles([]); localStorage.removeItem("skai.selectedProject"); onError(`${response.error?.message ?? "Project folder is unavailable."} Reconnect its folder in Projects.`); if (navigateToProject) onNavigate("projects"); return; }
     const result = response.result as { files: DesktopProjectFile[]; protectedFilesSkipped: number; hitEntryLimit: boolean };
     setProjectFiles(result.files ?? []);
     setSelectedProject(project);
     setFileSummary(`${result.files.length} readable files · ${result.protectedFilesSkipped} protected names hidden${result.hitEntryLimit ? " · entry limit reached" : ""}`);
     await refreshGitStatus(project.id);
-    onNavigate("coding");
+    if (navigateToProject) onNavigate("coding");
   };
 
   const refreshGitStatus = async (projectId = selectedProject?.id) => {
@@ -135,13 +137,6 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     onError(null);
     return true;
   };
-
-  useEffect(() => {
-    if (connection !== "ready" || selectedProject || projects.length === 0) return;
-    const storedId = localStorage.getItem("skai.selectedProject");
-    const storedProject = storedId ? projects.find((project) => project.id === storedId) : undefined;
-    if (storedProject) void selectProject(storedProject);
-  }, [connection, projects, selectedProject]);
 
   const openProjectFile = async (relativePath: string) => {
     if (!selectedProject) return;
@@ -228,5 +223,5 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setTerminalSessionId(null); setTerminalScreen(null); setTerminalExitCode(null); return true;
   };
 
-  return { projects, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest };
+  return { projects, projectsLoaded, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest };
 }

@@ -58,6 +58,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [conversations, setConversations] = useState<DesktopConversation[]>([]);
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [queuedMessages, setQueuedMessages] = useState<DesktopQueuedMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [responseMode, setResponseModeState] = useState<ChatResponseMode>(() => normalizeResponseMode(localStorage.getItem("skai.chat.responseMode")));
@@ -68,6 +69,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       if (conversationResponse.ok) {
         const loaded = (conversationResponse.result as DesktopConversation[]) ?? [];
         setConversations(loaded);
+        setConversationsLoaded(true);
         const savedConversationId = localStorage.getItem("skai.conversation.active");
         const first = loaded.find((conversation) => conversation.id === savedConversationId) ?? loaded.find((conversation) => (conversation.mode ?? "ChatBot") === modeRef.current);
         if (first) {
@@ -328,5 +330,5 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
+  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
 }

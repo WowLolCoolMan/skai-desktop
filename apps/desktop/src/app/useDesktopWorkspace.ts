@@ -117,8 +117,11 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [route, setRoute] = useState<Route>(routeFromLocation);
   const [settingsReturnRoute, setSettingsReturnRoute] = useState<Route>(() => routeFromLocation() === "settings" ? "chat" : routeFromLocation());
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readWorkspaceTabs);
+  const [hasStoredWorkspaceTabs] = useState(() => localStorage.getItem(WORKSPACE_TABS_KEY) !== null);
+  const [workspaceSessionRestored, setWorkspaceSessionRestored] = useState(false);
   const [closedWorkspaceTabs, setClosedWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readClosedWorkspaceTabs);
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState(() => localStorage.getItem(ACTIVE_WORKSPACE_TAB_KEY) ?? readWorkspaceTabs()[0].id);
+  const workspaceSessionRestoreStartedRef = useRef(false);
   const [navigation, setNavigation] = useState<NavigationState>(() => readNavigationState(routeFromLocation()));
   const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(localStorage.getItem("skai.sidebar.collapsed") === "true");
@@ -288,12 +291,57 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     onNavigate("coding");
   }, [chat, coding, onNavigate, selectWorkspaceTab, workspaceTabs]);
   useEffect(() => {
+    if (workspaceSessionRestored || workspaceSessionRestoreStartedRef.current || connection !== "ready" || !chat.conversationsLoaded || !coding.projectsLoaded) return;
+    const activeTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId) ?? workspaceTabs[0];
+    if (!activeTab) { workspaceSessionRestoreStartedRef.current = true; setWorkspaceSessionRestored(true); return; }
+    workspaceSessionRestoreStartedRef.current = true;
+    if (activeWorkspaceTabId !== activeTab.id) setActiveWorkspaceTabId(activeTab.id);
+    let restoredTab = activeTab;
+    if (!hasStoredWorkspaceTabs && activeTab.id === "workspace-home") {
+      const legacyConversation = chat.conversations.find((conversation) => conversation.id === chat.conversationId);
+      const legacyProject = route === "coding" ? coding.projects.find((project) => project.id === localStorage.getItem("skai.selectedProject")) : undefined;
+      restoredTab = {
+        ...activeTab,
+        title: legacyProject?.name ?? legacyConversation?.title ?? activeTab.title,
+        route: legacyProject ? "coding" : "chat",
+        conversationId: legacyConversation?.id ?? null,
+        projectId: legacyProject?.id ?? null,
+      };
+      if (restoredTab !== activeTab) setWorkspaceTabs([restoredTab]);
+    }
+    const conversation = restoredTab.conversationId ? chat.conversations.find((item) => item.id === restoredTab.conversationId) : undefined;
+    if (conversation) {
+      const mode = conversation.mode === "Coding Agent" ? "Coding Agent" : "ChatBot";
+      setAgentModeState(mode);
+      localStorage.setItem("skai.agentMode", mode);
+      chat.selectConversation(conversation.id);
+    } else {
+      chat.startNewChat();
+      const codingThread = restoredTab.route === "coding" || restoredTab.title === "New coding thread";
+      const mode = codingThread ? "Coding Agent" : "ChatBot";
+      setAgentModeState(mode);
+      localStorage.setItem("skai.agentMode", mode);
+      chat.setResponseMode(codingThread ? "coding" : "think");
+    }
+    const project = restoredTab.projectId ? coding.projects.find((item) => item.id === restoredTab.projectId) : undefined;
+    const shouldNavigateToWorkspace = route === "chat" || route === "coding";
+    if (restoredTab.projectId && project) {
+      void coding.selectProject(project, shouldNavigateToWorkspace).catch(() => undefined).finally(() => setWorkspaceSessionRestored(true));
+      return;
+    }
+    else if (restoredTab.projectId && !project) {
+      setError("The project saved in this workspace tab is no longer available. Reconnect it from Projects.");
+      if (shouldNavigateToWorkspace) onNavigate("projects");
+    } else if (shouldNavigateToWorkspace) onNavigate(restoredTab.route === "coding" ? "projects" : "chat");
+    setWorkspaceSessionRestored(true);
+  }, [activeWorkspaceTabId, chat.conversationId, chat.conversations, chat.conversationsLoaded, chat.selectConversation, chat.setResponseMode, chat.startNewChat, coding.projects, coding.projectsLoaded, coding.selectProject, connection, hasStoredWorkspaceTabs, onNavigate, route, workspaceSessionRestored, workspaceTabs]);
+  useEffect(() => {
     localStorage.setItem(WORKSPACE_TABS_KEY, JSON.stringify(workspaceTabs));
     localStorage.setItem(ACTIVE_WORKSPACE_TAB_KEY, activeWorkspaceTabId);
   }, [activeWorkspaceTabId, workspaceTabs]);
   useEffect(() => { localStorage.setItem(CLOSED_WORKSPACE_TABS_KEY, JSON.stringify(closedWorkspaceTabs)); }, [closedWorkspaceTabs]);
   useEffect(() => {
-    if (route !== "chat" && route !== "coding") return;
+    if (!workspaceSessionRestored || (route !== "chat" && route !== "coding")) return;
     setWorkspaceTabs((current) => current.map((tab) => tab.id !== activeWorkspaceTabId ? tab : {
       ...tab,
       route: route === "coding" && coding.selectedProject ? "coding" : "chat",
@@ -301,7 +349,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       projectId: route === "coding" ? coding.selectedProject?.id ?? tab.projectId : null,
       title: route === "coding" && coding.selectedProject ? coding.selectedProject.name : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
     }));
-  }, [activeWorkspaceTabId, agentMode, chat.activeConversation?.title, chat.conversationId, coding.selectedProject?.id, coding.selectedProject?.name, route]);
+  }, [activeWorkspaceTabId, agentMode, chat.activeConversation?.title, chat.conversationId, coding.selectedProject?.id, coding.selectedProject?.name, route, workspaceSessionRestored]);
   useEffect(() => {
     const bridge = window.skaiAgent;
     const removeConversation = bridge?.onTrayOpenConversation?.((id) => { selectConversation(id); onNavigate("chat"); });
