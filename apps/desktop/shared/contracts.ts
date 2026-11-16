@@ -29,6 +29,7 @@ export type LocalCapacitySnapshot = {
   cpuUtilizationPercent: number | null;
   gpu: { name: string; totalBytes: number | null; availableBytes: number | null; utilizationPercent: number | null } | null;
   measurementNote: string | null;
+  scheduler?: { activeTaskCount: number; queuedTaskCount: number; executionSlotLimit: number };
 };
 
 export type DesktopProject = {

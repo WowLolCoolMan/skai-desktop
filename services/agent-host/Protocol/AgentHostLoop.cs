@@ -184,7 +184,19 @@ public static class AgentHostLoop
     private static AgentResponse GetLocalCapacity(AgentRequest request)
     {
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
-        return new(ProtocolVersion, request.Id, true, snapshot);
+        var tasks = CreateTaskStore().Load();
+        var activeTaskCount = tasks.Count(task => task.Status == AgentTaskStatuses.Running);
+        var queuedTaskCount = tasks.Count(task => task.Status == AgentTaskStatuses.Queued);
+        return new(ProtocolVersion, request.Id, true, new
+        {
+            snapshot.CapturedAtUtc,
+            snapshot.RamTotalBytes,
+            snapshot.RamAvailableBytes,
+            snapshot.CpuUtilizationPercent,
+            snapshot.Gpu,
+            snapshot.MeasurementNote,
+            scheduler = new { activeTaskCount, queuedTaskCount, executionSlotLimit = 1 },
+        });
     }
 
     private static AgentResponse GetAirLlmStatus(AgentRequest request)

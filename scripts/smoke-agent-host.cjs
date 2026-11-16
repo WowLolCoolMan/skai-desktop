@@ -101,6 +101,9 @@ async function run() {
   const health = await request("runtime.health");
   if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
+  const capacity = await request("system.capacity");
+  if (!capacity.ok || capacity.result?.scheduler?.activeTaskCount !== 0 || capacity.result?.scheduler?.queuedTaskCount !== 0 || capacity.result?.scheduler?.executionSlotLimit !== 1)
+    throw new Error(`system.capacity did not expose the bounded local scheduler snapshot: ${JSON.stringify(capacity)}`);
   const mcpConnections = await request("mcp.connections.list");
   if (!mcpConnections.ok || !Array.isArray(mcpConnections.result?.connections) || mcpConnections.result.connections.length !== 0)
     throw new Error("mcp.connections.list did not return the isolated empty registry.");
