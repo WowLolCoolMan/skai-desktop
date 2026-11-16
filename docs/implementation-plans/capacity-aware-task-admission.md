@@ -7,11 +7,13 @@ Allow more than one local coding task only when the device has enough measured h
 ## Integration
 
 1. Add a pure capacity policy over the existing local RAM, GPU, and CPU snapshot.
-2. Use a small fixed upper bound of four admitted tasks; derive the active limit from available memory and CPU pressure.
-3. Keep one slot when RAM or GPU telemetry is unavailable, or when CPU load is critically high.
-4. Replace the hard-coded host semaphore with an admission gate that re-evaluates capacity while queued tasks wait.
-5. Report the same dynamic limit through `system.capacity`, so the UI does not advertise a different scheduler than the executor uses.
-6. Leave direct chat generation and runtime-specific model allocation unchanged; this slice governs durable coding-task execution only.
+2. Persist the selected model, provider, size, context, and AirLLM compatibility on each durable task so admission uses the model that will actually run.
+3. Use a small fixed upper bound of four admitted tasks; derive the active limit from available memory, model size/context, and CPU pressure.
+4. Keep one slot when RAM or GPU telemetry is unavailable, or when CPU load is critically high.
+5. Replace the hard-coded host semaphore with an admission gate that re-evaluates capacity while queued tasks wait.
+6. Apply the lower disk-streamed weight estimate only when the task is AirLLM-compatible and explicitly uses AirLLM.
+7. Report the same dynamic limit through `system.capacity`, so the UI does not advertise a different scheduler than the executor uses.
+8. Leave direct chat generation and runtime-specific model allocation unchanged; this slice governs durable coding-task execution only.
 
 ## Acceptance criteria
 

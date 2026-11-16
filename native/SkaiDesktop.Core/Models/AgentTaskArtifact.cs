@@ -23,6 +23,11 @@ public sealed class AgentTaskArtifact
     public string Title { get; set; } = string.Empty;
     public string Instruction { get; set; } = string.Empty;
     public string ResponseMode { get; set; } = ChatResponseModes.Coding;
+    public string? Model { get; set; }
+    public string? ModelProvider { get; set; }
+    public long? ModelSizeBytes { get; set; }
+    public int? ModelContextLength { get; set; }
+    public bool AirLlmCompatible { get; set; }
     public string Role { get; set; } = "specialist";
     public string Status { get; set; } = AgentTaskStatuses.Proposed;
     public bool RequiresApproval { get; set; }

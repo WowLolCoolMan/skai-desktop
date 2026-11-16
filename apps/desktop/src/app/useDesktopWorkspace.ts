@@ -200,7 +200,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const goBack = useCallback(() => { if (navigation.index > 0) window.history.back(); }, [navigation.index]);
   const goForward = useCallback(() => { if (navigation.index < navigation.length - 1) window.history.forward(); }, [navigation.index, navigation.length]);
   const coding = useCodingWorkspace({ request, connection, onError: setError, onNavigate });
-  const chat = useChatWorkspace({ request, connection, provider, endpoint, model, mode: agentMode, project: route === "coding" ? coding.selectedProject : null, onError: setError });
+  const chat = useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata: models.find((entry) => entry.model === model), mode: agentMode, project: route === "coding" ? coding.selectedProject : null, onError: setError });
   const openCommandPalette = useCallback(() => setCommandOpen(true), []);
   const closeCommandPalette = useCallback(() => setCommandOpen(false), []);
   const toggleSidebar = useCallback(() => setSidebarCollapsed((value) => !value), []);

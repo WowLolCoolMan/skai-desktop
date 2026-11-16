@@ -1416,6 +1416,11 @@ public static class AgentHostLoop
                 title = task.Title,
                 instruction = task.Instruction,
                 responseMode = ChatResponseModes.IsValid(task.ResponseMode) ? task.ResponseMode : ChatResponseModes.Coding,
+                model = task.Model,
+                modelProvider = task.ModelProvider,
+                modelSizeBytes = task.ModelSizeBytes,
+                modelContextLength = task.ModelContextLength,
+                airLlmCompatible = task.AirLlmCompatible,
                 projectId = task.ProjectId,
                 conversationId = task.ConversationId,
                 changedFiles = task.ChangedFiles,
@@ -1444,7 +1449,12 @@ public static class AgentHostLoop
             requiresApproval: request.Params?.TryGetProperty("requiresApproval", out var requiresApproval) == true && requiresApproval.ValueKind == JsonValueKind.True,
             projectId: OptionalString(request, "projectId"),
             conversationId: OptionalString(request, "conversationId"),
-            responseMode: OptionalString(request, "responseMode") ?? ChatResponseModes.Coding);
+            responseMode: OptionalString(request, "responseMode") ?? ChatResponseModes.Coding,
+            model: OptionalString(request, "model"),
+            modelProvider: OptionalString(request, "modelProvider"),
+            modelSizeBytes: OptionalLong(request, "modelSizeBytes"),
+            modelContextLength: OptionalInt(request, "modelContextLength"),
+            airLlmCompatible: OptionalBoolean(request, "airLlmCompatible"));
         return new(ProtocolVersion, request.Id, true, new
         {
             id = task.Id,
@@ -1486,7 +1496,8 @@ public static class AgentHostLoop
         var acquired = false;
         try
         {
-            await WaitForLocalExecutionCapacityAsync(execution.Cancellation.Token).ConfigureAwait(false);
+            var task = CreateTaskStore().Get(taskId);
+            await WaitForLocalExecutionCapacityAsync(task, execution.Cancellation.Token).ConfigureAwait(false);
             acquired = true;
             var store = CreateTaskStore();
             if (execution.Cancellation.IsCancellationRequested || store.Get(taskId).Status != AgentTaskStatuses.Queued)
@@ -1530,13 +1541,13 @@ public static class AgentHostLoop
         }
     }
 
-    private static async Task WaitForLocalExecutionCapacityAsync(CancellationToken cancellationToken)
+    private static async Task WaitForLocalExecutionCapacityAsync(AgentTaskArtifact task, CancellationToken cancellationToken)
     {
         while (true)
         {
             var snapshot = await new LocalCapacityProbe().GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
             var settings = CreateSettingsStore().Load();
-            var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes);
+            var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, string.Equals(task.ModelProvider, "AirLLM", StringComparison.OrdinalIgnoreCase));
             lock (LocalExecutionGate)
             {
                 if (LocalAdmittedTaskCount < decision.SlotLimit)

@@ -12,6 +12,7 @@ type ChatWorkspaceOptions = {
   provider: string;
   endpoint: string;
   model: string;
+  modelMetadata?: { model: string; provider?: string; sizeBytes?: number | null; contextLength?: number | null };
   mode: "ChatBot" | "Coding Agent";
   project?: { id: string; name: string; instructions?: string } | null;
   onError: (message: string | null) => void;
@@ -51,7 +52,7 @@ function skillMentions(messages: Array<{ content: string }>) {
   return [...ids].slice(0, 4);
 }
 
-export function useChatWorkspace({ request, connection, provider, endpoint, model, mode, project, onError }: ChatWorkspaceOptions) {
+export function useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata, mode, project, onError }: ChatWorkspaceOptions) {
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -115,6 +116,11 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
           projectId: project?.id ?? null,
           conversationId: savedId,
           responseMode,
+          model: modelMetadata?.model ?? model,
+          modelProvider: modelMetadata?.provider ?? provider,
+          modelSizeBytes: modelMetadata?.sizeBytes ?? null,
+          modelContextLength: modelMetadata?.contextLength ?? null,
+          airLlmCompatible: (modelMetadata?.provider ?? provider).toLowerCase() === "airllm" || model.includes("/"),
         });
         if (!planned.ok) throw new Error(planned.error?.message ?? "The coding task could not be created.");
         const taskId = (planned.result as { id: string }).id;

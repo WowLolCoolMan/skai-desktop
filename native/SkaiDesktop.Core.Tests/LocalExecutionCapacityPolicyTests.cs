@@ -22,5 +22,8 @@ internal static class LocalExecutionCapacityPolicyTests
 
         var budgeted = LocalExecutionCapacityPolicy.Decide(new(DateTimeOffset.UtcNow, 64L << 30, 40L << 30, 20, null, null), 48L << 30);
         Check(budgeted.SlotLimit == 2 && budgeted.LimitingResource == "RAM headroom", "explicit RAM budget limits admission without exceeding remaining headroom");
+
+        var airLlm = LocalExecutionCapacityPolicy.Decide(new(DateTimeOffset.UtcNow, 64L << 30, 24L << 30, 20, new LocalGpuCapacity("Test GPU", 16L << 30, 2L << 30, 10), null), modelSizeBytes: 24L << 30, modelContextLength: 131072, airLlmCompatible: true, airLlmAvailable: true);
+        Check(airLlm.SlotLimit >= 2, "AirLLM-compatible admission uses the lower disk-streamed weight estimate when available");
     }
 }

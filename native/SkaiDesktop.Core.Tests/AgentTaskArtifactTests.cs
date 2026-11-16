@@ -11,9 +11,9 @@ internal static class AgentTaskArtifactTests
         try
         {
             var store = new AgentTaskArtifactStore(Path.Combine(root, "agent-tasks.json"));
-            var first = store.Create("Inspect provider routing", "Review capability preflight evidence.", "researcher", "run-1", responseMode: ChatResponseModes.Security);
+            var first = store.Create("Inspect provider routing", "Review capability preflight evidence.", "researcher", "run-1", responseMode: ChatResponseModes.Security, model: "org/model-8b", modelProvider: "AirLLM", modelSizeBytes: 8L << 30, modelContextLength: 131072, airLlmCompatible: true);
             var second = store.Create("Verify the routing change", "Check the result against the first task.", "verifier", dependsOn: [first.Id]);
-            Check(first.Status == AgentTaskStatuses.Proposed && first.ResponseMode == ChatResponseModes.Security && store.Get(first.Id).ResponseMode == ChatResponseModes.Security && second.DependsOn.SequenceEqual([first.Id]), "agent task artifacts persist response mode alongside roles and dependencies");
+            Check(first.Status == AgentTaskStatuses.Proposed && first.ResponseMode == ChatResponseModes.Security && store.Get(first.Id).ResponseMode == ChatResponseModes.Security && store.Get(first.Id).Model == "org/model-8b" && store.Get(first.Id).AirLlmCompatible && second.DependsOn.SequenceEqual([first.Id]), "agent task artifacts persist response mode and model capacity metadata alongside roles and dependencies");
             Check(store.GetNextReady() is null, "agent task readiness preview ignores proposed tasks");
             Check(store.TryClaimReady() is null, "queued dependent agent task is not claimable before its prerequisite is queued and completed");
             store.Queue(first.Id);
