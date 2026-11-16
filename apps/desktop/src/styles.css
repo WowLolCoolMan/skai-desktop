@@ -1095,7 +1095,30 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .plugins-connection small, .plugins-tool-list { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .plugins-tool-list { display: grid; gap: 3px; margin-top: 7px; }
 .plugins-connection-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.plugins-connection.is-selected { border-color: color-mix(in srgb, var(--skai-color-accent) 52%, var(--skai-color-border)); background: color-mix(in srgb, var(--skai-color-accent) 4%, var(--skai-color-surface)); }
+.plugins-connection-summary { display: flex; justify-content: space-between; gap: 14px; width: 100%; align-items: flex-start; }
+.plugins-connection-select { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 0; border: 0; color: var(--skai-color-text); background: transparent; text-align: left; cursor: pointer; }
+.plugins-connection-select > span:first-child { display: grid; gap: 4px; min-width: 0; }
+.plugins-connection-select .status-badge { flex: 0 0 auto; }
+.plugins-connection-inspector { display: grid; gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--skai-color-border); }
+.plugins-connection-metadata { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.plugins-connection-metadata span { display: grid; gap: 4px; padding: 10px; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-xs); overflow-wrap: anywhere; }
+.plugins-connection-metadata b { color: var(--skai-color-text); font-size: var(--skai-text-2xs); letter-spacing: .06em; text-transform: uppercase; }
+.plugins-tool-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.plugins-tool-groups > div { display: grid; align-content: start; gap: 7px; }
+.plugins-tool-groups h4 { display: flex; justify-content: space-between; gap: 8px; margin: 0; color: var(--skai-color-text); font-size: var(--skai-text-sm); }
+.plugins-tool-groups h4 span { color: var(--skai-color-text-muted); font-weight: 500; }
+.plugins-tool-review { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
+.plugins-tool-review > span { display: grid; gap: 3px; min-width: 0; }
+.plugins-tool-review strong { overflow-wrap: anywhere; font-size: var(--skai-text-xs); }
+.plugins-tool-review small { line-height: 1.4; }
+.plugins-tool-review em { color: var(--skai-color-accent); font-size: var(--skai-text-2xs); font-style: normal; overflow-wrap: anywhere; }
+.plugins-tool-review.is-mutating { border-color: color-mix(in srgb, var(--skai-color-warning) 35%, var(--skai-color-border)); }
+.plugins-tool-review.is-mutating em { color: var(--skai-color-warning); }
+.plugins-tool-empty, .plugins-approval-boundary { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
+.plugins-approval-boundary { padding-top: 10px; border-top: 1px solid var(--skai-color-border); }
 @media (max-width: 720px) { .plugins-mcp-form { grid-template-columns: 1fr; } .plugins-connection { flex-direction: column; } .plugins-connection-actions { justify-content: flex-start; } }
+@media (max-width: 720px) { .plugins-connection-summary { flex-direction: column; } .plugins-connection-metadata, .plugins-tool-groups { grid-template-columns: 1fr; } }
 
 /* Short windows: give the sidebar's projects and chats room. The active-session card only repeats the current page. */
 @media (max-height: 640px) {
