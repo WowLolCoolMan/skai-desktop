@@ -33,6 +33,35 @@ function checkpointWorkflow(checkpoint: string, mode: WorkflowMode) {
   return JSON.stringify(graph, null, 2);
 }
 
+const maxReopenedImageBytes = 6 * 1024 * 1024;
+
+async function imageHistorySource(image: ImageResult): Promise<ChatAttachment> {
+  if (image.url.startsWith("data:image/png;base64,") || image.url.startsWith("data:image/jpeg;base64,")) {
+    const [, content = ""] = image.url.split(",", 2);
+    if (!content || content.length > maxReopenedImageBytes * 2) throw new Error("This saved image is too large to reopen for local editing.");
+    return { fileName: image.fileName, mediaType: image.url.slice(5, image.url.indexOf(";")), content };
+  }
+
+  let parsed: URL;
+  try { parsed = new URL(image.url); } catch { throw new Error("This saved image has an invalid local output URL."); }
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname)) throw new Error("Only images still available from a local runtime can be reopened for editing.");
+  const response = await fetch(parsed);
+  if (!response.ok) throw new Error(`The local image output is no longer available (${response.status}).`);
+  const blob = await response.blob();
+  if (blob.size <= 0 || blob.size > maxReopenedImageBytes) throw new Error("The local image output is too large to reopen for editing.");
+  if (blob.type !== "image/png" && blob.type !== "image/jpeg") throw new Error("The local image output is not a supported PNG or JPEG.");
+  return { fileName: image.fileName, mediaType: blob.type, content: await blobToBase64(blob) };
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => { const value = String(reader.result ?? ""); resolve(value.slice(value.indexOf(",") + 1)); };
+    reader.onerror = () => reject(reader.error ?? new Error("The local image output could not be read."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 type ImageProvider = "comfyui" | "diffusers";
 type ImageRuntime = { workerAvailable: boolean; dependenciesAvailable: boolean; backgroundRemovalAvailable?: boolean; pythonCommand: string; status: string; message: string };
 type ImageRuntimeInstall = { id: string; status: string; progress: string[]; error?: string | null };
@@ -49,6 +78,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, images,
   const [discoveringCheckpoints, setDiscoveringCheckpoints] = useState(false);
   const [sourceImage, setSourceImage] = useState<ChatAttachment | null>(null);
   const [selectingImage, setSelectingImage] = useState(false);
+  const [reopeningImage, setReopeningImage] = useState(false);
   const [imageRuntime, setImageRuntime] = useState<ImageRuntime | null>(null);
   const [imageRuntimeInstall, setImageRuntimeInstall] = useState<ImageRuntimeInstall | null>(null);
   const [imageRuntimeBusy, setImageRuntimeBusy] = useState(false);
@@ -73,6 +103,17 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, images,
   const discoverCheckpoints = async () => { if (discoveringCheckpoints) return; setDiscoveringCheckpoints(true); setWorkflowError(null); try { const response: AgentResponse | undefined = await window.skaiAgent?.request("image.models.list", { endpoint }); if (!response?.ok) throw new Error(response?.error?.message ?? "The local ComfyUI checkpoint list is unavailable."); const checkpointValue = (response.result as { checkpoints?: unknown }).checkpoints; const discovered = Array.isArray(checkpointValue) ? checkpointValue.filter((value: unknown): value is string => typeof value === "string") : []; setCheckpoints(discovered); setCheckpoint((current) => discovered.includes(current) ? current : discovered[0] ?? ""); if (discovered.length === 0) setWorkflowError("ComfyUI is reachable, but it reported no installed checkpoints."); } catch (error) { setCheckpoints([]); setCheckpoint(""); setWorkflowError(error instanceof Error ? error.message : "Local checkpoints could not be discovered."); } finally { setDiscoveringCheckpoints(false); } };
   const buildWorkflow = (mode: WorkflowMode) => { if (!checkpoint) { setWorkflowError("Discover and select a local checkpoint first."); return; } const kind = mode === "edit" ? "Image edit" : "Text to image"; const name = `${kind} · ${checkpoint}`.slice(0, 80); const built = checkpointWorkflow(checkpoint, mode); setSavedWorkflows((current) => [{ name, workflow: built }, ...current.filter((item) => item.name !== name)].slice(0, 12)); setSelectedWorkflowName(name); setWorkflowName(name); setWorkflowError(null); onChange("workflow", built); };
   const importWorkflow = async () => { setWorkflowError(null); setImportingWorkflow(true); try { const imported = await onImportWorkflow(); if (!imported) return; setSavedWorkflows((current) => [{ name: imported.name, workflow: imported.workflow }, ...current.filter((item) => item.name !== imported.name)].slice(0, 12)); setSelectedWorkflowName(imported.name); setWorkflowName(imported.name); onChange("workflow", imported.workflow); } catch (error) { setWorkflowError(error instanceof Error ? error.message : "The workflow could not be imported."); } finally { setImportingWorkflow(false); } };
+  const useHistoryImageForEdit = async () => {
+    if (!selectedImage || reopeningImage) return;
+    setReopeningImage(true);
+    setWorkflowError(null);
+    try {
+      setSourceImage(await imageHistorySource(selectedImage));
+      setSelectedImage(null);
+    } catch (error) {
+      setWorkflowError(error instanceof Error ? error.message : "The saved local image could not be reopened for editing.");
+    } finally { setReopeningImage(false); }
+  };
   return <div className="feature-page image-studio-page">
     <PageHeader eyebrow="IMAGE STUDIO" title="Create visual work" description="A creative local workspace for prompts, saved workflows, and generated outputs." actions={<StatusBadge tone={readiness.tone}>{readiness.label}</StatusBadge>} />
     <div className="image-studio-layout">
@@ -92,6 +133,6 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, images,
       </div><div className="studio-readiness"><StatusBadge tone={readiness.tone}>{readiness.label}</StatusBadge><span>{readiness.detail}</span></div><div className="form-footer"><span>{selectedProvider === "diffusers" ? sourceImage ? "Edits run locally with Stable Diffusion Turbo." : "First generation downloads the selected model locally." : sourceImage ? "Edit workflow needs {{image}} and {{prompt}}." : "Outputs stay in this local workspace history."}</span><Button variant="primary" disabled={busy || !prompt.trim() || (selectedProvider === "diffusers" ? !imageRuntime?.dependenciesAvailable : !endpoint.trim() || !workflow.trim() || Boolean(workflow.includes("{{image}}") && !sourceImage) || Boolean(sourceImage && !workflow.includes("{{image}}")))} onClick={() => onGenerate(sourceImage ?? undefined)}>{busy ? "Generating…" : sourceImage ? "Edit image" : "Generate image"}</Button></div></Card>
       <Card className="image-history"><div className="panel-heading"><div><p className="section-kicker">GENERATION HISTORY</p><h3>Recent outputs</h3></div><span className="panel-count">{images.length}</span></div>{images.length === 0 ? <EmptyState title="No generated images" description="Your local outputs will appear here after a successful generation." /> : <div className="image-gallery">{images.map((image) => <button className="image-result" key={image.url} type="button" onClick={() => setSelectedImage(image)}><img src={image.url} alt={image.fileName} /><span>{image.fileName}</span></button>)}</div>}</Card>
     </div>
-    <ModalDialog open={Boolean(selectedImage)} onClose={() => setSelectedImage(null)} titleId="image-preview-title" className="ui-dialog image-preview-dialog"><div className="dialog-heading"><div><p className="section-kicker">OUTPUT INSPECTOR</p><h3 id="image-preview-title">{selectedImage?.fileName ?? "Image preview"}</h3><p>Generated locally with {(selectedImage?.provider ?? selectedProvider) === "diffusers" ? "Stable Diffusion Turbo" : "the ComfyUI workflow"}.</p>{selectedImage?.prompt && <p>{selectedImage.prompt}</p>}</div><button type="button" onClick={() => setSelectedImage(null)} aria-label="Close image preview">×</button></div>{selectedImage && <img className="image-preview-full" src={selectedImage.url} alt={selectedImage.fileName} />}<div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setSelectedImage(null)}>Close</Button>{selectedImage && <a className="ui-button ui-button-secondary" href={selectedImage.url} download={selectedImage.fileName}>Download image</a>}</div></ModalDialog>
+    <ModalDialog open={Boolean(selectedImage)} onClose={() => setSelectedImage(null)} titleId="image-preview-title" className="ui-dialog image-preview-dialog"><div className="dialog-heading"><div><p className="section-kicker">OUTPUT INSPECTOR</p><h3 id="image-preview-title">{selectedImage?.fileName ?? "Image preview"}</h3><p>Generated locally with {(selectedImage?.provider ?? selectedProvider) === "diffusers" ? "Stable Diffusion Turbo" : "the ComfyUI workflow"}.</p>{selectedImage?.prompt && <p>{selectedImage.prompt}</p>}</div><button type="button" onClick={() => setSelectedImage(null)} aria-label="Close image preview">×</button></div>{selectedImage && <img className="image-preview-full" src={selectedImage.url} alt={selectedImage.fileName} />}<div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setSelectedImage(null)}>Close</Button>{selectedImage && <Button variant="secondary" type="button" disabled={reopeningImage} onClick={() => void useHistoryImageForEdit()}>{reopeningImage ? "Opening…" : "Use for edit"}</Button>}{selectedImage && <a className="ui-button ui-button-secondary" href={selectedImage.url} download={selectedImage.fileName}>Download image</a>}</div></ModalDialog>
   </div>;
 }
