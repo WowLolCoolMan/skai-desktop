@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties } from "react";
-import type { Model, ThemeMode } from "../../app/types";
+import type { Model, Route, ThemeMode } from "../../app/types";
 import type { AgentResponse, CloseBehavior, UpdateCheckResult } from "../../../shared/contracts";
 import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
-import { deletePetSpriteProfile, getPetSpriteProfile, listPetSpriteProfiles, PET_ANIMATIONS, savePetSpriteProfile, validatePetProfileImport, validatePetStrip, type PetAnimationId, type PetSpriteProfile, type PetStrip } from "./petSprites";
+import { listPetSpriteProfiles, savePetSpriteProfile, validatePetStrip, type PetSpriteProfile, type PetStrip } from "./petSprites";
 import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 
@@ -80,6 +80,7 @@ type SettingsProps = {
   reduceMotion: boolean;
   petVisible: boolean;
   petWander: boolean;
+  petInteractionDemo: boolean;
   petCharacter: string;
   petSpriteDataUrl: string;
   developerMode: boolean;
@@ -91,6 +92,7 @@ type SettingsProps = {
   onDiscoverModels: () => void | Promise<boolean>;
   onImageChange: (key: "endpoint" | "prompt" | "workflow", value: string) => void;
   onExportMemory: () => void;
+  onNavigate: (route: Route) => void;
 };
 
 export function SettingsPage(props: SettingsProps) {
@@ -120,16 +122,6 @@ export function SettingsPage(props: SettingsProps) {
   }, []);
   const change = (key: string, value: string | boolean) => { setSaveState("idle"); props.onChange(key, value); };
   const selectedOllamaModel = props.models.find((entry) => entry.model === props.model && (entry.provider ?? "").toLowerCase() === "ollama");
-  const currentModelChoice = props.models.find((entry) => entry.model === props.model && (entry.provider === "AirLLM" ? selectedProviderId === "AirLLM" : entry.endpoint === props.endpoint));
-  const modelChoiceKey = (entry: Model) => `${entry.provider ?? ""}|${entry.endpoint ?? ""}|${entry.model}`;
-  const selectModelChoice = (key: string) => {
-    const entry = props.models.find((candidate) => modelChoiceKey(candidate) === key);
-    if (!entry) return;
-    const nextProvider = entry.provider === "AirLLM" || entry.provider === "Ollama" || entry.provider === "LM Studio" ? entry.provider : "Local API";
-    change("provider", nextProvider);
-    if (entry.endpoint) change("endpoint", entry.endpoint);
-    change("model", entry.model);
-  };
   const contextSupport = selectedOllamaModel?.contextLength == null ? "unknown" : selectedOllamaModel.contextLength >= 1_048_576 ? "supported" : "unsupported";
   const save = async () => { if (saveState === "saving") return; setSaveState("saving"); try { setSaveState(await props.onSave() ? "saved" : "idle"); } catch { setSaveState("idle"); } };
   const discoverModels = async () => { if (discoveringModels) return; setDiscoveringModels(true); await props.onDiscoverModels(); setDiscoveringModels(false); };
@@ -185,9 +177,9 @@ export function SettingsPage(props: SettingsProps) {
     <div className="settings-window">
       <aside className="settings-nav"><p className="section-kicker">SETTINGS</p><input className="settings-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search settings…" aria-label="Search settings" />{normalizedQuery && <p className="settings-search-status" role="status">{visibleCategories.length} matching {visibleCategories.length === 1 ? "section" : "sections"}</p>}{visibleCategories.map((category) => <button className={activeCategory === category ? "is-active" : ""} key={category} onClick={() => setActiveCategory(category)} type="button"><NavIcon name={categoryIcons[category]} /><span>{category}</span></button>)}{visibleCategories.length === 0 && <p className="settings-no-results">No settings match. Try a label such as endpoint, motion, or memory.</p>}</aside>
       <main className="settings-content">
-        <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h3>{activeCategory}</h3><p>{categoryDescription(activeCategory)}</p></div><StatusBadge tone={activeCategory === "Integrations" ? "neutral" : "success"}>{activeCategory === "Integrations" ? "Review connections" : "Available"}</StatusBadge></div>
+        <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h3>{activeCategory}</h3><p>{categoryDescription(activeCategory)}</p></div></div>
 
-        {activeCategory === "General" && <><CloseBehaviorSetting /><div className="settings-callout"><strong>{selectedProvider.label}</strong><span>{selectedProvider.detail}</span></div><div className="settings-field"><label>How should Skai answer?<select value={selectedProviderId} onChange={(event) => change("provider", event.target.value)}>{providerChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><label>Preferred model<select value={currentModelChoice ? modelChoiceKey(currentModelChoice) : "__current"} onChange={(event) => selectModelChoice(event.target.value)}><option value="__current">{props.model} · current selection</option>{props.models.map((item) => <option key={modelChoiceKey(item)} value={modelChoiceKey(item)}>{item.displayName || item.model} · {item.provider || "Local runtime"}</option>)}</select></label></div><p className="settings-help">Choosing a discovered model also selects its local runtime and endpoint. All model runtimes run on this computer.</p></>}
+        {activeCategory === "General" && <><CloseBehaviorSetting /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
 
         {activeCategory === "Appearance" && <><div className="settings-field"><label>Color theme<select value={props.themeMode} onChange={(event) => change("themeMode", event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label><label>Accent<select value={props.accentColor} onChange={(event) => change("accentColor", event.target.value)}><option value="cyan">Cyan</option><option value="violet">Violet</option><option value="amber">Amber</option><option value="rose">Rose</option></select></label></div><div className="settings-field"><label>Interface density<select value={props.density} onChange={(event) => change("density", event.target.value)}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label><label>Backdrop<select value={props.backdrop} onChange={(event) => change("backdrop", event.target.value)}><option value="none">None</option><option value="deep-sea">Deep sea</option><option value="deep-space">Deep space</option></select></label></div><Toggle label="Reduced motion" detail="Minimize interface animations and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /></>}
 
@@ -232,14 +224,14 @@ function CloseBehaviorSetting() {
   return <div className="settings-field settings-field-single"><label>When you close the window<select value={behavior} onChange={update}><option value="ask">Ask every time</option><option value="background">Run in background</option><option value="quit">Fully close</option></select><small className="settings-help">Applies to window-manager close shortcuts such as Super+C. Quit any time from the tray menu.</small></label></div>;
 }
 
-function Toggle({ label, detail, checked, onChange }: { label: string; detail: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <label className="settings-toggle"><span><strong>{label}</strong><small>{detail}</small></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /></label>;
+function Toggle({ label, detail, checked, onChange, disabled = false }: { label: string; detail: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
+  return <label className={`settings-toggle${disabled ? " is-disabled" : ""}`}><span><strong>{label}</strong><small>{detail}</small></span><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /></label>;
 }
 
 function PetSettings({ props, change }: { props: SettingsProps; change: (key: string, value: string | boolean) => void }) {
   const [character, setCharacter] = useState(props.petCharacter);
   const [profiles, setProfiles] = useState<PetSpriteProfile[]>([]);
-  const [profileName, setProfileName] = useState("My companion");
+  const [workshopEnabled, setWorkshopEnabled] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
   const [profileError, setProfileError] = useState<string | null>(null);
   const activeProfileId = character.startsWith("custom:") ? character.slice("custom:".length) : null;
   const activeProfile = profiles.find((profile) => profile.id === activeProfileId) ?? null;
@@ -269,62 +261,17 @@ function PetSettings({ props, change }: { props: SettingsProps; change: (key: st
     localStorage.setItem("skai.pet.character", value);
     change("petCharacter", value);
   };
-  const createProfile = async () => {
-    const name = profileName.trim().slice(0, 48);
-    if (!name) { setProfileError("Give your companion a name first."); return; }
-    const profile = { id: crypto.randomUUID(), name, strips: {} } satisfies PetSpriteProfile;
-    try {
-      await savePetSpriteProfile(profile);
-      setProfiles((current) => [...current, profile]);
-      setProfileName("");
-      setProfileError(null);
-      chooseCharacter(`custom:${profile.id}`);
-    } catch (error) { setProfileError(error instanceof Error ? error.message : "The companion profile could not be saved."); }
-  };
-  const importProfile = async (file?: File) => {
-    if (!file) return;
-    try {
-      const profile = await validatePetProfileImport(file);
-      await savePetSpriteProfile(profile);
-      setProfiles((current) => [...current, profile]);
-      setProfileError(null);
-      chooseCharacter(`custom:${profile.id}`);
-    } catch (error) { setProfileError(error instanceof Error ? error.message : "The companion profile could not be imported."); }
-  };
-  const updateStrip = async (animation: PetAnimationId, file?: File) => {
-    if (!activeProfile || !file) return;
-    setProfileError(null);
-    try {
-      const strip = await validatePetStrip(file);
-      const updated = { ...activeProfile, strips: { ...activeProfile.strips, [animation]: strip } };
-      await savePetSpriteProfile(updated);
-      setProfiles((current) => current.map((profile) => profile.id === updated.id ? updated : profile));
-    } catch (error) { setProfileError(error instanceof Error ? error.message : "This sprite strip could not be used."); }
-  };
-  const removeStrip = async (animation: PetAnimationId) => {
-    if (!activeProfile) return;
-    const strips = { ...activeProfile.strips };
-    delete strips[animation];
-    const updated = { ...activeProfile, strips };
-    await savePetSpriteProfile(updated);
-    setProfiles((current) => current.map((profile) => profile.id === updated.id ? updated : profile));
-  };
-  const removeProfile = async () => {
-    if (!activeProfile) return;
-    await deletePetSpriteProfile(activeProfile.id);
-    setProfiles((current) => current.filter((profile) => profile.id !== activeProfile.id));
-    chooseCharacter("percy");
-  };
+  const setWorkshop = (enabled: boolean) => { setWorkshopEnabled(enabled); localStorage.setItem("skai.pet.workshop.enabled", String(enabled)); window.dispatchEvent(new Event("skai:pet-workshop-setting")); };
   return <>
     <div className="settings-callout"><strong>Separate desktop companion</strong><span>Percy is its own transparent, always-on-top window. It can be dragged anywhere and stays independent from the Skai workspace.</span></div>
     <Toggle label="Show Percy" detail="Open the companion above your other windows." checked={props.petVisible} onChange={(value) => change("petVisible", value)} />
     <Toggle label="Let Percy walk around" detail="Allow gentle ambient movement while Percy is idle. Dragging always pauses movement." checked={props.petWander} onChange={(value) => change("petWander", value)} />
+    <Toggle label="Show Pet Workshop" detail="Add Pet Workshop to Extras (Quick Actions) for sprite drawing and companion behavior." checked={workshopEnabled} onChange={setWorkshop} />
+    {workshopEnabled && <div className="settings-field"><Button variant="secondary" onClick={() => props.onNavigate("pet-workshop")}>Open Pet Workshop</Button></div>}
+    <Toggle label="DEMO - More Interaction" detail={window.serverRockAgent?.pet?.interactionDemoAvailable ? "Occasionally perch on visible window tops and walk along the taskbar edge. Dragging pauses movement." : "Extra surface interactions are unavailable on this platform. Regular walking still works."} checked={props.petInteractionDemo} disabled={!window.serverRockAgent?.pet?.interactionDemoAvailable || !props.petWander} onChange={(value) => change("petInteractionDemo", value)} />
     <div className="settings-field"><label>Companion<select value={character} onChange={(event) => chooseCharacter(event.target.value)}><option value="percy">Percy · Skai wolf</option><option value="byte">Byte · neon bot</option><option value="ember">Ember · ember fox</option><option value="nova">Nova · star cat</option><option value="rocky">Rocky · pocket rock</option><option value="sprout">Sprout · tiny plant</option>{profiles.map((profile) => <option key={profile.id} value={`custom:${profile.id}`}>{profile.name} · custom</option>)}</select></label><div className="pet-settings-preview"><img src={activeProfile?.strips.idle?.dataUrl || builtInPetPreviews[character] || builtInPetPreviews.percy} alt="" /><span>{activeProfile ? `${activeProfile.name} · custom profile` : "Built-in sprite set"}</span></div></div>
-    <section className="pet-profile-builder" aria-label="Custom companion profiles"><div><p className="section-kicker">MAKE A COMPANION</p><h4>Create a custom pet</h4><p>Name a profile, then add the animation strips you have. Missing states fall back to the built-in pet animation until you add one.</p></div><div className="pet-profile-create"><input value={profileName} onChange={(event) => setProfileName(event.target.value)} maxLength={48} placeholder="Companion name" aria-label="Custom companion name" /><Button variant="secondary" onClick={() => void createProfile()}>Create profile</Button><label className="ui-button ui-button-secondary"><span>Import profile</span><input type="file" accept="application/json,.json" onChange={(event) => { void importProfile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div>
-      {activeProfile && <><div className="pet-profile-title"><strong>{activeProfile.name} animations</strong><Button variant="ghost" onClick={() => void removeProfile()}>Delete profile</Button></div><div className="pet-animation-grid">{PET_ANIMATIONS.map((animation) => { const strip = activeProfile.strips[animation.id]; return <article className="pet-animation-card" key={animation.id}><div className={`pet-animation-preview${strip ? " is-animated" : " is-fallback"}`} aria-label={`${animation.label} strip preview`} style={strip ? petStripPreviewStyle(strip) : undefined} /> <div className="pet-animation-copy"><strong>{animation.label}</strong><small>{strip ? `Preview · 6 frames · ${strip.frameWidth} × ${strip.frameHeight} each` : "Using built-in fallback"}</small><label className="ui-button ui-button-secondary"><span>{strip ? "Replace strip" : "Add strip"}</span><input type="file" accept="image/png,image/webp" onChange={(event) => { void updateStrip(animation.id, event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>{strip && <Button variant="ghost" onClick={() => void removeStrip(animation.id)}>Use fallback</Button>}</div></article>; })}</div><div className="pet-profile-actions"><Button variant="secondary" onClick={() => { const blob = new Blob([JSON.stringify(activeProfile)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${activeProfile.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || "skai-pet"}.json`; link.click(); window.setTimeout(() => URL.revokeObjectURL(link.href), 1000); }}>Export profile</Button></div></>}
-      {profileError && <p className="form-error" role="alert">{profileError}</p>}
-      <p className="settings-help">Each PNG or WebP must be a single horizontal row of six equal-width frames with transparent pixels. Strips can have different frame sizes; Skai scales them to fit. Each strip can be up to 5 MB.</p>
-    </section>
+    {activeProfile && <div className="settings-callout"><strong>{activeProfile.name}</strong><span>Use Pet Workshop to draw ten-frame animation strips and customize this companion’s behavior. Legacy six-frame artwork remains stored until replaced.</span></div>}
+    {profileError && <p className="form-error" role="alert">{profileError}</p>}
   </>;
 }
 

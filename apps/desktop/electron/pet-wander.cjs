@@ -166,6 +166,21 @@ class PetWanderPlanner {
     return { target, path: PetWanderPlanner.buildPath(start, target, reachable), planned: true };
   }
 
+  tryPlanWalkTo(from, target, blocked) {
+    const start = clampCell(from);
+    const destination = clampCell(target);
+    const reachable = PetWanderPlanner.reachableFrom(start, blocked);
+    reachable.delete(cellKey(start));
+    if (reachable.size === 0) return { target: start, path: [], planned: false };
+    const candidates = [...reachable.values()].sort((left, right) => {
+      const leftDistance = Math.max(Math.abs(left.column - destination.column), Math.abs(left.row - destination.row));
+      const rightDistance = Math.max(Math.abs(right.column - destination.column), Math.abs(right.row - destination.row));
+      return leftDistance - rightDistance || left.row - right.row || left.column - right.column;
+    });
+    const selected = candidates[0];
+    return { target: selected, path: PetWanderPlanner.buildPath(start, selected, reachable), planned: true };
+  }
+
   static planPath(from, to, blocked) {
     const start = clampCell(from);
     const target = { column: to.column, row: to.row };

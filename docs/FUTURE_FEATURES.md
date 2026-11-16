@@ -34,6 +34,7 @@ cancellation, permission review, and local credential handling.
 
 ## Core chat
 
+- [ ] Visible user-selected Chat/Think, Coding, and Security/Risky modes. The active mode must be obvious and passed to the selected model. Do not add Skai-side intent classification, topic filtering, or automatic refusal behavior; model-level behavior belongs to the selected model.
 - [x] Multi-model picker supporting any compatible provider.
 - [x] Side-by-side model comparison.
 - [x] File, image, and PDF upload with bounded local retrieval-augmented context. (Selectable-text PDFs, supported images, and text attachments are policy-checked; broader extraction and semantic retrieval remain open.)

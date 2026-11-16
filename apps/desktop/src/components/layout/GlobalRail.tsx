@@ -11,7 +11,14 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
 
 export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (route: Route) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showPetWorkshop, setShowPetWorkshop] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
   const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const refresh = () => setShowPetWorkshop(localStorage.getItem("skai.pet.workshop.enabled") === "true");
+    window.addEventListener("storage", refresh);
+    window.addEventListener("skai:pet-workshop-setting", refresh);
+    return () => { window.removeEventListener("storage", refresh); window.removeEventListener("skai:pet-workshop-setting", refresh); };
+  }, []);
   useEffect(() => {
     if (!menuOpen) return;
     const closeOutside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
@@ -33,7 +40,7 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
       {destinations.map((item) => <button key={item.route} className={route === item.route ? "is-active" : ""} type="button" aria-current={route === item.route ? "page" : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.route)}><NavIcon name={item.icon} /></button>)}
       <div className="global-rail-app-menu" ref={menuRef}>
         <button className={menuOpen ? "is-active" : ""} type="button" aria-label="Quick actions" title="Quick actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><NavIcon name="more" /></button>
-        {menuOpen && <div className="global-rail-app-menu-panel" role="group" aria-label="Quick actions">{menuItems.map((item) => <button type="button" key={item.route} onClick={() => { setMenuOpen(false); onNavigate(item.route); }}><NavIcon name={item.icon} /><span>{item.label}</span></button>)}<div className="global-rail-app-menu-divider" /><button type="button" onClick={() => { setMenuOpen(false); onNavigate("marketplace"); }}><NavIcon name="marketplace" /><span>Voice Workbench &amp; tools</span></button></div>}
+    {menuOpen && <div className="global-rail-app-menu-panel" role="group" aria-label="Quick actions">{menuItems.map((item) => <button type="button" key={item.route} onClick={() => { setMenuOpen(false); onNavigate(item.route); }}><NavIcon name={item.icon} /><span>{item.label}</span></button>)}{showPetWorkshop && <button type="button" onClick={() => { setMenuOpen(false); onNavigate("pet-workshop"); }}><NavIcon name="sparkle" /><span>Pet Workshop</span></button>}<div className="global-rail-app-menu-divider" /><button type="button" onClick={() => { setMenuOpen(false); onNavigate("marketplace"); }}><NavIcon name="marketplace" /><span>Voice Workbench &amp; tools</span></button></div>}
       </div>
     </nav>
     <div className="global-rail-more">

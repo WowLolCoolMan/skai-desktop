@@ -83,9 +83,10 @@ type ChatPageProps = {
   onTogglePinned: () => void;
   onArchive: () => void;
   onRenameConversation: (title: string) => Promise<boolean>;
+  workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ provider, model, endpoint, models, messages, busy, taskBusy, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onPlanTask, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation }: ChatPageProps) {
+export function ChatPage({ provider, model, endpoint, models, messages, busy, taskBusy, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onPlanTask, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, workspaceMode = "conversation" }: ChatPageProps) {
   const [taskPrefill] = useState<ChatTaskPrefill | null>(takeTaskPrefill);
   const [draft, setDraft] = useState(() => readChatDraft(conversationId));
   const [documentsOnly, setDocumentsOnly] = useState(false);
@@ -205,7 +206,7 @@ export function ChatPage({ provider, model, endpoint, models, messages, busy, ta
     if (saved) setRenameOpen(false);
   };
 
-  return <div className="feature-page chat-page">
+  return <div className={`feature-page chat-page ${workspaceMode === "project" ? "project-task-chat" : ""}`}>
     <div className="chat-context-bar">
       <div><p className="section-kicker">{temporaryChat ? "TEMPORARY CHAT" : "CONVERSATION"}</p><strong>{conversationId ? conversationTitle : "New chat"}</strong><span>{temporaryChat ? "This chat stays in memory only and won’t appear in Recents." : `${provider} · saved on this device · keep the thread focused, then turn work into a reviewed task when needed.`}</span></div>
       <div className="chat-header-actions"><ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>

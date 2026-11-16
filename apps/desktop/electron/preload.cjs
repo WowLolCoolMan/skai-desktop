@@ -40,8 +40,10 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
     openFolder: () => ipcRenderer.invoke("plugins:open-downloads"),
   },
   pet: {
+    interactionDemoAvailable: process.platform === "win32",
     setVisible: (visible) => ipcRenderer.send("pet:set-visible", Boolean(visible)),
     setMotion: (settings) => ipcRenderer.send("pet:set-motion", settings),
+    setBehaviorSettings: (settings) => ipcRenderer.send("pet:set-behavior", settings),
     setState: (state) => ipcRenderer.send("pet:set-state", state),
     beginDrag: (point) => ipcRenderer.send("pet:drag-start", point),
     moveDrag: (point) => ipcRenderer.send("pet:drag-move", point),
@@ -66,6 +68,11 @@ contextBridge.exposeInMainWorld("serverRockAgent", {
       const listener = (_event, activity) => handler(activity);
       ipcRenderer.on("pet:activity", listener);
       return () => ipcRenderer.removeListener("pet:activity", listener);
+    },
+    onEntrance: (handler) => {
+      const listener = (_event, entering) => handler(Boolean(entering));
+      ipcRenderer.on("pet:entrance", listener);
+      return () => ipcRenderer.removeListener("pet:entrance", listener);
     },
   },
   tray: {

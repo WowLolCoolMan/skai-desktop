@@ -7,6 +7,8 @@ const readline = require("node:readline");
 const { randomUUID } = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
+const { listVisibleWindows } = require("./pet-surfaces.cjs");
+const { normalizePetBehaviorSettings, randomAttackSequence } = require("./pet-attack.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
 const { augmentUserPath } = require("./user-path.cjs");
 
@@ -54,6 +56,12 @@ let tray;
 let trayRefreshSequence = 0;
 let petReady = false;
 let petDragOffset = null;
+let petEntranceTimer;
+let petEntranceSequence = 0;
+let petEntranceTargetBounds = null;
+let petEntranceWalk = null;
+let petEntranceStartedAt = 0;
+let petEntranceMoving = false;
 let petDragTimer;
 let petWanderPauseTimer;
 let petWanderStepTimer;
@@ -62,8 +70,21 @@ let petWanderWalk = null;
 let petWanderStartedAt = 0;
 let petWanderNextAt = 0;
 let petWanderLayoutSignature = "";
+let petWanderPlanning = false;
+let petWanderPlanSequence = 0;
+let petBehaviorSettings = normalizePetBehaviorSettings(null);
+let petBehaviorPauseTimer;
+let petBehaviorStepTimer;
+let petBehaviorRunning = false;
+let petBehaviorSequence = [];
+let petBehaviorOrigin = null;
+let petBehaviorTarget = null;
+let petBehaviorWalk = null;
+let petBehaviorWalkMode = null;
+let petBehaviorWalkStartedAt = 0;
+let petBehaviorResumeWander = false;
 const petWanderPlanner = new PetWanderPlanner();
-let petMotion = { wander: true, reduceMotion: false };
+let petMotion = { wander: true, reduceMotion: false, interactionDemo: false };
 // The OS "reduce motion" / "show animations: off" preference also stills Percy: the renderer's
 // prefers-reduced-motion CSS stops the sprite, so wandering would slide a frozen sprite around.
 function osPrefersReducedMotion() {
@@ -162,15 +183,18 @@ function stopPetWander() {
   petWanderStepTimer = undefined;
   petWanderWalk = null;
   petWanderMoving = false;
-  setPetActivity("idle");
+  petWanderPlanning = false;
+  petWanderPlanSequence += 1;
+  if (!petEntranceMoving) setPetActivity("idle");
 }
 
-function setPetActivity(state, facing = petActivity.facing) {
-  const allowedStates = new Set(["idle", "walk", "thinking", "coding", "coding_malicious", "stuck", "needs-attention"]);
+function setPetActivity(state, facing = petActivity.facing, target = undefined) {
+  const allowedStates = new Set(["idle", "walk", "thinking", "coding", "coding_malicious", "stuck", "needs-attention", "angry", "pounce", "fire-breath"]);
   const nextState = allowedStates.has(state) ? state : "idle";
   const nextFacing = facing === -1 ? -1 : 1;
-  if (petActivity.state === nextState && petActivity.facing === nextFacing) return;
-  petActivity = { state: nextState, facing: nextFacing };
+  const nextTarget = target && Number.isFinite(target.x) && Number.isFinite(target.y) ? { x: target.x, y: target.y } : undefined;
+  if (petActivity.state === nextState && petActivity.facing === nextFacing && petActivity.target?.x === nextTarget?.x && petActivity.target?.y === nextTarget?.y) return;
+  petActivity = { state: nextState, facing: nextFacing, ...(nextTarget ? { target: nextTarget } : {}) };
   if (petReady && petWindow && !petWindow.isDestroyed()) petWindow.webContents.send("pet:activity", petActivity);
 }
 
@@ -215,23 +239,273 @@ function petWanderLayout() {
   return { area, bounds, grid, blocked, signature };
 }
 
+function petBehaviorCanRun() {
+  return Boolean(petWindow && !petWindow.isDestroyed() && petWindow.isVisible() && !petDragOffset && !petEntranceMoving && !petMotion.reduceMotion && !osPrefersReducedMotion());
+}
+
+function clearPetBehaviorTimers() {
+  if (petBehaviorPauseTimer) clearTimeout(petBehaviorPauseTimer);
+  if (petBehaviorStepTimer) clearTimeout(petBehaviorStepTimer);
+  petBehaviorPauseTimer = undefined;
+  petBehaviorStepTimer = undefined;
+}
+
+function stopPetBehavior(returnToOrigin = false) {
+  const wasRunning = petBehaviorRunning;
+  clearPetBehaviorTimers();
+  if (returnToOrigin && petBehaviorRunning && petBehaviorOrigin && windowPositioningAvailable && petWindow && !petWindow.isDestroyed()) {
+    try { petWindow.setPosition(petBehaviorOrigin.x, petBehaviorOrigin.y); } catch {}
+  }
+  petBehaviorRunning = false;
+  petBehaviorSequence = [];
+  petBehaviorWalk = null;
+  petBehaviorTarget = null;
+  petBehaviorWalkMode = null;
+  petBehaviorOrigin = null;
+  petBehaviorResumeWander = false;
+  if (wasRunning || petActivity.state === "angry" || petActivity.state === "pounce" || petActivity.state === "fire-breath") setPetActivity("idle");
+  if (petBehaviorSettings.enabled) schedulePetBehaviorAttack();
+}
+
+function schedulePetBehaviorAttack() {
+  if (petBehaviorPauseTimer || petBehaviorRunning || !petBehaviorSettings.enabled || !petBehaviorCanRun()) return;
+  const minimum = petBehaviorSettings.minimumIntervalSeconds;
+  const maximum = Math.max(minimum, petBehaviorSettings.maximumIntervalSeconds);
+  const delay = (minimum + Math.random() * (maximum - minimum)) * 1000;
+  petBehaviorPauseTimer = setTimeout(() => {
+    petBehaviorPauseTimer = undefined;
+    startPetBehaviorAttack();
+  }, delay);
+}
+
+function petBehaviorActivityAllowed() {
+  return (petActivity.state === "idle" && petBehaviorSettings.triggerDuringIdle)
+    || (petActivity.state === "walk" && petBehaviorSettings.triggerDuringWalk);
+}
+
+function petBehaviorTargetPosition(cursor) {
+  const bounds = petWindow.getBounds();
+  const facing = cursor.x >= bounds.x + bounds.width / 2 ? 1 : -1;
+  const position = clampPetPosition({
+    x: facing === 1 ? cursor.x - PET_WINDOW_WIDTH + 18 : cursor.x - 18,
+    y: cursor.y - Math.floor(PET_WINDOW_HEIGHT / 2),
+  });
+  return { position, facing };
+}
+
+function petBehaviorAimPoint() {
+  if (!petWindow || petWindow.isDestroyed()) return undefined;
+  const cursor = screen.getCursorScreenPoint();
+  const bounds = petWindow.getBounds();
+  return {
+    x: Math.max(8, Math.min(PET_WINDOW_WIDTH - 8, cursor.x - bounds.x)),
+    y: Math.max(8, Math.min(PET_WINDOW_HEIGHT - 8, cursor.y - bounds.y)),
+  };
+}
+
+function makePetBehaviorWalk(fromBounds, toBounds, speed = 380) {
+  if (!windowPositioningAvailable) return null;
+  const { area, grid, blocked } = petWanderLayout();
+  const start = grid.clampPetPosition({ x: fromBounds.x - area.x, y: fromBounds.y - area.y });
+  const target = grid.clampPetPosition({ x: toBounds.x - area.x, y: toBounds.y - area.y });
+  const startCell = grid.cellForPetPosition(start);
+  const targetCell = grid.cellForPetPosition(target);
+  const cells = PetWanderPlanner.planPath(startCell, targetCell, blocked);
+  const waypoints = cells.map((cell) => grid.petPositionFor(cell));
+  if (waypoints.length === 0 && (Math.abs(start.x - target.x) > 2 || Math.abs(start.y - target.y) > 2)) waypoints.push(target);
+  return waypoints.length > 0 ? new PetWalk(start, waypoints, speed) : null;
+}
+
+function movePetForBehavior(mode, targetBounds) {
+  if (!petBehaviorRunning || !petBehaviorCanRun() || !petBehaviorWalk || !petWindow || petWindow.isDestroyed()) {
+    petBehaviorWalk = null;
+    petBehaviorStepTimer = undefined;
+    return;
+  }
+  const { area, grid } = petWanderLayout();
+  const elapsed = (Date.now() - petBehaviorWalkStartedAt) / 1000;
+  const relative = grid.clampPetPosition(petBehaviorWalk.positionAt(elapsed));
+  const x = Math.trunc(area.x + relative.x);
+  const y = Math.trunc(area.y + relative.y);
+  try {
+    petWindow.setPosition(x, y);
+    if (mode === "approach") setPetActivity("walk", petBehaviorTarget?.facing ?? 1);
+  } catch {
+    petBehaviorWalk = null;
+    petBehaviorStepTimer = undefined;
+    if (mode === "return") finishPetBehavior();
+    else performNextPetBehaviorAction();
+    return;
+  }
+  if (petBehaviorWalk.isFinished(elapsed)) {
+    petBehaviorWalk = null;
+    petBehaviorStepTimer = undefined;
+    if (mode === "approach") {
+      petWindow.setPosition(Math.trunc(targetBounds.x), Math.trunc(targetBounds.y));
+      petBehaviorTarget = petBehaviorTargetPosition(screen.getCursorScreenPoint());
+      setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint());
+      petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 460);
+    } else finishPetBehavior();
+    return;
+  }
+  petBehaviorStepTimer = setTimeout(() => movePetForBehavior(mode, targetBounds), 55);
+}
+
+function startPetBehaviorWalk(mode, targetBounds) {
+  if (!windowPositioningAvailable || !petWindow || petWindow.isDestroyed()) {
+    if (mode === "return") finishPetBehavior();
+    else performNextPetBehaviorAction();
+    return;
+  }
+  const bounds = petWindow.getBounds();
+  petBehaviorWalk = makePetBehaviorWalk(bounds, targetBounds);
+  if (!petBehaviorWalk) {
+    if (mode === "approach") {
+      petBehaviorTarget = petBehaviorTargetPosition(screen.getCursorScreenPoint());
+      setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint());
+      petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 460);
+    } else finishPetBehavior();
+    return;
+  }
+  petBehaviorWalkMode = mode;
+  petBehaviorWalkStartedAt = Date.now();
+  movePetForBehavior(mode, targetBounds);
+}
+
+function finishPetBehavior() {
+  clearPetBehaviorTimers();
+  petBehaviorRunning = false;
+  petBehaviorSequence = [];
+  petBehaviorWalk = null;
+  petBehaviorWalkMode = null;
+  petBehaviorTarget = null;
+  petBehaviorOrigin = null;
+  const resumeWander = petBehaviorResumeWander;
+  petBehaviorResumeWander = false;
+  petBehaviorTarget = null;
+  setPetActivity("idle");
+  persistPetState();
+  if (resumeWander && petMotion.wander) {
+    petWanderNextAt = Date.now() + 1;
+    schedulePetWander();
+  } else petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
+  schedulePetBehaviorAttack();
+}
+
+function performNextPetBehaviorAction() {
+  if (!petBehaviorRunning || !petBehaviorCanRun()) { stopPetBehavior(false); return; }
+  const action = petBehaviorSequence.shift();
+  if (!action) {
+    if (windowPositioningAvailable && petBehaviorOrigin && petWindow && !petWindow.isDestroyed()) {
+      startPetBehaviorWalk("return", petBehaviorOrigin);
+    } else finishPetBehavior();
+    return;
+  }
+  if (action === "approach-cursor") {
+    const cursor = screen.getCursorScreenPoint();
+    const { position, facing } = petBehaviorTargetPosition(cursor);
+    petBehaviorTarget = { facing, position };
+    startPetBehaviorWalk("approach", position);
+    return;
+  }
+  if (action === "pounce") {
+    const aim = petBehaviorAimPoint();
+    setPetActivity("pounce", petBehaviorTarget?.facing ?? 1, aim);
+    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 560);
+    return;
+  }
+  if (action === "fire-breath") {
+    const aim = petBehaviorAimPoint();
+    setPetActivity("fire-breath", petBehaviorTarget?.facing ?? 1, aim);
+    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1150);
+  }
+}
+
+function startPetBehaviorAttack() {
+  if (!petBehaviorSettings.enabled || !petBehaviorCanRun() || !petBehaviorActivityAllowed()) {
+    schedulePetBehaviorAttack();
+    return;
+  }
+  const sequence = randomAttackSequence(petBehaviorSettings);
+  if (sequence.length === 0) { schedulePetBehaviorAttack(); return; }
+  petBehaviorRunning = true;
+  petBehaviorOrigin = petWindow.getBounds();
+  petBehaviorResumeWander = petActivity.state === "walk" || Boolean(petWanderWalk);
+  if (petWanderPauseTimer) clearTimeout(petWanderPauseTimer);
+  if (petWanderStepTimer) clearTimeout(petWanderStepTimer);
+  petWanderPauseTimer = undefined;
+  petWanderStepTimer = undefined;
+  petWanderWalk = null;
+  petWanderMoving = false;
+  petBehaviorSequence = sequence;
+  const cursor = screen.getCursorScreenPoint();
+  petBehaviorTarget = petBehaviorTargetPosition(cursor);
+  setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint());
+  petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 520);
+}
+
 function schedulePetWander() {
   if (!windowPositioningAvailable) return;
-  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
-  if (petWanderPauseTimer || petWanderStepTimer) return;
+  if (petBehaviorRunning) return;
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset || petEntranceMoving) return;
+  if (petWanderPauseTimer || petWanderStepTimer || petWanderPlanning) return;
   const delay = Math.max(0, petWanderNextAt - Date.now()) || petWanderPlanner.nextRestSeconds() * 1000;
   petWanderPauseTimer = setTimeout(() => {
     petWanderPauseTimer = undefined;
-    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
+    if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset || petEntranceMoving) return;
     startPetWander();
   }, delay);
 }
 
-function startPetWander() {
+function petDemoShelfTarget(area, grid, windows) {
+  const taskbarDisplays = screen.getAllDisplays().filter((display) => {
+    const { bounds, workArea } = display;
+    return workArea.y === bounds.y && workArea.width > 0 && workArea.height > 0
+      && bounds.y + bounds.height - (workArea.y + workArea.height) > 1;
+  });
+  const windowTargets = windows.filter((rect) => screen.getAllDisplays().some(({ workArea }) => {
+    return rect.x < workArea.x + workArea.width && rect.x + rect.width > workArea.x
+      && rect.y >= workArea.y && rect.y < workArea.y + workArea.height;
+  }));
+  const useWindow = windowTargets.length > 0 && (taskbarDisplays.length === 0 || Math.random() < 0.68);
+  if (useWindow) {
+    const rect = windowTargets[Math.floor(Math.random() * windowTargets.length)];
+    const left = rect.x + 12;
+    const right = Math.max(left, rect.x + rect.width - PET_WINDOW_WIDTH - 12);
+    return grid.clampPetPosition({
+      x: left + Math.random() * (right - left) - area.x,
+      y: rect.y - PET_WINDOW_HEIGHT - area.y,
+    });
+  }
+  if (taskbarDisplays.length === 0) return null;
+  const display = taskbarDisplays[Math.floor(Math.random() * taskbarDisplays.length)];
+  const left = display.workArea.x + 8;
+  const right = Math.max(left, display.workArea.x + display.workArea.width - PET_WINDOW_WIDTH - 8);
+  return grid.clampPetPosition({
+    x: left + Math.random() * (right - left) - area.x,
+    y: display.workArea.y + display.workArea.height - PET_WINDOW_HEIGHT - area.y,
+  });
+}
+
+async function startPetWander() {
+  if (petBehaviorRunning) return;
   if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
+  const planSequence = ++petWanderPlanSequence;
+  petWanderPlanning = true;
   const { area, bounds, grid, blocked, signature } = petWanderLayout();
   const relative = grid.clampPetPosition({ x: bounds.x - area.x, y: bounds.y - area.y });
-  const plan = petWanderPlanner.tryPlanWalk(grid.cellForPetPosition(relative), blocked);
+  let demoTarget = null;
+  if (petMotion.interactionDemo && process.platform === "win32") {
+    let excludedHandle = "0";
+    try { excludedHandle = petWindow.getNativeWindowHandle().readBigUInt64LE(0).toString(); } catch {}
+    const visibleWindows = await listVisibleWindows(excludedHandle);
+    if (planSequence !== petWanderPlanSequence || !petMotion.wander || !petMotion.interactionDemo || petDragOffset) return;
+    demoTarget = petDemoShelfTarget(area, grid, visibleWindows);
+  }
+  petWanderPlanning = false;
+  const plan = demoTarget
+    ? petWanderPlanner.tryPlanWalkTo(grid.cellForPetPosition(relative), grid.cellForPetPosition(demoTarget), blocked)
+    : petWanderPlanner.tryPlanWalk(grid.cellForPetPosition(relative), blocked);
   if (!plan.planned || plan.path.length === 0) {
     petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
     petWanderLayoutSignature = signature;
@@ -239,7 +513,12 @@ function startPetWander() {
     return;
   }
   // Keep each walk smooth, then leave a longer idle interval before the next one.
-  const walk = new PetWalk(relative, plan.path.map((cell) => grid.petPositionFor(cell)), 220);
+  const waypoints = plan.path.map((cell) => grid.petPositionFor(cell));
+  if (demoTarget && waypoints.length > 0) {
+    const last = waypoints[waypoints.length - 1];
+    if (Math.hypot(last.x - demoTarget.x, last.y - demoTarget.y) > 1) waypoints.push(demoTarget);
+  }
+  const walk = new PetWalk(relative, waypoints, 220);
   if (walk.length < 1) {
     petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
     schedulePetWander();
@@ -253,6 +532,7 @@ function startPetWander() {
 }
 
 function movePetTowardTarget() {
+  if (petBehaviorRunning) return;
   if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petWanderWalk || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) {
     petWanderStepTimer = undefined;
     petWanderMoving = false;
@@ -314,7 +594,7 @@ function persistPetState() {
   const state = readPetState();
   state.visible = petWindow.isVisible();
   // getBounds() reports 0,0 on native Wayland; keep the last real position.
-  if (windowPositioningAvailable) state.bounds = petWindow.getBounds();
+  if (windowPositioningAvailable && !petEntranceMoving) state.bounds = petWindow.getBounds();
   void fs.mkdir(app.getPath("userData"), { recursive: true }).then(() => fs.writeFile(petStatePath(), JSON.stringify(state, null, 2), "utf8")).catch(() => {});
 }
 
@@ -330,12 +610,102 @@ function sendPetVisibility(visible) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("pet:visibility", visible);
 }
 
+function stopPetEntrance(restoreTarget = false) {
+  if (petEntranceTimer) clearTimeout(petEntranceTimer);
+  petEntranceTimer = undefined;
+  petEntranceSequence += 1;
+  if (restoreTarget && windowPositioningAvailable && petEntranceTargetBounds && petWindow && !petWindow.isDestroyed()) {
+    try { petWindow.setPosition(petEntranceTargetBounds.x, petEntranceTargetBounds.y); } catch {}
+  }
+  petEntranceMoving = false;
+  petEntranceWalk = null;
+  petEntranceTargetBounds = null;
+  if (!windowPositioningAvailable && petReady && petWindow && !petWindow.isDestroyed()) petWindow.webContents.send("pet:entrance", false);
+  if (petActivity.state === "walk") setPetActivity("idle");
+}
+
+function finishPetEntrance(sequence) {
+  if (sequence !== petEntranceSequence || !petWindow || petWindow.isDestroyed()) return;
+  if (petEntranceTimer) clearTimeout(petEntranceTimer);
+  petEntranceTimer = undefined;
+  if (windowPositioningAvailable && petEntranceTargetBounds) {
+    try { petWindow.setPosition(petEntranceTargetBounds.x, petEntranceTargetBounds.y); } catch {}
+  }
+  petEntranceMoving = false;
+  petEntranceWalk = null;
+  petEntranceTargetBounds = null;
+  if (!windowPositioningAvailable && petReady) petWindow.webContents.send("pet:entrance", false);
+  setPetActivity("idle");
+  persistPetState();
+  schedulePetWander();
+  schedulePetBehaviorAttack();
+}
+
+function stepPetEntrance(sequence) {
+  if (sequence !== petEntranceSequence || !petEntranceMoving || !petWindow || petWindow.isDestroyed() || !petWindow.isVisible()) return;
+  if (windowPositioningAvailable && petEntranceWalk) {
+    const elapsed = (Date.now() - petEntranceStartedAt) / 1000;
+    const position = petEntranceWalk.positionAt(elapsed);
+    try {
+      petWindow.setPosition(Math.round(position.x), Math.round(position.y));
+      const facing = petEntranceWalk.facingAt(elapsed);
+      if (facing) setPetActivity("walk", facing);
+    } catch {
+      finishPetEntrance(sequence);
+      return;
+    }
+    if (petEntranceWalk.isFinished(elapsed)) {
+      finishPetEntrance(sequence);
+      return;
+    }
+  }
+  petEntranceTimer = setTimeout(() => stepPetEntrance(sequence), 32);
+}
+
+function startPetEntrance() {
+  if (!petWindow || petWindow.isDestroyed() || petWindow.isVisible() || !petReady || petMotion.reduceMotion || osPrefersReducedMotion()) return false;
+  const sequence = ++petEntranceSequence;
+  petEntranceMoving = true;
+  if (!windowPositioningAvailable) {
+    const facing = Math.random() < 0.5 ? 1 : -1;
+    setPetActivity("walk", facing);
+    petWindow.webContents.send("pet:entrance", true);
+    petWindow.showInactive();
+    petEntranceTimer = setTimeout(() => finishPetEntrance(sequence), 1450);
+    return true;
+  }
+
+  const bounds = petWindow.getBounds();
+  const workArea = screen.getDisplayMatching(bounds).workArea;
+  const target = clampPetPosition({ x: bounds.x, y: bounds.y });
+  const fromLeft = target.x + PET_WINDOW_WIDTH / 2 < workArea.x + workArea.width / 2;
+  const start = {
+    x: fromLeft ? workArea.x - PET_WINDOW_WIDTH + 30 : workArea.x + workArea.width - 30,
+    y: target.y,
+  };
+  petEntranceTargetBounds = { ...bounds, x: target.x, y: target.y };
+  petEntranceWalk = new PetWalk(start, [target], 520);
+  petEntranceStartedAt = Date.now();
+  setPetActivity("walk", fromLeft ? 1 : -1);
+  try { petWindow.setPosition(start.x, start.y); } catch { stopPetEntrance(false); return false; }
+  petWindow.showInactive();
+  stepPetEntrance(sequence);
+  return true;
+}
+
 function setPetVisible(visible) {
   if (!petWindow || petWindow.isDestroyed()) return;
   if (visible) {
-    petWindow.showInactive();
-    schedulePetWander();
+    const wasVisible = petWindow.isVisible();
+    const entering = !wasVisible && startPetEntrance();
+    if (!wasVisible && !entering) petWindow.showInactive();
+    if (!entering) {
+      schedulePetWander();
+      schedulePetBehaviorAttack();
+    }
   } else {
+    stopPetEntrance(true);
+    stopPetBehavior(true);
     stopPetWander();
     petWindow.hide();
   }
@@ -460,11 +830,12 @@ function createPetWindow() {
     },
   });
   petWindow.setAlwaysOnTop(true, "floating");
-  petWindow.on("moved", () => { if (!petWanderMoving) persistPetState(); });
+  petWindow.on("moved", () => { if (!petWanderMoving && !petEntranceMoving) persistPetState(); });
   petWindow.webContents.on("did-finish-load", () => {
     petReady = true;
     petWindow.webContents.send("pet:activity", petActivity);
     flushPetMessages();
+    schedulePetBehaviorAttack();
   });
   // Window managers can close Percy directly (Hyprland/i3 close-window keybinds
   // ignore `closable: false`). Treat that as "hide Percy" so the tray and
@@ -490,11 +861,15 @@ function createPetWindow() {
     void petWindow.loadFile(path.join(rendererRoot, "dist", "index.html"), { query: petQuery });
   }
   petWindow.once("ready-to-show", () => {
-    persistPetState();
     if (savedState.visible !== false) {
-      petWindow?.showInactive();
-      schedulePetWander();
-    }
+      const entering = startPetEntrance();
+      if (!entering) {
+        petWindow?.showInactive();
+        schedulePetWander();
+        schedulePetBehaviorAttack();
+        persistPetState();
+      }
+    } else persistPetState();
   });
   return petWindow;
 }
@@ -1051,21 +1426,40 @@ app.whenReady().then(() => {
   });
   ipcMain.on("pet:set-motion", (event, settings) => {
     if (!BrowserWindow.fromWebContents(event.sender) || !settings || typeof settings !== "object") return;
-    petMotion = { wander: Boolean(settings.wander), reduceMotion: Boolean(settings.reduceMotion) };
+    petMotion = {
+      wander: Boolean(settings.wander),
+      reduceMotion: Boolean(settings.reduceMotion),
+      interactionDemo: process.platform === "win32" && Boolean(settings.interactionDemo),
+    };
+    if (petMotion.reduceMotion || osPrefersReducedMotion()) {
+      stopPetEntrance(true);
+      stopPetBehavior(true);
+    }
     stopPetWander();
     petWindow?.webContents.send("pet:motion", petMotion);
     schedulePetWander();
+    schedulePetBehaviorAttack();
+  });
+  ipcMain.on("pet:set-behavior", (event, settings) => {
+    if (BrowserWindow.fromWebContents(event.sender) !== petWindow) return;
+    stopPetBehavior(true);
+    if (petBehaviorPauseTimer) clearTimeout(petBehaviorPauseTimer);
+    petBehaviorPauseTimer = undefined;
+    petBehaviorSettings = normalizePetBehaviorSettings(settings);
+    schedulePetBehaviorAttack();
   });
   ipcMain.on("pet:set-state", (event, state) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return;
     const allowedStates = new Set(["idle", "thinking", "coding", "coding_malicious", "stuck", "needs-attention"]);
     if (typeof state !== "string" || !allowedStates.has(state)) return;
-    if (state === "idle") schedulePetWander();
-    else stopPetWander();
+    if (state === "idle" && petEntranceMoving) return;
+    if (state === "idle") { schedulePetWander(); schedulePetBehaviorAttack(); }
+    else { stopPetBehavior(true); stopPetWander(); }
     setPetActivity(state);
   });
   ipcMain.on("pet:drag-start", (event, point) => {
     if (!windowPositioningAvailable || BrowserWindow.fromWebContents(event.sender) !== petWindow || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    stopPetBehavior(false);
     stopPetWander();
     stopPetDrag();
     const bounds = petWindow.getBounds();
@@ -1082,6 +1476,7 @@ app.whenReady().then(() => {
     stopPetDrag();
     persistPetState();
     schedulePetWander();
+    schedulePetBehaviorAttack();
   });
   createWindow();
   registerGlobalLauncher();
@@ -1102,6 +1497,7 @@ app.on("before-quit", () => {
   isQuitting = true;
   globalShortcut.unregister(globalLauncherAccelerator);
   stopPetWander();
+  stopPetBehavior(false);
   if (petWindow && !petWindow.isDestroyed()) petWindow.destroy();
   stopAgentHost();
 });

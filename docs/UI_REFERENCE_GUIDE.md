@@ -20,6 +20,8 @@ The app should feel approachable for everyday chat while giving advanced users d
 - Model discovery should separate regular and uncensored/obliterated catalog views and make the source and license visible.
 - Pets are optional local companions that can be selected, shown or hidden, and customized. Do not reuse ChatGPT brand assets.
 - Updates should have a clear source and channel and verify downloaded artifacts. Any GitHub-based rolling update behavior must be attached to this app's GitHub repository and must not silently depend on Skai Desktop services.
+- **User-directed modes:** Chat/Think, Coding, and Security/Risky work should be explicit, immediately visible, and selected by the user. Pass the selected mode as context to the chosen model. Skai must not add app-side intent classification, topic filtering, or automatic refusal behavior. Do not imply this overrides behavior built into the selected model.
+- **Owner's product principle:** “We do not care what you make, if anything we have the tools for anything you would like.” Treat this as product direction, not a claim that every possible tool is already implemented. Make available tools easy to discover and use.
 - Keep the default surface calm and understandable. Advanced settings, provider details, and rarely used actions should be grouped by purpose rather than piled into one long menu or dialog.
 - Cross-platform packaging is a goal for Linux and Windows. State exact tested distributions and Windows versions; do not claim support from build targets alone.
 

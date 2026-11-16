@@ -1478,6 +1478,7 @@ public static class AgentHostLoop
             {
                 id = session.Id,
                 title = session.Title,
+                mode = session.Mode,
                 messages = session.Messages,
                 projectId = session.ProjectId,
                 projectName = session.ProjectName,
@@ -1500,6 +1501,7 @@ public static class AgentHostLoop
             {
                 id = hit.Session.Id,
                 title = hit.Session.Title,
+                mode = hit.Session.Mode,
                 messages = hit.Session.Messages,
                 projectId = hit.Session.ProjectId,
                 projectName = hit.Session.ProjectName,
@@ -1548,12 +1550,16 @@ public static class AgentHostLoop
         var store = CreateConversationStore();
         var sessions = store.Load();
         var requestedId = OptionalString(request, "id");
+        var requestedMode = OptionalString(request, "mode");
+        if (requestedMode is not null && requestedMode is not (WorkspaceModes.Chat or WorkspaceModes.CodingAgent))
+            throw new InvalidOperationException("The conversation mode is invalid.");
         var session = string.IsNullOrWhiteSpace(requestedId)
-            ? new ChatSession { Title = title, Messages = messages }
+            ? new ChatSession { Title = title, Messages = messages, Mode = requestedMode ?? WorkspaceModes.Chat }
             : sessions.SingleOrDefault(item => item.Id == requestedId)
               ?? throw new InvalidOperationException("The requested conversation does not exist.");
         session.Title = title;
         session.Messages = messages;
+        if (requestedMode is not null) session.Mode = requestedMode;
         var projectId = OptionalString(request, "projectId");
         if (string.IsNullOrWhiteSpace(projectId))
         {

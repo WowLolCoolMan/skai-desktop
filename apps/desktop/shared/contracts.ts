@@ -68,6 +68,7 @@ export type DesktopPullRequestDraft = {
 export type DesktopConversation = {
   id: string;
   title: string;
+  mode?: "ChatBot" | "Coding Agent";
   messages: Array<{ role: "user" | "assistant" | "system"; content: string; attachments?: ChatAttachment[] }>;
   projectId?: string | null;
   projectName?: string | null;
@@ -125,11 +126,23 @@ export type DesktopQueuedMessage = {
 export type PetMotionSettings = {
   wander: boolean;
   reduceMotion: boolean;
+  interactionDemo: boolean;
 };
 
 export type PetActivity = {
-  state: "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "needs-attention";
+  state: "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "needs-attention" | "angry" | "pounce" | "fire-breath";
   facing: 1 | -1;
+  target?: { x: number; y: number };
+};
+
+export type PetAttackAction = "approach-cursor" | "pounce" | "fire-breath";
+export type PetBehaviorSettings = {
+  enabled: boolean;
+  triggerDuringIdle: boolean;
+  triggerDuringWalk: boolean;
+  minimumIntervalSeconds: number;
+  maximumIntervalSeconds: number;
+  actions: PetAttackAction[];
 };
 
 export type PetCompletionEvent = {
@@ -139,8 +152,11 @@ export type PetCompletionEvent = {
 };
 
 export interface PetBridge {
+  /** Whether this platform can provide demo window-surface interactions. */
+  interactionDemoAvailable: boolean;
   setVisible(visible: boolean): void;
   setMotion(settings: PetMotionSettings): void;
+  setBehaviorSettings(settings: PetBehaviorSettings): void;
   setState(state: PetActivity["state"]): void;
   beginDrag(point: { x: number; y: number }): void;
   moveDrag(point: { x: number; y: number }): void;
@@ -150,6 +166,7 @@ export interface PetBridge {
   onVisibilityChange(handler: (visible: boolean) => void): () => void;
   onMotionChange(handler: (settings: PetMotionSettings) => void): () => void;
   onActivityChange(handler: (activity: PetActivity) => void): () => void;
+  onEntrance(handler: (entering: boolean) => void): () => void;
 }
 
 /** What closing the main window does. "ask" shows the Linux close prompt. */

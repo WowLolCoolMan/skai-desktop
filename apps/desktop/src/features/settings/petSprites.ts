@@ -8,11 +8,81 @@ export const PET_ANIMATIONS = [
   { id: "needs-attention", label: "Needs attention", pose: "error" },
   { id: "success", label: "Success", pose: "success" },
   { id: "malicious-coding", label: "Malicious coding", pose: "coding_malicious" },
+  { id: "angry", label: "Angry", pose: "angry" },
+  { id: "pounce", label: "Pounce / attack", pose: "pounce" },
+  { id: "fire-breath", label: "Fire breath", pose: "fire-breath" },
+] as const;
+
+export const PET_FRAME_COUNT = 10;
+export const PET_ACTIONS = [
+  { id: "approach-cursor", label: "Approach the cursor", needsCursor: true },
+  { id: "pounce", label: "Pounce / lunge", needsCursor: true },
+  { id: "fire-breath", label: "Breathe fire", needsCursor: true },
 ] as const;
 
 export type PetAnimationId = typeof PET_ANIMATIONS[number]["id"];
-export type PetStrip = { dataUrl: string; frameWidth: number; frameHeight: number };
-export type PetSpriteProfile = { id: string; name: string; strips: Partial<Record<PetAnimationId, PetStrip>> };
+export type PetActionId = PetAttackAction;
+export type PetStrip = { dataUrl: string; frameWidth: number; frameHeight: number; frameCount?: number };
+export type PetSpriteProfile = {
+  id: string;
+  name: string;
+  strips: Partial<Record<PetAnimationId, PetStrip>>;
+  behavior?: PetBehaviorSettings;
+};
+
+export function petStripFrameCount(strip: PetStrip): number {
+  // Old profiles did not persist a frame count; they contain six-cel strips.
+  return strip.frameCount ?? 6;
+}
+
+export function defaultPetBehavior(name: string, enabled = false): PetBehaviorSettings {
+  const blaze = name.trim().toLocaleLowerCase() === "blaze";
+  return {
+    enabled: enabled || blaze,
+    triggerDuringIdle: true,
+    triggerDuringWalk: true,
+    minimumIntervalSeconds: 60,
+    maximumIntervalSeconds: 180,
+    actions: ["approach-cursor", "pounce", "fire-breath"],
+  };
+}
+
+export function normalizePetBehavior(value: unknown, name = ""): PetBehaviorSettings {
+  const fallback = defaultPetBehavior(name);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+  const candidate = value as Partial<PetBehaviorSettings>;
+  const allowed = new Set<string>(PET_ACTIONS.map((action) => action.id));
+  const actions = Array.isArray(candidate.actions)
+    ? [...new Set(candidate.actions.filter((action): action is PetActionId => typeof action === "string" && allowed.has(action)))]
+    : fallback.actions;
+  const minimumIntervalSeconds = clampInterval(candidate.minimumIntervalSeconds, 60);
+  const maximumIntervalSeconds = Math.max(minimumIntervalSeconds, clampInterval(candidate.maximumIntervalSeconds, 180));
+  return {
+    enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled,
+    triggerDuringIdle: typeof candidate.triggerDuringIdle === "boolean" ? candidate.triggerDuringIdle : true,
+    triggerDuringWalk: typeof candidate.triggerDuringWalk === "boolean" ? candidate.triggerDuringWalk : true,
+    minimumIntervalSeconds,
+    maximumIntervalSeconds,
+    actions,
+  };
+}
+
+function clampInterval(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(Math.max(20, Math.min(480, parsed))) : fallback;
+}
+
+export function makePetAttackSequence(settings: PetBehaviorSettings, random = Math.random): PetActionId[] {
+  const available = settings.actions.filter((action) => PET_ACTIONS.some((item) => item.id === action));
+  if (available.length === 0) return [];
+  const selected = available.filter(() => random() < 0.66);
+  if (selected.length === 0) selected.push(available[Math.floor(random() * available.length)]);
+  const approachNeeded = selected.some((action) => action === "pounce" || action === "fire-breath");
+  const sequence: PetActionId[] = [];
+  if (approachNeeded || selected.includes("approach-cursor")) sequence.push("approach-cursor");
+  sequence.push(...selected.filter((action) => action !== "approach-cursor"));
+  return sequence;
+}
 
 const databaseName = "skai-companion-profiles";
 const profileStore = "profiles";
@@ -83,7 +153,7 @@ export async function deletePetSpriteProfile(id: string): Promise<void> {
   }
 }
 
-export async function validatePetStrip(file: File): Promise<PetStrip> {
+export async function validatePetStrip(file: File, allowLegacySixFrames = false): Promise<PetStrip> {
   if (!(file.type === "image/png" || file.type === "image/webp")) throw new Error("Choose a PNG or WebP sprite strip.");
   if (file.size > 5 * 1024 * 1024) throw new Error("Each sprite strip must be 5 MB or smaller.");
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -98,9 +168,10 @@ export async function validatePetStrip(file: File): Promise<PetStrip> {
     decoded.onerror = () => reject(new Error("This image could not be decoded."));
     decoded.src = dataUrl;
   });
-  if (image.naturalWidth < 6 || image.naturalHeight < 1 || image.naturalWidth % 6 !== 0)
-    throw new Error("The strip must have six equal-width frames in one horizontal row.");
-  const frameWidth = image.naturalWidth / 6;
+  const frameCount = image.naturalWidth % PET_FRAME_COUNT === 0 ? PET_FRAME_COUNT : allowLegacySixFrames && image.naturalWidth % 6 === 0 ? 6 : 0;
+  if (!frameCount || image.naturalWidth < frameCount || image.naturalHeight < 1)
+    throw new Error("The strip must have ten equal-width frames in one horizontal row. Frame 0 is the resting pose.");
+  const frameWidth = image.naturalWidth / frameCount;
   if (frameWidth > 2048 || image.naturalHeight > 2048)
     throw new Error("Each frame must be 2048 pixels or smaller in either direction.");
   const canvas = document.createElement("canvas");
@@ -109,18 +180,25 @@ export async function validatePetStrip(file: File): Promise<PetStrip> {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Skai could not inspect this sprite strip.");
   context.drawImage(image, 0, 0);
+  if (frameCount === PET_FRAME_COUNT) {
+    const rest = context.getImageData(0, 0, frameWidth, image.naturalHeight);
+    context.putImageData(rest, frameWidth * (PET_FRAME_COUNT - 1), 0);
+  }
   try {
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
     let hasTransparentPixel = false;
+    let hasVisiblePixel = false;
     for (let index = 3; index < pixels.length; index += 4) {
-      if (pixels[index] < 255) { hasTransparentPixel = true; break; }
+      if (pixels[index] < 255) hasTransparentPixel = true;
+      if (pixels[index] > 0) hasVisiblePixel = true;
     }
+    if (!hasVisiblePixel) throw new Error("Draw or import visible artwork before saving this animation.");
     if (!hasTransparentPixel) throw new Error("Use a transparent background so the companion fits cleanly over your desktop.");
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Use a transparent")) throw error;
+    if (error instanceof Error && (error.message.startsWith("Use a transparent") || error.message.startsWith("Draw or import"))) throw error;
     throw new Error("Skai could not verify the strip transparency. Export it as a PNG or WebP with transparency and try again.");
   }
-  return { dataUrl, frameWidth, frameHeight: image.naturalHeight };
+  return { dataUrl: frameCount === PET_FRAME_COUNT ? canvas.toDataURL("image/png") : dataUrl, frameWidth, frameHeight: image.naturalHeight, frameCount };
 }
 
 export async function validatePetProfileImport(file: File): Promise<PetSpriteProfile> {
@@ -130,7 +208,7 @@ export async function validatePetProfileImport(file: File): Promise<PetSpritePro
   try { value = JSON.parse(await file.text()); }
   catch { throw new Error("This companion profile is not valid JSON."); }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("This file does not contain a companion profile.");
-  const candidate = value as { name?: unknown; strips?: unknown };
+  const candidate = value as { name?: unknown; strips?: unknown; behavior?: unknown };
   if (typeof candidate.name !== "string" || !candidate.name.trim() || candidate.name.length > 48 || !candidate.strips || typeof candidate.strips !== "object" || Array.isArray(candidate.strips))
     throw new Error("The profile needs a name and an animations collection.");
   const strips: Partial<Record<PetAnimationId, PetStrip>> = {};
@@ -144,7 +222,9 @@ export async function validatePetProfileImport(file: File): Promise<PetSpritePro
     try { blob = await (await fetch(dataUrl)).blob(); }
     catch { throw new Error(`${animation.label} could not be read from the profile.`); }
     if (blob.size > 5 * 1024 * 1024) throw new Error(`${animation.label} is larger than 5 MB.`);
-    strips[animation.id] = await validatePetStrip(new File([blob], `${animation.id}.${blob.type === "image/webp" ? "webp" : "png"}`, { type: blob.type }));
+    strips[animation.id] = await validatePetStrip(new File([blob], `${animation.id}.${blob.type === "image/webp" ? "webp" : "png"}`, { type: blob.type }), true);
   }
-  return { id: crypto.randomUUID(), name: candidate.name.trim(), strips };
+  return { id: crypto.randomUUID(), name: candidate.name.trim(), strips, behavior: normalizePetBehavior(candidate.behavior, candidate.name) };
 }
+import type { PetAttackAction, PetBehaviorSettings } from "../../../shared/contracts";
+

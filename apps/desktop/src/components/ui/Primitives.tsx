@@ -10,7 +10,7 @@ export function Button({ children, variant = "secondary", className = "", ...pro
 }
 
 export function PageHeader({ eyebrow, title, description, actions, className = "" }: { eyebrow: string; title: string; description: string; actions?: ReactNode; className?: string }) {
-  return <header className={`page-header ${className}`}><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2><p className="page-description">{description}</p></div>{actions && <div className="page-actions">{actions}</div>}</header>;
+  return <header className={`page-header ${className}`}><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-description">{description}</p></div>{actions && <div className="page-actions">{actions}</div>}</header>;
 }
 
 export function StatusBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "danger" }) {

@@ -7,6 +7,7 @@ site](https://wowlolcoolman.github.io/skai-desktop/).
 
 - [Capability matrix](CAPABILITY_MATRIX.md) — implemented, partial, and planned
   areas with the remaining boundaries.
+- [ChatGPT/Codex vs. Skai difference register](CHATGPT_CODEX_VS_SKAI_DIFFERENCES.md) — product, UI-flow, capability, privacy, and platform comparison.
 - [Future features](FUTURE_FEATURES.md) — active product backlog, scoped to the
   local-first product boundary.
 - [Release readiness](RELEASE_READINESS.md) — current packaging and acceptance

@@ -22,7 +22,7 @@ export function routeFromLocation(): Route {
 }
 
 export function isRoute(value: string): value is Route {
-  return ["chat", "projects", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory", "usage"].includes(value);
+  return ["chat", "projects", "coding", "settings", "models", "images", "marketplace", "workbench", "terminal", "memory", "usage", "pet-workshop"].includes(value);
 }
 
 function readHistoryState(): NavigationState | null {

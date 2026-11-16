@@ -48,14 +48,20 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     return (response.result as { path?: string | null }).path ?? null;
   };
 
-  const saveProject = async (name: string, instructions: string, folderPaths: string[]) => {
+  const saveProject = async (name: string, instructions: string, folderPaths: string[]): Promise<DesktopProject | null> => {
     const response = await request("project.save", { name, instructions, folderPaths });
-    if (!response.ok) { onError(response.error?.message ?? "Project could not be saved."); return false; }
+    if (!response.ok) { onError(response.error?.message ?? "Project could not be saved."); return null; }
+    const result = response.result as { id?: string; updatedAt?: string };
+    const createdId = result.id;
+    if (!createdId) { onError("Project was saved, but Skai could not identify it to open the workspace."); return null; }
+    const savedProject: DesktopProject = { id: createdId, name, instructions, folderPaths, updatedAt: result.updatedAt ?? new Date().toISOString(), gitHubRepository: null };
     const refreshed = await request("projects.list");
-    if (refreshed.ok) setProjects((refreshed.result as DesktopProject[]) ?? []);
-    else onError(refreshed.error?.message ?? "Projects could not be refreshed.");
+    if (!refreshed.ok) { setProjects((current) => [savedProject, ...current.filter((project) => project.id !== createdId)]); onError(null); return savedProject; }
+    const updatedProjects = (refreshed.result as DesktopProject[]) ?? [];
+    const createdProject = updatedProjects.find((project) => project.id === createdId) ?? savedProject;
+    setProjects(updatedProjects.some((project) => project.id === createdId) ? updatedProjects : [savedProject, ...updatedProjects]);
     onError(null);
-    return true;
+    return createdProject;
   };
 
   const selectProject = async (project: DesktopProject) => {

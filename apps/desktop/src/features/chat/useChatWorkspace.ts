@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AgentRequest } from "../../services/agentClient";
 import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage } from "../../../shared/contracts";
 import type { Message } from "../../app/types";
@@ -12,6 +12,8 @@ type ChatWorkspaceOptions = {
   provider: string;
   endpoint: string;
   model: string;
+  mode: "ChatBot" | "Coding Agent";
+  project?: { id: string; name: string; instructions?: string } | null;
   onError: (message: string | null) => void;
 };
 
@@ -43,7 +45,9 @@ function skillMentions(messages: Array<{ content: string }>) {
   return [...ids].slice(0, 4);
 }
 
-export function useChatWorkspace({ request, connection, provider, endpoint, model, onError }: ChatWorkspaceOptions) {
+export function useChatWorkspace({ request, connection, provider, endpoint, model, mode, project, onError }: ChatWorkspaceOptions) {
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -57,10 +61,13 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       if (conversationResponse.ok) {
         const loaded = (conversationResponse.result as DesktopConversation[]) ?? [];
         setConversations(loaded);
-        const first = loaded[0];
+        const first = loaded.find((conversation) => (conversation.mode ?? "ChatBot") === modeRef.current);
         if (first) {
           setConversationId(first.id);
           setMessages(first.messages.filter((item) => item.role !== "system") as Message[]);
+        } else {
+          setConversationId(null);
+          setMessages([]);
         }
       } else onError(conversationResponse.error?.message ?? "Conversations could not be loaded.");
       if (queueResponse.ok) setQueuedMessages((queueResponse.result as DesktopQueuedMessage[]) ?? []);
@@ -71,7 +78,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   const saveConversation = async (nextMessages: Message[], id = conversationId) => {
     const existingTitle = id ? conversations.find((conversation) => conversation.id === id)?.title : undefined;
     const title = existingTitle || nextMessages.find((item) => item.role === "user")?.content.slice(0, 80) || "New chat";
-    const response = await request("conversation.save", { id: id ?? undefined, title, messages: nextMessages });
+    const response = await request("conversation.save", { id: id ?? undefined, title, mode, messages: nextMessages, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) });
     if (!response.ok) { onError(response.error?.message ?? "Conversation could not be saved."); return id; }
     const savedId = (response.result as { id: string }).id;
     setConversationId(savedId);

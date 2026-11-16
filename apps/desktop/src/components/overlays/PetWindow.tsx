@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import type { PetActivity, PetCompletionEvent, PetMotionSettings } from "../../../shared/contracts";
-import { NavIcon } from "../ui/NavIcon";
-import { getPetSpriteProfile, type PetAnimationId, type PetSpriteProfile } from "../../features/settings/petSprites";
+import type { PetActivity, PetBehaviorSettings, PetCompletionEvent, PetMotionSettings } from "../../../shared/contracts";
+import { defaultPetBehavior, getPetSpriteProfile, petStripFrameCount, type PetAnimationId, type PetSpriteProfile } from "../../features/settings/petSprites";
 
-type PetPose = "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "success" | "error" | "needs-attention";
-type BuiltinPose = Exclude<PetPose, "needs-attention">;
+type PetPose = "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "success" | "error" | "needs-attention" | "angry" | "pounce" | "fire-breath";
+type BuiltinPose = Exclude<PetPose, "needs-attention" | "angry" | "pounce" | "fire-breath">;
 const BUILTIN_STRIPS: Record<string, Record<BuiltinPose, string>> = {
   percy: {
     idle: new URL("../../../../../assets/pets/generated/percy-idle-frames.png", import.meta.url).href,
@@ -75,7 +74,7 @@ const COMPOSITOR_DRAG = new URLSearchParams(window.location.search).get("drag") 
 const OPAQUE_SURFACE = new URLSearchParams(window.location.search).get("surface") === "opaque";
 const animationByPose: Record<PetPose, PetAnimationId> = {
   idle: "idle", walk: "walking", thinking: "thinking", coding: "working", coding_malicious: "malicious-coding",
-  stuck: "stuck", success: "success", error: "fail", "needs-attention": "needs-attention",
+  stuck: "stuck", success: "success", error: "fail", "needs-attention": "needs-attention", angry: "angry", pounce: "pounce", "fire-breath": "fire-breath",
 };
 const BUILTIN_NAMES: Record<string, string> = { percy: "Percy", byte: "Byte", ember: "Ember", nova: "Nova", rocky: "Rocky", sprout: "Sprout" };
 
@@ -90,8 +89,9 @@ export function PetWindow() {
   const [pose, setPose] = useState<PetPose>("walk");
   const [bubble, setBubble] = useState<string | null>(null);
   const [bubbleKind, setBubbleKind] = useState<PetCompletionEvent["kind"]>("success");
-  const [motion, setMotion] = useState<PetMotionSettings>({ wander: true, reduceMotion: false });
+  const [motion, setMotion] = useState<PetMotionSettings>({ wander: true, reduceMotion: false, interactionDemo: false });
   const [activity, setActivity] = useState<PetActivity>({ state: "idle", facing: 1 });
+  const [entering, setEntering] = useState(false);
   const [character, setCharacter] = useState(readPetCharacter);
   const [customProfile, setCustomProfile] = useState<PetSpriteProfile | null>(null);
   const dragging = useRef(false);
@@ -108,11 +108,22 @@ export function PetWindow() {
     let active = true;
     const syncProfile = async (nextCharacter = readPetCharacter()) => {
       setCharacter(nextCharacter);
-      if (!nextCharacter.startsWith("custom:")) { setCustomProfile(null); return; }
+      if (!nextCharacter.startsWith("custom:")) {
+        setCustomProfile(null);
+        window.serverRockAgent?.pet?.setBehaviorSettings(defaultPetBehavior(BUILTIN_NAMES[nextCharacter] ?? "", false));
+        return;
+      }
       try {
         const profile = await getPetSpriteProfile(nextCharacter.slice("custom:".length));
-        if (active) setCustomProfile(profile);
-      } catch { if (active) setCustomProfile(null); }
+        if (active) {
+          setCustomProfile(profile);
+          const behavior: PetBehaviorSettings = profile?.behavior ?? defaultPetBehavior(profile?.name ?? "", false);
+          window.serverRockAgent?.pet?.setBehaviorSettings(behavior);
+        }
+      } catch {
+        if (active) setCustomProfile(null);
+        window.serverRockAgent?.pet?.setBehaviorSettings(defaultPetBehavior("", false));
+      }
     };
     void syncProfile();
     const syncSettings = () => { void syncProfile(); };
@@ -141,6 +152,7 @@ export function PetWindow() {
     const removeMessage = pet.onMessage(showCompletion);
     const removeMotion = pet.onMotionChange(setMotion);
     const removeActivity = pet.onActivityChange(setActivity);
+    const removeEntrance = pet.onEntrance(setEntering);
     const cancelDrag = () => {
       if (!dragging.current) return;
       dragging.current = false;
@@ -151,6 +163,7 @@ export function PetWindow() {
       removeMessage();
       removeMotion();
       removeActivity();
+      removeEntrance();
       window.removeEventListener("blur", cancelDrag);
       cancelDrag();
       window.clearTimeout(bubbleTimer.current);
@@ -163,7 +176,7 @@ export function PetWindow() {
   const activePose = pose === "success" || pose === "error" || pose === "needs-attention" ? pose : COMPOSITOR_DRAG ? "idle" : activity.state;
   const animationId = animationByPose[activePose];
   const customStrip = customProfile?.strips[animationId];
-  const builtinPose: BuiltinPose = activePose === "needs-attention" ? "error" : activePose;
+  const builtinPose: BuiltinPose = activePose === "needs-attention" ? "error" : activePose === "angry" || activePose === "pounce" || activePose === "fire-breath" ? "idle" : activePose;
   // A custom companion may omit a state, but it must never borrow another
   // companion's artwork. Reuse that profile's idle strip instead and keep its
   // identity stable while the missing state is being displayed.
@@ -175,7 +188,11 @@ export function PetWindow() {
   const frameScale = resolvedCustomStrip ? Math.min(128 / resolvedCustomStrip.frameWidth, 128 / resolvedCustomStrip.frameHeight) : 1;
   const frameWidth = resolvedCustomStrip ? resolvedCustomStrip.frameWidth * frameScale : 128;
   const frameHeight = resolvedCustomStrip ? resolvedCustomStrip.frameHeight * frameScale : 128;
-  const spriteStyle = { backgroundImage: `url(${sheet})`, backgroundSize: `${frameWidth * 6}px ${frameHeight}px`, width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-strip-end": `${-frameWidth * 5}px` } as CSSProperties;
+  const frameCount = resolvedCustomStrip ? petStripFrameCount(resolvedCustomStrip) : 10;
+  const spriteStyle = { backgroundImage: `url(${sheet})`, backgroundSize: `${frameWidth * frameCount}px ${frameHeight}px`, width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-strip-end": `${-frameWidth * (frameCount - 1)}px`, "--pet-frame-steps": frameCount - 1, "--pet-facing": activity.facing } as CSSProperties;
+  const target = activity.target ?? { x: activity.facing === -1 ? 8 : 212, y: 104 };
+  const mouthX = activity.facing === -1 ? 76 : 144;
+  const firePath = `M ${mouthX} 105 Q ${(mouthX + target.x) / 2} ${(105 + target.y) / 2 - 18} ${target.x} ${target.y}`;
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
     event.preventDefault();
@@ -194,9 +211,10 @@ export function PetWindow() {
     window.serverRockAgent?.pet?.endDrag();
   };
   const dragHandlers = COMPOSITOR_DRAG ? {} : { onPointerDown: beginDrag, onPointerMove: moveDrag, onPointerUp: endDrag, onPointerCancel: endDrag };
-  return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}`} aria-label={`${companionName} desktop companion. Drag to move.`} data-pose={activePose}>
+  return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}${animationPaused ? " is-paused" : ""}${entering && !animationPaused ? " is-entering" : ""}`} aria-label={`${companionName} desktop companion. Drag to move.`} data-pose={activePose}>
     {bubble && <div className={`pet-window-bubble pet-window-bubble-${bubbleKind}`} role="status" aria-live="polite">{bubble}</div>}
-    <button className="pet-window-hide" type="button" title={`Hide ${companionName}`} onClick={() => window.serverRockAgent?.pet?.hide()} aria-label={`Hide ${companionName} companion`}><NavIcon name="close" /></button>
-    <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}${activity.facing === -1 ? " is-facing-left" : ""}`} style={spriteStyle} role="img" aria-label={`Animated ${companionName} companion`} {...dragHandlers} />
+    {activePose === "angry" && <span className={`pet-window-anger${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true">✦</span>}
+    {activePose === "fire-breath" && <svg className="pet-window-fire" viewBox="0 0 220 190" aria-hidden="true"><path className="pet-window-fire-glow" d={firePath} /><path className="pet-window-fire-core" d={firePath} /><circle className="pet-window-fire-impact" cx={target.x} cy={target.y} r="7" /></svg>}
+    <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}${activity.facing === -1 ? " is-facing-left" : ""}`} style={spriteStyle} onAnimationEnd={(event) => { if (event.animationName.startsWith("pet-window-enter-")) setEntering(false); }} role="img" aria-label={`Animated ${companionName} companion`} {...dragHandlers} />
   </main>;
 }

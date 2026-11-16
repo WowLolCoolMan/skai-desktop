@@ -34,7 +34,7 @@ type CodingPageProps = {
   onPushGitChanges: () => Promise<boolean>;
   onCreateGitPullRequest: (title: string, body: string) => Promise<boolean>;
   onPickFolder: () => Promise<string | null>;
-  onSaveProject: (name: string, instructions: string, folders: string[]) => Promise<boolean>;
+  onSaveProject: (name: string, instructions: string, folders: string[]) => Promise<DesktopProject | null>;
   onOpenProject: (project: DesktopProject) => void;
   onOpenFile: (relativePath: string) => void;
   onCloseFile: () => void;
@@ -60,7 +60,7 @@ export function CodingPage({ projectDirectory = false, projects, selectedProject
     setSaving(true);
     const saved = await onSaveProject(name.trim(), instructions.trim(), folders);
     setSaving(false);
-    if (saved) { setName(""); setInstructions(""); setFolders([]); setDialogOpen(false); }
+    if (saved) { setName(""); setInstructions(""); setFolders([]); setDialogOpen(false); void onOpenProject(saved); }
   };
 
   const addFolder = async (preferredPath?: string) => {

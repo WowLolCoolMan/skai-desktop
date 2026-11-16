@@ -12,11 +12,11 @@ import { UpdateNotice } from "./components/overlays/UpdateNotice";
 export default function App() {
   const workspace = useDesktopWorkspace();
   const shellStyle = { "--skai-sidebar-width": `${workspace.sidebarWidth}px` } as CSSProperties;
-  const hideThreadSidebar = ["marketplace", "settings", "projects"].includes(workspace.route);
+  const hideThreadSidebar = ["marketplace", "settings", "projects", "images", "pet-workshop"].includes(workspace.route);
   return <ErrorBoundary><div className={`app-shell ${workspace.sidebarCollapsed ? "sidebar-collapsed" : ""} ${hideThreadSidebar ? "thread-sidebar-hidden" : ""}`} style={shellStyle}>
     <a className="skip-link" href="#main-content">Skip to content</a>
     <GlobalRail route={workspace.route} onNavigate={workspace.onNavigate} />
-    {!hideThreadSidebar && <Sidebar className="thread-sidebar" route={workspace.route} onNavigate={workspace.onNavigate} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} collapsed={workspace.sidebarCollapsed} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onToggleCollapsed={workspace.toggleSidebar} onNewChat={workspace.startNewChat} onOpenProject={workspace.routeActions.onOpenProject} onSelectConversation={workspace.selectConversation} onConversationMetadata={workspace.updateConversationMetadata} />}
+    {!hideThreadSidebar && <Sidebar className="thread-sidebar" route={workspace.route} agentMode={workspace.agentMode} onAgentModeChange={workspace.setAgentMode} onNavigate={workspace.onNavigate} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} collapsed={workspace.sidebarCollapsed} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onToggleCollapsed={workspace.toggleSidebar} onNewChat={workspace.startNewChat} onOpenProject={workspace.routeActions.onOpenProject} onSelectConversation={workspace.selectConversation} onConversationMetadata={workspace.updateConversationMetadata} />}
     <main className="app-main">
       <div className="backdrop-effects" aria-hidden="true" />
       <Toolbar route={workspace.route} connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} />
