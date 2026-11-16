@@ -136,7 +136,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         return;
       }
     }
-    const response = await request("chat.complete", { provider, endpoint, model, messages: next, responseMode, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
+    const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
     if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
@@ -171,7 +171,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     ];
     onError(null);
     try {
-      const response = await request("chat.complete", { provider, endpoint, model, messages: rewriteMessages });
+      const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: rewriteMessages });
       if (!response.ok) throw new Error(response.error?.message ?? "The selected model could not rewrite this prompt.");
       const candidate = (response.result as { content?: unknown }).content;
       if (typeof candidate !== "string" || candidate.trim().length < 2 || candidate.trim().length > 24_000) {
@@ -192,7 +192,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (messages[messageIndex]?.role !== "assistant" || !prefix.some((message) => message.role === "user")) return;
     stopNativeSpeech();
     setMessages(prefix); setBusy(true); onError(null);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: prefix, responseMode, skills: skillMentions(prefix) });
+    const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: prefix, responseMode, skills: skillMentions(prefix) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content }];
@@ -210,7 +210,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const next = [...prefix, edited];
     stopNativeSpeech();
     setMessages(next); setBusy(true); onError(null);
-    const response = await request("chat.complete", { provider, endpoint, model, messages: next, responseMode, skills: skillMentions(next) });
+    const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The edited message could not be completed."); return false; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];

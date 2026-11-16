@@ -1035,6 +1035,11 @@ public static class AgentHostLoop
             AirLlmDevice = storedSettings.AirLlmDevice,
             AirLlmDeleteOriginal = storedSettings.AirLlmDeleteOriginal,
         };
+        var contextMismatch = ModelContextCompatibilityPolicy.Explain(
+            settings.ModelProvider,
+            settings.OllamaContextWindowTokens,
+            OptionalInt(request, "modelContextLength"));
+        if (contextMismatch is not null) throw new InvalidOperationException(contextMismatch);
         if (!documentsOnly && CreateSettingsStore().Load().MemoryInjectionEnabled)
         {
             var memoryContext = MemoryPromptContext.Build(CreateMemoryStore().Load(), true, projectName);
