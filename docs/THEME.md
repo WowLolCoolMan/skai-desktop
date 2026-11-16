@@ -178,3 +178,28 @@ Round 2 was committed as 17bb50e and pushed to main in the merge 8cce092.
 - **Audit:** `audit:theme-tokens` also fails on px `font-size` and px radii in CSS (both baselines are 0).
 - **Screens** (`.theme-shots/r3-after`): 0.1–3% of sampled bytes changed against round 2. The
   only visible change is a few headings 1px larger (17→18px).
+
+### Round 4: theme file format, validator, schema (Phase 3, part 1)
+
+Round 3 was committed and pushed as 01fbbc3.
+
+- **Validator** `apps/desktop/electron/theme-files.cjs`, used by the main process. It accepts a theme family
+  (`name`, `author`, `license`, `themes[]` of `{ name, appearance, colors, gradients, fonts }`). It keeps only
+  values that match strict shapes and canonicalizes colors (rgb/hsl are rebuilt from their numbers), and
+  builds gradients from validated stops. Font names must be plain names. It rejects `url()`, `@import`,
+  `var()`, `color-mix()`, `expression()`, keywords, oversized files (over 256 KB), more than 16 themes,
+  unknown keys and out-of-range numbers. Each problem is reported as `{ file, key, problem }`, and a bad key
+  doesn't sink the file.
+- **Keys:** 78 color keys, one per color token (`ansi-*` and `syntax-*` keep their prefix), 10 gradient surfaces and 4 font roles.
+- **Built-in Skai family:** `src/theme/presets/skai.json` (Skai Dark + Skai Light) is generated from
+  `tokens.css` by `scripts/theme-generate.cjs`. The 4 tokens defined as `var()` or `color-mix()`
+  (focus ring, selection, link, scrollbar thumb) stay CSS defaults.
+- **Schema** `docs/theme.schema.json` is generated from the validator's key lists.
+- **Docs:** `docs/THEMING.md` covers locations (userData on Linux is `~/.config/skai-desktop/`), the format,
+  every color key and what it colors, gradients, fonts, and what is rejected and why.
+- **Tests** `scripts/test-theme-files.cjs` (`npm run test:themes`, also run by `check:syntax`) cover
+  12 groups: accepted colors; injection attempts (`url()`, `;` breakouts, `expression()`, `var()`, `@import`);
+  dropped keys reported with problems; prefixes; structure; caps and bad JSON; gradients; fonts; every key
+  maps to a real token; `skai.json` and the schema in sync; every shipped preset valid with a license.
+- **Next:** load user themes from `<userData>/themes`, watch and live-reload them, bridge the validated
+  themes to the renderer, apply tokens live, and add theme picks and folder actions in Appearance.
