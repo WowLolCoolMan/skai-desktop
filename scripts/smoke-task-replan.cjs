@@ -19,7 +19,7 @@ if (!fs.existsSync(executable)) {
   process.exit(1);
 }
 
-const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${profileRoot}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${profileRoot}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
@@ -63,10 +63,10 @@ async function main() {
   }
   if (!target) throw new Error(`Packaged Electron did not expose the main page before timeout. Output: ${output.slice(-2_000)}`);
 
-  const staged = await evaluate(target, `localStorage.setItem(${JSON.stringify(prefillKey)}, JSON.stringify({ title: "Recover local task", instruction: "Review the failed result and produce a verified local plan.", environment: "local" })); location.hash = "#/workbench"; "staged"`);
+  const staged = await evaluate(target, `localStorage.setItem(${JSON.stringify(prefillKey)}, JSON.stringify({ title: "Recover local task", instruction: "Review the failed result and produce a verified local plan.", environment: "local" })); location.hash = "#/workbench"; window.dispatchEvent(new PopStateEvent("popstate")); "staged"`);
   if (staged !== "staged") throw new Error(`Could not stage the task handoff: ${JSON.stringify(staged)}`);
   await sleep(250);
-  const navigated = await evaluate(target, `location.hash = "#/chat"; "navigated"`);
+  const navigated = await evaluate(target, `location.hash = "#/chat"; window.dispatchEvent(new PopStateEvent("popstate")); "navigated"`);
   if (navigated !== "navigated") throw new Error("Could not navigate to Chat for the task re-plan handoff.");
 
   let state;

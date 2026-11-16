@@ -40,7 +40,15 @@ public static class LegacyDataMigration
                 using var copiedStream = File.OpenRead(temporary);
                 if (sourceStream.Length != copiedStream.Length || !CryptographicOperations.FixedTimeEquals(SHA256.HashData(sourceStream), SHA256.HashData(copiedStream)))
                     throw new IOException("A local data migration copy did not match its source.");
-                File.Move(temporary, target, overwrite: false);
+                try
+                {
+                    File.Move(temporary, target, overwrite: false);
+                }
+                catch (IOException) when (File.Exists(target))
+                {
+                    // Another Skai Desktop process completed this same
+                    // first-run copy after our initial existence check.
+                }
             }
             finally
             {

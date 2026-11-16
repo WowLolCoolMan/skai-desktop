@@ -79,6 +79,8 @@ let petBehaviorRunning = false;
 let petBehaviorSequence = [];
 let petBehaviorOrigin = null;
 let petBehaviorTarget = null;
+let petBehaviorCursorTarget = null;
+let petAttackSceneBounds = null;
 let petBehaviorWalk = null;
 let petBehaviorWalkMode = null;
 let petBehaviorWalkStartedAt = 0;
@@ -189,7 +191,7 @@ function stopPetWander() {
 }
 
 function setPetActivity(state, facing = petActivity.facing, target = undefined) {
-  const allowedStates = new Set(["idle", "walk", "thinking", "coding", "coding_malicious", "stuck", "needs-attention", "angry", "pounce", "fire-breath"]);
+  const allowedStates = new Set(["idle", "walk", "thinking", "coding", "coding_malicious", "stuck", "needs-attention", "angry", "pounce", "fire-breath", "celebrate", "curious-scan", "ember-curl", "star-orbit", "rock-roll", "sprout-stretch"]);
   const nextState = allowedStates.has(state) ? state : "idle";
   const nextFacing = facing === -1 ? -1 : 1;
   const nextTarget = target && Number.isFinite(target.x) && Number.isFinite(target.y) ? { x: target.x, y: target.y } : undefined;
@@ -250,9 +252,36 @@ function clearPetBehaviorTimers() {
   petBehaviorStepTimer = undefined;
 }
 
+function setPetAttackScene(active) {
+  if (!petWindow || petWindow.isDestroyed() || !windowPositioningAvailable) return;
+  if (active) {
+    if (petAttackSceneBounds) return;
+    const bounds = petWindow.getBounds();
+    const width = PET_WINDOW_WIDTH + 240;
+    petAttackSceneBounds = bounds;
+    try {
+      petWindow.setIgnoreMouseEvents(true, { forward: true });
+      petWindow.setBounds({ x: bounds.x - Math.round((width - bounds.width) / 2), y: bounds.y, width, height: bounds.height });
+    } catch {
+      petAttackSceneBounds = null;
+      try { petWindow.setIgnoreMouseEvents(false); } catch {}
+    }
+    return;
+  }
+  if (!petAttackSceneBounds) return;
+  const current = petWindow.getBounds();
+  const original = petAttackSceneBounds;
+  petAttackSceneBounds = null;
+  try {
+    petWindow.setBounds({ ...original, x: current.x + Math.round((current.width - original.width) / 2) });
+    petWindow.setIgnoreMouseEvents(false);
+  } catch {}
+}
+
 function stopPetBehavior(returnToOrigin = false) {
   const wasRunning = petBehaviorRunning;
   clearPetBehaviorTimers();
+  setPetAttackScene(false);
   if (returnToOrigin && petBehaviorRunning && petBehaviorOrigin && windowPositioningAvailable && petWindow && !petWindow.isDestroyed()) {
     try { petWindow.setPosition(petBehaviorOrigin.x, petBehaviorOrigin.y); } catch {}
   }
@@ -260,10 +289,11 @@ function stopPetBehavior(returnToOrigin = false) {
   petBehaviorSequence = [];
   petBehaviorWalk = null;
   petBehaviorTarget = null;
+  petBehaviorCursorTarget = null;
   petBehaviorWalkMode = null;
   petBehaviorOrigin = null;
   petBehaviorResumeWander = false;
-  if (wasRunning || petActivity.state === "angry" || petActivity.state === "pounce" || petActivity.state === "fire-breath") setPetActivity("idle");
+  if (wasRunning || ["angry", "pounce", "fire-breath", "celebrate", "curious-scan", "ember-curl", "star-orbit", "rock-roll", "sprout-stretch"].includes(petActivity.state)) setPetActivity("idle");
   if (petBehaviorSettings.enabled) schedulePetBehaviorAttack();
 }
 
@@ -286,21 +316,30 @@ function petBehaviorActivityAllowed() {
 function petBehaviorTargetPosition(cursor) {
   const bounds = petWindow.getBounds();
   const facing = cursor.x >= bounds.x + bounds.width / 2 ? 1 : -1;
+  const targetCenterX = cursor.x - facing * 180;
   const position = clampPetPosition({
-    x: facing === 1 ? cursor.x - PET_WINDOW_WIDTH + 18 : cursor.x - 18,
+    x: targetCenterX - Math.floor(PET_WINDOW_WIDTH / 2),
     y: cursor.y - Math.floor(PET_WINDOW_HEIGHT / 2),
   });
-  return { position, facing };
+  return { position, facing, cursor: { x: cursor.x, y: cursor.y } };
 }
 
-function petBehaviorAimPoint() {
+function petBehaviorAimPoint(cursor = petBehaviorCursorTarget) {
   if (!petWindow || petWindow.isDestroyed()) return undefined;
-  const cursor = screen.getCursorScreenPoint();
+  const target = cursor ?? screen.getCursorScreenPoint();
   const bounds = petWindow.getBounds();
   return {
-    x: Math.max(8, Math.min(PET_WINDOW_WIDTH - 8, cursor.x - bounds.x)),
-    y: Math.max(8, Math.min(PET_WINDOW_HEIGHT - 8, cursor.y - bounds.y)),
+    x: Math.max(8, Math.min(bounds.width - 8, target.x - bounds.x)),
+    y: Math.max(8, Math.min(bounds.height - 8, target.y - bounds.y)),
   };
+}
+
+function petCursorIsInScene(cursor) {
+  if (!petWindow || petWindow.isDestroyed()) return false;
+  const bounds = petWindow.getBounds();
+  const petDisplay = screen.getDisplayNearestPoint({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 });
+  const cursorDisplay = screen.getDisplayNearestPoint(cursor);
+  return petDisplay.id === cursorDisplay.id;
 }
 
 function makePetBehaviorWalk(fromBounds, toBounds, speed = 380) {
@@ -343,8 +382,7 @@ function movePetForBehavior(mode, targetBounds) {
     petBehaviorStepTimer = undefined;
     if (mode === "approach") {
       petWindow.setPosition(Math.trunc(targetBounds.x), Math.trunc(targetBounds.y));
-      petBehaviorTarget = petBehaviorTargetPosition(screen.getCursorScreenPoint());
-      setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint());
+      setPetActivity("angry", petBehaviorTarget?.facing ?? 1, petBehaviorAimPoint());
       petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 460);
     } else finishPetBehavior();
     return;
@@ -362,8 +400,7 @@ function startPetBehaviorWalk(mode, targetBounds) {
   petBehaviorWalk = makePetBehaviorWalk(bounds, targetBounds);
   if (!petBehaviorWalk) {
     if (mode === "approach") {
-      petBehaviorTarget = petBehaviorTargetPosition(screen.getCursorScreenPoint());
-      setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint());
+      setPetActivity("angry", petBehaviorTarget?.facing ?? 1, petBehaviorAimPoint());
       petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 460);
     } else finishPetBehavior();
     return;
@@ -375,11 +412,13 @@ function startPetBehaviorWalk(mode, targetBounds) {
 
 function finishPetBehavior() {
   clearPetBehaviorTimers();
+  setPetAttackScene(false);
   petBehaviorRunning = false;
   petBehaviorSequence = [];
   petBehaviorWalk = null;
   petBehaviorWalkMode = null;
   petBehaviorTarget = null;
+  petBehaviorCursorTarget = null;
   petBehaviorOrigin = null;
   const resumeWander = petBehaviorResumeWander;
   petBehaviorResumeWander = false;
@@ -397,29 +436,34 @@ function performNextPetBehaviorAction() {
   if (!petBehaviorRunning || !petBehaviorCanRun()) { stopPetBehavior(false); return; }
   const action = petBehaviorSequence.shift();
   if (!action) {
+    setPetAttackScene(false);
     if (windowPositioningAvailable && petBehaviorOrigin && petWindow && !petWindow.isDestroyed()) {
+      setPetActivity("walk", petActivity.facing);
       startPetBehaviorWalk("return", petBehaviorOrigin);
     } else finishPetBehavior();
     return;
   }
   if (action === "approach-cursor") {
-    const cursor = screen.getCursorScreenPoint();
-    const { position, facing } = petBehaviorTargetPosition(cursor);
-    petBehaviorTarget = { facing, position };
-    startPetBehaviorWalk("approach", position);
+    if (petBehaviorTarget && petBehaviorCursorTarget) startPetBehaviorWalk("approach", petBehaviorTarget.position);
+    else performNextPetBehaviorAction();
     return;
   }
   if (action === "pounce") {
+    setPetAttackScene(true);
     const aim = petBehaviorAimPoint();
     setPetActivity("pounce", petBehaviorTarget?.facing ?? 1, aim);
-    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 560);
+    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 760);
     return;
   }
   if (action === "fire-breath") {
+    setPetAttackScene(true);
     const aim = petBehaviorAimPoint();
     setPetActivity("fire-breath", petBehaviorTarget?.facing ?? 1, aim);
-    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1150);
+    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1500);
+    return;
   }
+  setPetActivity(action, petActivity.facing);
+  petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, action === "celebrate" ? 1200 : 1600);
 }
 
 function startPetBehaviorAttack() {
@@ -439,10 +483,27 @@ function startPetBehaviorAttack() {
   petWanderWalk = null;
   petWanderMoving = false;
   petBehaviorSequence = sequence;
+  const needsCursor = sequence.some((action) => ["approach-cursor", "pounce", "fire-breath"].includes(action));
+  if (!needsCursor) {
+    petBehaviorCursorTarget = null;
+    petBehaviorTarget = null;
+    performNextPetBehaviorAction();
+    return;
+  }
   const cursor = screen.getCursorScreenPoint();
+  if (!petCursorIsInScene(cursor)) { stopPetBehavior(false); return; }
+  petBehaviorCursorTarget = cursor;
   petBehaviorTarget = petBehaviorTargetPosition(cursor);
-  setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint());
-  petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 520);
+  setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint(cursor));
+  petBehaviorStepTimer = setTimeout(() => {
+    if (!petBehaviorRunning || !petBehaviorCanRun()) { stopPetBehavior(false); return; }
+    const current = screen.getCursorScreenPoint();
+    if (!petCursorIsInScene(current) || Math.hypot(current.x - cursor.x, current.y - cursor.y) > 22) {
+      stopPetBehavior(false);
+      return;
+    }
+    performNextPetBehaviorAction();
+  }, 420);
 }
 
 function schedulePetWander() {
@@ -1059,6 +1120,20 @@ function startAgentHost() {
     windowsHide: true,
   });
   const startedHost = host;
+
+  // A dead host can close stdin between the destroyed check and write().
+  // Writable emits EPIPE asynchronously, so a surrounding try/catch alone does
+  // not protect Electron's main process from an uncaught pipe error.
+  host.stdin.on("error", () => {
+    const response = { v: 1, ok: false, error: { code: "HOST_WRITE_FAILED", message: "The local agent host closed its request pipe." } };
+    for (const entry of pending.values()) {
+      clearTimeout(entry.timer);
+      const completion = petCompletionText(entry.method, response);
+      if (completion) sendPetMessage(completion.text, completion.kind);
+      entry.resolve(response);
+    }
+    pending.clear();
+  });
 
   hostReader = readline.createInterface({ input: host.stdout });
   hostReader.on("line", (line) => {

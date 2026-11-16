@@ -21,6 +21,7 @@ const env = {
   SRAI_PROJECTS_PATH: path.join(profileRoot, "projects.json"),
   SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
   SRAI_MCP_CONNECTIONS_PATH: path.join(profileRoot, "mcp-connections.json"),
+  SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
 };
 spawnSync("git", ["init", "--quiet", tempRoot], { cwd: tempRoot, windowsHide: true });
 spawnSync("git", ["config", "user.email", "smoke@example.invalid"], { cwd: tempRoot, windowsHide: true });
@@ -45,7 +46,7 @@ fs.writeFileSync(env.SRAI_TASKS_PATH, JSON.stringify([{
   createdAtUtc: new Date().toISOString(),
   updatedAtUtc: new Date().toISOString(),
 }], null, 2));
-const hostOutput = path.join(root, "services", "agent-host", "bin", "Debug", "net10.0");
+const hostOutput = path.join(root, ".tmp", "agent-host-smoke");
 const hostProgram = process.platform === "win32" ? path.join(hostOutput, "SkaiDesktop.AgentHost.exe") : "dotnet";
 const hostArgs = process.platform === "win32" ? ["--stdio"] : [path.join(hostOutput, "SkaiDesktop.AgentHost.dll"), "--stdio"];
 if (!require("node:fs").existsSync(path.join(hostOutput, "SkaiDesktop.AgentHost.dll"))) {

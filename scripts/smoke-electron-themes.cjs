@@ -20,7 +20,7 @@ if (!fs.existsSync(executable)) {
 
 // Isolated profile: a running Skai instance would otherwise take the single-instance lock and the smoke launch would exit.
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
@@ -116,8 +116,8 @@ async function main() {
 
   const devtools = connect(target);
   await devtools.open;
-  await devtools.evaluate("(document.querySelector('.sidebar-settings') ?? document.querySelector('[aria-label=\"Settings\"]'))?.click(); if (!location.hash.includes('settings')) location.hash = '#/settings'; 'settings'");
-  await waitFor(devtools.evaluate, "document.querySelectorAll('.settings-content select').length", (value) => value >= 2, "Settings controls");
+  await devtools.evaluate("(document.querySelector('.sidebar-settings') ?? document.querySelector('[aria-label=\"Settings\"]'))?.click(); if (!location.hash.includes('settings')) { location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate')); } 'settings'");
+  await waitFor(devtools.evaluate, "document.querySelector('.settings-content')?.textContent || ''", (value) => typeof value === "string" && value.includes("General"), "Settings page");
   await devtools.evaluate("[...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === 'Appearance')?.click(); 'appearance'");
   await waitFor(devtools.evaluate, "document.querySelector('.settings-content select')?.value", (value) => typeof value === "string", "Appearance controls");
 

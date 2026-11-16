@@ -27,8 +27,15 @@ for (const pet of pets) {
   const blink = path.join(root, `${pet}-blink-frames.png`);
   if (!fs.existsSync(blink)) throw new Error(`Missing blink strip for ${pet}.`);
   const size = pngDimensions(blink);
-  if (size.width !== 1024 || size.height !== 256) throw new Error(`${pet} blink strip must be 1024x256 (4 frames); got ${size.width}x${size.height}.`);
+  if (size.width !== 2816 || size.height !== 256) throw new Error(`${pet} blink strip must be 2816x256 (11 frames); got ${size.width}x${size.height}.`);
   if (size.bytes < 5_000) throw new Error(`${pet} blink strip is unexpectedly small.`);
+}
+
+for (const effect of ["blaze-fire-breath-frames.png", "blaze-fire-impact-frames.png"]) {
+  const effectPath = path.join(root, effect);
+  if (!fs.existsSync(effectPath)) throw new Error(`Missing Blaze attack effect strip: ${effect}.`);
+  const size = pngDimensions(effectPath);
+  if (size.width !== 2048 || size.height !== 256) throw new Error(`${effect} must be an 8-cel 2048x256 strip; got ${size.width}x${size.height}.`);
 }
 
 const pixelValidation = `from PIL import Image, ImageChops
@@ -59,16 +66,28 @@ for pet in pets:
     alpha = blink.getchannel("A").getextrema()
     if alpha[0] == 255 or alpha[1] == 0:
         raise SystemExit(f"{pet} blink needs visible artwork and transparent pixels")
-    blinks = [blink.crop((index * 256, 0, (index + 1) * 256, 256)) for index in range(4)]
+    blinks = [blink.crop((index * 256, 0, (index + 1) * 256, 256)) for index in range(11)]
     if not any(ImageChops.difference(blinks[index - 1], blinks[index]).getbbox() is not None for index in range(1, 4)):
         raise SystemExit(f"{pet} blink has no visible eye-state changes")
     idle_bounds = idle_rest.getchannel("A").getbbox()
     for index, frame in enumerate(blinks):
         if frame.getchannel("A").getbbox() != idle_bounds:
             raise SystemExit(f"{pet} blink frame {index} changes the character's visible bounds")
-    for index in (0, 3):
+    for index in (0, 10):
         if ImageChops.difference(blinks[index], idle_rest).getbbox() is not None:
             raise SystemExit(f"{pet} blink frame {index} must be an exact copy of idle rest")`;
+const effectPixelValidation = `from PIL import Image, ImageChops
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+for name in ('blaze-fire-breath-frames.png', 'blaze-fire-impact-frames.png'):
+    image = Image.open(root / name).convert('RGBA')
+    if image.getchannel('A').getextrema()[0] == 255:
+        raise SystemExit(f'{name} must preserve transparent pixels')
+    frames = [image.crop((index * 256, 0, (index + 1) * 256, 256)) for index in range(8)]
+    changed = sum(ImageChops.difference(frames[index - 1], frames[index]).getbbox() is not None for index in range(1, 8))
+    if changed < 5:
+        raise SystemExit(f'{name} needs at least six visibly distinct animation cels')`;
 const uniqueBlazeValidation = `from PIL import Image, ImageChops
 from pathlib import Path
 import sys
@@ -79,10 +98,11 @@ if ImageChops.difference(blaze, ember).getbbox() is None:
     raise SystemExit('Blaze must ship with his own distinct art, not an Ember recolor')`;
 try {
   execFileSync("python", ["-c", pixelValidation, root, ...pets], { stdio: "pipe" });
+  execFileSync("python", ["-c", effectPixelValidation, root], { stdio: "pipe" });
   execFileSync("python", ["-c", uniqueBlazeValidation, root], { stdio: "pipe" });
 } catch (error) {
   const details = error && typeof error === "object" && "stderr" in error && Buffer.isBuffer(error.stderr) ? error.stderr.toString().trim() : "";
   throw new Error(details || "Built-in pet pixel validation failed (requires Python Pillow).");
 }
 
-console.log(`Pet assets passed: ${pets.length * states.length} eleven-frame state strips, exact rest-pose seams, visible movement, and ${pets.length} transparent four-frame blink strips.`);
+console.log(`Pet assets passed: ${pets.length * states.length} eleven-frame state strips, exact rest-pose seams, visible movement, eleven-frame blinks, and Blaze's transparent attack effects.`);

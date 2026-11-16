@@ -23,6 +23,16 @@
   workflow templates to the Images workspace.
 - Added an optional managed Diffusers environment and local Stable Diffusion
   Turbo worker, with runtime setup from the Images page and bounded JPEG results.
+- Overhauled built-in pet sprites into eleven-cell looping strips with a stable
+  rest-pose seam, per-pet blink duration controls, and seven inspectable built-in
+  companions in Pet Workshop.
+- Added per-pet idle and wandering actions plus Blaze's cursor-aware approach,
+  pounce, fire-breath, and impact scene using separate large transparent effects.
+- Added a guided Pet Workshop concept-generation flow for the local Diffusers
+  runtime and ComfyUI, with explicit review before creating a companion draft.
+- Hardened Agent Host writes against a closed Electron stdin pipe and made
+  concurrent legacy-data migration tolerate another app instance winning the
+  first-run file creation race.
 
 ### Updated
 
@@ -32,11 +42,19 @@
   release docs with hands-free chat behavior and the Pages setup blocker.
 - Updated image-generation docs to describe the implemented Diffusers runtime
   and clearly identify the real-model and packaged-runtime acceptance gaps.
+- Added the pets and companions guide and refreshed the README, capability
+  matrix, project site, architecture, and release notes with current pet behavior
+  and test evidence.
+- Updated the project browser and other protocol smoke scripts to use the
+  isolated Agent Host smoke build instead of competing with an existing Debug
+  host process in the checkout.
 
 ### Fixed
 
 - Preserved the built-in project reverse-engineering skill and allowed normal
   line breaks in reviewed skill prompts after the plugin catalog update.
+- Prevented an Electron main-process EPIPE from becoming an uncaught exception
+  when the renderer closes while an Agent Host response is being written.
 
 ## [0.1.3] - 2026-11-14
 

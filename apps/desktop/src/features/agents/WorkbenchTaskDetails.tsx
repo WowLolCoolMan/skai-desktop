@@ -16,6 +16,7 @@ function stageTaskForChat(task: DesktopTask) {
     (task.resultSummary || "No result was recorded.").trim().slice(0, 3000),
   ].join("\n");
   localStorage.setItem(CHAT_TASK_PREFILL_KEY, JSON.stringify({ title, instruction, environment: "local" }));
+  window.dispatchEvent(new Event("skai:task-prefill"));
 }
 
 export function TaskDetails({ task, openByDefault = false }: { task: DesktopTask; openByDefault?: boolean }) {

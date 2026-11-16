@@ -135,7 +135,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 |---|---|
 | Eligible ChatGPT desktop users can use Voice in Work or Codex. ChatGPT's wider multimodal and image-generation features depend on the selected experience and account access. | Skai provides local dictation, OS-native text-to-speech, image workflows through ComfyUI or managed local Diffusers, image/PDF/text attachments, and local video-frame sampling. |
 | Hosted model and service availability can make these features accessible without installing local inference runtimes. | Skai requires compatible local runtimes/models. Voice success, live ComfyUI, image editing, and broader media acceptance are still partial/unverified per its capability matrix. |
-| Codex desktop's primary reference flow is coding and agent supervision; media/voice is not the center of the supplied coding screenshots. | Skai makes Image Studio, Percy, voice, local model management, and memory first-class app routes. These are Skai-specific capabilities, not Codex navigation equivalents. |
+| Codex desktop's primary reference flow is coding and agent supervision; media/voice is not the center of the supplied coding screenshots. | Skai makes Image Studio, the built-in pet and companion system, voice, local model management, and memory first-class app routes. These are Skai-specific capabilities, not Codex navigation equivalents. |
 
 **Sources:** OpenAI [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex). Skai: [ImagesPage.tsx](../apps/desktop/src/features/catalog/ImagesPage.tsx), [ChatPage.tsx](../apps/desktop/src/features/chat/ChatPage.tsx), [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
 
@@ -171,7 +171,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 
 | ChatGPT/Codex | Skai Desktop |
 |---|---|
-| Skills and plugins can package instructions, resources, scripts, and connected apps; availability and syncing vary by product surface and account. Codex also interoperates with its CLI/IDE configuration. | Skai supports local personas, prompt presets, local skills/MCP, model/provider configuration, appearance settings, and Percy customization. It does not inherit ChatGPT account skills, GPTs, app connections, or Codex CLI history. |
+| Skills and plugins can package instructions, resources, scripts, and connected apps; availability and syncing vary by product surface and account. Codex also interoperates with its CLI/IDE configuration. | Skai supports local personas, prompt presets, local skills/MCP, model/provider configuration, appearance settings, and configurable pets. It does not inherit ChatGPT account skills, GPTs, app connections, or Codex CLI history. |
 | The plugin directory and workspace administration provide a managed distribution and permission surface. | Skai's local marketplace and MCP UI have their own install/grant flow. They are independent catalogs, not a mirror of the OpenAI directory. |
 
 **Sources:** OpenAI [Skills in ChatGPT](https://help.openai.com/en/articles/20001066-skills-in-chatgpt), [Plugins in ChatGPT and Codex](https://help.openai.com/en/articles/20001256-plugins-in-codex/), [Codex app introduction](https://openai.com/index/introducing-the-codex-app/). Skai: [PluginsPage.tsx](../apps/desktop/src/features/catalog/PluginsPage.tsx), [SettingsPage.tsx](../apps/desktop/src/features/settings/SettingsPage.tsx), [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
@@ -181,7 +181,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | ChatGPT/Codex | Skai Desktop |
 |---|---|
 | Current ChatGPT desktop is available on macOS and Windows. Cloud Work extends to web/mobile; supported Codex remote access is also available from mobile surfaces. Availability depends on plan/workspace. | Skai's documented desktop distribution targets Windows and Linux. The repo documents Linux installers and window-manager/Wayland behavior; a macOS product distribution is not documented as a supported release target. |
-| Account-based cloud work can continue across eligible devices; Codex has local and cloud environments. | Skai runs an Electron shell plus a persistent local .NET Agent Host and optional separate Percy companion window. Closing the main window may leave the host/tray/companion resident, depending on platform. |
+| Account-based cloud work can continue across eligible devices; Codex has local and cloud environments. | Skai runs an Electron shell plus a persistent local .NET Agent Host and optional separate companion window. Closing the main window may leave the host/tray/pet resident, depending on platform. |
 | OpenAI manages desktop updates and service/model availability. | Skai packages and updates its own application from its repository/release pipeline; local model runtimes and model files have separate install/update lifecycles. |
 
 **Sources:** OpenAI [Moving to the new ChatGPT desktop app](https://help.openai.com/en/articles/20001276-moving-to-the-new-chatgpt-desktop-app). Skai: [README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [RELEASE_READINESS.md](RELEASE_READINESS.md).
@@ -194,7 +194,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | Codex's visible hierarchy keeps the prompt and response central, and moves files/review details into adjacent panes or the right inspector. | Skai's shell has a route toolbar plus page headers; the supplied Usage screenshot repeats “Usage” and surfaces a repository error on that unrelated page. The screenshot also shows filler-like recent-chat titles. |
 | Codex's right panel exposes task-related changes, outputs, sources, and subagents in one place. | Skai's activity panel, task Workbench, project Git review, and chat sources are distinct UI areas. |
 
-The goal should be to imitate the **work flow and information hierarchy**, not to erase Skai's local-first identity or copy ChatGPT branding. Keep Skai's local model, explicit folder, Git safety, Linux, image, memory, and Percy surfaces visible where they materially differ.
+The goal should be to imitate the **work flow and information hierarchy**, not to erase Skai's local-first identity or copy ChatGPT branding. Keep Skai's local model, explicit folder, Git safety, Linux, image, memory, and companion surfaces visible where they materially differ.
 
 ## Differences that matter most to the product direction
 

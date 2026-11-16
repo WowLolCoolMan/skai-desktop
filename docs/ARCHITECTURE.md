@@ -7,7 +7,7 @@ backed by a persistent .NET Agent Host.
 Electron main process
   ├─ sandboxed React renderer
   ├─ context-isolated typed preload bridge
-  └─ companion window (Percy, when enabled)
+  └─ companion window (selected built-in or custom pet, when enabled)
        │
        ▼
   persistent .NET Agent Host
@@ -21,7 +21,9 @@ Electron main process
 - The renderer owns presentation, navigation, local UI state, and user
   interaction. It has no Node.js or direct filesystem access.
 - Electron main owns window lifecycle, the typed IPC boundary, host lifecycle,
-  file-picker mediation, and the separate always-on-top companion window.
+  file-picker mediation, and the separate always-on-top companion window. The
+  renderer owns sprite playback and pet behavior preferences; attack actions
+  read cursor coordinates but do not move or click the pointer.
 - The Agent Host owns protocol handling, local model/provider requests,
   persistence, project boundaries, approvals, terminal sessions, and workflow
   state.
@@ -41,6 +43,10 @@ npm run smoke:electron:artifact
 The packaged artifact includes the self-contained Agent Host under
 `resources/agent-host`, so a packaged install does not require a source
 checkout or a separate .NET installation.
+
+Built-in and custom pet profiles are managed in the renderer's Pet Workshop.
+See [Pets and companions](PETS_AND_COMPANIONS.md) for the strip format, behavior
+defaults, and local generation flow.
 
 ## Validation
 

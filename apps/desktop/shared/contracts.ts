@@ -142,12 +142,12 @@ export type PetMotionSettings = {
 };
 
 export type PetActivity = {
-  state: "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "needs-attention" | "angry" | "pounce" | "fire-breath";
+  state: "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "needs-attention" | "angry" | "pounce" | "fire-breath" | "celebrate" | "curious-scan" | "ember-curl" | "star-orbit" | "rock-roll" | "sprout-stretch";
   facing: 1 | -1;
   target?: { x: number; y: number };
 };
 
-export type PetAttackAction = "approach-cursor" | "pounce" | "fire-breath";
+export type PetAttackAction = "approach-cursor" | "pounce" | "fire-breath" | "celebrate" | "curious-scan" | "ember-curl" | "star-orbit" | "rock-roll" | "sprout-stretch";
 export type PetBehaviorSettings = {
   enabled: boolean;
   triggerDuringIdle: boolean;

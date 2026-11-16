@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { PetBehaviorSettings } from "../../../shared/contracts";
 import { Button, PageHeader } from "../../components/ui/Primitives";
-import { defaultPetBehavior, deletePetSpriteProfile, listPetSpriteProfiles, normalizePetBehavior, PET_ACTIONS, PET_ANIMATIONS, PET_FRAME_COUNT, savePetSpriteProfile, validatePetProfileImport, validatePetStrip, type PetAnimationId, type PetSpriteProfile, type PetStrip } from "../settings/petSprites";
+import { defaultPetBehavior, deletePetSpriteProfile, listPetSpriteProfiles, normalizePetBehavior, PET_ACTIONS, PET_ANIMATIONS, PET_BLINK_DURATION_DEFAULT_MS, PET_BLINK_DURATION_MAX_MS, PET_BLINK_DURATION_MIN_MS, PET_FRAME_COUNT, readPetBehavior, readPetBlinkDuration, savePetBehavior, savePetBlinkDuration, savePetSpriteProfile, validatePetProfileImport, validatePetStrip, type PetAnimationId, type PetSpriteProfile, type PetStrip } from "../settings/petSprites";
 
 const DEFAULT_FRAME_SIZE = 128;
 const BUILTIN_NAMES = ["percy", "byte", "ember", "blaze", "nova", "rocky", "sprout"] as const;
@@ -11,10 +11,10 @@ const BUILTIN_STATES: Partial<Record<PetAnimationId, string>> = { idle: "idle", 
 const BUILTIN_ASSETS = import.meta.glob("../../../../../assets/pets/generated/*-frames.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 const BUILTIN_PROFILES: PetSpriteProfile[] = BUILTIN_NAMES.map((name) => ({
   id: `builtin:${name}`, name: BUILTIN_LABELS[name], strips: Object.fromEntries(Object.entries(BUILTIN_STATES).map(([animation, state]) => [animation, { dataUrl: BUILTIN_ASSETS[`../../../../../assets/pets/generated/${BUILTIN_SOURCE_NAMES[name]}-${state}-frames.png`], frameWidth: 256, frameHeight: 256, frameCount: PET_FRAME_COUNT }])) as PetSpriteProfile["strips"],
-  blink: { dataUrl: BUILTIN_ASSETS[`../../../../../assets/pets/generated/${BUILTIN_SOURCE_NAMES[name]}-blink-frames.png`], frameWidth: 256, frameHeight: 256, frameCount: 4 },
+  blink: { dataUrl: BUILTIN_ASSETS[`../../../../../assets/pets/generated/${BUILTIN_SOURCE_NAMES[name]}-blink-frames.png`], frameWidth: 256, frameHeight: 256, frameCount: 11 },
 }));
 BUILTIN_PROFILES.forEach((profile, index) => {
-  profile.blink = { dataUrl: BUILTIN_ASSETS[`../../../../../assets/pets/generated/${BUILTIN_SOURCE_NAMES[BUILTIN_NAMES[index]]}-blink-frames.png`], frameWidth: 256, frameHeight: 256, frameCount: 4 };
+  profile.blink = { dataUrl: BUILTIN_ASSETS[`../../../../../assets/pets/generated/${BUILTIN_SOURCE_NAMES[BUILTIN_NAMES[index]]}-blink-frames.png`], frameWidth: 256, frameHeight: 256, frameCount: 11 };
 });
 
 function loadImage(source: string) {
@@ -125,7 +125,7 @@ function PetFrameEditor({ strip, animation, onSave, busy, readOnly = false, refe
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
-  const frameData = useRef<string[]>(Array.from({ length: animation === "blink" ? 4 : PET_FRAME_COUNT }, () => ""));
+  const frameData = useRef<string[]>(Array.from({ length: animation === "blink" ? 11 : PET_FRAME_COUNT }, () => ""));
   const history = useRef<string[]>([]);
   const [frameWidth, setFrameWidth] = useState(DEFAULT_FRAME_SIZE);
   const [frameHeight, setFrameHeight] = useState(DEFAULT_FRAME_SIZE);
@@ -161,7 +161,7 @@ function PetFrameEditor({ strip, animation, onSave, busy, readOnly = false, refe
       }
       try {
         const image = await loadImage(strip.dataUrl);
-        const frameCount = readOnly || animation === "blink" ? strip.frameCount ?? (animation === "blink" ? 4 : 6) : PET_FRAME_COUNT;
+        const frameCount = readOnly || animation === "blink" ? strip.frameCount ?? (animation === "blink" ? 11 : 6) : PET_FRAME_COUNT;
         const cellWidth = image.naturalWidth / frameCount;
         const loadedFrames = Array.from({ length: frameCount }, () => "");
         for (let index = 0; index < frameCount; index += 1) {
@@ -394,7 +394,7 @@ function PetFrameEditor({ strip, animation, onSave, busy, readOnly = false, refe
   const previousFrame = (frameIndex + activeFrameCount - 1) % activeFrameCount;
 
   return <section className={`pet-workshop-editor${readOnly ? " is-reference" : ""}`} aria-label={`${animation} animation editor`}>
-    <div className="pet-workshop-editor-heading"><div><p className="section-kicker">{readOnly ? "BUILT-IN SOURCE STRIP" : "FRAME EDITOR"}</p><h3>{PET_ANIMATIONS.find((item) => item.id === animation)?.label ?? animation}</h3><p>{readOnly ? "Inspect the exact shipped artwork one cel at a time." : animation === "blink" ? "Four eye poses make one short blink; frame each change and keep the rest of the pet still." : "Draw frames 1–9. Frame 0 is rest, and frame 10 repeats it to close the cycle."}</p>{!readOnly && <small>Generate one cel at a time with the local engine selected in Image Studio. Review each result before using it; the final strip is checked when you save.</small>}</div>{!readOnly && <Button variant="primary" disabled={busy} onClick={() => void saveStrip()}>{busy ? "Saving…" : animation === "blink" ? "Save blink strip" : "Save 11-frame strip"}</Button>}</div>
+    <div className="pet-workshop-editor-heading"><div><p className="section-kicker">{readOnly ? "BUILT-IN SOURCE STRIP" : "FRAME EDITOR"}</p><h3>{PET_ANIMATIONS.find((item) => item.id === animation)?.label ?? animation}</h3><p>{readOnly ? "Inspect the exact shipped artwork one cel at a time." : animation === "blink" ? "Eleven eye poses ease into and out of a longer blink; keep the rest of the pet still." : "Draw frames 1–9. Frame 0 is rest, and frame 10 repeats it to close the cycle."}</p>{!readOnly && <small>Generate one cel at a time with the local engine selected in Image Studio. Review each result before using it; the final strip is checked when you save.</small>}</div>{!readOnly && <Button variant="primary" disabled={busy} onClick={() => void saveStrip()}>{busy ? "Saving…" : animation === "blink" ? "Save blink strip" : "Save 11-frame strip"}</Button>}</div>
     {legacyStrip && <div className="pet-workshop-legacy" role="status"><strong>Legacy {legacyStrip.frameCount ?? 6}-frame art</strong><span>Redraw this animation as 11 frames. Your original stays in this profile until the replacement is saved.</span><div className="pet-workshop-legacy-preview" style={stripPreviewStyle(legacyStrip)} aria-label="Legacy sprite strip preview" /></div>}
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="pet-workshop-drawing-layout">
@@ -416,7 +416,7 @@ function PetFrameEditor({ strip, animation, onSave, busy, readOnly = false, refe
         </div>}
       </div>
       <div className="pet-workshop-frame-rail" aria-label="Animation frames">
-        <p>{activeFrameCount === 4 ? "4-frame blink sequence" : "11-frame loop · final cel mirrors rest"}</p>
+        <p>{activeFrameCount === 11 ? "11-frame blink sequence · adjustable duration" : "11-frame loop · final cel mirrors rest"}</p>
         <div>{frameThumbs.map((frame, index) => <button key={index} type="button" className={index === frameIndex ? "is-active" : ""} aria-label={`Edit frame ${index}`} aria-pressed={index === frameIndex} onClick={() => selectFrame(index)}><span>{frame ? <img src={frame} alt="" /> : <i />}</span><small>{index}</small></button>)}</div>
       </div>
     </div>
@@ -435,8 +435,10 @@ export function PetWorkshopPage() {
   const builtinProfile = BUILTIN_PROFILES.find((item) => item.id === selectedId) ?? null;
   const activeProfile = profile ?? builtinProfile;
   const isBuiltin = Boolean(builtinProfile);
-  const behavior = useMemo(() => profile ? normalizePetBehavior(profile.behavior, profile.name) : null, [profile]);
+  const behavior = useMemo(() => profile ? normalizePetBehavior(profile.behavior, profile.name) : builtinProfile ? readPetBehavior(builtinProfile.name.toLocaleLowerCase(), builtinProfile.name) : null, [profile, builtinProfile]);
   const [behaviorPreview, setBehaviorPreview] = useState<PetBehaviorSettings | null>(null);
+  const preferenceId = profile ? `custom:${profile.id}` : builtinProfile ? builtinProfile.name.toLocaleLowerCase() : "";
+  const [blinkDuration, setBlinkDuration] = useState(PET_BLINK_DURATION_DEFAULT_MS);
 
   useEffect(() => {
     let active = true;
@@ -449,6 +451,7 @@ export function PetWorkshopPage() {
     return () => { active = false; };
   }, []);
   useEffect(() => { setBehaviorPreview(behavior); }, [behavior]);
+  useEffect(() => { if (preferenceId) setBlinkDuration(readPetBlinkDuration(preferenceId)); }, [preferenceId]);
 
   const updateProfile = async (updated: PetSpriteProfile) => {
     setSaving(true);
@@ -505,7 +508,20 @@ export function PetWorkshopPage() {
   const updateBehavior = (next: PetBehaviorSettings) => {
     setBehaviorPreview(next);
     if (profile) void updateProfile({ ...profile, behavior: next });
+    else if (builtinProfile) savePetBehavior(preferenceId, next);
   };
+  const updateBlinkDuration = (nextDuration: number) => {
+    setBlinkDuration(savePetBlinkDuration(preferenceId, nextDuration));
+  };
+  const updateBehaviorTemplate = (template: string) => {
+    if (!behaviorPreview) return;
+    const templateActions = template === "blaze-mix" ? ["approach-cursor", "pounce", "fire-breath"]
+      : template === "pounce" || template === "fire-breath" ? ["approach-cursor", template]
+        : template ? [template] : [];
+    updateBehavior({ ...behaviorPreview, actions: templateActions as PetBehaviorSettings["actions"] });
+  };
+  const selectedBehaviorTemplate = behaviorPreview?.actions.includes("pounce") && behaviorPreview.actions.includes("fire-breath")
+    ? "blaze-mix" : behaviorPreview?.actions.find((action) => action !== "approach-cursor") ?? "";
   const addAction = (action: PetBehaviorSettings["actions"][number]) => {
     if (!behaviorPreview || behaviorPreview.actions.includes(action)) return;
     updateBehavior({ ...behaviorPreview, actions: [...behaviorPreview.actions, action] });
@@ -552,16 +568,15 @@ export function PetWorkshopPage() {
       <main className="pet-workshop-main">
         {activeProfile && (isBuiltin || behaviorPreview) ? <>
           <header className="pet-workshop-profile-heading"><div><p className="section-kicker">{isBuiltin ? "SKAI ORIGINAL · BUILT-IN REFERENCE" : "COMPANION PROFILE"}</p>{isBuiltin ? <h2>{activeProfile.name}</h2> : <input aria-label="Companion name" value={profile!.name} maxLength={48} onChange={(event) => setProfiles((current) => current.map((item) => item.id === profile!.id ? { ...item, name: event.target.value } : item))} onBlur={() => { const next = profiles.find((item) => item.id === profile!.id); if (next?.name.trim()) void updateProfile({ ...next, name: next.name.trim() }); }} />}<p>{isBuiltin ? "Production sprite strips, frame by frame. This is the artwork shipped with Skai Desktop." : profile?.strips.idle ? "Custom artwork and behavior stay with this profile." : "Draft pet · create its idle strip before using it on the desktop."}</p></div><div>{isBuiltin ? <Button variant="secondary" disabled={saving} onClick={() => void createGeneratedProfile(activeProfile.name + " copy", "", activeProfile.id)}>Fork this pet</Button> : <><Button variant="secondary" disabled={!profile?.strips.idle || localStorage.getItem("skai.pet.character") === `custom:${profile!.id}`} onClick={() => activateProfile(profile!.id)}>Use this pet</Button><Button variant="secondary" onClick={exportProfile}>Export profile</Button><Button variant="ghost" onClick={() => void removeProfile()}>Delete</Button></>}</div></header>
-          {isBuiltin && activeProfile.id === "builtin:blaze" && <div className="settings-callout"><strong>Blaze attack kit</strong><span>Approach cursor, pounce, and fire breath are enabled for this companion. Every random sequence includes a pounce or fire breath and starts after a 12–24 second wait while idle or walking. Attacks pause during reduced motion, dragging, and active work.</span></div>}
           {!isBuiltin && profile?.referenceImageDataUrl && <div className="pet-generation-reference"><div><strong>Approved concept reference</strong><span>Use this local image while drawing the companion’s animation strips below.</span></div><img src={profile.referenceImageDataUrl} alt={`${profile.name} concept reference`} /></div>}
-          {!isBuiltin && profile?.name.trim().toLocaleLowerCase() === "blaze" && behaviorPreview && <>
+          {behaviorPreview && <>
           <section className="pet-workshop-behavior">
-            <div className="pet-workshop-section-heading"><div><p className="section-kicker">BLAZE’S PERSONALITY</p><h2>Cursor attacks</h2><p>Blaze can get bored and attack the cursor while resting or wandering.</p></div><label className="pet-workshop-switch"><input type="checkbox" checked={behaviorPreview.enabled} onChange={(event) => updateBehavior({ ...behaviorPreview, enabled: event.target.checked })} /><span>{behaviorPreview.enabled ? "Enabled" : "Disabled"}</span></label></div>
-            <div className="pet-workshop-behavior-options"><label><input type="checkbox" checked={behaviorPreview.triggerDuringIdle} onChange={(event) => updateBehavior({ ...behaviorPreview, triggerDuringIdle: event.target.checked })} /> While idle</label><label><input type="checkbox" checked={behaviorPreview.triggerDuringWalk} onChange={(event) => updateBehavior({ ...behaviorPreview, triggerDuringWalk: event.target.checked })} /> While walking</label><label className="pet-workshop-interval">Random wait<input type="number" min="10" max="480" value={behaviorPreview.minimumIntervalSeconds} onChange={(event) => updateBehavior({ ...behaviorPreview, minimumIntervalSeconds: Number(event.target.value) })} /><span>to</span><input type="number" min="10" max="480" value={behaviorPreview.maximumIntervalSeconds} onChange={(event) => updateBehavior({ ...behaviorPreview, maximumIntervalSeconds: Number(event.target.value) })} /><span>seconds · default 12–24</span></label></div>
-            <div className="pet-workshop-actions-heading"><div><strong>Possible actions</strong><small>Skai assembles a random combination; cursor actions approach first and return afterward.</small></div><label>Add action<select value="" onChange={(event) => { if (event.target.value) addAction(event.target.value as PetBehaviorSettings["actions"][number]); }}><option value="">Choose…</option>{PET_ACTIONS.filter((item) => !behaviorPreview.actions.includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label></div>
-            <div className="pet-workshop-action-list">{behaviorPreview.actions.map((action, index) => { const item = PET_ACTIONS.find((candidate) => candidate.id === action)!; return <article key={`${action}-${index}`}><span className="pet-workshop-action-number">{String(index + 1).padStart(2, "0")}</span><span><strong>{item.label}</strong><small>{action === "fire-breath" ? "Play the fire-breath animation and aim at the cursor." : action === "pounce" ? "Lunge toward the current cursor position." : "Move beside the cursor before attacking."}</small></span><div><button type="button" aria-label={`Move ${item.label} earlier`} disabled={index === 0} onClick={() => moveAction(index, -1)}>↑</button><button type="button" aria-label={`Move ${item.label} later`} disabled={index === behaviorPreview.actions.length - 1} onClick={() => moveAction(index, 1)}>↓</button><button type="button" aria-label={`Remove ${item.label}`} onClick={() => updateBehavior({ ...behaviorPreview, actions: behaviorPreview.actions.filter((_, itemIndex) => itemIndex !== index) })}>×</button></div></article>; })}{behaviorPreview.actions.length === 0 && <p className="pet-workshop-empty">Add an action to make this companion expressive.</p>}</div>
-            <p className="pet-workshop-safety-note">Attacks only read the cursor position. They never move or click it. Hidden pets, dragging, and reduced motion pause these behaviors.</p>
+            <div className="pet-workshop-section-heading"><div><p className="section-kicker">{isBuiltin ? `${activeProfile.name.toLocaleUpperCase()}’S PERSONALITY` : "COMPANION PERSONALITY"}</p><h2>Signature behavior</h2><p>{isBuiltin ? "This pet has its own little routine while resting or wandering." : "Choose a small autonomous routine for this companion."}</p></div><label className="pet-workshop-switch"><input type="checkbox" checked={behaviorPreview.enabled} onChange={(event) => updateBehavior({ ...behaviorPreview, enabled: event.target.checked })} /><span>{behaviorPreview.enabled ? "Enabled" : "Disabled"}</span></label></div>
+            {isBuiltin ? <div className="pet-workshop-personality-chip"><strong>{behaviorPreview.actions.map((action) => PET_ACTIONS.find((item) => item.id === action)?.label ?? action).join(" + ") || "No routine selected"}</strong><span>{activeProfile.name === "Blaze" ? "Locks onto a stationary cursor, approaches, then commits to a pounce or a large fire-breath attack." : "Runs occasionally while idle or walking; it pauses during active work, dragging, or reduced motion."}</span></div> : <label className="pet-workshop-template">Behavior template<select value={selectedBehaviorTemplate} onChange={(event) => updateBehaviorTemplate(event.target.value)}><option value="">Choose a routine…</option>{PET_ACTIONS.filter((item) => item.id !== "approach-cursor" && (!item.needsCursor || profile?.name.trim().toLocaleLowerCase() === "blaze")).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}{profile?.name.trim().toLocaleLowerCase() === "blaze" && <option value="blaze-mix">Pounce + fire breath mix</option>}</select></label>}
+            <div className="pet-workshop-behavior-options"><label><input type="checkbox" checked={behaviorPreview.triggerDuringIdle} onChange={(event) => updateBehavior({ ...behaviorPreview, triggerDuringIdle: event.target.checked })} /> While idle</label><label><input type="checkbox" checked={behaviorPreview.triggerDuringWalk} onChange={(event) => updateBehavior({ ...behaviorPreview, triggerDuringWalk: event.target.checked })} /> While walking</label><label className="pet-workshop-interval">Random wait<input type="number" min="10" max="480" value={behaviorPreview.minimumIntervalSeconds} onChange={(event) => { const minimum = Math.max(10, Number(event.target.value)); updateBehavior({ ...behaviorPreview, minimumIntervalSeconds: minimum, maximumIntervalSeconds: Math.max(minimum, behaviorPreview.maximumIntervalSeconds) }); }} /><span>to</span><input type="number" min="10" max="480" value={behaviorPreview.maximumIntervalSeconds} onChange={(event) => { const maximum = Math.max(10, Number(event.target.value)); updateBehavior({ ...behaviorPreview, minimumIntervalSeconds: Math.min(behaviorPreview.minimumIntervalSeconds, maximum), maximumIntervalSeconds: maximum }); }} /><span>seconds · default 30–60</span></label></div>
+            {activeProfile.name === "Blaze" && <p className="pet-workshop-safety-note">The fight scene only reads a steady cursor position. It never moves or clicks it, and the expanded effect window passes clicks through.</p>}
           </section>
+          <section className="pet-workshop-blink-control"><div><p className="section-kicker">BLINK TIMING · {activeProfile.name.toLocaleUpperCase()}</p><strong>How long should {activeProfile.name} blink?</strong><span>Adjust the timing live. This setting is saved separately for each pet.</span></div><label><input aria-label={`${activeProfile.name} blink duration`} type="range" min={PET_BLINK_DURATION_MIN_MS} max={PET_BLINK_DURATION_MAX_MS} step="10" value={blinkDuration} onChange={(event) => updateBlinkDuration(Number(event.target.value))} /><output>{blinkDuration} ms</output></label></section>
           </>}
           <section className="pet-workshop-animation-section">
             <div className="pet-workshop-section-heading"><div><p className="section-kicker">{isBuiltin ? "SHIPPED ANIMATION CELLS" : "ANIMATION STUDIO"}</p><h2>{isBuiltin ? "How this pet is built" : "Draw every moment"}</h2><p>{isBuiltin ? "Source art at native 256 × 256 resolution · 11 frames · frame 0 and 10 close the loop." : "11 cels per strip · transparent background · frame 0 is rest · frame 10 closes the loop."}</p></div>{!isBuiltin && <label className="ui-button ui-button-secondary pet-workshop-import-strip"><span>Import 11-frame strip</span><input type="file" accept="image/png,image/webp" onChange={async (event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file || !profile) return; try { const strip = await validatePetStrip(file); await updateProfile({ ...profile, strips: { ...profile.strips, [selectedAnimation]: strip } }); } catch (error) { setLoadError(error instanceof Error ? error.message : "This strip could not be imported."); } }} /></label>}</div>

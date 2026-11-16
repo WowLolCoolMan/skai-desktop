@@ -7,6 +7,8 @@ import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { ModelPicker } from "../../components/ui/ModelPicker";
 import { ChatMessage } from "./ChatMessage";
 import { ChatComposer } from "./ChatComposer";
+import { ChatTaskComposer } from "./ChatTaskComposer";
+import type { TaskEnvironment } from "../../../shared/contracts";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 const CHAT_SCROLL_KEY_PREFIX = "skai.chat.scroll.";
@@ -79,10 +81,11 @@ type ChatPageProps = {
   onTogglePinned: () => void;
   onArchive: () => void;
   onRenameConversation: (title: string) => Promise<boolean>;
+  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment) => Promise<boolean>;
   workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ capacity, recentConversations, provider, model, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, workspaceMode = "conversation" }: ChatPageProps) {
+export function ChatPage({ capacity, recentConversations, provider, model, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, workspaceMode = "conversation" }: ChatPageProps) {
   const [draft, setDraft] = useState(() => readChatDraft(conversationId));
   const [documentsOnly, setDocumentsOnly] = useState(false);
   const [temporaryChat, setTemporaryChat] = useState(false);
@@ -227,6 +230,7 @@ export function ChatPage({ capacity, recentConversations, provider, model, endpo
             <><div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={index} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>{showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>Jump to latest ↓</Button></div>}</>
           )}
         </section>
+        <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={onPlanTask} />
         <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={setDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} />
       </main>
       <aside className="chat-rail">{messages.length === 0 ? <Card className="rail-card"><p className="section-kicker">QUICK START</p><button onClick={() => onNavigate("coding")} type="button"><strong>Build in a project</strong><span>Open files, terminal, and agent tasks</span></button><button onClick={() => onNavigate("images")} type="button"><strong>Create an image</strong><span>Use a local image workflow</span></button><button onClick={() => onNavigate("marketplace")} type="button"><strong>Find a model or tool</strong><span>Browse voices, image models, skills, and runtimes</span></button></Card> : <Card className="rail-card chat-thread-summary"><p className="section-kicker">ACTIVE THREAD</p><strong>{conversationTitle}</strong><span>{messages.length} messages · {model}</span><small>Saved locally on this device.</small></Card>}</aside>

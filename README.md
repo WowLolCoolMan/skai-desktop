@@ -34,7 +34,8 @@ Skai Desktop is **local-only** for AI runtime and application data:
 | **Scheduled work** | Local one-time and repeating schedules with pause/resume/cancel and reviewed Run now controls. No unattended provider request is implied. |
 | **Models** | Local provider discovery, model library, pinned models, capability checks, comparison, explicit unavailable-model recovery, and no silent model switching. |
 | **Workspace shell** | Resizable sidebar, persistent navigation state, command palette, settings search, responsive layouts, in-app documentation, and Deep Sea/Deep Space appearance presets. |
-| **Local integrations** | Guarded GitHub repository workflows, local ComfyUI-compatible image workflows, optional Diffusers image generation, local attachments, and Percy, the optional Skai wolf companion. |
+| **Pets and companions** | Seven built-in pets in Pet Workshop, eleven-frame looping sprites, adjustable blinks, per-pet idle/walk actions, Blaze's animated pounce and fire-breath fight scene, and guided pet concept generation through local Diffusers or ComfyUI. |
+| **Local integrations** | Guarded GitHub repository workflows, local ComfyUI-compatible image workflows, optional Diffusers image generation, and local attachments. |
 
 The [capability matrix](docs/CAPABILITY_MATRIX.md) is the source of truth for working, partial, unverified, and planned areas. The project favors small, tested vertical slices over static mock screens, with screenshots and interaction evidence recorded in [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md).
 
@@ -60,7 +61,7 @@ Electron + React + TypeScript
 Ollama · LM Studio · AirLLM · local OpenAI-compatible APIs · ComfyUI
 ```
 
-The Electron renderer is the only product UI. The isolated preload bridge exposes only typed desktop operations. The persistent .NET Agent Host and shared Core services own local model requests, project boundaries, persistence, approvals, and guarded file/terminal operations. Closing the main window keeps the local host and Percy companion resident in the system tray, where users can reopen Skai, open recent chats, toggle Percy, or quit explicitly.
+The Electron renderer is the only product UI. The isolated preload bridge exposes only typed desktop operations. The persistent .NET Agent Host and shared Core services own local model requests, project boundaries, persistence, approvals, and guarded file/terminal operations. Closing the main window keeps the local host and enabled companion resident in the system tray, where users can reopen Skai, open recent chats, show or hide pets, or quit explicitly. Pet cursor targeting reads pointer coordinates and never moves or clicks the cursor.
 
 ## Run locally
 
@@ -89,11 +90,9 @@ dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj
 ### Linux window managers
 
 - **Installing a Linux build:** extract the `Skai-Desktop-electron-linux-x64` archive and run `./install.sh`. It installs for your user (no root needed) and adds Skai to your app launcher and a `skai-desktop` command. On distributions that restrict unprivileged user namespaces (such as Ubuntu 24.04+), it offers the one `sudo` step Chromium's sandbox needs. `./uninstall.sh` removes the app and keeps your data.
-- **Wayland (Hyprland, Sway, GNOME, KDE):** Skai runs under XWayland by default, because native Wayland does not let apps position their own windows and Percy needs that to walk and be dragged. Set `SKAI_OZONE_PLATFORM=wayland` (or pass `--ozone-platform=wayland`) for native Wayland. Percy then stays where the compositor puts it and is moved by dragging.
-- **Tiling WMs (i3, bspwm, Hyprland, Sway):** Percy asks to float. Your WM decides borders, stickiness and always-on-top, so you can add rules for it, for example:
-  - i3: `for_window [class="skai-desktop" title="^Percy"] floating enable, sticky enable, border none`
-  - Hyprland: `windowrule = float, pin, noborder, noshadow, title:^(Percy)`
-- **X11 without a compositor** (plain i3, bspwm): transparent windows render with a black background. Run a compositor such as `picom`, or hide Percy from the tray or Settings.
+- **Wayland (Hyprland, Sway, GNOME, KDE):** Skai runs under XWayland by default because native Wayland does not let apps position their own windows. Set `SKAI_OZONE_PLATFORM=wayland` (or pass `--ozone-platform=wayland`) to use native Wayland; pets then stay where the compositor places them and use compositor-driven dragging.
+- **Tiling WMs (i3, bspwm, Hyprland, Sway):** Pets ask to float. Your WM decides borders, stickiness and always-on-top, so add rules for the pet window title if needed.
+- **X11 without a compositor** (plain i3, bspwm): transparent windows render with a black background. Run a compositor such as `picom`, or hide pets from the tray or Settings.
 - **System tray:** closing the window keeps Skai in the tray only when a tray host is running (Waybar `tray`, KDE, the GNOME AppIndicator extension, or an X11 tray such as i3bar). Without one, closing the window quits Skai.
 
 ## Verification
@@ -118,7 +117,7 @@ The local-only audit is intentional: it rejects hosted/cloud model routes from t
 apps/desktop/              Electron + React desktop surface
 services/agent-host/       Persistent .NET host and protocol boundary
 native/SkaiDesktop.Core/   Headless provider, persistence, workflow, and safety logic
-assets/                    Skai branding and Percy mascot assets
+assets/                    Skai branding and built-in pet sprite assets
 docs/                      Architecture, capability, release, and feature documentation
 ```
 
@@ -129,6 +128,7 @@ Project documentation:
 - [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — evidence-backed feature status.
 - [`docs/GITHUB_PAGES.md`](docs/GITHUB_PAGES.md) — project site and deployment notes.
 - [`docs/LOCAL_IMAGE_GENERATION.md`](docs/LOCAL_IMAGE_GENERATION.md) — managed Diffusers runtime, ComfyUI workflows, and remaining acceptance gaps.
+- [`docs/PETS_AND_COMPANIONS.md`](docs/PETS_AND_COMPANIONS.md) — built-in pet personalities, sprite format, Blaze attacks, and guided local generation.
 - [`CHANGELOG.md`](CHANGELOG.md) — version history.
 
 Engineering references:

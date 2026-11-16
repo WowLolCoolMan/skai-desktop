@@ -20,7 +20,7 @@ expect(main.includes("requestSingleInstanceLock") && main.includes('app.on("seco
 expect(main.includes('mainWindow.on("close"') && main.includes("event.preventDefault()") && main.includes("mainWindow.hide()"), "closing the main window must hide it instead of quitting");
 expect(main.includes("new Tray") && main.includes('tray.on("click"') && main.includes('tray.on("right-click"'), "tray must support click and context-menu interactions");
 expect(main.includes("Recent chats") && main.includes("conversations.list") && main.includes("tray:open-conversation"), "tray must expose host-backed recent chats");
-expect(main.includes("Show Percy") && main.includes("Hide Percy") && main.includes("setPetVisible"), "tray must expose Percy visibility control");
+expect(main.includes('petVisible ? "Hide all pets" : "Show all pets"') && main.includes("setPetVisible"), "tray must expose an all-pets visibility toggle");
 expect(main.includes("Quit Skai Desktop") && main.includes("app.quit()"), "tray must expose an explicit quit action");
 expect(main.includes('process.platform === "win32" ? source.resize({ width: 16, height: 16 }) : source'), "tray icon sizing must use the Windows-specific size while preserving the native Linux icon");
 expect(releaseWorkflow.includes("rid: linux-x64") && releaseWorkflow.includes("runner.os == 'Linux'"), "release workflow must build and smoke-test the Linux Electron artifact");
@@ -44,4 +44,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("Electron tray audit passed: resident Windows behavior and Linux packaging contracts are present.");
+console.log("Electron tray audit passed: resident app behavior and Windows/Linux packaging contracts are present.");

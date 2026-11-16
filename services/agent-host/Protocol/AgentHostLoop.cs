@@ -28,7 +28,8 @@ public static class AgentHostLoop
 
     public static async Task RunAsync(Stream input, Stream output, CancellationToken cancellationToken = default)
     {
-        LegacyDataMigration.MigrateLocalData();
+        if (!bool.TryParse(Environment.GetEnvironmentVariable("SKAI_SKIP_LEGACY_DATA_MIGRATION"), out var skipLegacyMigration) || !skipLegacyMigration)
+            LegacyDataMigration.MigrateLocalData();
         using var reader = new StreamReader(input);
         await using var writer = new StreamWriter(output) { AutoFlush = true };
         using var voice = new OsNativeTtsService();

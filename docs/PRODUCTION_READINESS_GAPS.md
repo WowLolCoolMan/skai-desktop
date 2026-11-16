@@ -29,7 +29,7 @@ remain unchanged across the product rename.
 - Run live keyboard and Narrator/assistive-technology passes across navigation, dialogs, composer, model library, GitHub, terminal, import/export, and error recovery.
 - Complete Linux/Skia and narrow-layout interaction smoke; static UI contracts are necessary but cannot prove runtime focus behavior.
 - Visually verify the Electron Settings redesign in a running packaged build.
-- Finish the companion/pet presentation: transparent rendering, activity bubble, positioning, and collision behavior across workspace sizes.
+- Complete live acceptance of pet attacks, cursor targeting, multi-monitor placement, activity indicators, and collision behavior across workspace sizes. The asset and behavior checks pass, but they do not validate visual timing or every compositor.
 - Consolidate transient success/error feedback into a consistent status system while keeping actionable failures visible until dismissed.
 - Keep all visual and interaction behavior in the Electron renderer; no second desktop UI stack is permitted.
 
@@ -38,7 +38,7 @@ remain unchanged across the product rename.
 - Improve model-library explanations for compatibility, task support, licensing, download size, import progress, and failure recovery.
 - Add clearer per-provider capability messaging before a user attaches unsupported media.
 - Improve voice availability messaging and recovery across OS speech-service differences.
-- Verify settings, marketplace, GitHub, and companion layouts at wide, desktop, tablet, mobile, and small-mobile widths in packaged builds.
+- Resolve the overlaps and unreachable controls reported by the expanded packaged UI matrix at narrow widths, then verify settings, marketplace, GitHub, and companion layouts across supported window sizes.
 - Add user-facing diagnostics that are redacted, exportable, and easy to attach to a bug report without including credentials or private content.
 
 ## Exit criteria

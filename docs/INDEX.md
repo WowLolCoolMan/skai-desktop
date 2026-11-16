@@ -29,6 +29,8 @@ site](https://wowlolcoolman.github.io/skai-desktop/).
   operations.
 - [Local image generation](LOCAL_IMAGE_GENERATION.md) — managed Diffusers runtime,
   ComfyUI workflows, and remaining acceptance work.
+- [Pets and companions](PETS_AND_COMPANIONS.md) — built-in personalities, sprite
+  format, Blaze's attacks, Workshop, and local generation.
 - [Electron default runtime](ELECTRON_DEFAULT_RUNTIME.md) — supported desktop
   runtime and migration evidence.
 - [UI reference progress](SKAI_PREMIUM_UI_PROGRESS.md) — visual work and

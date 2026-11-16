@@ -17,7 +17,7 @@ const steps = [
   "package:electron",
   // The host smokes run the Debug build in services/agent-host/bin; build it explicitly
   // (package:electron only publishes the Release host into dist/).
-  "agent-host:build",
+  "agent-host:build:smoke",
   "smoke:agent-host",
   "smoke:marketplace-host",
   "test",

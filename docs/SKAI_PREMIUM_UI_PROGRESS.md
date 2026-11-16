@@ -13,9 +13,9 @@ what they cover.
   session context.
 - Secondary tools are opened through the searchable command launcher rather
   than being permanently listed in the thread sidebar.
-- Percy is a separate transparent always-on-top Electron window with drag,
+- Pets use a separate transparent always-on-top Electron window with drag,
   bounded placement, optional wandering, sprite customization, and reduced
-  motion support.
+  motion support. All seven built-ins are inspectable in Pet Workshop.
 
 ## Current feature surfaces
 
@@ -39,7 +39,7 @@ Run `npm run smoke:windows` from the repository root. It currently runs:
 3. Portable Electron packaging with the self-contained Agent Host and AirLLM
    worker.
 4. Agent Host, Marketplace, and task-replan protocol smoke.
-5. Packaged Electron shell and separate Percy surface smoke.
+5. Packaged Electron shell and separate companion surface smoke.
 6. Dark/light/system theme acceptance.
 7. Ten packaged routes across 1920, 1440, 1280, 960, and 640 pixel widths.
 
@@ -59,3 +59,7 @@ dispatch, resumable downloads, and Worktree task execution remain explicitly
 partial or planned in `docs/CAPABILITY_MATRIX.md` and
 `docs/PRODUCTION_READINESS_GAPS.md`. They must not be represented as working
 controls until their host contracts and packaged acceptance evidence exist.
+
+The full `smoke:windows` run passed on 2026-11-16. Pet asset and behavior checks
+passed as well. The expanded UI matrix still reports narrow-layout overlaps and
+unreachable controls; it is an open acceptance item, not a passing claim.

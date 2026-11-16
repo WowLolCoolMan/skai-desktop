@@ -44,6 +44,7 @@ expect(!packageJson.scripts["build:native"] && !packageJson.scripts["open:native
 expect(desktopPackage.main === "electron/main.cjs", "desktop package must use Electron main");
 expect(main.includes("contextIsolation: true"), "context isolation must remain enabled");
 expect(main.includes("nodeIntegration: false"), "Node integration must remain disabled");
+expect(main.includes('host.stdin.on("error"') && main.includes('code: "HOST_WRITE_FAILED"'), "Electron must handle asynchronous Agent Host pipe errors without crashing the main process");
 expect(main.includes("sandbox: true"), "renderer sandbox must remain enabled");
 expect(main.includes("media-src 'self' file:"), "local video decoding must permit only local file media sources");
 expect(main.includes('path.join(app.getPath("userData"), "media-samples")'), "local media samples must be written only to the private app data folder");
@@ -97,7 +98,7 @@ expect(packageScript.includes("electronDist") && packageScript.includes("const a
 expect(smokeScript.includes("remote-debugging-port") && smokeScript.includes("mainTarget") && smokeScript.includes("petTarget") && smokeScript.includes("Primary navigation") && smokeScript.includes(".pet-window-root") && smokeScript.includes("pet-window-sprite") && smokeScript.includes("smoke-silence.wav"), "Electron packaged smoke must inspect the main navigation, local audio, and separate Percy surfaces");
 expect(packageJson.scripts["smoke:electron:themes"] === "node scripts/smoke-electron-themes.cjs" && themeSmokeScript.includes("Emulation.setDeviceMetricsOverride") && themeSmokeScript.includes("Page.captureScreenshot") && themeSmokeScript.includes("deep-space"), "Packaged Electron theme acceptance must exercise constrained rendering and capture appearance states");
 expect(packageJson.scripts["smoke:electron:overflow"] === "node scripts/smoke-electron-overflow.cjs" && overflowSmokeScript.includes("1920") && overflowSmokeScript.includes("routes") && overflowSmokeScript.includes("getBoundingClientRect"), "Packaged Electron overflow acceptance must exercise every route across supported viewport widths");
-expect(workspace.includes("const hasActiveTasks") && workspace.includes("loadWorkbench(false)") && workspace.includes("window.setInterval"), "Workbench must refresh background task state while local execution is active");
+expect(workspace.includes('request("tasks.list")') && workspace.includes("window.setInterval(refresh, 2000)"), "Workbench must refresh task state while local execution is active");
 const workbenchDetails = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "agents", "WorkbenchTaskDetails.tsx"), "utf8");
 expect(workbenchDetails.includes('task.status === "running" || task.status === "verifying"') && workbenchDetails.includes('onTransition(task.id, "cancel")') && workbenchDetails.includes("Stop run"), "Workbench must expose cancellation for active local task execution");
 const alternateDesktopFiles = findAlternateDesktopFiles(root);

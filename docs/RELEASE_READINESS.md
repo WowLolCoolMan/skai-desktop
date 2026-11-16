@@ -1,6 +1,6 @@
 # Skai Desktop first-release readiness
 
-Last audited: 2026-11-15
+Last audited: 2026-11-16
 
 Status: **not ready to publish as the first major release**.
 
@@ -8,14 +8,16 @@ Status: **not ready to publish as the first major release**.
 
 - Electron renderer typecheck and production build pass.
 - The persistent Agent Host builds cleanly and its protocol smoke passes.
-- Core tests pass, including AirLLM fallback policy and the pet wander planner.
+- Core tests pass, including AirLLM fallback policy and the pet behavior logic.
 - The packaged Windows Electron artifact builds and passes bounded startup smoke, including the host-backed Marketplace catalog/search/install contract and AirLLM worker staging.
 - The packaged voice smoke verifies that Electron exposes on-device recognition APIs and reports the expected privacy-preserving error when the en-US pack is unavailable; microphone acceptance still requires an installed pack.
-- The Windows smoke gate runs 19 staged checks, including core tests, Electron-only architecture/release audits, packaged Percy/AirLLM verification, and responsive overflow coverage.
+- The Windows smoke gate passed all 19 staged checks on 2026-11-16, including core tests, Electron-only architecture/release audits, packaged companion/AirLLM verification, themes, task replanning, and responsive overflow coverage.
+- `npm run check:pet-assets` passed for all 56 eleven-frame strips, exact rest-pose seams, visible motion, eleven-frame blinks, and Blaze's effects; `npm run test:pet` passed wander and attack behavior checks.
+- Additional project, conversation, queue, memory, and PDF protocol smokes passed against the isolated Agent Host build.
 - The portable Electron artifact now bundles the renderer, Electron runtime, and a self-contained Agent Host; its startup smoke verifies the rendered settings and pet surfaces.
 - Packaged artifacts include a versioned executable/Agent Host/AirLLM SHA-256 manifest; the Windows release workflow refreshes and verifies the executable hash after Authenticode signing.
 - Electron Settings now has a usable surface for general routing, appearance, model discovery, local voice, local image workflows, agent controls, privacy, storage, updates, and advanced controls.
-- The Electron pet uses the existing Byte asset pack, persists its position, supports pointer drag-and-drop, keyboard arrows, wandering, reduced-motion behavior, and a hide control.
+- The optional companion window supports the built-in and custom pet profiles, position persistence, pointer dragging, keyboard movement, wandering, per-pet idle/walk actions, reduced motion, and hide controls. Blaze has a tested attack sequence and separate fire/impact sprite effects; visual timing and pointer behavior still need live acceptance.
 - Model execution remains local-only; external model providers and cloud fallback are outside product scope.
 
 ## Hosted evidence
@@ -24,16 +26,16 @@ Status: **not ready to publish as the first major release**.
 
 ## Documentation site
 
-The Pages source and deployment workflow are present, but the first deployment
-is not yet enabled for this repository. The latest Pages run fails at
-**Configure Pages** because GitHub returns `404 Not Found` for the Pages site.
-An administrator must set **Settings → Pages → Build and deployment → Source**
-to **GitHub Actions**, then rerun the deployment workflow. See
-[GitHub Pages setup](GITHUB_PAGES.md).
+GitHub Pages is configured to deploy from GitHub Actions. The public site last
+returned HTTP 200 on 2026-11-15. The updated pet documentation and feature card
+in this checkout still need to be pushed to `main` and deployed before they are
+live. See [GitHub Pages setup](GITHUB_PAGES.md).
 
 ## Release blockers
 
 1. A signed Electron installer/release asset and clean-machine install/upgrade/uninstall evidence are not available in this checkout. The release workflow now packages and smoke-tests Electron for Windows and Linux, but remains fail-closed until signing material and lifecycle evidence are supplied.
-2. Complete the exact packaged-artifact accessibility, platform, and clean-install acceptance matrix. Cloud model routing is deliberately outside the product boundary and is not a release blocker.
+2. The extended packaged UI matrix still reports overlaps and unreachable controls at several narrow viewport sizes. Resolve those findings, then complete exact-artifact accessibility and platform acceptance. Cloud model routing is deliberately outside the product boundary and is not a release blocker.
 
-The current `main` branch is suitable for continuing release work, but it is not an honest candidate for a public release until the blockers above are closed.
+The Windows smoke suite and pet-focused checks pass, but this is not an honest
+candidate for a public release until the signing/lifecycle and narrow-layout
+acceptance blockers above are closed.

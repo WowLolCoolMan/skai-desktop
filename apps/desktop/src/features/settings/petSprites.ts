@@ -19,11 +19,78 @@ export const PET_ACTIONS = [
   { id: "approach-cursor", label: "Approach the cursor", needsCursor: true },
   { id: "pounce", label: "Pounce / lunge", needsCursor: true },
   { id: "fire-breath", label: "Breathe fire", needsCursor: true },
+  { id: "celebrate", label: "Celebrate", needsCursor: false },
+  { id: "curious-scan", label: "Curious scan", needsCursor: false },
+  { id: "ember-curl", label: "Curl up by the flame", needsCursor: false },
+  { id: "star-orbit", label: "Make a star orbit", needsCursor: false },
+  { id: "rock-roll", label: "Roll and settle", needsCursor: false },
+  { id: "sprout-stretch", label: "Stretch and unfurl", needsCursor: false },
 ] as const;
 
 export type PetAnimationId = typeof PET_ANIMATIONS[number]["id"];
 export type PetActionId = PetAttackAction;
 export type PetStrip = { dataUrl: string; frameWidth: number; frameHeight: number; frameCount?: number };
+export const PET_BLINK_DURATION_DEFAULT_MS = 280;
+export const PET_BLINK_DURATION_MIN_MS = 170;
+export const PET_BLINK_DURATION_MAX_MS = 700;
+const PET_BLINK_STORAGE_PREFIX = "skai.pet.blinkDuration.v1.";
+const PET_BEHAVIOR_STORAGE_PREFIX = "skai.pet.behavior.v1.";
+const BUILTIN_BEHAVIORS: Record<string, PetActionId[]> = {
+  percy: ["celebrate"],
+  byte: ["curious-scan"],
+  ember: ["ember-curl"],
+  blaze: ["approach-cursor", "pounce", "fire-breath"],
+  nova: ["star-orbit"],
+  rocky: ["rock-roll"],
+  sprout: ["sprout-stretch"],
+};
+
+export function petPreferenceId(character: string): string {
+  return character.replace(/^(?:custom:|builtin:)/, "");
+}
+
+export function readPetBlinkDuration(character: string): number {
+  try {
+    const saved = Number(localStorage.getItem(`${PET_BLINK_STORAGE_PREFIX}${petPreferenceId(character)}`));
+    return Number.isFinite(saved) && saved > 0
+      ? Math.round(Math.max(PET_BLINK_DURATION_MIN_MS, Math.min(PET_BLINK_DURATION_MAX_MS, saved)))
+      : PET_BLINK_DURATION_DEFAULT_MS;
+  } catch { return PET_BLINK_DURATION_DEFAULT_MS; }
+}
+
+export function savePetBlinkDuration(character: string, durationMs: number): number {
+  const duration = Math.round(Math.max(PET_BLINK_DURATION_MIN_MS, Math.min(PET_BLINK_DURATION_MAX_MS, durationMs)));
+  const petId = petPreferenceId(character);
+  const key = `${PET_BLINK_STORAGE_PREFIX}${petId}`;
+  localStorage.setItem(key, String(duration));
+  window.dispatchEvent(new StorageEvent("storage", { key, newValue: String(duration) }));
+  if (typeof BroadcastChannel !== "undefined") {
+    const channel = new BroadcastChannel("skai-companion-profiles");
+    channel.postMessage({ type: "blink-duration-changed", petId, duration });
+    channel.close();
+  }
+  return duration;
+}
+
+export function readPetBehavior(character: string, name: string): PetBehaviorSettings {
+  try {
+    const saved = localStorage.getItem(`${PET_BEHAVIOR_STORAGE_PREFIX}${petPreferenceId(character)}`);
+    return normalizePetBehavior(saved ? JSON.parse(saved) : null, name);
+  } catch { return defaultPetBehavior(name); }
+}
+
+export function savePetBehavior(character: string, settings: PetBehaviorSettings): void {
+  const petId = petPreferenceId(character);
+  const key = `${PET_BEHAVIOR_STORAGE_PREFIX}${petId}`;
+  const value = JSON.stringify(settings);
+  localStorage.setItem(key, value);
+  window.dispatchEvent(new StorageEvent("storage", { key, newValue: value }));
+  if (typeof BroadcastChannel !== "undefined") {
+    const channel = new BroadcastChannel("skai-companion-profiles");
+    channel.postMessage({ type: "behavior-settings-changed", petId });
+    channel.close();
+  }
+}
 export type PetSpriteProfile = {
   id: string;
   name: string;
@@ -38,15 +105,16 @@ export function petStripFrameCount(strip: PetStrip): number {
   return strip.frameCount ?? 6;
 }
 
-export function defaultPetBehavior(name: string, enabled = false): PetBehaviorSettings {
-  const blaze = name.trim().toLocaleLowerCase() === "blaze";
+export function defaultPetBehavior(name: string, enabled?: boolean): PetBehaviorSettings {
+  const normalizedName = name.trim().toLocaleLowerCase();
+  const actions = BUILTIN_BEHAVIORS[normalizedName] ?? [];
   return {
-    enabled: enabled || blaze,
+    enabled: enabled ?? actions.length > 0,
     triggerDuringIdle: true,
     triggerDuringWalk: true,
-    minimumIntervalSeconds: 12,
-    maximumIntervalSeconds: 24,
-    actions: blaze ? ["approach-cursor", "pounce", "fire-breath"] : [],
+    minimumIntervalSeconds: 30,
+    maximumIntervalSeconds: 60,
+    actions,
   };
 }
 
@@ -56,14 +124,14 @@ export function normalizePetBehavior(value: unknown, name = ""): PetBehaviorSett
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
   const candidate = value as Partial<PetBehaviorSettings>;
   const allowed = new Set<string>(PET_ACTIONS.map((action) => action.id));
-  const actions = cursorAttacksAllowed && Array.isArray(candidate.actions)
-    ? [...new Set(candidate.actions.filter((action): action is PetActionId => typeof action === "string" && allowed.has(action)))]
-    : cursorAttacksAllowed ? fallback.actions : [];
-  const legacyDefault = cursorAttacksAllowed && candidate.minimumIntervalSeconds === 60 && candidate.maximumIntervalSeconds === 180;
-  const minimumIntervalSeconds = legacyDefault ? 20 : clampInterval(candidate.minimumIntervalSeconds, fallback.minimumIntervalSeconds);
+  const actions = Array.isArray(candidate.actions)
+    ? [...new Set(candidate.actions.filter((action): action is PetActionId => typeof action === "string" && allowed.has(action) && (cursorAttacksAllowed || !PET_ACTIONS.find((item) => item.id === action)?.needsCursor)))]
+    : fallback.actions;
+  const legacyDefault = candidate.minimumIntervalSeconds === 60 && candidate.maximumIntervalSeconds === 180;
+  const minimumIntervalSeconds = legacyDefault ? 30 : clampInterval(candidate.minimumIntervalSeconds, fallback.minimumIntervalSeconds);
   const maximumIntervalSeconds = Math.max(minimumIntervalSeconds, legacyDefault ? 60 : clampInterval(candidate.maximumIntervalSeconds, fallback.maximumIntervalSeconds));
   return {
-    enabled: cursorAttacksAllowed && actions.length > 0 && (typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled),
+    enabled: actions.length > 0 && (typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled),
     triggerDuringIdle: typeof candidate.triggerDuringIdle === "boolean" ? candidate.triggerDuringIdle : true,
     triggerDuringWalk: typeof candidate.triggerDuringWalk === "boolean" ? candidate.triggerDuringWalk : true,
     minimumIntervalSeconds,

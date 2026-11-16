@@ -6,15 +6,17 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const readline = require("node:readline");
+const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
 const root = path.resolve(__dirname, "..");
+const hostAssembly = ensureSmokeAgentHostBuild(root);
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-project-editor-smoke-"));
 const workspace = path.join(tempRoot, "workspace");
 fs.mkdirSync(workspace, { recursive: true });
 fs.writeFileSync(path.join(workspace, "README.md"), "before edit\n");
-const child = spawn("dotnet", ["run", "--project", path.join(root, "services", "agent-host", "SkaiDesktop.AgentHost.csproj"), "--no-build", "--", "--stdio"], {
+const child = spawn("dotnet", [hostAssembly, "--stdio"], {
   cwd: root,
-  env: { ...process.env, SRAI_PROJECTS_PATH: path.join(tempRoot, "projects.json"), SRAI_UNDO_PATH: path.join(tempRoot, "undo.json") },
+  env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", SRAI_PROJECTS_PATH: path.join(tempRoot, "projects.json"), SRAI_UNDO_PATH: path.join(tempRoot, "undo.json") },
   stdio: ["pipe", "pipe", "pipe"],
   windowsHide: true,
 });

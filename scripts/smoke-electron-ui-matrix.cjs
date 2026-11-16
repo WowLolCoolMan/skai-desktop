@@ -21,7 +21,7 @@ if (!fs.existsSync(executable)) {
 }
 const port = 19331;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
-const env = { ...process.env, XDG_CONFIG_HOME: path.join(temp, "config"), XDG_DATA_HOME: path.join(temp, "data"), XDG_CACHE_HOME: path.join(temp, "cache"), APPDATA: path.join(temp, "appdata"), LOCALAPPDATA: path.join(temp, "localappdata") };
+const env = { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", XDG_CONFIG_HOME: path.join(temp, "config"), XDG_DATA_HOME: path.join(temp, "data"), XDG_CACHE_HOME: path.join(temp, "cache"), APPDATA: path.join(temp, "appdata"), LOCALAPPDATA: path.join(temp, "localappdata") };
 for (const dir of ["config", "data", "cache", "appdata", "localappdata"]) fs.mkdirSync(path.join(temp, dir), { recursive: true });
 const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
 const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${path.join(temp, "electron")}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -139,16 +139,16 @@ async function main() {
   fs.writeFileSync(path.join(seedProject, "README.md"), `# Seed\n${longWord}\n`);
   const seeded = await cdp.evaluate(`(async () => {
     const r = (m, p) => window.skaiAgent.request(m, p);
-    const ok = [];
-    ok.push((await r("conversation.save", { title: ${JSON.stringify(longTitle)}, messages: [{ role: "user", content: ${JSON.stringify(`Unbroken token: ${longWord}`)} }, { role: "assistant", content: ${JSON.stringify("Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40))} }] })).ok);
-    ok.push((await r("conversation.save", { title: ${JSON.stringify(longWord)}, messages: [{ role: "user", content: "short" }] })).ok);
+    const results = [];
+    results.push(await r("conversation.save", { title: ${JSON.stringify(longTitle)}, messages: [{ role: "user", content: ${JSON.stringify(`Unbroken token: ${longWord}`)} }, { role: "assistant", content: ${JSON.stringify("Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40))} }] }));
+    results.push(await r("conversation.save", { title: ${JSON.stringify(longWord)}, messages: [{ role: "user", content: "short" }] }));
     for (let i = 0; i < 25; i++) await r("conversation.save", { title: "Filler conversation number " + i, messages: [{ role: "user", content: "filler " + i }] });
-    ok.push((await r("tasks.plan", { title: ${JSON.stringify(longTitle)}, instruction: ${JSON.stringify(`Instruction ${longWord}`)}, environment: "local" })).ok);
-    ok.push((await r("scheduled.create", { prompt: ${JSON.stringify(`${longTitle} ${longWord}`)}, dueAt: new Date(Date.now() + 3600000).toISOString(), repeatEveryMinutes: 60 })).ok);
-    ok.push((await r("project.save", { name: ${JSON.stringify(longTitle)}, folderPaths: [${JSON.stringify(seedProject)}] })).ok);
-    return ok;
+    results.push(await r("tasks.plan", { title: ${JSON.stringify(longTitle)}, instruction: ${JSON.stringify(`Instruction ${longWord}`)}, environment: "local" }));
+    results.push(await r("scheduled.create", { prompt: ${JSON.stringify(`${longTitle} ${longWord}`)}, dueAt: new Date(Date.now() + 3600000).toISOString(), repeatEveryMinutes: 60 }));
+    results.push(await r("project.save", { name: ${JSON.stringify(longTitle)}, folderPaths: [${JSON.stringify(seedProject)}] }));
+    return results;
   })()`);
-  if (!Array.isArray(seeded) || seeded.some((value) => value !== true)) throw new Error(`Seeding the throwaway profile failed: ${JSON.stringify(seeded)}`);
+  if (!Array.isArray(seeded) || seeded.some((result) => result?.ok !== true)) throw new Error(`Seeding the throwaway profile failed: ${JSON.stringify(seeded)}`);
 
   const findings = [];
   for (const [theme, collapsed] of variants) {

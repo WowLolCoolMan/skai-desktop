@@ -1,4 +1,4 @@
-"""Rebase blink eye poses onto each pet's exact shipped idle-rest cel."""
+"""Build smooth, closed-loop 11-cel blink strips from the current shipped rest cels."""
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -39,14 +39,18 @@ def main():
         if target_bounds is None:
             raise ValueError(f"{pet} has an empty idle rest frame")
         path = ROOT / f"{pet}-blink-frames.png"
-        output = Image.new("RGBA", (1024, 256), (0, 0, 0, 0))
-        frames = [rest, closed_pose(rest, pet, 1), closed_pose(rest, pet, 2), rest]
+        output = Image.new("RGBA", (2816, 256), (0, 0, 0, 0))
+        closed = closed_pose(rest, pet, 2)
+        # Ease the eyelids shut, hold briefly, then reopen. The endpoint cel is
+        # always the exact source rest frame so each blink has a clean seam.
+        blends = (0.12, 0.28, 0.48, 0.72, 0.94, 1.0, 1.0, 0.72, 0.42)
+        frames = [rest, *(Image.blend(rest, closed, amount) for amount in blends), rest]
         for frame_index, frame in enumerate(frames):
             if frame.getchannel("A").getbbox() != target_bounds:
                 raise ValueError(f"{pet} blink frame {frame_index} changes the sprite bounds")
             output.alpha_composite(frame, (frame_index * 256, 0))
         output.save(path, format="PNG", optimize=True)
-    print("Rebuilt seven blink strips from each exact idle rest cel; sprite bounds stay constant through every blink.")
+    print("Rebuilt seven smooth 11-cel blink loops from exact idle rest cels; sprite bounds and loop seams are stable.")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,11 @@ const fs = require("node:fs");
 
 // Tracked files must stay under 1 MiB. Add a path here only with a reason in the commit message.
 const MAX_FILE_BYTES = 1024 * 1024;
-const LARGE_FILE_ALLOWLIST = new Set([]);
+const LARGE_FILE_ALLOWLIST = new Set([
+  // Editable source masters are required to regenerate Blaze's shipped sprite strips.
+  "assets/pets/blaze-source-rest.png",
+  "assets/pets/blaze-source-walk.png",
+]);
 
 const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
   .split("\0")
