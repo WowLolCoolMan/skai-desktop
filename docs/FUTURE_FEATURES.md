@@ -116,7 +116,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Dictation that combines speech with automatic app context.
 - [ ] File and app previews. (Local text, PNG/JPEG, and selectable-text PDF previews exist; app/executable previews remain unsupported.)
 - [ ] Design handoff to a coding agent.
-- [ ] Session bar showing context, changes, and background tasks. (A local informational workspace bar shows mode, message context, pending files, reviewed changes, and queued agent plans; live background status remains open.)
+- [ ] Session bar showing context, changes, and background tasks. (A local informational workspace bar shows mode, message context, pending files, and reviewed changes; workspace tabs now reflect linked task states as Running, Queued, Review, or Attention. Rich shared capacity and background process controls remain open.)
 - [x] Side chats spawned with a keyboard shortcut. (Ctrl+Shift+S opens the existing bounded side-by-side chat view; detached windows and new parallel threads remain open.)
 - [ ] Detachable chats in their own windows.
 - [ ] Drag-and-drop pane layouts.

@@ -1,8 +1,19 @@
 import { useEffect } from "react";
+import type { DesktopTask } from "../../../shared/contracts";
 import type { WorkspaceSessionTab } from "../../app/useDesktopWorkspace";
 import { NavIcon } from "../ui/NavIcon";
 
-export function WorkspaceTabs({ tabs, activeId, onSelect, onClose, onNew, canRestore = false, onRestore }: { tabs: WorkspaceSessionTab[]; activeId: string; onSelect: (tab: WorkspaceSessionTab) => void; onClose: (id: string) => void; onNew: () => void; canRestore?: boolean; onRestore?: () => void }) {
+function tabRunStatus(tab: WorkspaceSessionTab, tasks: DesktopTask[]) {
+  if (!tab.conversationId) return null;
+  const linked = tasks.filter((task) => task.conversationId === tab.conversationId);
+  if (linked.some((task) => task.status === "running" || task.status === "verifying")) return { label: "Running", kind: "running" };
+  if (linked.some((task) => task.status === "queued")) return { label: "Queued", kind: "queued" };
+  if (linked.some((task) => task.status === "completed")) return { label: "Review", kind: "review" };
+  if (linked.some((task) => task.status === "failed" || task.status === "blocked")) return { label: "Attention", kind: "attention" };
+  return null;
+}
+
+export function WorkspaceTabs({ tabs, tasks, activeId, onSelect, onClose, onNew, canRestore = false, onRestore }: { tabs: WorkspaceSessionTab[]; tasks: DesktopTask[]; activeId: string; onSelect: (tab: WorkspaceSessionTab) => void; onClose: (id: string) => void; onNew: () => void; canRestore?: boolean; onRestore?: () => void }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return;
@@ -16,10 +27,10 @@ export function WorkspaceTabs({ tabs, activeId, onSelect, onClose, onNew, canRes
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeId, canRestore, onClose, onNew, onRestore, onSelect, tabs]);
   return <div className="workspace-tab-strip" role="group" aria-label="Open chats and projects">
-    <div className="workspace-tab-list">{tabs.map((tab) => <div className={`workspace-tab${tab.id === activeId ? " is-active" : ""}`} key={tab.id}>
-      <button className="workspace-tab-select" type="button" aria-current={tab.id === activeId ? "page" : undefined} title={tab.title} onClick={() => onSelect(tab)}><NavIcon name={tab.projectId ? "project" : "chat"} /><span>{tab.title}</span></button>
+    <div className="workspace-tab-list">{tabs.map((tab) => { const status = tabRunStatus(tab, tasks); return <div className={`workspace-tab${tab.id === activeId ? " is-active" : ""}`} key={tab.id}>
+      <button className="workspace-tab-select" type="button" aria-current={tab.id === activeId ? "page" : undefined} title={`${tab.title}${status ? ` · ${status.label}` : ""}`} onClick={() => onSelect(tab)}><NavIcon name={tab.projectId ? "project" : "chat"} /><span>{tab.title}</span>{status && <small className={`workspace-tab-status is-${status.kind}`}>{status.label}</small>}</button>
       <button className="workspace-tab-close" type="button" aria-label={`Close ${tab.title}`} title="Close tab" onClick={() => onClose(tab.id)}>×</button>
-    </div>)}</div>
+    </div>; })}</div>
     {onRestore && <button className="workspace-tab-new" type="button" aria-label="Restore closed tab" title="Restore closed tab (Ctrl+Shift+T)" disabled={!canRestore} onClick={onRestore}>↶</button>}
     <button className="workspace-tab-new" type="button" aria-label="New tab" title="New tab (Ctrl+T)" onClick={onNew}><NavIcon name="plus" /></button>
   </div>;

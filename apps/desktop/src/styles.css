@@ -49,6 +49,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .workspace-tab-select { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; height: 36px; padding: 0 8px 0 11px; border-radius: 8px 0 0; color: inherit; background: transparent; text-align: left; }
 .workspace-tab-select .nav-icon { flex: 0 0 auto; width: 14px; height: 14px; color: var(--skai-color-text-muted); }
 .workspace-tab-select span { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-tab-status { flex: 0 0 auto; padding: 2px 5px; border: 1px solid var(--skai-color-border); border-radius: 999px; color: var(--skai-color-text-muted); font-size: 9px; font-weight: 600; line-height: 1.2; }
+.workspace-tab-status.is-running { color: var(--skai-color-accent); border-color: color-mix(in srgb, var(--skai-color-accent) 45%, var(--skai-color-border)); }
+.workspace-tab-status.is-queued { color: var(--skai-color-text-muted); }
+.workspace-tab-status.is-review { color: var(--skai-color-success); }
+.workspace-tab-status.is-attention { color: var(--skai-color-danger); }
 .workspace-tab-close, .workspace-tab-new { flex: 0 0 27px; width: 27px; height: 27px; margin: 4px 4px 0 0; border-radius: 7px; color: var(--skai-color-text-muted); background: transparent; font-size: 16px; }
 .workspace-tab-close:hover, .workspace-tab-new:hover { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
 .workspace-tab-new { display: grid; flex: 0 0 28px; place-items: center; width: 28px; height: 28px; margin: 4px 0 0; }
