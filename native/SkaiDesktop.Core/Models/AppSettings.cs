@@ -33,6 +33,10 @@ public sealed class AppSettings
     public string EffortMode { get; set; } = "standard";
     /// <summary>Optional Ollama context window override. Zero leaves the runtime default unchanged.</summary>
     public int OllamaContextWindowTokens { get; set; }
+    /// <summary>Optional local RAM budget for concurrent coding tasks. Zero means automatic.</summary>
+    public long LocalRamBudgetBytes { get; set; }
+    /// <summary>Optional local GPU memory budget for concurrent coding tasks. Zero means automatic.</summary>
+    public long LocalGpuBudgetBytes { get; set; }
     /// <summary>When enabled, sends bounded full text for text/PDF attachments instead of ranked chunks.</summary>
     public bool FullTextContextInjectionEnabled { get; set; }
     public bool WebSearchEnabled { get; set; }

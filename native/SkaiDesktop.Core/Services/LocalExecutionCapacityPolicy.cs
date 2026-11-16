@@ -10,23 +10,34 @@ public static class LocalExecutionCapacityPolicy
     private const long RamPerTaskBytes = 8L * 1024 * 1024 * 1024;
     private const long GpuPerTaskBytes = 6L * 1024 * 1024 * 1024;
 
-    public static LocalExecutionCapacityDecision Decide(LocalCapacitySnapshot snapshot)
+    public static LocalExecutionCapacityDecision Decide(LocalCapacitySnapshot snapshot, long? ramBudgetBytes = null, long? gpuBudgetBytes = null)
     {
         if (snapshot.RamAvailableBytes is not > 0)
             return new(1, "RAM telemetry unavailable");
         if (snapshot.CpuUtilizationPercent is > 90)
             return new(1, "CPU pressure");
 
-        var ramSlots = Math.Max(1, (int)((snapshot.RamAvailableBytes.Value - ReservedRamBytes) / RamPerTaskBytes));
+        var availableRam = ApplyBudget(snapshot.RamAvailableBytes.Value, snapshot.RamTotalBytes, ramBudgetBytes);
+        if (availableRam <= 0) return new(1, "RAM budget");
+        var ramSlots = Math.Max(1, (int)((availableRam - ReservedRamBytes) / RamPerTaskBytes));
         var slotLimit = Math.Clamp(ramSlots, 1, MaximumSlots);
         var limitingResource = "RAM headroom";
 
         if (snapshot.Gpu?.AvailableBytes is > 0)
         {
-            var gpuSlots = Math.Max(1, (int)(snapshot.Gpu.AvailableBytes.Value / GpuPerTaskBytes));
+            var availableGpu = ApplyBudget(snapshot.Gpu.AvailableBytes.Value, snapshot.Gpu.TotalBytes, gpuBudgetBytes);
+            var gpuSlots = Math.Max(1, (int)(availableGpu / GpuPerTaskBytes));
             if (gpuSlots < slotLimit) { slotLimit = gpuSlots; limitingResource = "GPU memory"; }
         }
 
         return new(Math.Clamp(slotLimit, 1, MaximumSlots), limitingResource);
+    }
+
+    private static long ApplyBudget(long availableBytes, long? totalBytes, long? budgetBytes)
+    {
+        if (budgetBytes is not > 0) return availableBytes;
+        if (totalBytes is not > 0) return Math.Min(availableBytes, budgetBytes.Value);
+        var usedBytes = Math.Max(0, totalBytes.Value - availableBytes);
+        return Math.Min(availableBytes, budgetBytes.Value - usedBytes);
     }
 }
