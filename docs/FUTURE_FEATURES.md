@@ -102,7 +102,7 @@ cancellation, permission review, and local credential handling.
 
 - [ ] Interactive artifacts for code, HTML, and diagrams.
 - [ ] Tabs beside chat for files, terminals, and previews.
-- [ ] In-browser terminal.
+- [x] In-browser terminal. (Project sessions open a persistent terminal dock in place; the standalone terminal destination remains available elsewhere.)
 - [ ] Rich Markdown editor with in-place AI enhancement.
 - [ ] Notes with context injection.
 - [ ] Channels with model tagging and threads.
