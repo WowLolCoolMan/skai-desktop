@@ -219,7 +219,7 @@ function schedulePetWander() {
   if (!windowPositioningAvailable) return;
   if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
   if (petWanderPauseTimer || petWanderStepTimer) return;
-  const delay = Math.max(0, petWanderNextAt - Date.now()) || 1800 + Math.round(Math.random() * 2600);
+  const delay = Math.max(0, petWanderNextAt - Date.now()) || petWanderPlanner.nextRestSeconds() * 1000;
   petWanderPauseTimer = setTimeout(() => {
     petWanderPauseTimer = undefined;
     if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) return;
@@ -238,8 +238,7 @@ function startPetWander() {
     schedulePetWander();
     return;
   }
-  // The segment pet reads this as a gait speed, so keep ambient movement lively
-  // enough to feel like a desktop character rather than a drifting notification.
+  // Keep each walk smooth, then leave a longer idle interval before the next one.
   const walk = new PetWalk(relative, plan.path.map((cell) => grid.petPositionFor(cell)), 220);
   if (walk.length < 1) {
     petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;

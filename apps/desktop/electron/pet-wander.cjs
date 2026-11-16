@@ -136,8 +136,8 @@ class PetWanderGrid {
 }
 
 class PetWanderPlanner {
-  static minimumRestSeconds = 2;
-  static maximumRestSeconds = 6;
+  static minimumRestSeconds = 30;
+  static maximumRestSeconds = 90;
 
   constructor(random = Math.random) {
     this.random = random;
