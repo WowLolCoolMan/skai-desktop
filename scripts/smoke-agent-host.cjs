@@ -269,6 +269,11 @@ async function run() {
   }
   if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2)
     throw new Error(`Queued task dispatch did not run both tasks serially: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests })}`);
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const capacitySnapshot = await request("system.capacity");
+    if (capacitySnapshot.ok && capacitySnapshot.result?.scheduler?.activeTaskCount === 0 && capacitySnapshot.result?.scheduler?.queuedTaskCount === 0) break;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   const cancellationLeader = await request("tasks.plan", { title: "Cancellation leader", instruction: "Keep the local slot occupied briefly.", environment: "local" });
   const cancellationWaiter = await request("tasks.plan", { title: "Cancellation waiter", instruction: "Cancel while waiting for the local slot.", environment: "local" });
   for (const task of [cancellationLeader, cancellationWaiter]) {
@@ -276,6 +281,7 @@ async function run() {
     if (!queuedTask.ok || queuedTask.result?.status !== "queued") throw new Error("tasks.queue did not queue the cancellation pair.");
   }
   const leaderExecution = await request("tasks.execute", { id: cancellationLeader.result.id });
+  for (let attempt = 0; attempt < 30 && queueRequests < 3; attempt += 1) await new Promise(resolve => setTimeout(resolve, 100));
   const waiterExecution = await request("tasks.execute", { id: cancellationWaiter.result.id });
   if (!leaderExecution.ok || !waiterExecution.ok || waiterExecution.result?.status !== "queued") throw new Error("The cancellation waiter did not enter the local queue.");
   const waiterCancelled = await request("tasks.cancel", { id: cancellationWaiter.result.id });

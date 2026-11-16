@@ -8,6 +8,7 @@ CatalogTests.Run();
 await ProjectHealthTests.RunAsync();
 await ModelLibraryTests.RunAsync();
 LocalExecutionCapacityPolicyTests.Run();
+await LocalRuntimeCapacityTests.RunAsync();
 await ChatProviderTests.RunAsync();
 DocumentsOnlyPromptTests.Run();
 AirLlmProviderTests.Run();

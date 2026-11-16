@@ -13,6 +13,8 @@ public static class AgentHostLoop
     private static readonly object ActiveTaskExecutionsGate = new();
     private static readonly object LocalExecutionGate = new();
     private static int LocalAdmittedTaskCount;
+    private static readonly object RuntimeCapacityGate = new();
+    private static RuntimeCapacitySnapshot? CachedRuntimeCapacity;
     private static readonly Dictionary<string, WorkspaceTerminalSession> TerminalSessions = new(StringComparer.Ordinal);
     private static readonly object TerminalSessionsGate = new();
     private static readonly Dictionary<string, ModelPullOperation> ModelPulls = new(StringComparer.Ordinal);
@@ -252,7 +254,8 @@ public static class AgentHostLoop
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
         var tasks = CreateTaskStore().Load();
         var settings = CreateSettingsStore().Load();
-        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes);
+        var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(settings.ModelProvider));
+        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, airLlmAvailable: runtime.AirLlmReady == true, loadedRamBytes: runtime.LoadedRamBytes, loadedGpuBytes: runtime.LoadedGpuBytes);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
         var queuedTaskCount = tasks.Count(task => task.Status == AgentTaskStatuses.Queued);
@@ -265,6 +268,7 @@ public static class AgentHostLoop
             snapshot.Gpu,
             snapshot.MeasurementNote,
             scheduler = new { activeTaskCount, queuedTaskCount, executionSlotLimit = decision.SlotLimit, limitingResource = decision.LimitingResource },
+            runtime = new { loadedModelsKnown = runtime.LoadedModelsKnown, loadedModels = runtime.LoadedModels, loadedRamBytes = runtime.LoadedRamBytes, loadedGpuBytes = runtime.LoadedGpuBytes, loadedModelNote = runtime.LoadedModelNote, airLlmReady = runtime.AirLlmReady },
         });
     }
 
@@ -1484,7 +1488,8 @@ public static class AgentHostLoop
 
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
         var settings = CreateSettingsStore().Load();
-        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes);
+        var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(task.ModelProvider));
+        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
         var status = activeTaskCount < decision.SlotLimit ? AgentTaskStatuses.Running : AgentTaskStatuses.Queued;
@@ -1547,7 +1552,8 @@ public static class AgentHostLoop
         {
             var snapshot = await new LocalCapacityProbe().GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
             var settings = CreateSettingsStore().Load();
-            var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, string.Equals(task.ModelProvider, "AirLLM", StringComparison.OrdinalIgnoreCase));
+            var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(task.ModelProvider), cancellationToken);
+            var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
             lock (LocalExecutionGate)
             {
                 if (LocalAdmittedTaskCount < decision.SlotLimit)
@@ -1558,6 +1564,33 @@ public static class AgentHostLoop
             }
             await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private static RuntimeCapacitySnapshot ReadRuntimeCapacity(AppSettings settings, bool checkAirLlm, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var cacheKey = $"{settings.ModelProvider}|{settings.Endpoint}";
+        lock (RuntimeCapacityGate)
+        {
+            if (CachedRuntimeCapacity is { } cached && cached.Key == cacheKey && now - cached.CapturedAtUtc < TimeSpan.FromSeconds(15) && (!checkAirLlm || cached.AirLlmReady.HasValue))
+                return cached;
+        }
+
+        var loaded = !string.Equals(settings.ModelProvider, "Ollama", StringComparison.OrdinalIgnoreCase)
+            ? new LocalLoadedModelSnapshot(false, [], "The selected local runtime does not expose loaded-model telemetry.")
+            : new LocalRuntimeCapacityProbe().ReadOllamaLoadedModelsAsync(settings.Endpoint, cancellationToken).GetAwaiter().GetResult();
+        var models = loaded.Models.Take(32).Select(model => new RuntimeLoadedModel(model.Runtime, model.Model, model.RamBytes, model.GpuBytes)).ToArray();
+        var result = new RuntimeCapacitySnapshot(
+            cacheKey,
+            now,
+            loaded.Known,
+            models,
+            loaded.Models.Sum(model => model.RamBytes.GetValueOrDefault()),
+            loaded.Models.Sum(model => model.GpuBytes.GetValueOrDefault()),
+            loaded.Note,
+            checkAirLlm ? new AirLlmProvider().IsRuntimeAvailable(settings) : null);
+        lock (RuntimeCapacityGate) CachedRuntimeCapacity = result;
+        return result;
     }
 
     private static async Task ExecuteLocalModelTaskAsync(string taskId, CancellationToken cancellationToken)
@@ -1685,6 +1718,18 @@ public static class AgentHostLoop
         };
         return new(ProtocolVersion, request.Id, true, new { id = task.Id, status = task.Status, updatedAt = task.UpdatedAtUtc, resultSummary = task.ResultSummary });
     }
+
+    private sealed record RuntimeLoadedModel(string Runtime, string Model, long? RamBytes, long? GpuBytes);
+
+    private sealed record RuntimeCapacitySnapshot(
+        string Key,
+        DateTimeOffset CapturedAtUtc,
+        bool LoadedModelsKnown,
+        IReadOnlyList<RuntimeLoadedModel> LoadedModels,
+        long LoadedRamBytes,
+        long LoadedGpuBytes,
+        string? LoadedModelNote,
+        bool? AirLlmReady);
 
     private sealed class ActiveTaskExecution(CancellationTokenSource cancellation)
     {

@@ -30,6 +30,14 @@ export type LocalCapacitySnapshot = {
   gpu: { name: string; totalBytes: number | null; availableBytes: number | null; utilizationPercent: number | null } | null;
   measurementNote: string | null;
   scheduler?: { activeTaskCount: number; queuedTaskCount: number; executionSlotLimit: number; limitingResource?: string };
+  runtime?: {
+    loadedModelsKnown: boolean;
+    loadedModels: Array<{ runtime: string; model: string; ramBytes: number | null; gpuBytes: number | null }>;
+    loadedRamBytes: number;
+    loadedGpuBytes: number;
+    loadedModelNote: string | null;
+    airLlmReady: boolean | null;
+  };
 };
 
 export type DesktopProject = {
