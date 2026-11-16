@@ -6,6 +6,7 @@ import { NavIcon } from "../ui/NavIcon";
 type Command = { id: string; label: string; detail: string; route: Route };
 const commands: Command[] = [
   { id: "chat", label: "Open Chat", detail: "Start or continue a conversation", route: "chat" },
+  { id: "projects", label: "Open Projects", detail: "Browse and choose a local workspace", route: "projects" },
   { id: "coding", label: "Open Coding Workspace", detail: "Projects, files, terminal, and edits", route: "coding" },
   { id: "terminal", label: "Open Terminal", detail: "Run a bounded command in a selected project", route: "terminal" },
   { id: "agents", label: "Open Agent Workbench", detail: "Review task progress and recovery", route: "workbench" },

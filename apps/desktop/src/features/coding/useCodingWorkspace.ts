@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile } from "../../../shared/contracts";
+import type { Route } from "../../app/types";
 import type { AgentRequest } from "../../services/agentClient";
 
 type CodingWorkspaceOptions = {
   request: AgentRequest;
   connection: "checking" | "ready" | "error";
   onError: (message: string | null) => void;
-  onNavigate: (route: "coding") => void;
+  onNavigate: (route: Route) => void;
 };
 
 export function useCodingWorkspace({ request, connection, onError, onNavigate }: CodingWorkspaceOptions) {
@@ -59,11 +60,12 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
 
   const selectProject = async (project: DesktopProject) => {
     localStorage.setItem("skai.selectedProject", project.id);
-    setSelectedProject(project); setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFileHash(null); setFileUndoId(null); setGitStatus(null); setGitDiff(null);
+    setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFileHash(null); setFileUndoId(null); setGitStatus(null); setGitDiff(null);
     const response = await request("project.files", { id: project.id });
-    if (!response.ok) { onError(response.error?.message ?? "Project browser failed."); return; }
+    if (!response.ok) { setSelectedProject(null); setProjectFiles([]); localStorage.removeItem("skai.selectedProject"); onError(`${response.error?.message ?? "Project folder is unavailable."} Reconnect its folder in Projects.`); onNavigate("projects"); return; }
     const result = response.result as { files: DesktopProjectFile[]; protectedFilesSkipped: number; hitEntryLimit: boolean };
     setProjectFiles(result.files ?? []);
+    setSelectedProject(project);
     setFileSummary(`${result.files.length} readable files · ${result.protectedFilesSkipped} protected names hidden${result.hitEntryLimit ? " · entry limit reached" : ""}`);
     await refreshGitStatus(project.id);
     onNavigate("coding");

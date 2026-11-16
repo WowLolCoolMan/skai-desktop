@@ -272,19 +272,26 @@ export function PetWindow() {
     };
   }, [companionName]);
 
-  const rigDemo = new URLSearchParams(window.location.search).get("rig") === "1";
+  // The rig is a selectable character, not a global renderer switch. A stale
+  // demo query must never replace a selected sprite companion with the
+  // stick-rig artwork.
+  const rigDemo = character === "skai-rig" && new URLSearchParams(window.location.search).get("rig") === "1";
   const activePose = rigDemo ? demoPose : pose === "success" || pose === "error" || pose === "needs-attention" ? pose : COMPOSITOR_DRAG ? "idle" : activity.state;
   const animationId = animationByPose[activePose];
   const customStrip = customProfile?.strips[animationId];
   const builtinPose: BuiltinPose = activePose === "needs-attention" ? "error" : activePose;
-  const sheet = customStrip?.dataUrl ?? (BUILTIN_STRIPS[character] ?? BUILTIN_STRIPS.percy)[builtinPose];
+  // A custom companion may omit a state, but it must never borrow another
+  // companion's artwork. Reuse that profile's idle strip instead and keep its
+  // identity stable while the missing state is being displayed.
+  const resolvedCustomStrip = customStrip ?? customProfile?.strips.idle;
+  const sheet = resolvedCustomStrip?.dataUrl ?? (BUILTIN_STRIPS[character] ?? BUILTIN_STRIPS.percy)[builtinPose];
   const animationPaused = motion.reduceMotion;
-  const isRig = character === "skai-rig" || new URLSearchParams(window.location.search).get("rig") === "1";
+  const isRig = character === "skai-rig";
   // Fit custom frames inside the companion canvas. A wide uploaded sprite should
   // never expand the always-on-top window across the desktop.
-  const frameScale = customStrip ? Math.min(128 / customStrip.frameWidth, 128 / customStrip.frameHeight) : 1;
-  const frameWidth = customStrip ? customStrip.frameWidth * frameScale : 128;
-  const frameHeight = customStrip ? customStrip.frameHeight * frameScale : 128;
+  const frameScale = resolvedCustomStrip ? Math.min(128 / resolvedCustomStrip.frameWidth, 128 / resolvedCustomStrip.frameHeight) : 1;
+  const frameWidth = resolvedCustomStrip ? resolvedCustomStrip.frameWidth * frameScale : 128;
+  const frameHeight = resolvedCustomStrip ? resolvedCustomStrip.frameHeight * frameScale : 128;
   const spriteStyle = { backgroundImage: `url(${sheet})`, backgroundSize: `${frameWidth * 6}px ${frameHeight}px`, width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-strip-end": `${-frameWidth * 5}px` } as CSSProperties;
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
