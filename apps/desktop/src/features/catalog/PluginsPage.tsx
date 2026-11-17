@@ -54,6 +54,32 @@ type McpTool = {
   requiredCapabilities: string[];
 };
 
+type WorkbenchVoiceProfile = {
+  id: string;
+  name: string;
+  engineId: string;
+  clipNames: string[];
+  status: "Ready" | "Changes pending" | "Building" | "Adapter unavailable";
+  updatedAt: string;
+};
+
+const WORKBENCH_PROFILES_KEY = "skai.voice.workbench.profiles";
+const WORKBENCH_NOTICE_KEY = "skai.voice.workbench.rightsNoticeAcknowledged";
+
+function loadWorkbenchProfiles(): WorkbenchVoiceProfile[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(WORKBENCH_PROFILES_KEY) ?? "[]") as unknown;
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is WorkbenchVoiceProfile => Boolean(item && typeof item === "object" && typeof (item as WorkbenchVoiceProfile).id === "string" && typeof (item as WorkbenchVoiceProfile).name === "string"));
+  } catch {
+    return [];
+  }
+}
+
+function saveWorkbenchProfiles(profiles: WorkbenchVoiceProfile[]) {
+  localStorage.setItem(WORKBENCH_PROFILES_KEY, JSON.stringify(profiles.slice(0, 24)));
+}
+
 function request(method: string, params?: Record<string, unknown>) {
   return (
     window.skaiAgent?.request(method, params) ??
@@ -71,6 +97,11 @@ function request(method: string, params?: Record<string, unknown>) {
 
 export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   const [settings, setSettings] = useState(selectedVoiceSettings);
+  const [workbenchProfiles, setWorkbenchProfiles] = useState<WorkbenchVoiceProfile[]>(loadWorkbenchProfiles);
+  const [activeWorkbenchId, setActiveWorkbenchId] = useState(() => loadWorkbenchProfiles()[0]?.id ?? "");
+  const [newProfileName, setNewProfileName] = useState("");
+  const [rightsNoticeOpen, setRightsNoticeOpen] = useState(() => localStorage.getItem(WORKBENCH_NOTICE_KEY) !== "true");
+  const activeWorkbench = workbenchProfiles.find((item) => item.id === activeWorkbenchId) ?? null;
   const update = (
     key:
       "profileId" | "primaryModelId" | "lowResourceMode" | "voiceOutputEnabled",
@@ -82,6 +113,26 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   const profile =
     voiceProfiles.find((item) => item.id === settings.profileId) ??
     voiceProfiles[0];
+  const updateWorkbench = (change: Partial<WorkbenchVoiceProfile>) => {
+    if (!activeWorkbench) return;
+    const next = workbenchProfiles.map((item) => item.id === activeWorkbench.id ? { ...item, ...change, updatedAt: new Date().toISOString() } : item);
+    setWorkbenchProfiles(next);
+    saveWorkbenchProfiles(next);
+  };
+  const createWorkbenchProfile = () => {
+    const name = newProfileName.trim();
+    if (!name) return;
+    const created: WorkbenchVoiceProfile = { id: `voice-${crypto.randomUUID()}`, name, engineId: settings.primaryModelId, clipNames: [], status: "Changes pending", updatedAt: new Date().toISOString() };
+    const next = [...workbenchProfiles, created];
+    setWorkbenchProfiles(next); saveWorkbenchProfiles(next); setActiveWorkbenchId(created.id); setNewProfileName("");
+  };
+  const addClips = (files: FileList | null) => {
+    if (!activeWorkbench || !files?.length) return;
+    const names = [...files].slice(0, 12).map((file) => file.name).filter((name) => /\.(wav|mp3|m4a|ogg|flac)$/i.test(name));
+    if (!names.length) return;
+    updateWorkbench({ clipNames: [...new Set([...activeWorkbench.clipNames, ...names])].slice(0, 48), status: "Changes pending" });
+  };
+  const acknowledgeRightsNotice = () => { localStorage.setItem(WORKBENCH_NOTICE_KEY, "true"); setRightsNoticeOpen(false); };
   return (
     <div className="voice-workbench-view">
       <header className="voice-workbench-header">
@@ -95,7 +146,15 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
           <p>Shape Skai’s local voice without leaving the catalog.</p>
         </div>
       </header>
+      {rightsNoticeOpen && <Card className="voice-workbench-notice"><p className="section-kicker">ONE-TIME NOTICE</p><h3>Use voice clips responsibly</h3><p>Only create an identifiable voice profile when you have the person’s permission or the rights to use the recordings. Skai keeps profile metadata local and does not treat a voice profile as proof of identity.</p><Button variant="primary" type="button" onClick={acknowledgeRightsNotice}>I understand</Button></Card>}
       <div className="voice-workbench-grid">
+        <Card>
+          <p className="section-kicker">VOICE PROFILES</p>
+          <h3>Reusable voices</h3>
+          <p className="marketplace-muted">Create a profile, add clips over time, and keep the last working version while a compatible adapter is pending.</p>
+          <div className="voice-workbench-profile-list">{workbenchProfiles.length === 0 ? <p className="settings-help">No custom voice profiles yet.</p> : workbenchProfiles.map((item) => <button key={item.id} type="button" className={item.id === activeWorkbenchId ? "is-active" : ""} onClick={() => setActiveWorkbenchId(item.id)}><strong>{item.name}</strong><small>{item.clipNames.length} clips · {item.status}</small></button>)}</div>
+          <div className="voice-workbench-create"><input value={newProfileName} onChange={(event) => setNewProfileName(event.target.value)} placeholder="New profile name" aria-label="New voice profile name" /><Button variant="secondary" type="button" onClick={createWorkbenchProfile} disabled={!newProfileName.trim()}>Create</Button></div>
+        </Card>
         <Card>
           <p className="section-kicker">VOICE PROFILE</p>
           <h3>{profile.name}</h3>
@@ -176,6 +235,11 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
               <small>Prefer a smaller CPU-first runtime.</small>
             </span>
           </label>
+        </Card>
+        <Card>
+          <p className="section-kicker">CLIPS</p>
+          <h3>{activeWorkbench?.name ?? "Choose a profile"}</h3>
+          {activeWorkbench ? <><p className="marketplace-muted">Add recordings incrementally. Leaving the page or first use can queue a rebuild once an adapter is connected.</p><input type="file" accept=".wav,.mp3,.m4a,.ogg,.flac,audio/*" multiple onChange={(event) => addClips(event.target.files)} aria-label="Add voice clips" /><div className="voice-workbench-clip-list">{activeWorkbench.clipNames.length === 0 ? <p className="settings-help">No clips attached.</p> : activeWorkbench.clipNames.map((name) => <span key={name}>{name}</span>)}</div><div className="voice-workbench-status" role="status"><strong>{activeWorkbench.status}</strong><small>{activeWorkbench.status === "Changes pending" ? "A compatible voice adapter is required before a clone can be built." : "Profile metadata is stored locally."}</small></div></> : <p className="settings-help">Create or choose a profile to add clips.</p>}
         </Card>
       </div>
     </div>
