@@ -137,6 +137,62 @@
   --skai-syntax-type: #7fdbe6;
   --skai-syntax-variable: #d0d0d6;
   --skai-syntax-punctuation: #a0a1a8;
+
+  /* Theme: art palette. Pet window effects (bubble, anger, fire, scanner, stars…) and the
+     deep-sea / deep-space backdrop art are illustrations, not UI, so they stay the same in
+     every theme (the pet window doesn't follow the app theme). Not theme-file keys. */
+  --skai-art-backdrop-deep-sea-1: #061a2c;
+  --skai-art-backdrop-deep-sea-2: rgba(0,126,160,.13);
+  --skai-art-backdrop-deep-sea-3: rgba(103,232,249,.018);
+  --skai-art-backdrop-deep-sea-4: rgba(125,225,255,.8);
+  --skai-art-backdrop-deep-sea-5: rgba(125,225,255,.55);
+  --skai-art-backdrop-deep-sea-6: rgba(125,225,255,.45);
+  --skai-art-backdrop-deep-sea-7: #8cecff;
+  --skai-art-backdrop-deep-space-1: rgba(44,64,132,.14);
+  --skai-art-backdrop-deep-space-2: rgba(255,255,255,.22);
+  --skai-art-backdrop-deep-space-3: rgba(211,203,255,.20);
+  --skai-art-backdrop-deep-space-4: rgba(255,255,255,.16);
+  --skai-art-pet-anger-1: rgba(255,103,44,.8);
+  --skai-art-pet-anger-2: #fff6a7;
+  --skai-art-pet-anger-3: #ff8c29;
+  --skai-art-pet-anger-4: rgba(237,52,43,.18);
+  --skai-art-pet-anger-5: rgba(255,74,32,.9);
+  --skai-art-pet-anger-6: #fff3a4;
+  --skai-art-pet-anger-7: #ff5b27;
+  --skai-art-pet-blink-1: rgba(1,7,22,.34);
+  --skai-art-pet-bubble-1: rgba(179,154,245,.32);
+  --skai-art-pet-bubble-2: #eafcff;
+  --skai-art-pet-bubble-3: rgba(12,18,34,.94);
+  --skai-art-pet-bubble-4: rgba(0,0,0,.25);
+  --skai-art-pet-bubble-5: rgba(255,139,139,.48);
+  --skai-art-pet-bubble-6: #fff0f0;
+  --skai-art-pet-celebration-1: #fff0a1;
+  --skai-art-pet-celebration-2: #ffb84d;
+  --skai-art-pet-fire-1: rgba(255,119,30,.9);
+  --skai-art-pet-fire-2: rgba(255,127,31,.85);
+  --skai-art-pet-generic-1: rgba(18,20,32,.82);
+  --skai-art-pet-generic-2: rgba(18,20,32,.18);
+  --skai-art-pet-idle-1: rgba(179,154,245,.13);
+  --skai-art-pet-leaf-1: #b8ff70;
+  --skai-art-pet-leaf-2: #82dd46;
+  --skai-art-pet-root-1: rgba(179,154,245,.16);
+  --skai-art-pet-root-2: #10141d;
+  --skai-art-pet-scanner-1: rgba(63,242,255,.64);
+  --skai-art-pet-scanner-2: rgba(62,240,255,.12);
+  --skai-art-pet-scanner-3: rgba(50,231,255,.55);
+  --skai-art-pet-scanner-4: #8affff;
+  --skai-art-pet-sprite-1: rgba(1,7,22,.34);
+  --skai-art-pet-star-1: rgba(185,177,255,.45);
+  --skai-art-pet-star-2: #fff3a5;
+  --skai-art-pet-star-3: #9c83ff;
+  --skai-art-pet-star-4: #91eaff;
+  --skai-art-pet-star-5: #ffd786;
+  --skai-art-pet-surface-1: #10141d;
+  --skai-art-pet-target-1: rgba(255,220,126,.92);
+  --skai-art-pet-target-2: rgba(255,98,38,.22);
+  --skai-art-pet-target-3: rgba(255,172,56,.6);
+  --skai-art-pet-target-4: rgba(255,98,38,.8);
+  --skai-art-pet-target-5: rgba(255,226,154,.92);
 }
 
 /* Theme: light palette. src/theme sets data-scheme to the resolved light/dark

@@ -1,8 +1,5 @@
 {
   "apps/desktop/src/features/pets/PetWorkshopPage.tsx": {
     "colors": 3
-  },
-  "apps/desktop/src/styles.css": {
-    "colors": 56
   }
 }

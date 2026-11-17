@@ -77,6 +77,18 @@ listed in that preset's `adjusted` field (`apps/desktop/src/theme/presets/`). Th
 - Copyright (c) 2015 - present Microsoft Corporation; palette based on the original Monokai by Wimer Hazenberg
 - Source: https://github.com/microsoft/vscode (extensions/theme-monokai/themes/monokai-color-theme.json, LICENSE.txt)
 
+## Ayu
+
+- License: Apache-2.0
+- Copyright: the ayu-theme authors (ayu-vim; its LICENSE file names no copyright holder)
+- Source: https://github.com/ayu-theme/ayu-vim (colors/ayu.vim, LICENSE)
+
+## GitHub
+
+- License: MIT
+- Copyright (c) 2018 GitHub Inc.
+- Source: https://github.com/primer/primitives (functional themes dark.css and light.css, LICENSE)
+
 ## MIT License text
 
 Applies to every palette above marked MIT or MIT/X11, each under its own copyright line.
@@ -89,4 +101,4 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## Apache License 2.0
 
-Applies to Tokyo Night. The full license text is in [Apache-2.0.txt](Apache-2.0.txt).
+Applies to Tokyo Night and Ayu. The full license text is in [Apache-2.0.txt](Apache-2.0.txt).

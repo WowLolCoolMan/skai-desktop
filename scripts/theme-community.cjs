@@ -155,6 +155,22 @@ family("monokai", "Monokai", { license: "MIT (VS Code's built-in Monokai theme f
   theme("Monokai", "dark", { canvas: "#272822", sidebar: "#1e1f1c", surface: "#31322b", raised: "#3e3d32", text: "#f8f8f2", muted: "#a59f85", accent: "#A6E22E", accentStrong: "#66D9EF", red: "#f92672", green: "#A6E22E", yellow: "#e6db74", blue: "#66D9EF", magenta: "#AE81FF", cyan: "#66D9EF", orange: "#fd971f", comment: "#75715e", ansi: ["#333333", "#C4265E", "#86B42B", "#B3B42B", "#6A7EC8", "#8C6BC8", "#56ADBC", "#e3e3dd", "#666666", "#f92672", "#A6E22E", "#e2e22e", "#819aff", "#AE81FF", "#66D9EF", "#f8f8f2"] }),
 ]);
 
+// Ayu — https://github.com/ayu-theme/ayu-vim (colors/ayu.vim palette, LICENSE: Apache-2.0)
+const ayu = {
+  dark: { bg: "#0F1419", fg: "#E6E1CF", panel: "#14191F", selection: "#253340", comment: "#5C6773", accent: "#F29718", tag: "#36A3D9", func: "#FFB454", string: "#B8CC52", regexp: "#95E6CB", markup: "#F07178", keyword: "#FF7733", constant: "#FFEE99", error: "#FF3333" },
+  mirage: { bg: "#212733", fg: "#D9D7CE", panel: "#272D38", selection: "#343F4C", comment: "#5C6773", accent: "#FFCC66", tag: "#5CCFE6", func: "#FFD57F", string: "#BBE67E", regexp: "#95E6CB", markup: "#F07178", keyword: "#FFAE57", constant: "#D4BFFF", error: "#FF3333" },
+  light: { bg: "#FAFAFA", fg: "#5C6773", panel: "#FFFFFF", selection: "#F0EEE4", comment: "#ABB0B6", accent: "#FF6A00", tag: "#36A3D9", func: "#F29718", string: "#86B300", regexp: "#4CBF99", markup: "#F07178", keyword: "#FF7733", constant: "#A37ACC", error: "#FF3333" },
+};
+const ayuTheme = (name, a, appearance) => theme(name, appearance, { canvas: a.bg, sidebar: appearance === "dark" ? mix(a.bg, "#000000", 0.2) : a.selection, surface: a.panel, raised: a.selection, text: a.fg, muted: a.comment, accent: a.accent, accentStrong: a.keyword, red: a.error, green: a.string, yellow: a.func, blue: a.tag, magenta: a.constant, cyan: a.regexp, orange: a.keyword, comment: a.comment, ansi: [appearance === "dark" ? a.panel : a.fg, a.markup, a.string, a.func, a.tag, a.constant, a.regexp, appearance === "dark" ? a.fg : a.comment, a.comment, a.error, a.string, a.func, a.tag, a.constant, a.regexp, appearance === "dark" ? "#ffffff" : a.fg] });
+family("ayu", "Ayu", { license: "Apache-2.0", copyright: "Copyright: the ayu-theme authors (ayu-vim; its LICENSE file names no copyright holder)", source: "https://github.com/ayu-theme/ayu-vim (colors/ayu.vim, LICENSE)" }, [ayuTheme("Ayu Dark", ayu.dark, "dark"), ayuTheme("Ayu Mirage", ayu.mirage, "dark"), ayuTheme("Ayu Light", ayu.light, "light")]);
+
+// GitHub — https://github.com/primer/primitives (dist/css/functional/themes/{dark,light}.css, LICENSE),
+// the palette behind primer/github-vscode-theme.
+family("github", "GitHub", { license: MIT, copyright: "Copyright (c) 2018 GitHub Inc.", source: "https://github.com/primer/primitives (functional themes dark.css and light.css, LICENSE)" }, [
+  theme("GitHub Dark", "dark", { canvas: "#0d1117", sidebar: mix("#0d1117", "#000000", 0.25), surface: "#151b23", raised: mix("#151b23", "#f0f6fc", 0.06), text: "#f0f6fc", muted: "#9198a1", accent: "#4493f8", accentStrong: "#1f6feb", red: "#f85149", green: "#3fb950", yellow: "#d29922", blue: "#58a6ff", magenta: "#be8fff", cyan: "#39c5cf", orange: "#e3b341", comment: "#9198a1", ansi: ["#2f3742", "#ff7b72", "#3fb950", "#d29922", "#58a6ff", "#be8fff", "#39c5cf", "#f0f6fc", "#656c76", "#ffa198", "#56d364", "#e3b341", "#79c0ff", "#d2a8ff", "#56d4dd", "#ffffff"] }),
+  theme("GitHub Light", "light", { canvas: "#ffffff", sidebar: "#f6f8fa", surface: "#ffffff", raised: "#f6f8fa", text: "#1f2328", muted: "#59636e", accent: "#0969da", accentStrong: "#0969da", red: "#d1242f", green: "#1a7f37", yellow: "#9a6700", blue: "#0969da", magenta: "#8250df", cyan: "#1b7c83", orange: "#9a6700", comment: "#59636e", ansi: ["#1f2328", "#cf222e", "#116329", "#4d2d00", "#0969da", "#8250df", "#1b7c83", "#59636e", "#393f46", "#a40e26", "#1a7f37", "#633c01", "#218bff", "#a475f9", "#3192aa", "#818b98"] }),
+]);
+
 // High contrast — original Skai themes, 7:1 everywhere.
 family("high-contrast", "Skai High Contrast", { license: "Original Skai Desktop theme (same license as the app)", copyright: "", source: "" }, [
   theme("High Contrast Dark", "dark", { highContrast: true, canvas: "#000000", sidebar: "#000000", surface: "#0a0a0a", raised: "#161616", text: "#ffffff", muted: "#d6d6d6", accent: "#ffd60a", accentStrong: "#7fdcff", red: "#ff8a8a", green: "#5cff8f", yellow: "#ffd60a", blue: "#7fdcff", magenta: "#ff9cf2", cyan: "#5cf2ff", orange: "#ffb35c", comment: "#c2c2c2", ansi: ["#000000", "#ff8a8a", "#5cff8f", "#ffd60a", "#7fdcff", "#ff9cf2", "#5cf2ff", "#ffffff", "#9e9e9e", "#ffb3b3", "#9dffbe", "#ffe866", "#b3ebff", "#ffc4f7", "#a3f7ff", "#ffffff"] }),
@@ -200,7 +216,7 @@ ${MIT_TEXT}
 
 ## Apache License 2.0
 
-Applies to Tokyo Night. The full license text is in [Apache-2.0.txt](Apache-2.0.txt).
+Applies to Tokyo Night and Ayu. The full license text is in [Apache-2.0.txt](Apache-2.0.txt).
 `;
 }
 const noticesPath = path.join(__dirname, "..", "licenses", "THEME-PALETTES.md");

@@ -68,14 +68,15 @@ license.
 | Kanagawa | Kanagawa Wave, Kanagawa Lotus | MIT |
 | Night Owl | Night Owl, Night Owl Light | MIT |
 | Monokai | Monokai (as shipped in VS Code) | MIT |
+| Ayu | Ayu Dark, Ayu Mirage, Ayu Light | Apache-2.0 |
+| GitHub | GitHub Dark, GitHub Light (Primer) | MIT |
 
 The community palettes are copied from each project's own repository and keep their copyright
 (see `licenses/THEME-PALETTES.md`). Every built-in theme passes an automated contrast check: text 4.5:1 on
 every background (7:1 for High Contrast), text on accent buttons 4.5:1, the focus ring (accent) 3:1, and
 every gradient stop. Where a palette color had to move to pass in this app, the preset lists the change
 (old color, new color, why) in its `adjusted` field. The Material Theme isn't included because no permissive
-license could be confirmed. GitHub and Ayu will be added once their palettes can be taken from a licensed
-source file.
+license could be confirmed.
 
 ## Appearance buttons (also in the command palette, under "Theme:")
 

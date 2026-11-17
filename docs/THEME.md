@@ -522,3 +522,22 @@ Round 14 was pushed as 2dd3c86.
   on a CDN request, a background that isn't the code surface, or an editor under 300 px.
 - **Not changed (owner's layout, reported):** in the coding view's chat column the empty-state heading ("What would you like to
   work on?") overlaps the Local task card at 1440x900. The editor column is narrow at that width.
+
+### Round 16: Ayu and GitHub themes, art tokens (refinements)
+
+Round 15 was pushed as f9a648b. The user asked to open the app; it runs from a copy of the packaged build
+(`.theme-shots/app-copy/`), so repackaging during checks can't delete its files while it's open.
+
+- **Ayu** (Dark, Mirage, Light), from `ayu-theme/ayu-vim` `colors/ayu.vim`, Apache-2.0. The LICENSE names no copyright holder,
+  and the notices say so rather than inventing one. ayu-vim has no ANSI set, so the terminal colors are mapped from its syntax
+  palette. Ayu Light needed the most contrast nudges (recorded in the preset): accent `#FF6A00`, muted text and the status
+  colors.
+- **GitHub** (Dark, Light), from `@primer/primitives` functional themes (MIT, © 2018 GitHub Inc.), the palette behind
+  primer/github-vscode-theme, whose repo doesn't commit generated colors. Light `fgColor-default` `#1f2328` came from the
+  truncated part of `light.css`; it equals the light `ansi.black` that was read verbatim.
+- The gallery now has **42** themes. The `THIRD_PARTY_NOTICES.md` paragraph, `licenses/THEME-PALETTES.md` and the `THEMING.md`
+  table list both. Apache-2.0 now covers Tokyo Night and Ayu.
+- **Art tokens:** the 52 remaining color literals in `styles.css` (pet window effects and the deep-sea / deep-space backdrop art)
+  became `--skai-art-<area>-<n>` tokens in `tokens.css` `:root` (mechanical, idempotent script; same values). They're
+  illustrations, the same in every theme, and not theme-file keys. The audit baseline drops from 59 to **3**, the pet pixel
+  editor's paint colors in `PetWorkshopPage.tsx`, which are data rather than UI.
