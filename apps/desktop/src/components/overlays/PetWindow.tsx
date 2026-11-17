@@ -20,7 +20,7 @@ const BUILTIN_STRIPS: Record<string, Record<BuiltinPose, string>> = {
     coding: new URL("../../../../../assets/pets/generated/percy-working-fallback-frames.png", import.meta.url).href,
     coding_malicious: new URL("../../../../../assets/pets/generated/percy-alert-fallback-frames.png", import.meta.url).href,
     stuck: new URL("../../../../../assets/pets/generated/percy-waiting-fallback-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/percy-wave-fallback-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/percy-celebrate-fallback-frames.png", import.meta.url).href,
     error: new URL("../../../../../assets/pets/generated/percy-failed-fallback-frames.png", import.meta.url).href,
   },
   byte: {

@@ -338,20 +338,12 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .pet-window-idle-life { position: absolute; right: 47px; bottom: 50px; z-index: 2; width: 7px; height: 4px; border-radius: 50%; pointer-events: none; animation: pet-window-breathe 2600ms ease-in-out infinite; }
 .pet-window-idle-life::after { position: absolute; top: 18px; left: -19px; width: 45px; height: 54px; border-radius: 50%; background: radial-gradient(ellipse at center, var(--skai-art-pet-idle-1), transparent 68%); content: ""; opacity: .45; }
 .pet-window-idle-life.is-facing-left { right: auto; left: 47px; }
-.pet-window-root[data-pose="fire-breath"] .pet-window-sprite { animation: pet-window-fire-crouch 1500ms ease-in-out both; }
-.pet-window-root[data-pose="celebrate"] .pet-window-sprite { animation: pet-window-success 850ms steps(var(--pet-frame-steps,10),end) 1 both; }
-.pet-window-root[data-pose="curious-scan"] .pet-window-sprite { animation: pet-window-scan-body 1.6s ease-in-out both; }
-.pet-window-root[data-pose="ember-curl"] .pet-window-sprite { animation: pet-window-curl 1.6s ease-in-out both; }
-.pet-window-root[data-pose="star-orbit"] .pet-window-sprite { animation: pet-window-star-pose 1.6s ease-in-out both; }
-.pet-window-root[data-pose="rock-roll"] .pet-window-sprite { animation: pet-window-rock-roll 1.6s cubic-bezier(.3,.6,.25,1) both; }
-.pet-window-root[data-pose="sprout-stretch"] .pet-window-sprite { animation: pet-window-sprout-stretch 1.5s cubic-bezier(.2,.7,.3,1) both; }
 .pet-window-root.is-paused .pet-window-anger, .pet-window-root.is-paused .pet-window-fire-sprite, .pet-window-root.is-paused .pet-window-fire-impact-sprite, .pet-window-root.is-paused .pet-window-target-lock, .pet-window-root.is-paused .pet-window-scanner, .pet-window-root.is-paused .pet-window-star-orbit, .pet-window-root.is-paused .pet-window-leaf-spark, .pet-window-root.is-paused .pet-window-celebration, .pet-window-root.is-paused .pet-window-idle-life, .pet-window-root.is-paused .pet-window-blink-sprite, .pet-window-root.is-paused .pet-window-generic-blink { animation-play-state: paused; }
 @keyframes pet-window-idle { from { background-position-x: 0; } to { background-position-x: var(--pet-strip-end, -1152px); } }
 @keyframes pet-window-walk {
   from { background-position-x: 0; }
   to { background-position-x: var(--pet-strip-end, -1152px); }
 }
-@keyframes pet-window-success { from { background-position-x: 0; } to { background-position-x: var(--pet-strip-end, -1152px); } }
 @keyframes pet-window-enter-from-left { from { transform: translateX(-230px); } to { transform: translateX(0); } }
 @keyframes pet-window-enter-from-right { from { transform: translateX(230px) scaleX(-1); } to { transform: translateX(0) scaleX(-1); } }
 @keyframes pet-window-charge { from { transform: scale(.76); filter: saturate(.9); } to { transform: scale(1.2); filter: saturate(1.5); } }
@@ -359,16 +351,10 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 @keyframes pet-window-fire-strip { from { background-position-x: 0; } to { background-position-x: calc(var(--pet-fire-frame-width) * -7); } }
 @keyframes pet-window-impact-strip { from { background-position-x: 0; opacity: .35; } 30% { opacity: 1; } to { background-position-x: calc(var(--pet-impact-frame-width) * -7); opacity: .9; } }
 @keyframes pet-window-lock { from { opacity: .48; transform: translate(-50%,-50%) scale(.82); } to { opacity: 1; transform: translate(-50%,-50%) scale(1.08); } }
-@keyframes pet-window-fire-crouch { 0%,100% { transform: translateY(0) scaleY(1) scaleX(var(--pet-facing, 1)); } 15%,72% { transform: translateY(7px) scaleY(.91) scaleX(var(--pet-facing, 1)); } 30%,85% { transform: translateY(-2px) scaleY(1.03) scaleX(var(--pet-facing, 1)); } }
 @keyframes pet-window-scan { from { opacity: 0; transform: translateX(-50%) scale(.85); } 25%,75% { opacity: 1; } to { opacity: 0; transform: translateX(-50%) scale(1.08); } }
 @keyframes pet-window-scan-line { to { transform: rotate(360deg); } }
-@keyframes pet-window-scan-body { 0%,100% { transform: translateX(0) scaleX(1); } 35%,65% { transform: translateX(3px) scaleX(.98); } }
-@keyframes pet-window-curl { 0%,100% { transform: rotate(0) scale(1); } 35%,70% { transform: rotate(-7deg) scale(.94,.98); } }
 @keyframes pet-window-orbit { 0% { opacity: 0; transform: translateX(-50%) rotate(-18deg) scale(.7); } 25%,75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) rotate(18deg) scale(1.08); } }
 @keyframes pet-window-star-glint { from { opacity: .42; transform: scale(.7) rotate(-18deg); } to { opacity: 1; transform: scale(1.2) rotate(18deg); } }
-@keyframes pet-window-star-pose { 0%,100% { transform: translateY(0) rotate(0); } 40%,65% { transform: translateY(-5px) rotate(4deg); } }
-@keyframes pet-window-rock-roll { 0% { transform: rotate(0) translateX(0); } 48% { transform: rotate(180deg) translateX(8px); } 100% { transform: rotate(360deg) translateX(0); } }
-@keyframes pet-window-sprout-stretch { 0%,100% { transform: scaleY(1); } 36%,68% { transform: scaleY(1.18) translateY(-5px); } }
 @keyframes pet-window-leaf { from { opacity: 0; transform: translateY(14px) rotate(-32deg) scale(.5); } 40% { opacity: 1; } to { opacity: 0; transform: translateY(-44px) rotate(28deg) scale(1.2); } }
 @keyframes pet-window-confetti { from { opacity: 0; transform: translateY(14px) scale(.4) rotate(-24deg); } 25% { opacity: 1; } to { opacity: 0; transform: translateY(-28px) scale(1.1) rotate(25deg); } }
 @keyframes pet-window-blink-strip { from { background-position-x: 0; } to { background-position-x: var(--pet-blink-end, -384px); } }
