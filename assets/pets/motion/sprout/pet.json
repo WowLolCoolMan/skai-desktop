@@ -16,7 +16,7 @@
   "clips": {
     "idle": {
       "file": "clips/idle.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "run": {

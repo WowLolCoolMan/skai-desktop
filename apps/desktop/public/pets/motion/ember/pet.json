@@ -16,7 +16,7 @@
   "clips": {
     "idle": {
       "file": "clips/idle.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "run": {
@@ -56,6 +56,21 @@
     },
     "malicious": {
       "file": "clips/malicious.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "curious-scan": {
+      "file": "clips/review.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "ember-curl": {
+      "file": "clips/jumping.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "fire-breath": {
+      "file": "clips/fire-breath.webp",
       "frames": 8,
       "playbackRate": 1
     }
@@ -100,6 +115,18 @@
     "malicious": {
       "play": "loop",
       "loop": "malicious"
+    },
+    "curious-scan": {
+      "play": "loop",
+      "loop": "review"
+    },
+    "ember-curl": {
+      "play": "once",
+      "clip": "jumping"
+    },
+    "fire-breath": {
+      "play": "once",
+      "clip": "fire-breath"
     }
   },
   "bindings": {
@@ -164,8 +191,31 @@
         {
           "animation": "jumping"
         }
+      ],
+      "curious-scan": [
+        {
+          "animation": "curious-scan"
+        }
+      ],
+      "fire-breath": [
+        {
+          "animation": "fire-breath"
+        }
       ]
     }
   },
-  "activities": []
+  "activities": [
+    {
+      "id": "ember-curl",
+      "displayName": "Ember curl",
+      "outfitId": "default",
+      "animation": "ember-curl"
+    },
+    {
+      "id": "fire-breath",
+      "displayName": "Fire breath",
+      "outfitId": "default",
+      "animation": "fire-breath"
+    }
+  ]
 }

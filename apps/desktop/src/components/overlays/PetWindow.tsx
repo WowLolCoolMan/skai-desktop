@@ -14,74 +14,74 @@ const BUILTIN_POSE_BY_ACTIVITY: Record<PetPose, BuiltinPose> = {
 };
 const BUILTIN_STRIPS: Record<string, Record<BuiltinPose, string>> = {
   percy: {
-    idle: new URL("../../../../../assets/pets/generated/percy-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/percy-walk-frames.png", import.meta.url).href,
-    thinking: new URL("../../../../../assets/pets/generated/percy-thinking-frames.png", import.meta.url).href,
-    coding: new URL("../../../../../assets/pets/generated/percy-coding-frames.png", import.meta.url).href,
-    coding_malicious: new URL("../../../../../assets/pets/generated/percy-coding_malicious-frames.png", import.meta.url).href,
-    stuck: new URL("../../../../../assets/pets/generated/percy-stuck-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/percy-success-frames.png", import.meta.url).href,
-    error: new URL("../../../../../assets/pets/generated/percy-error-frames.png", import.meta.url).href,
+    idle: new URL("../../../../../assets/pets/generated/percy-idle-fallback-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/percy-run-fallback-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/percy-thinking-fallback-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/percy-working-fallback-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/percy-alert-fallback-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/percy-waiting-fallback-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/percy-wave-fallback-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/percy-failed-fallback-frames.png", import.meta.url).href,
   },
   byte: {
-    idle: new URL("../../../../../assets/pets/generated/byte-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/byte-walk-frames.png", import.meta.url).href,
-    thinking: new URL("../../../../../assets/pets/generated/byte-thinking-frames.png", import.meta.url).href,
-    coding: new URL("../../../../../assets/pets/generated/byte-coding-frames.png", import.meta.url).href,
-    coding_malicious: new URL("../../../../../assets/pets/generated/byte-coding_malicious-frames.png", import.meta.url).href,
-    stuck: new URL("../../../../../assets/pets/generated/byte-stuck-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/byte-success-frames.png", import.meta.url).href,
-    error: new URL("../../../../../assets/pets/generated/byte-error-frames.png", import.meta.url).href,
+    idle: new URL("../../../../../assets/pets/generated/byte-idle-fallback-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/byte-run-fallback-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/byte-thinking-fallback-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/byte-working-fallback-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/byte-alert-fallback-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/byte-waiting-fallback-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/byte-wave-fallback-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/byte-failed-fallback-frames.png", import.meta.url).href,
   },
   ember: {
-    idle: new URL("../../../../../assets/pets/generated/ember-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/ember-walk-frames.png", import.meta.url).href,
-    thinking: new URL("../../../../../assets/pets/generated/ember-thinking-frames.png", import.meta.url).href,
-    coding: new URL("../../../../../assets/pets/generated/ember-coding-frames.png", import.meta.url).href,
-    coding_malicious: new URL("../../../../../assets/pets/generated/ember-coding_malicious-frames.png", import.meta.url).href,
-    stuck: new URL("../../../../../assets/pets/generated/ember-stuck-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/ember-success-frames.png", import.meta.url).href,
-    error: new URL("../../../../../assets/pets/generated/ember-error-frames.png", import.meta.url).href,
+    idle: new URL("../../../../../assets/pets/generated/ember-motion-idle-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/ember-motion-walk-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/ember-motion-thinking-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/ember-motion-coding-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/ember-motion-alert-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/ember-motion-waiting-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/ember-motion-wave-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/ember-motion-failed-frames.png", import.meta.url).href,
   },
   blaze: {
-    idle: new URL("../../../../../assets/pets/generated/blaze-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/blaze-walk-frames.png", import.meta.url).href,
-    thinking: new URL("../../../../../assets/pets/generated/blaze-thinking-frames.png", import.meta.url).href,
-    coding: new URL("../../../../../assets/pets/generated/blaze-coding-frames.png", import.meta.url).href,
-    coding_malicious: new URL("../../../../../assets/pets/generated/blaze-coding_malicious-frames.png", import.meta.url).href,
-    stuck: new URL("../../../../../assets/pets/generated/blaze-stuck-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/blaze-success-frames.png", import.meta.url).href,
-    error: new URL("../../../../../assets/pets/generated/blaze-error-frames.png", import.meta.url).href,
+    idle: new URL("../../../../../assets/pets/generated/blaze-idle-fallback-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/blaze-run-fallback-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/blaze-review-fallback-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/blaze-running-fallback-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/blaze-malicious-fallback-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/blaze-waiting-fallback-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/blaze-waving-fallback-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/blaze-failed-fallback-frames.png", import.meta.url).href,
   },
   nova: {
-    idle: new URL("../../../../../assets/pets/generated/nova-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/nova-walk-frames.png", import.meta.url).href,
-    thinking: new URL("../../../../../assets/pets/generated/nova-thinking-frames.png", import.meta.url).href,
-    coding: new URL("../../../../../assets/pets/generated/nova-coding-frames.png", import.meta.url).href,
-    coding_malicious: new URL("../../../../../assets/pets/generated/nova-coding_malicious-frames.png", import.meta.url).href,
-    stuck: new URL("../../../../../assets/pets/generated/nova-stuck-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/nova-success-frames.png", import.meta.url).href,
-    error: new URL("../../../../../assets/pets/generated/nova-error-frames.png", import.meta.url).href,
+    idle: new URL("../../../../../assets/pets/generated/nova-idle-fallback-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/nova-run-fallback-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/nova-thinking-fallback-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/nova-working-fallback-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/nova-alert-fallback-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/nova-waiting-fallback-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/nova-wave-fallback-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/nova-failed-fallback-frames.png", import.meta.url).href,
   },
   rocky: {
-    idle: new URL("../../../../../assets/pets/generated/rocky-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/rocky-walk-frames.png", import.meta.url).href,
-    thinking: new URL("../../../../../assets/pets/generated/rocky-thinking-frames.png", import.meta.url).href,
-    coding: new URL("../../../../../assets/pets/generated/rocky-coding-frames.png", import.meta.url).href,
-    coding_malicious: new URL("../../../../../assets/pets/generated/rocky-coding_malicious-frames.png", import.meta.url).href,
-    stuck: new URL("../../../../../assets/pets/generated/rocky-stuck-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/rocky-success-frames.png", import.meta.url).href,
-    error: new URL("../../../../../assets/pets/generated/rocky-error-frames.png", import.meta.url).href,
+    idle: new URL("../../../../../assets/pets/generated/rocky-idle-fallback-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/rocky-run-fallback-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/rocky-thinking-fallback-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/rocky-working-fallback-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/rocky-alert-fallback-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/rocky-waiting-fallback-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/rocky-wave-fallback-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/rocky-failed-fallback-frames.png", import.meta.url).href,
   },
   sprout: {
-    idle: new URL("../../../../../assets/pets/generated/sprout-idle-frames.png", import.meta.url).href,
-    walk: new URL("../../../../../assets/pets/generated/sprout-walk-frames.png", import.meta.url).href,
-    thinking: new URL("../../../../../assets/pets/generated/sprout-thinking-frames.png", import.meta.url).href,
-    coding: new URL("../../../../../assets/pets/generated/sprout-coding-frames.png", import.meta.url).href,
-    coding_malicious: new URL("../../../../../assets/pets/generated/sprout-coding_malicious-frames.png", import.meta.url).href,
-    stuck: new URL("../../../../../assets/pets/generated/sprout-stuck-frames.png", import.meta.url).href,
-    success: new URL("../../../../../assets/pets/generated/sprout-success-frames.png", import.meta.url).href,
-    error: new URL("../../../../../assets/pets/generated/sprout-error-frames.png", import.meta.url).href,
+    idle: new URL("../../../../../assets/pets/generated/sprout-idle-fallback-frames.png", import.meta.url).href,
+    walk: new URL("../../../../../assets/pets/generated/sprout-run-fallback-frames.png", import.meta.url).href,
+    thinking: new URL("../../../../../assets/pets/generated/sprout-thinking-fallback-frames.png", import.meta.url).href,
+    coding: new URL("../../../../../assets/pets/generated/sprout-working-fallback-frames.png", import.meta.url).href,
+    coding_malicious: new URL("../../../../../assets/pets/generated/sprout-alert-fallback-frames.png", import.meta.url).href,
+    stuck: new URL("../../../../../assets/pets/generated/sprout-waiting-fallback-frames.png", import.meta.url).href,
+    success: new URL("../../../../../assets/pets/generated/sprout-wave-fallback-frames.png", import.meta.url).href,
+    error: new URL("../../../../../assets/pets/generated/sprout-failed-fallback-frames.png", import.meta.url).href,
   },
 };
 const BUILTIN_BLINK_STRIPS: Record<string, string> = {
@@ -93,9 +93,7 @@ const BUILTIN_BLINK_STRIPS: Record<string, string> = {
   rocky: new URL("../../../../../assets/pets/generated/rocky-blink-frames.png", import.meta.url).href,
   sprout: new URL("../../../../../assets/pets/generated/sprout-blink-frames.png", import.meta.url).href,
 };
-const BLAZE_FIRE_BREATH = new URL("../../../../../assets/pets/generated/blaze-fire-breath-frames.png", import.meta.url).href;
-const BLAZE_FIRE_IMPACT = new URL("../../../../../assets/pets/generated/blaze-fire-impact-frames.png", import.meta.url).href;
-const BLAZE_FIRE_BREATH_BODY_V2 = new URL("../../../../../assets/pets/generated/blaze-fire-breath-body-v2-atlas.png", import.meta.url).href;
+const BLAZE_FIRE_BREATH_STRIP = new URL("../../../../../assets/pets/generated/blaze-fire-breath-fallback-frames.png", import.meta.url).href;
 
 // Native Wayland: the app cannot move its own windows, so the compositor drags
 // Percy (CSS app-region) and Percy stays put instead of walking in place.
@@ -253,41 +251,31 @@ export function PetWindow() {
   // identity stable while the missing state is being displayed.
   const resolvedCustomStrip = customStrip ?? customProfile?.strips.idle;
   const animationPaused = motion.reduceMotion;
-  const usesBlazeAttackAtlas = character === "blaze" && activePose === "fire-breath" && !resolvedCustomStrip && !motionClip;
-  const sheet = usesBlazeAttackAtlas ? BLAZE_FIRE_BREATH_BODY_V2 : resolvedCustomStrip?.dataUrl ?? (BUILTIN_STRIPS[character] ?? BUILTIN_STRIPS.percy)[builtinPose];
+  const usesBlazeFireBreathStrip = character === "blaze" && activePose === "fire-breath" && !resolvedCustomStrip && !motionClip;
+  const sheet = usesBlazeFireBreathStrip ? BLAZE_FIRE_BREATH_STRIP : resolvedCustomStrip?.dataUrl ?? (BUILTIN_STRIPS[character] ?? BUILTIN_STRIPS.percy)[builtinPose];
   // Fit custom frames inside the companion canvas. A wide uploaded sprite should
   // never expand the always-on-top window across the desktop.
-  const sourceFrameWidth = motionManifest?.geometry.width ?? (usesBlazeAttackAtlas ? 1246 / 4 : resolvedCustomStrip?.frameWidth ?? 256);
-  const sourceFrameHeight = motionManifest?.geometry.height ?? (usesBlazeAttackAtlas ? 1263 / 4 : resolvedCustomStrip?.frameHeight ?? 256);
+  const sourceFrameWidth = motionManifest?.geometry.width ?? (resolvedCustomStrip?.frameWidth ?? 256);
+  const sourceFrameHeight = motionManifest?.geometry.height ?? (resolvedCustomStrip?.frameHeight ?? 256);
   const frameScale = Math.min(128 / sourceFrameWidth, 128 / sourceFrameHeight);
   const frameWidth = sourceFrameWidth * frameScale;
   const frameHeight = sourceFrameHeight * frameScale;
-  const frameCount = usesBlazeAttackAtlas ? 16 : resolvedCustomStrip ? petStripFrameCount(resolvedCustomStrip) : 11;
-  const spriteColumns = usesBlazeAttackAtlas ? 4 : frameCount;
-  const spriteRows = usesBlazeAttackAtlas ? 4 : 1;
-  const spriteFps = usesBlazeAttackAtlas ? 18 : resolvedCustomStrip?.fps ?? (activePose === "walk" ? 16 : 13);
-  const spriteLoops = usesBlazeAttackAtlas ? false : resolvedCustomStrip?.loop ?? !["success", "error", "needs-attention", "pounce", "celebrate"].includes(activePose);
+  const frameCount = resolvedCustomStrip ? petStripFrameCount(resolvedCustomStrip) : 8;
+  const spriteColumns = frameCount;
+  const spriteRows = 1;
+  const spriteFps = resolvedCustomStrip?.fps ?? (activePose === "walk" ? 16 : 13);
+  const spriteLoops = resolvedCustomStrip?.loop ?? !["success", "error", "needs-attention", "pounce", "fire-breath", "celebrate"].includes(activePose);
   const spriteStyle = { width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-facing": activity.facing } as CSSProperties;
   const spritePlaybackKey = `${activePose}:${activePose === pose ? poseGeneration : activity.generation ?? 0}`;
   const stillPose = !["walk", "success", "error", "needs-attention", "angry", "pounce", "fire-breath", "celebrate", "curious-scan", "ember-curl", "star-orbit", "rock-roll", "sprout-stretch"].includes(activePose);
-  const blinkSheet = motionManifest ? undefined : customProfile?.blink?.dataUrl ?? BUILTIN_BLINK_STRIPS[character];
+  const blinkSheet = motionManifest || ["ember", "percy", "byte", "blaze", "nova", "rocky", "sprout"].includes(character) ? undefined : customProfile?.blink?.dataUrl ?? BUILTIN_BLINK_STRIPS[character];
   const blinkStrip = customProfile?.blink;
   const genericBlinkFallback = Boolean(customProfile && !blinkStrip);
   const blinkFrameCount = blinkStrip?.frameCount ?? (blinkSheet ? 11 : 0);
   const blinkStyle = blinkSheet ? { backgroundImage: `url(${blinkSheet})`, backgroundSize: `${frameWidth * blinkFrameCount}px ${frameHeight}px`, width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-blink-end": `${-frameWidth * (blinkFrameCount - 1)}px`, "--pet-blink-steps": blinkFrameCount - 1, "--pet-blink-duration": `${blinkDuration}ms` } as CSSProperties : undefined;
   const target = activity.target ?? { x: activity.facing === -1 ? 8 : 212, y: 104 };
-  const fightScene = !COMPOSITOR_DRAG && (activePose === "pounce" || activePose === "fire-breath");
+  const fightScene = !COMPOSITOR_DRAG && activePose === "pounce";
   const sceneWidth = fightScene ? 460 : 220;
-  const mouthX = sceneWidth / 2 + (activity.facing === -1 ? -34 : 34);
-  const breathDx = target.x - mouthX;
-  const breathDy = target.y - 105;
-  const breathLength = Math.max(24, Math.hypot(breathDx, breathDy));
-  const breathAngle = Math.atan2(breathDy, breathDx) * 180 / Math.PI;
-  const fireWidth = Math.max(145, Math.min(270, breathLength + 24));
-  const fireHeight = 158;
-  const fireSpriteStyle = { width: `${fireWidth}px`, height: `${fireHeight}px`, left: `${mouthX}px`, top: `${105 - fireHeight / 2}px`, transform: `rotate(${breathAngle}deg)` } as CSSProperties;
-  const impactSize = 150;
-  const impactSpriteStyle = { width: `${impactSize}px`, height: `${impactSize}px`, left: `${target.x - impactSize / 2}px`, top: `${target.y - impactSize / 2}px` } as CSSProperties;
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
     event.preventDefault();
@@ -344,7 +332,6 @@ export function PetWindow() {
     {bubble && <div className={`pet-window-bubble pet-window-bubble-${bubbleKind}`} role="status" aria-live="polite">{bubble}</div>}
     {activePose === "angry" && <span className={`pet-window-anger${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true"><i /><i /><i /></span>}
     {activePose === "pounce" && <span className={`pet-window-pounce-trail${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true"><i /><i /><i /></span>}
-    {activePose === "fire-breath" && <div className="pet-window-fire-scene" aria-hidden="true"><PetSpriteCanvas clip={{ imageUrl: BLAZE_FIRE_BREATH, frameCount: 8, columns: 8, rows: 1, fps: 16, loop: true }} playbackKey={`fire:${activity.generation ?? 0}`} paused={animationPaused || !pageVisible} pixelWidth={256} pixelHeight={256} className="pet-window-fire-sprite" style={fireSpriteStyle} label="Blaze breathes fire" /><PetSpriteCanvas clip={{ imageUrl: BLAZE_FIRE_IMPACT, frameCount: 8, columns: 8, rows: 1, fps: 16, loop: false }} playbackKey={`impact:${activity.generation ?? 0}`} paused={animationPaused || !pageVisible} pixelWidth={256} pixelHeight={256} className="pet-window-fire-impact-sprite" style={impactSpriteStyle} label="Fire impact effect" /><span className="pet-window-target-lock" style={{ left: `${target.x}px`, top: `${target.y}px` }} /></div>}
     {activePose === "pounce" && <span className="pet-window-target-lock is-pounce-target" style={{ left: `${target.x}px`, top: `${target.y}px` }} aria-hidden="true" />}
     {activePose === "curious-scan" && <span className="pet-window-scanner" aria-hidden="true"><i /></span>}
     {activePose === "star-orbit" && <span className="pet-window-star-orbit" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i></span>}

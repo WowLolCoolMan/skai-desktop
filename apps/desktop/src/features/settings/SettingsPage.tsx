@@ -62,13 +62,13 @@ const providerChoices = [
 ];
 
 const builtInPetPreviews: Record<string, string> = {
-  percy: new URL("../../../../../assets/pets/generated/percy-idle-frames.png", import.meta.url).href,
-  byte: new URL("../../../../../assets/pets/generated/byte-idle-frames.png", import.meta.url).href,
-  ember: new URL("../../../../../assets/pets/generated/ember-idle-frames.png", import.meta.url).href,
-  blaze: new URL("../../../../../assets/pets/generated/ember-idle-frames.png", import.meta.url).href,
-  nova: new URL("../../../../../assets/pets/generated/nova-idle-frames.png", import.meta.url).href,
-  rocky: new URL("../../../../../assets/pets/generated/rocky-idle-frames.png", import.meta.url).href,
-  sprout: new URL("../../../../../assets/pets/generated/sprout-idle-frames.png", import.meta.url).href,
+  percy: new URL("../../../../../assets/pets/generated/percy-idle-preview.png", import.meta.url).href,
+  byte: new URL("../../../../../assets/pets/generated/byte-idle-preview.png", import.meta.url).href,
+  ember: new URL("../../../../../assets/pets/generated/ember-motion-idle-preview.png", import.meta.url).href,
+  blaze: new URL("../../../../../assets/pets/generated/blaze-idle-preview.png", import.meta.url).href,
+  nova: new URL("../../../../../assets/pets/generated/nova-idle-preview.png", import.meta.url).href,
+  rocky: new URL("../../../../../assets/pets/generated/rocky-idle-preview.png", import.meta.url).href,
+  sprout: new URL("../../../../../assets/pets/generated/sprout-idle-preview.png", import.meta.url).href,
 };
 
 type SettingsProps = {
@@ -279,7 +279,7 @@ function PetSettings({ props, change }: { props: SettingsProps; change: (key: st
     <Toggle label="Show Pet Workshop" detail="Add Pet Workshop to Extras (Quick Actions) for sprite drawing and companion behavior." checked={workshopEnabled} onChange={setWorkshop} />
     {workshopEnabled && <div className="settings-field"><Button variant="secondary" onClick={() => props.onNavigate("pet-workshop")}>Open Pet Workshop</Button></div>}
     <Toggle label="DEMO - More Interaction" detail={window.skaiAgent?.pet?.interactionDemoAvailable ? "Occasionally perch on visible window tops and walk along the taskbar edge. Dragging pauses movement." : "Extra surface interactions are unavailable on this platform. Regular walking still works."} checked={props.petInteractionDemo} disabled={!window.skaiAgent?.pet?.interactionDemoAvailable || !props.petWander} onChange={(value) => change("petInteractionDemo", value)} />
-    <div className="settings-field"><label>Companion<select value={character} onChange={(event) => chooseCharacter(event.target.value)}><option value="percy">Percy · Skai wolf</option><option value="byte">Byte · neon bot</option><option value="ember">Ember · ember fox</option><option value="blaze">Blaze · fire companion</option><option value="nova">Nova · star cat</option><option value="rocky">Rocky · pocket rock</option><option value="sprout">Sprout · tiny plant</option>{profiles.map((profile) => <option key={profile.id} value={`custom:${profile.id}`}>{profile.name} · custom</option>)}</select></label><div className="pet-settings-preview"><img src={activeProfile?.strips.idle?.dataUrl || builtInPetPreviews[character] || builtInPetPreviews.percy} alt="" /><span>{activeProfile ? `${activeProfile.name} · custom profile` : character === "blaze" ? "All attack behaviors enabled" : "Built-in sprite set"}</span></div></div>
+    <div className="settings-field"><label>Companion<select value={character} onChange={(event) => chooseCharacter(event.target.value)}><option value="percy">Percy · Skai wolf</option><option value="byte">Byte · neon bot</option><option value="ember">Ember · fire dragon</option><option value="blaze">Blaze · fire companion</option><option value="nova">Nova · star cat</option><option value="rocky">Rocky · pocket rock</option><option value="sprout">Sprout · tiny plant</option>{profiles.map((profile) => <option key={profile.id} value={`custom:${profile.id}`}>{profile.name} · custom</option>)}</select></label><div className="pet-settings-preview"><img src={activeProfile?.strips.idle?.dataUrl || builtInPetPreviews[character] || builtInPetPreviews.percy} alt="" /><span>{activeProfile ? `${activeProfile.name} · custom profile` : character === "blaze" ? "All attack behaviors enabled" : "Built-in sprite set"}</span></div></div>
     {activeProfile && <div className="settings-callout"><strong>{activeProfile.name}</strong><span>Use Pet Workshop to draw 11-frame animation strips and customize this companion’s behavior. Legacy six- and ten-frame artwork remains stored until replaced.</span></div>}
     {profileError && <p className="form-error" role="alert">{profileError}</p>}
   </>;

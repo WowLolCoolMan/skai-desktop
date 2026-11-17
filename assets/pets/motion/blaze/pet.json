@@ -16,52 +16,52 @@
   "clips": {
     "idle": {
       "file": "clips/idle.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "run": {
       "file": "clips/run.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "review": {
       "file": "clips/review.webp",
-      "frames": 10,
+      "frames": 8,
       "playbackRate": 1
     },
     "running": {
       "file": "clips/running.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "waiting": {
       "file": "clips/waiting.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "waving": {
       "file": "clips/waving.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "jumping": {
       "file": "clips/jumping.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "failed": {
       "file": "clips/failed.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "malicious": {
       "file": "clips/malicious.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "pounce": {
       "file": "clips/pounce.webp",
-      "frames": 11,
+      "frames": 8,
       "playbackRate": 1
     },
     "fire-breath": {
