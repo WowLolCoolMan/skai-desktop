@@ -477,3 +477,21 @@ Round 12 was pushed as b5c6383.
   - **The existing Accent select (Cyan/Violet/Amber/Rose) still does nothing.** No CSS reads `data-accent`, and its
     stored default is "cyan", so wiring it up would turn everyone's accent cyan. The new accent override does the
     job; the old select should probably be removed or merged.
+
+### Round 14: old Accent select removed, Monaco follows the theme (refinements)
+
+Round 13 was pushed as bb5b5b6.
+
+- **Removed (user's request):** the old Settings → Appearance **Accent** select (Cyan/Violet/Amber/Rose). Nothing read its
+  value. Only the control is gone; the stored `accentColor` setting and its host/Core plumbing are untouched (unused
+  and harmless). The accent is set in Layout and motion → Accent.
+- **Monaco:** `src/theme/useMonacoTheme.ts` (new) defines a `skai` Monaco theme from the tokens (code surface and
+  text, the 8 syntax colors, line numbers, cursor, selection, line highlight, widgets, diff added/removed,
+  scrollbar), based on `vs` or `vs-dark` by scheme. It uses the code role's font and size (13px × code scale) and is
+  redefined live on any theme, scheme, preview, option or font change. `CodingSessionView.tsx` gets one hook call
+  and `theme`/`beforeMount`/font options on its Editor and DiffEditor; `theme="vs-dark"` and `fontSize: 13` are gone.
+- **Found (owner's code, not changed):** `@monaco-editor/react` has no loader config, so the built renderer fetches
+  Monaco 0.55.1 from `https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs`, and the production CSP
+  (`script-src 'self'`) blocks it. The editor most likely never loads in the packaged app, and a remote fetch
+  goes against the local-only design. Reported to the user. Because of this, the Monaco theme could only be
+  typechecked, not seen running in the packaged build.
