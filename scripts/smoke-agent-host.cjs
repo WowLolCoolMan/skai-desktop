@@ -198,6 +198,14 @@ async function run() {
   const personaId = persona.result.persona.id;
   const secondPersona = await request("persona.save", { persona: { name: "Group persona", sourceMode: "own-material", sourceMaterial: "A second group participant." } });
   if (!secondPersona.ok || !secondPersona.result?.persona?.id) throw new Error("persona.save did not create a second group persona.");
+  const evidencePersona = await request("persona.save", { persona: { name: "Research character", sourceMode: "public-research", subjectType: "character", sources: [{ title: "Canon source", url: "https://example.org/canon", authorOrPublisher: "Example", publishedDate: "", type: "Canon reference", reliabilityNote: "Smoke test source.", excerpt: "A short evidence chunk." }] } });
+  if (!evidencePersona.ok || evidencePersona.result?.persona?.subjectType !== "character") throw new Error("Persona subject type did not persist for fictional characters.");
+  const sourceUrl = "https://example.org/canon";
+  const removedChunk = await request("persona.source.remove", { personaId: evidencePersona.result.persona.id, url: sourceUrl, removeExcerpt: true });
+  if (!removedChunk.ok || removedChunk.result?.sources?.length !== 1 || removedChunk.result.sources[0].excerpt !== "") throw new Error("A saved research excerpt could not be removed independently of its source.");
+  const removedSource = await request("persona.source.remove", { personaId: evidencePersona.result.persona.id, url: sourceUrl });
+  if (!removedSource.ok || removedSource.result?.sources?.length !== 0) throw new Error("A research source and its remaining chunks could not be removed.");
+  await request("persona.remove", { id: evidencePersona.result.persona.id });
   const personaThread = await request("conversation.save", { title: "Persona workshop thread", personaId, messages: [{ role: "user", content: "Keep this inside the workshop." }] });
   const groupThread = await request("conversation.save", { title: "Persona group thread", isPersonaGroup: true, personaIds: [personaId, secondPersona.result.persona.id], messages: [] });
   if (!personaThread.ok || !groupThread.ok) throw new Error("Persona and group conversations could not be saved.");

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DesktopConversation, DesktopPersona } from "../../../shared/contracts";
+import type { DesktopConversation, DesktopPersona, DesktopPersonaSource } from "../../../shared/contracts";
 import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { navigatePersonaWorkshop, personaWorkshopLocation, type PersonaWorkshopPage as WorkshopPage } from "../../app/navigation";
 import { voiceProfiles, speakNativeResponse, waitForLocalSpeechToFinish, selectedVoiceSettings } from "../../services/nativeTts";
@@ -24,6 +24,10 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   const [memory, setMemory] = useState<{ enabled: boolean; turns: Array<{ atUtc: string; role: string; content: string }> } | null>(null);
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [moreResearchOpen, setMoreResearchOpen] = useState(false);
+  const [moreResearchFocus, setMoreResearchFocus] = useState("");
+  const [moreResearchSources, setMoreResearchSources] = useState<DesktopPersonaSource[]>([]);
+  const [moreResearchBusy, setMoreResearchBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = useCallback((method: string, params?: Record<string, unknown>) => window.skaiAgent.request(method, params), []);
   const refreshPersonas = useCallback(async () => {
@@ -136,6 +140,31 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     else setError(response.error?.message ?? "Persona memories could not be cleared.");
     setMemoryBusy(false);
   };
+  const findMorePersonaSources = async () => {
+    if (!persona || moreResearchBusy) return;
+    setMoreResearchBusy(true); setError(null); setMoreResearchSources([]);
+    const response = await request("persona.research", { query: persona.name, subjectType: persona.subjectType ?? "person", notes: moreResearchFocus.trim(), sourceUrls: [] });
+    if (response.ok) {
+      const result = response.result as { sources?: DesktopPersonaSource[] };
+      const known = new Set(persona.sources.map((source) => source.url.toLowerCase()));
+      setMoreResearchSources((result.sources ?? []).filter((source) => !known.has(source.url.toLowerCase())));
+    } else setError(response.error?.message ?? "More sources could not be found.");
+    setMoreResearchBusy(false);
+  };
+  const savePersonaSource = async (source: DesktopPersonaSource) => {
+    if (!persona) return;
+    const response = await request("persona.source.add", { personaId: persona.id, ...source });
+    if (response.ok) { await refreshPersonas(); setMoreResearchSources((items) => items.filter((item) => item.url !== source.url)); }
+    else setError(response.error?.message ?? "The source could not be saved.");
+  };
+  const removePersonaResearch = async (source: DesktopPersonaSource, removeExcerpt: boolean) => {
+    if (!persona) return;
+    const action = removeExcerpt ? "Remove this saved research excerpt? The source link will stay." : "Remove this source and its saved research excerpt from the persona?";
+    if (!window.confirm(action)) return;
+    const response = await request("persona.source.remove", { personaId: persona.id, url: source.url, removeExcerpt });
+    if (response.ok) await refreshPersonas();
+    else setError(response.error?.message ?? "The research source could not be changed.");
+  };
   const deletePersona = async () => {
     if (!persona || !window.confirm(`Remove ${persona.name} and its persona card?`)) return;
     const response = await request("persona.remove", { id: persona.id });
@@ -176,7 +205,10 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     </section>;
   } else if (location.page === "knowledge" && persona) {
     const records = [{ label: "Profile instructions", value: persona.instructions }, { label: "Personality and values", value: persona.personality }, { label: "Roles and subjects", value: persona.roles }, { label: "Timeline", value: persona.timeline }, { label: "Provided material", value: persona.sourceMaterial }].filter((record) => record.value.trim());
-    content = <section className="persona-workshop-content"><PageHeader eyebrow={`PERSONA WORKSHOP · ${persona.name}`} title="Knowledge base" description="Review the profile information and sources that shape this persona’s replies." actions={<Button type="button" onClick={() => open("settings", persona.id)}>Edit knowledge</Button>} /><div className="persona-knowledge-grid">{records.map((record) => <Card key={record.label}><h2>{record.label}</h2><p className="persona-knowledge-copy">{record.value}</p></Card>)}<Card><h2>Reference sources</h2>{persona.sources.length ? <ul className="persona-source-list">{persona.sources.map((source) => <li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title || source.url}</a><small>{source.reliabilityNote || source.type}</small>{source.excerpt && <p>{source.excerpt}</p>}</li>)}</ul> : <p className="settings-help">No external sources. This persona uses only its saved profile and your material.</p>}</Card><Card><h2>Verified quotes</h2>{persona.verifiedQuotes.length ? persona.verifiedQuotes.map((quote) => <blockquote key={quote.sourceId}>{quote.text}<cite>{quote.attribution}</cite></blockquote>) : <p className="settings-help">No verified quotes have been added.</p>}</Card></div></section>;
+    content = <section className="persona-workshop-content"><PageHeader eyebrow={`PERSONA WORKSHOP · ${persona.name}`} title="Knowledge base" description="Review the profile information and sources that shape this persona’s replies." actions={<div className="persona-knowledge-actions"><Button variant="secondary" type="button" onClick={() => { setMoreResearchOpen((open) => !open); setMoreResearchSources([]); }}>Find more sources</Button><Button type="button" onClick={() => open("settings", persona.id)}>Edit profile</Button></div>} />
+      {moreResearchOpen && <Card className="persona-more-research"><div><h2>Deepen this research</h2><p>Search more public material about {persona.name}. Skai checks multiple research angles; review each result before adding it.</p></div><div className="persona-more-research-form"><input value={moreResearchFocus} onChange={(event) => setMoreResearchFocus(event.target.value)} placeholder={persona.subjectType === "character" ? "e.g. film dialogue, canon history, character arc" : "e.g. podcast interviews, long-form conversations, public speeches"} /><Button type="button" disabled={moreResearchBusy || persona.sources.length >= 32} onClick={() => void findMorePersonaSources()}>{moreResearchBusy ? "Searching sources…" : "Search more"}</Button></div>{persona.sources.length >= 32 && <p className="settings-help">This persona has reached its 32-source limit. Remove a source before adding more.</p>}{moreResearchSources.length > 0 && <div className="persona-more-research-results">{moreResearchSources.map((source) => <article key={source.url}><div><strong>{source.title}</strong><small>{source.type} · {source.authorOrPublisher || source.url}</small>{source.excerpt && <p>{source.excerpt}</p>}</div><a href={source.url} target="_blank" rel="noreferrer">Open ↗</a><Button variant="secondary" type="button" disabled={persona.sources.length >= 32} onClick={() => void savePersonaSource(source)}>Add source</Button></article>)}</div>}</Card>}
+      <p className="settings-help persona-evidence-note">Removing a source or excerpt removes it from saved research. It does not automatically rewrite profile details already reviewed; use Edit profile to update those.</p><div className="persona-knowledge-grid">{records.map((record) => <Card key={record.label}><h2>{record.label}</h2><p className="persona-knowledge-copy">{record.value}</p></Card>)}<Card><h2>Reference sources <small>({persona.sources.length}/32)</small></h2>{persona.sources.length ? <ul className="persona-source-list">{persona.sources.map((source) => <li key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title || source.url}</a><small>{source.type} · {source.reliabilityNote}</small>{source.excerpt && <p>{source.excerpt}</p>}<div className="persona-source-actions">{source.excerpt && <Button variant="ghost" type="button" onClick={() => void removePersonaResearch(source, true)}>Remove excerpt</Button>}<Button variant="ghost" type="button" onClick={() => void removePersonaResearch(source, false)}>Remove source</Button></div></li>)}</ul> : <p className="settings-help">No external sources. This persona uses only its saved profile and your material.</p>}</Card><Card><h2>Verified quotes</h2>{persona.verifiedQuotes.length ? persona.verifiedQuotes.map((quote) => <blockquote key={quote.sourceId}>{quote.text}<cite>{quote.attribution}</cite></blockquote>) : <p className="settings-help">No verified quotes have been added.</p>}</Card></div>
+    </section>;
   } else if (location.page === "chat" && activeThread) {
     const isGroup = Boolean(activeThread.isPersonaGroup);
     const participants = personas.filter((item) => isGroup ? activeThread.personaIds?.includes(item.id) : item.id === activeThread.personaId);

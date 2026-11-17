@@ -150,6 +150,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .persona-mode-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--skai-color-border); padding-bottom: 10px; }
 .persona-mode-tabs button { border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); padding: 9px 11px; color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); cursor: pointer; font: inherit; }
 .persona-mode-tabs button.is-active { border-color: var(--skai-color-accent); color: var(--skai-color-text); background: color-mix(in srgb, var(--skai-color-accent) 10%, var(--skai-color-surface-soft)); }
+.persona-subject-tabs { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.persona-subject-tabs button { padding: 7px 11px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: var(--skai-color-surface); cursor: pointer; font: inherit; font-size: var(--skai-text-sm); }
+.persona-subject-tabs button.is-active { border-color: var(--skai-color-accent); color: var(--skai-color-text); background: color-mix(in srgb, var(--skai-color-accent) 10%, var(--skai-color-surface)); }
+.persona-subject-tabs small { flex: 1 1 240px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .persona-research-result { display: grid; gap: 10px; padding: 13px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 28%, var(--skai-color-border)); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 5%, var(--skai-color-surface)); }
 .persona-research-result p { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.45; }
 .persona-research-steps { display: flex; align-items: center; gap: 10px; padding: 4px 0 12px; border-bottom: 1px solid var(--skai-color-border); }
@@ -284,6 +288,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .persona-source-list li { display: grid; gap: 5px; }
 .persona-source-list small { color: var(--skai-color-text-muted); }
 .persona-source-list p { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+.persona-knowledge-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.persona-more-research { display: grid; gap: 14px; margin-bottom: 14px; }
+.persona-more-research h2, .persona-more-research p { margin: 0; }
+.persona-more-research > div:first-child { display: grid; gap: 5px; }
+.persona-more-research > div:first-child p, .persona-more-research-results small, .persona-more-research-results p { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.45; }
+.persona-more-research-form { display: flex; gap: 8px; }
+.persona-more-research-form input { flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font: inherit; }
+.persona-more-research-results { display: grid; gap: 8px; }
+.persona-more-research-results article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); }
+.persona-more-research-results article > div { display: grid; gap: 4px; min-width: 0; }
+.persona-more-research-results article > div p { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; margin: 0; }
+.persona-more-research-results article > a { white-space: nowrap; color: var(--skai-color-accent); font-size: var(--skai-text-xs); }
+.persona-source-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .persona-confirm-backdrop { position: fixed; z-index: 120; inset: 0; display: grid; place-items: center; padding: 20px; background: var(--skai-color-overlay); }
 .persona-confirm-dialog { display: grid; gap: 12px; width: min(100%, 460px); padding: 22px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-surface); box-shadow: var(--skai-shadow-lg); }
 .persona-confirm-dialog h2, .persona-confirm-dialog p { margin: 0; }

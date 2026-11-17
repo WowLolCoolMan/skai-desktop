@@ -7,6 +7,8 @@ public sealed class SavedPersona
     public string Name { get; set; } = string.Empty;
     /// <summary>public-research or own-material. Public research is always opt-in.</summary>
     public string SourceMode { get; set; } = "own-material";
+    /// <summary>person or character; controls which public evidence lanes are searched.</summary>
+    public string SubjectType { get; set; } = "person";
     public bool IsPublicFigure { get; set; }
     public string? BirthDate { get; set; }
     public string? DeathDate { get; set; }

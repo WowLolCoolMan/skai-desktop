@@ -133,6 +133,7 @@ export type DesktopPersona = {
   id: string;
   name: string;
   sourceMode: "public-research" | "own-material";
+  subjectType: "person" | "character";
   isPublicFigure: boolean;
   birthDate?: string | null;
   deathDate?: string | null;

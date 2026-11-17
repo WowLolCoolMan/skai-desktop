@@ -166,7 +166,7 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "persona.list", "persona.discover", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
+                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "persona.list", "persona.discover", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
             "system.capacity" => GetLocalCapacity(request),
             "airllm.status" => GetAirLlmStatus(request),
             "airllm.install.start" => StartAirLlmInstall(request),
@@ -243,6 +243,7 @@ public static class AgentHostLoop
             "persona.memory.clear" => ClearPersonaMemory(request),
             "persona.group.complete" => PersonaGroupCompleteAsync(request).GetAwaiter().GetResult(),
             "persona.source.add" => AddPersonaSource(request),
+            "persona.source.remove" => RemovePersonaSource(request),
             "image.generate" => GenerateImageAsync(request).GetAwaiter().GetResult(),
             "pet.background.remove" => RemovePetBackgroundAsync(request).GetAwaiter().GetResult(),
             "image.models.list" => ListImageCheckpointsAsync(request).GetAwaiter().GetResult(),
@@ -2331,20 +2332,23 @@ public static class AgentHostLoop
     private static async Task<AgentResponse> DiscoverPersonaAsync(AgentRequest request)
     {
         var query = RequiredBoundedString(request, "query", 240);
+        var subjectType = OptionalString(request, "subjectType")?.Equals("character", StringComparison.OrdinalIgnoreCase) == true ? "character" : "person";
         var notes = OptionalString(request, "notes") ?? string.Empty;
         if (notes.Length > 600 || notes.Any(char.IsControl)) throw new InvalidOperationException("Search notes exceed the safety limit.");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
         var search = new WebSearchProvider();
         IReadOnlyList<WebSearchResult> results;
-        try { results = await search.SearchAsync(string.Join(' ', new[] { $"\"{query}\"", notes, "person biography profile" }.Where(part => !string.IsNullOrWhiteSpace(part))), timeout.Token).ConfigureAwait(false); }
+        var discoveryTerms = subjectType == "character" ? "fictional character franchise canon" : "real person biography profile";
+        try { results = await search.SearchAsync(string.Join(' ', new[] { $"\"{query}\"", notes, discoveryTerms }.Where(part => !string.IsNullOrWhiteSpace(part))), timeout.Token).ConfigureAwait(false); }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested) { throw new TimeoutException("People search took too long. Try again with a fuller name."); }
         var matches = results.Select(result => new { id = result.Url, title = result.Title, snippet = result.Snippet, url = result.Url }).ToArray();
-        return new(ProtocolVersion, request.Id, true, new { query, matches });
+        return new(ProtocolVersion, request.Id, true, new { query, subjectType, matches });
     }
 
     private static async Task<AgentResponse> ResearchPersonaAsync(AgentRequest request)
     {
         var query = RequiredBoundedString(request, "query", 240);
+        var subjectType = OptionalString(request, "subjectType")?.Equals("character", StringComparison.OrdinalIgnoreCase) == true ? "character" : "person";
         var notes = OptionalString(request, "notes") ?? string.Empty;
         var cutoffText = OptionalString(request, "cutoffDate");
         DateTimeOffset? cutoff = DateTimeOffset.TryParse(cutoffText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedCutoff) ? parsedCutoff : null;
@@ -2353,26 +2357,38 @@ public static class AgentHostLoop
         var requestedUrls = OptionalStringList(request, "sourceUrls", 64, 2_000)
             .Where(url => Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var lanes = new[]
-        {
-            (Category: "Biography", Terms: "biography official profile career education"),
-            (Category: "Conversation transcript", Terms: "podcast conversation transcript full episode"),
-            (Category: "Interview", Terms: "interview Q&A conversation with"),
-            (Category: "Video captions", Terms: "YouTube interview video captions transcript"),
-        };
-        using var searchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(9));
+        var lanes = subjectType == "character"
+            ? new[]
+            {
+                (Category: "Canon reference", Terms: "fictional character official canon profile franchise"),
+                (Category: "Character dialogue", Terms: "character dialogue transcript screenplay subtitles"),
+                (Category: "Story transcript", Terms: "movie film full transcript script subtitles"),
+                (Category: "Character analysis", Terms: "character history personality motivations story arc analysis"),
+                (Category: "Official source", Terms: "official character biography studio franchise"),
+                (Category: "Other reference", Terms: "character lore wiki reference guide"),
+            }
+            : new[]
+            {
+                (Category: "Biography", Terms: "official biography profile career education"),
+                (Category: "Conversation transcript", Terms: "podcast conversation transcript full episode"),
+                (Category: "Interview", Terms: "long form interview Q&A conversation with"),
+                (Category: "Video captions", Terms: "YouTube interview podcast video captions transcript"),
+                (Category: "Conversation transcript", Terms: "public speech debate Q&A transcript conversation"),
+                (Category: "Other reference", Terms: "official site public statements career profile"),
+            };
+        using var searchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(24));
         var searches = await Task.WhenAll(lanes.Select(async lane =>
         {
             try { return (lane.Category, Results: await search.SearchAsync($"\"{query}\" {notes} {lane.Terms}".Trim(), searchTimeout.Token).ConfigureAwait(false)); }
             catch { return (lane.Category, Results: (IReadOnlyList<WebSearchResult>)Array.Empty<WebSearchResult>()); }
         })).ConfigureAwait(false);
-        var candidates = searches.SelectMany(batch => batch.Results.Take(3).Select(result => (batch.Category, Result: result)))
+        var candidates = searches.SelectMany(batch => batch.Results.Take(6).Select(result => (batch.Category, Result: result)))
             .GroupBy(item => item.Result.Url, StringComparer.OrdinalIgnoreCase).Select(group => group.First()).ToList();
         candidates.AddRange(requestedUrls.Take(16).Where(url => candidates.All(item => !item.Result.Url.Equals(url, StringComparison.OrdinalIgnoreCase)))
             .Select(url => (Category: "Other reference", Result: new WebSearchResult(url, url, string.Empty))));
-        candidates = candidates.Take(28).ToList();
-        using var fetchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        using var fetchLimit = new SemaphoreSlim(6, 6);
+        candidates = candidates.Take(32).ToList();
+        using var fetchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(42));
+        using var fetchLimit = new SemaphoreSlim(10, 10);
         var loaded = await Task.WhenAll(candidates.Select(async item =>
         {
             await fetchLimit.WaitAsync(fetchTimeout.Token).ConfigureAwait(false);
@@ -2385,7 +2401,7 @@ public static class AgentHostLoop
                     return null;
                 var title = page?.Title ?? item.Result.Title;
                 var excerpt = page?.Text ?? item.Result.Snippet;
-                var category = page?.SourceType ?? CategorizePersonaSource(item.Category, title, item.Result.Url, excerpt);
+                var category = page?.SourceType ?? CategorizePersonaSource(subjectType, item.Category, title, item.Result.Url, excerpt);
                 var reputable = IsReputablePublicSource(item.Result.Url);
                 return new SavedPersonaSource
                 {
@@ -2402,7 +2418,9 @@ public static class AgentHostLoop
         })).ConfigureAwait(false);
         var sources = loaded.Where(source => source is not null).Cast<SavedPersonaSource>().ToList();
         var reputableCount = sources.Count(source => IsReputablePublicSource(source.Url));
-        var qualified = sources.Count >= 2 && reputableCount >= 1;
+        var qualified = subjectType == "character"
+            ? sources.Any(source => source.Type is "Canon reference" or "Official source") || sources.Count >= 2
+            : sources.Count >= 2 && reputableCount >= 1;
         var categoryCounts = new
         {
             biographies = sources.Count(source => source.Type == "Biography"),
@@ -2411,23 +2429,39 @@ public static class AgentHostLoop
             videoCaptions = sources.Count(source => source.Type == "Video captions"),
             videoReferences = sources.Count(source => source.Type == "Video reference"),
             otherReferences = sources.Count(source => source.Type == "Other reference"),
+            canonReferences = sources.Count(source => source.Type is "Canon reference" or "Official source"),
+            characterDialogues = sources.Count(source => source.Type is "Character dialogue" or "Story transcript"),
+            characterAnalysis = sources.Count(source => source.Type == "Character analysis"),
             total = sources.Count,
         };
         return new(ProtocolVersion, request.Id, true, new
         {
             query,
+            subjectType,
             publicFigureQualified = qualified,
             qualification = qualified
-                ? "Research is grouped into biographies, conversation transcripts, interviews, and video-caption sources. Review the sources and counts before saving."
-                : "The research returned too little trusted coverage to confirm public status. Review every source before saving or add a known official source.",
+                ? subjectType == "character"
+                    ? "Character research found canon or reference material. Dialogue and story sources are counted separately; review the evidence and gaps before building the profile."
+                    : "Research searched biographies, long-form conversations, interviews, video captions, and public appearances. Review the evidence and gaps before building the profile."
+                : subjectType == "character"
+                    ? "The research found too little canon or reference material to confirm this character. Add a franchise clue or a known source and search again."
+                    : "The research returned too little trusted coverage to confirm this person. Review every source before saving or add a known official source.",
             categoryCounts,
             sources,
         });
     }
 
-    private static string CategorizePersonaSource(string suggested, string title, string url, string excerpt)
+    private static string CategorizePersonaSource(string subjectType, string suggested, string title, string url, string excerpt)
     {
         var text = $"{title} {url} {excerpt}";
+        if (subjectType == "character")
+        {
+            if (Regex.IsMatch(text, @"\b(?:screenplay|dialogue transcript|movie transcript|film transcript|subtitles|script)", RegexOptions.IgnoreCase)) return "Story transcript";
+            if (Regex.IsMatch(text, @"\b(?:character dialogue|dialogue|quotes|lines spoken by)\b", RegexOptions.IgnoreCase)) return "Character dialogue";
+            if (Regex.IsMatch(text, @"\b(?:official character|canon|franchise|character profile|character wiki)\b", RegexOptions.IgnoreCase)) return "Canon reference";
+            if (Regex.IsMatch(text, @"\b(?:character analysis|story arc|motivations|personality|lore)\b", RegexOptions.IgnoreCase)) return "Character analysis";
+            return suggested;
+        }
         if (Regex.IsMatch(url, @"(?:wikipedia\.org|britannica\.com)/", RegexOptions.IgnoreCase) || Regex.IsMatch(text, @"\b(?:biography|biographical|official profile|about (?:him|her|them)|early life|alumni|career profile)\b", RegexOptions.IgnoreCase)) return "Biography";
         if (Regex.IsMatch(url, @"(?:youtube\.com|youtu\.be)/", RegexOptions.IgnoreCase)) return "Video reference";
         if (suggested == "Conversation transcript" && Regex.IsMatch(text, @"\btranscript\b", RegexOptions.IgnoreCase)) return "Conversation transcript";
@@ -2485,8 +2519,42 @@ public static class AgentHostLoop
         var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == personaId) ?? throw new KeyNotFoundException("The persona does not exist.");
         if (persona.SourceMode != "public-research") throw new InvalidOperationException("Handcrafted personas do not accept web research sources.");
         if (persona.Sources.All(source => !source.Url.Equals(url, StringComparison.OrdinalIgnoreCase)))
-            persona.Sources.Add(new SavedPersonaSource { Title = OptionalString(request, "title") ?? url, Url = url, Type = "user-approved group research", ReliabilityNote = "Explicitly approved from a temporary persona-group research result.", Excerpt = (OptionalString(request, "excerpt") ?? string.Empty)[..Math.Min((OptionalString(request, "excerpt") ?? string.Empty).Length, 1_200)] });
+            persona.Sources.Add(new SavedPersonaSource
+            {
+                Title = BoundPersonaText(OptionalString(request, "title") ?? url, 300),
+                Url = url,
+                AuthorOrPublisher = BoundPersonaText(OptionalString(request, "authorOrPublisher") ?? parsed.Host, 300),
+                PublishedDate = BoundPersonaText(OptionalString(request, "publishedDate") ?? string.Empty, 80),
+                Type = BoundPersonaText(OptionalString(request, "type") ?? "user-approved group research", 80),
+                ReliabilityNote = BoundPersonaText(OptionalString(request, "reliabilityNote") ?? "User-selected public source; review before relying on it.", 500),
+                Excerpt = (OptionalString(request, "excerpt") ?? string.Empty)[..Math.Min((OptionalString(request, "excerpt") ?? string.Empty).Length, 1_200)],
+            });
         persona.Sources = persona.Sources.Take(32).ToList();
+        persona.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        store.Save(settings);
+        return new(ProtocolVersion, request.Id, true, PersonaResponse(persona));
+    }
+
+    private static AgentResponse RemovePersonaSource(AgentRequest request)
+    {
+        var personaId = RequiredBoundedString(request, "personaId", 128);
+        var url = RequiredBoundedString(request, "url", 2_000);
+        var removeExcerpt = OptionalBoolean(request, "removeExcerpt");
+        var store = CreateSettingsStore();
+        var settings = store.Load();
+        var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == personaId) ?? throw new KeyNotFoundException("The persona does not exist.");
+        var source = persona.Sources.SingleOrDefault(item => item.Url.Equals(url, StringComparison.OrdinalIgnoreCase));
+        if (source is null) throw new KeyNotFoundException("The research source no longer exists.");
+        if (removeExcerpt)
+        {
+            source.Excerpt = string.Empty;
+            persona.VerifiedQuotes = persona.VerifiedQuotes.Where(quote => !quote.SourceId.Equals(url, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        else
+        {
+            persona.Sources.Remove(source);
+            persona.VerifiedQuotes = persona.VerifiedQuotes.Where(quote => !quote.SourceId.Equals(url, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
         persona.UpdatedAtUtc = DateTimeOffset.UtcNow;
         store.Save(settings);
         return new(ProtocolVersion, request.Id, true, PersonaResponse(persona));
@@ -2497,6 +2565,7 @@ public static class AgentHostLoop
         persona.Name = persona.Name?.Trim() ?? string.Empty;
         if (persona.Name.Length is < 1 or > 200 || persona.Name.Any(char.IsControl)) throw new InvalidOperationException("Persona name must be between 1 and 200 visible characters.");
         persona.SourceMode = persona.SourceMode?.Equals("public-research", StringComparison.OrdinalIgnoreCase) == true ? "public-research" : "own-material";
+        persona.SubjectType = persona.SubjectType?.Equals("character", StringComparison.OrdinalIgnoreCase) == true ? "character" : "person";
         persona.Instructions = BoundPersonaText(persona.Instructions, 12_000);
         persona.LastResearchSummary = BoundPersonaText(persona.LastResearchSummary, 500);
         persona.ResearchHistory ??= [];
@@ -2529,6 +2598,7 @@ public static class AgentHostLoop
         id = persona.Id,
         name = persona.Name,
         sourceMode = persona.SourceMode,
+        subjectType = persona.SubjectType,
         isPublicFigure = persona.IsPublicFigure,
         birthDate = persona.BirthDate,
         deathDate = persona.DeathDate,
