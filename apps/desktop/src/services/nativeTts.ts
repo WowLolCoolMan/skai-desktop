@@ -6,6 +6,25 @@ export type VoiceProfile = {
   pitch: number;
 };
 
+export type VoiceCapabilities = {
+  supportsAudioEffects?: boolean;
+  supportsEmotion?: boolean;
+};
+
+/**
+ * Speech controls are deliberately structured tags, not free-form prompts for
+ * a voice engine. Engines may implement a cue, but unsupported cues are
+ * removed before fallback speech so the user never hears "cough" or "laugh".
+ */
+export type SpeechCue = "laugh" | "cough" | "clear-throat" | "breath" | "sigh";
+
+const speechCuePattern = /\[(laugh|cough|clear[- ]?throat|breath|sigh)(?::[^\]]+)?\]/gi;
+
+export function removeUnsupportedSpeechCues(text: string, capabilities: VoiceCapabilities = {}) {
+  if (capabilities.supportsAudioEffects || capabilities.supportsEmotion) return text;
+  return text.replace(speechCuePattern, "").replace(/[ \t]{2,}/g, " ").trim();
+}
+
 export const voiceProfiles: VoiceProfile[] = [
   { id: "skai-neutral", name: "Skai Neutral", description: "Balanced speed and clarity.", rate: 1, pitch: 1 },
   { id: "skai-warm", name: "Skai Warm", description: "Softer pacing for longer conversations.", rate: 0.95, pitch: 1.02 },
@@ -70,20 +89,22 @@ export async function waitForLocalSpeechToFinish(maxWaitMs = 120_000) {
   }
 }
 
-export async function speakNativeResponse(text: string, force = false) {
+export async function speakNativeResponse(text: string, force = false, profileId?: string) {
   if (!text.trim()) return false;
+  const safeText = removeUnsupportedSpeechCues(text);
+  if (!safeText) return false;
   const settings = selectedVoiceSettings();
   if (!force && !settings.voiceOutputEnabled) return false;
-  const profile = voiceProfiles.find((item) => item.id === settings.profileId) ?? voiceProfiles[0];
+  const profile = voiceProfiles.find((item) => item.id === (profileId || settings.profileId)) ?? voiceProfiles[0];
   try {
-    const native = await window.skaiAgent?.request("voice.speak", { text, profileId: profile.id, rate: profile.rate });
+    const native = await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate });
     if (native?.ok) return true;
   } catch { /* Browser preview fallback below. */ }
   if (!("speechSynthesis" in window)) return false;
   const localVoice = window.speechSynthesis.getVoices().find((voice) => voice.localService);
   if (!localVoice) return false;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text.replace(/[`*_>#]/g, "").replace(/\s+/g, " ").trim().slice(0, 4000));
+  const utterance = new SpeechSynthesisUtterance(safeText.replace(/[`*_>#]/g, "").replace(/\s+/g, " ").trim().slice(0, 4000));
   utterance.voice = localVoice;
   utterance.rate = profile.rate;
   utterance.pitch = profile.pitch;

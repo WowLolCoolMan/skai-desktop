@@ -113,6 +113,7 @@ public sealed class JsonSettingsStore
             persona.Name = (persona.Name ?? string.Empty).Trim();
             persona.SourceMode = persona.SourceMode?.Equals("public-research", StringComparison.OrdinalIgnoreCase) == true ? "public-research" : "own-material";
             persona.Roles = Bound(persona.Roles, 4_000);
+            persona.VoiceProfileId = Bound(persona.VoiceProfileId, 120);
             persona.Voice = Bound(persona.Voice, 8_000);
             persona.Personality = Bound(persona.Personality, 8_000);
             persona.Timeline = Bound(persona.Timeline, 12_000);

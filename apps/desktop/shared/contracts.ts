@@ -137,6 +137,7 @@ export type DesktopPersona = {
   knowledgeCutoffDate?: string | null;
   eraDate?: string | null;
   roles: string;
+  voiceProfileId: string;
   voice: string;
   personality: string;
   timeline: string;

@@ -413,6 +413,12 @@ public static class AgentHostLoop
                 size = model.Size,
                 installed = model.IsInstalled,
                 lowResource = model.IsLowResource,
+                adapterAvailable = model.AdapterAvailable,
+                supportsStreaming = model.SupportsStreaming,
+                supportsVoiceCloning = model.SupportsVoiceCloning,
+                supportsEmotion = model.SupportsEmotion,
+                supportsAudioEffects = model.SupportsAudioEffects,
+                availabilityNote = model.AvailabilityNote,
             }).ToArray(),
         });
 
@@ -2406,6 +2412,7 @@ public static class AgentHostLoop
         persona.ResearchHistory ??= [];
         persona.ResearchHistory = persona.ResearchHistory.Take(12).ToList();
         persona.Roles = BoundPersonaText(persona.Roles, 4_000);
+        persona.VoiceProfileId = BoundPersonaText(persona.VoiceProfileId, 120);
         persona.Voice = BoundPersonaText(persona.Voice, 8_000);
         persona.Personality = BoundPersonaText(persona.Personality, 8_000);
         persona.Timeline = BoundPersonaText(persona.Timeline, 12_000);
@@ -2438,6 +2445,7 @@ public static class AgentHostLoop
         knowledgeCutoffDate = persona.KnowledgeCutoffDate,
         eraDate = persona.EraDate,
         roles = persona.Roles,
+        voiceProfileId = persona.VoiceProfileId,
         voice = persona.Voice,
         personality = persona.Personality,
         timeline = persona.Timeline,
@@ -2688,7 +2696,14 @@ public static class AgentHostLoop
         var value = RequiredString(request, name);
         if (value.Length > maxLength || value.Any(character => char.IsControl(character) && character is not ('\r' or '\n' or '\t')))
             throw new InvalidOperationException($"{name} exceeds its safety limit.");
-        return value.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim();
+        // The native fallback does not implement expressive effect tags. Strip
+        // structured cues at the protocol boundary so it never says "cough"
+        // or "laugh" aloud when the selected engine cannot render them.
+        return System.Text.RegularExpressions.Regex.Replace(
+            value.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim(),
+            @"\[(laugh|cough|clear[- ]?throat|breath|sigh)(?::[^\]]+)?\]",
+            string.Empty,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
     }
 
     private static string? OptionalBoundedValue(string? value, int maxLength)

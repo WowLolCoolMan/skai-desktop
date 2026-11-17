@@ -20,6 +20,10 @@ public static class MarketplaceCatalogService
             new { id = "comfyui", name = "ComfyUI", kinds = new[] { "image" }, remote = false },
             new { id = "github", name = "GitHub", kinds = new[] { "skill", "tool" }, remote = true },
         },
+        voiceProviders = new[]
+        {
+            new { id = "elevenlabs", name = "ElevenLabs", kind = "cloud voice", requiresUserKey = true, status = "Optional connector; bring your own API key." },
+        },
         voices = VoiceModelCatalog.All.Select(voice => new
         {
             id = voice.Id,
@@ -31,7 +35,13 @@ public static class MarketplaceCatalogService
             installed = voice.IsInstalled,
             lowResource = voice.IsLowResource,
             sourceUrl = voice.SourceUrl,
-            installable = !string.IsNullOrWhiteSpace(voice.SourceUrl) && !voice.IsInstalled,
+            adapterAvailable = voice.AdapterAvailable,
+            supportsStreaming = voice.SupportsStreaming,
+            supportsVoiceCloning = voice.SupportsVoiceCloning,
+            supportsEmotion = voice.SupportsEmotion,
+            supportsAudioEffects = voice.SupportsAudioEffects,
+            availabilityNote = voice.AvailabilityNote,
+            installable = voice.AdapterAvailable && !string.IsNullOrWhiteSpace(voice.SourceUrl) && !voice.IsInstalled,
         }).ToArray(),
         skills = SkillCatalogService.BuiltIns.Select(skill => new
         {

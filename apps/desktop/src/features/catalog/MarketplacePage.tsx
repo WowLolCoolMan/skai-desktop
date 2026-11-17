@@ -10,7 +10,7 @@ type Section = "Discover" | "Models" | "Image models" | "Voices" | "Image workfl
 type Filter = "All" | "Local models" | "Voices" | "Image workflows" | "Skills" | "Tools";
 type CatalogItem = { id: string; title: string; filter: Filter; description: string; detail: string; icon: NavIconName; status: string; tone: "neutral" | "success" | "warning"; publisher: string; version: string; compatibility: string; nextStep: string; installable: boolean };
 type MarketplaceModel = { id: string; repository: string; name?: string; source: string; kind: string; downloads: number; likes: number; uncensored: boolean; tags: string[]; sizeBytes?: number | null; installRoute: string; installable: boolean; requiresAirLlm?: boolean; files?: Array<{ path: string; sizeBytes: number; sha256?: string | null }> };
-type MarketplaceCatalog = { providers: Array<{ id: string; name: string; kinds: string[]; remote: boolean }>; voices: Array<{ id: string; name: string; description: string; runtime: string; license: string; size: string; installed: boolean; lowResource: boolean; sourceUrl: string; installable: boolean }>; skills: Array<{ id: string; name: string; description: string; category: string; permissions: string[]; source: string; installed: boolean; enabled: boolean; installable: boolean }>; tools: Array<{ id: string; name: string; description: string; category: string; access: string; builtIn: boolean; status: string; source?: string | null; installable: boolean }> };
+type MarketplaceCatalog = { providers: Array<{ id: string; name: string; kinds: string[]; remote: boolean }>; voiceProviders?: Array<{ id: string; name: string; kind: string; requiresUserKey: boolean; status: string }>; voices: Array<{ id: string; name: string; description: string; runtime: string; license: string; size: string; installed: boolean; lowResource: boolean; sourceUrl: string; adapterAvailable: boolean; supportsStreaming: boolean; supportsVoiceCloning: boolean; supportsEmotion: boolean; supportsAudioEffects: boolean; availabilityNote: string; installable: boolean }>; skills: Array<{ id: string; name: string; description: string; category: string; permissions: string[]; source: string; installed: boolean; enabled: boolean; installable: boolean }>; tools: Array<{ id: string; name: string; description: string; category: string; access: string; builtIn: boolean; status: string; source?: string | null; installable: boolean }> };
 
 const items: CatalogItem[] = [
   { id: "local-models", title: "Local models", filter: "Local models", description: "Search Hugging Face and ModelScope for local GGUF models.", detail: "Remote catalog discovery is separated from inference. Every result shows its provider, provenance, safety label, size when available, and the verified local install route.", icon: "model", status: "Remote discovery", tone: "success", publisher: "Hugging Face · ModelScope", version: "Live catalog", compatibility: "Local runtime required", nextStep: "Search, filter, inspect the source, then start a verified local download.", installable: false },
@@ -108,10 +108,16 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const marketplaceItems = useMemo<CatalogItem[]>(() => {
     const voiceItems: CatalogItem[] = (catalog?.voices ?? []).map((voice) => ({
       id: `voice:${voice.id}`, title: voice.name, filter: "Voices", description: voice.description,
-      detail: `${voice.description} Runtime: ${voice.runtime}. License: ${voice.license}. ${voice.size}.`,
-      icon: "activity", status: voice.installed ? "Available locally" : "Not installed", tone: voice.installed ? "success" : "neutral",
+      detail: `${voice.description} Runtime: ${voice.runtime}. License: ${voice.license}. ${voice.size}. ${voice.availabilityNote}`,
+      icon: "activity", status: voice.installed ? "Available locally" : voice.adapterAvailable ? "Ready to install" : "Catalog only", tone: voice.installed ? "success" : voice.adapterAvailable ? "success" : "neutral",
       publisher: voice.runtime, version: voice.size, compatibility: voice.license,
-      nextStep: voice.installed ? "Select this voice in the voice controls and preview it." : voice.installable ? `Review the source before installing from ${voice.sourceUrl}.` : "No verified local installer is connected for this voice.", installable: false,
+      nextStep: voice.installed ? "Select this voice in the voice controls and preview it." : voice.installable ? `Review the source before installing from ${voice.sourceUrl}.` : voice.sourceUrl ? `Review the upstream source. ${voice.availabilityNote}` : "No verified local installer is connected for this voice.", installable: voice.installable,
+    }));
+    const voiceProviderItems: CatalogItem[] = (catalog?.voiceProviders ?? []).map((provider) => ({
+      id: `voice-provider:${provider.id}`, title: provider.name, filter: "Tools", description: `Optional ${provider.kind} connector for voice generation.`,
+      detail: `${provider.status} API keys remain local and are never exposed to the model.`, icon: "activity", status: "Optional cloud connector", tone: "warning",
+      publisher: "User-configured", version: provider.requiresUserKey ? "Bring your own key" : "No key required", compatibility: provider.kind,
+      nextStep: "Connect this provider in Settings when cloud voice is enabled.", installable: false,
     }));
     const skillItems: CatalogItem[] = (catalog?.skills ?? []).map((skill) => ({
       id: `skill:${skill.id}`, title: skill.name, filter: "Skills", description: skill.description,
@@ -129,7 +135,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
       compatibility: tool.access,
       nextStep: tool.builtIn ? "Open the listed local workflow to use this capability." : "Connect and review a compatible local integration before use.", installable: false,
     }));
-    return [...items, ...voiceItems, ...skillItems, ...toolItems];
+    return [...items, ...voiceItems, ...voiceProviderItems, ...skillItems, ...toolItems];
   }, [catalog]);
 
   const loadInstalledModels = async () => {

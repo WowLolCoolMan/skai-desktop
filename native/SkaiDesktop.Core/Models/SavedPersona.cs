@@ -13,6 +13,8 @@ public sealed class SavedPersona
     public string? KnowledgeCutoffDate { get; set; }
     public string? EraDate { get; set; }
     public string Roles { get; set; } = string.Empty;
+    /// <summary>Optional local voice profile used when this persona speaks.</summary>
+    public string VoiceProfileId { get; set; } = string.Empty;
     public string Voice { get; set; } = string.Empty;
     public string Personality { get; set; } = string.Empty;
     public string Timeline { get; set; } = string.Empty;

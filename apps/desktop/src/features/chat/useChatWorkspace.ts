@@ -17,6 +17,7 @@ type ChatWorkspaceOptions = {
   project?: { id: string; name: string; instructions?: string } | null;
   onConversationModelRestore?: (model: string | null | undefined, provider: string | null | undefined) => void;
   personaId?: string | null;
+  personaVoiceProfileId?: string | null;
   onConversationPersonaRestore?: (personaId: string | null | undefined) => void;
   onError: (message: string | null) => void;
 };
@@ -55,7 +56,7 @@ function skillMentions(messages: Array<{ content: string }>) {
   return [...ids].slice(0, 4);
 }
 
-export function useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata, mode, project, onConversationModelRestore, personaId, onConversationPersonaRestore, onError }: ChatWorkspaceOptions) {
+export function useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata, mode, project, onConversationModelRestore, personaId, personaVoiceProfileId, onConversationPersonaRestore, onError }: ChatWorkspaceOptions) {
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -145,7 +146,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
-    await speakNativeResponse(completed.at(-1)?.content ?? "", speakReply);
+    await speakNativeResponse(completed.at(-1)?.content ?? "", speakReply, personaVoiceProfileId ?? undefined);
     setBusy(false);
   };
 
@@ -202,7 +203,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); await saveConversation(completed, conversationId);
-    void speakNativeResponse(completed.at(-1)?.content ?? "");
+    void speakNativeResponse(completed.at(-1)?.content ?? "", false, personaVoiceProfileId ?? undefined);
   };
 
   const editMessage = async (messageIndex: number, content: string) => {
@@ -220,7 +221,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The edited message could not be completed."); return false; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); await saveConversation(completed, conversationId);
-    void speakNativeResponse(completed.at(-1)?.content ?? "");
+    void speakNativeResponse(completed.at(-1)?.content ?? "", false, personaVoiceProfileId ?? undefined);
     return true;
   };
 
