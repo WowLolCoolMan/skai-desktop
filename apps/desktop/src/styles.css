@@ -158,6 +158,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .persona-research-steps > div.is-active > span, .persona-research-steps > div.is-complete > span { border-color: var(--skai-color-accent); color: var(--skai-color-on-accent); background: var(--skai-color-accent); }
 .persona-research-steps > i { flex: 1; min-width: 16px; border-top: 1px solid var(--skai-color-border); }
 .persona-identify-step, .persona-match-results, .persona-evidence-summary { display: grid; gap: 15px; }
+.persona-profile-build { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 5%, var(--skai-color-surface)); }
+.persona-profile-build h2, .persona-profile-build p { margin: 0; }
+.persona-profile-build h2 { color: var(--skai-color-text); font-size: var(--skai-text-xl); }
+.persona-profile-build > p:not(.section-kicker) { color: var(--skai-color-text-muted); }
+.persona-profile-draft-status { font-size: var(--skai-text-sm); }
 .persona-match-results { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--skai-color-border); }
 .persona-match-results > div:first-child, .persona-evidence-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .persona-match-results h2, .persona-evidence-heading h2, .persona-research-loading h2 { margin: 2px 0 0; color: var(--skai-color-text); font-size: var(--skai-text-xl); letter-spacing: -.02em; }
