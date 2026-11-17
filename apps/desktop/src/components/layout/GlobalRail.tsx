@@ -10,12 +10,14 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
   { route: "marketplace", icon: "marketplace", label: "Marketplace" },
 ];
 
+const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];
+
 export function GlobalRail({ route, agentMode, onNavigate }: { route: Route; agentMode: "ChatBot" | "Coding Agent"; onNavigate: (route: Route) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPetWorkshop, setShowPetWorkshop] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
   const [query, setQuery] = useState("");
   const [recentRoutes, setRecentRoutes] = useState<Route[]>(() => {
-    try { const value = JSON.parse(localStorage.getItem("skai.extras.recent") ?? "[]"); return Array.isArray(value) ? value.filter((route): route is Route => ["memory", "voice-workbench", "pet-workshop", "persona-workshop", "personas", "persona-groups"].includes(route)).map((route) => route === "personas" || route === "persona-groups" ? "persona-workshop" : route).filter((route, index, items) => items.indexOf(route) === index).slice(0, 3) : []; }
+    try { const value = JSON.parse(localStorage.getItem("skai.extras.recent") ?? "[]"); return Array.isArray(value) ? value.filter((route): route is Route => recentExtraRoutes.includes(route)).filter((route, index, items) => items.indexOf(route) === index).slice(0, 3) : []; }
     catch { return []; }
   });
   const menuRef = useRef<HTMLDivElement>(null);
@@ -26,6 +28,9 @@ export function GlobalRail({ route, agentMode, onNavigate }: { route: Route; age
     return () => { window.removeEventListener("storage", refresh); window.removeEventListener("skai:pet-workshop-setting", refresh); };
   }, []);
   useEffect(() => {
+    localStorage.setItem("skai.extras.recent", JSON.stringify(recentRoutes));
+  }, [recentRoutes]);
+  useEffect(() => {
     if (!menuOpen) return;
     const closeOutside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
     const closeEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
@@ -34,14 +39,16 @@ export function GlobalRail({ route, agentMode, onNavigate }: { route: Route; age
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape); };
   }, [menuOpen]);
   const menuItems = useMemo(() => [
-    { route: "persona-workshop" as Route, label: "Persona Workshop", icon: "sparkle" as NavIconName, unavailable: false },
+    { route: "persona-workshop" as Route, label: "Skai Personas", icon: "sparkle" as NavIconName, unavailable: false },
     { route: "memory" as Route, label: "Memory", icon: "memory" as NavIconName, unavailable: false },
     { route: "voice-workbench" as Route, label: "Voice Workbench", icon: "activity" as NavIconName, unavailable: installedVoiceModels.length === 0 },
     ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pet Workshop", icon: "sparkle" as NavIconName, unavailable: false }] : []),
   ], [showPetWorkshop]);
   const filteredItems = menuItems.filter((item) => !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase()));
   const openExtra = (itemRoute: Route) => {
-    const next = [itemRoute, ...recentRoutes.filter((route) => route !== itemRoute)].slice(0, 3);
+    const next = recentExtraRoutes.includes(itemRoute)
+      ? [itemRoute, ...recentRoutes.filter((route) => route !== itemRoute)].slice(0, 3)
+      : recentRoutes;
     setRecentRoutes(next);
     localStorage.setItem("skai.extras.recent", JSON.stringify(next));
     setMenuOpen(false);
@@ -58,7 +65,7 @@ export function GlobalRail({ route, agentMode, onNavigate }: { route: Route; age
           {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search extras" aria-label="Search extras" /></label>}
           {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PICK UP WHERE YOU LEFT OFF</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
           <div className="global-rail-extras-group"><p className="global-rail-extras-label">FEATURES</p>
-          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching extras.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.route === "memory" ? "Your saved notes and knowledge" : item.route === "voice-workbench" ? "Choose and preview local voices" : item.route === "persona-workshop" ? "Create personas, organize groups, and continue their stories" : "Customize your desktop companion"}</small></span>{item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
+          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching extras.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.route === "memory" ? "Your saved notes and knowledge" : item.route === "voice-workbench" ? "Choose and preview local voices" : item.route === "persona-workshop" ? "Create personas, groups, and conversations" : "Customize your desktop companion"}</small></span>{item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
           </div>
         </section>}
       </div>

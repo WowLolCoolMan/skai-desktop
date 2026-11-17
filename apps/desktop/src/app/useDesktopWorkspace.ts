@@ -207,6 +207,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     if (nextRoute === "settings" && route !== "settings") setSettingsReturnRoute(route);
     if (nextRoute === "personas") navigatePersonaWorkshop("library");
     else if (nextRoute === "persona-groups") navigatePersonaWorkshop("groups");
+    else if (nextRoute === "persona-workshop") navigatePersonaWorkshop("library", null, null, route === "persona-workshop");
     else navigate(nextRoute);
   }, [route]);
   const goBack = useCallback(() => { if (navigation.index > 0) window.history.back(); }, [navigation.index]);

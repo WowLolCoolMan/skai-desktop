@@ -140,7 +140,7 @@ export function PersonaWorkshopPage({ personas, endpoint, model, provider }: { p
   const toggleGroupPersona = (id: string) => setGroupIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
 
   const threadItems = useMemo(() => threads.filter((item) => location.page === "threads" || (location.personaId ? item.personaId === location.personaId || item.personaIds?.includes(location.personaId) : true)), [threads, location.page, location.personaId]);
-  const sidebar = <nav className="persona-workshop-nav" aria-label="Persona Workshop pages">
+  const sidebar = <nav className="persona-workshop-nav" aria-label="Skai Personas pages">
     <button type="button" className={location.page === "library" ? "is-active" : ""} onClick={() => open("library")}>Persona library</button>
     <button type="button" className={location.page === "threads" ? "is-active" : ""} onClick={() => open("threads")}>All conversations <span>{threads.length}</span></button>
     <button type="button" className={location.page === "groups" ? "is-active" : ""} onClick={() => open("groups")}>Persona groups</button>
@@ -182,5 +182,5 @@ export function PersonaWorkshopPage({ personas, endpoint, model, provider }: { p
     content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Persona not found" description="This persona or conversation may have been removed." actions={<Button type="button" onClick={() => open("library")}>Back to library</Button>} /></section>;
   }
 
-  return <main className="app-content feature-page persona-workshop-page"><header className="persona-workshop-header"><div><p className="section-kicker">YOUR SPACE</p><h1>Persona Workshop</h1><span>Profiles, group stories, memories, and knowledge — together in one place.</span></div><Button variant="ghost" type="button" onClick={() => open("create")}>＋ Create persona</Button></header><div className="persona-workshop-layout">{sidebar}<div className="persona-workshop-main">{content}</div></div>{error && location.page !== "chat" && <div className="persona-workshop-error" role="alert">{error}<button type="button" onClick={() => setError(null)} aria-label="Dismiss">×</button></div>}</main>;
+  return <main className="app-content feature-page persona-workshop-page"><header className="persona-workshop-header"><div><p className="section-kicker">SKAI PERSONAS</p><h1>Skai Personas</h1><span>Profiles, group stories, memories, and knowledge — together in one place.</span></div><Button variant="ghost" type="button" onClick={() => open("create")}>＋ Create persona</Button></header><div className="persona-workshop-layout">{sidebar}<div className="persona-workshop-main">{content}</div></div>{error && location.page !== "chat" && <div className="persona-workshop-error" role="alert">{error}<button type="button" onClick={() => setError(null)} aria-label="Dismiss">×</button></div>}</main>;
 }

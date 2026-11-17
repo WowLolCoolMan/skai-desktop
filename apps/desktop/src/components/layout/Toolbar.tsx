@@ -6,7 +6,7 @@ import { PRODUCT_DISPLAY_NAME } from "../../../shared/productIdentity";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 
-const titles: Record<Route, string> = { chat: "Chat", projects: "Projects", coding: "Coding workspace", settings: "Settings", models: "Models", images: "Image Studio", marketplace: "Marketplace", plugins: "Marketplace", workbench: "Chat", terminal: "Terminal", memory: "Memory", usage: "Usage", "pet-workshop": "Pet Workshop", "voice-workbench": "Voice Workbench", "persona-workshop": "Persona Workshop", personas: "Persona Workshop", "persona-groups": "Persona Workshop" };
+const titles: Record<Route, string> = { chat: "Chat", projects: "Projects", coding: "Coding workspace", settings: "Settings", models: "Models", images: "Image Studio", marketplace: "Marketplace", plugins: "Marketplace", workbench: "Chat", terminal: "Terminal", memory: "Memory", usage: "Usage", "pet-workshop": "Pet Workshop", "voice-workbench": "Voice Workbench", "persona-workshop": "Skai Personas", personas: "Skai Personas", "persona-groups": "Skai Personas" };
 
 type MenuItem = { label: string; shortcut?: string; onSelect: () => void; separatorBefore?: boolean };
 
