@@ -33,7 +33,7 @@ public sealed class ScheduledTaskStore
         }
     }
 
-    public ScheduledTask Schedule(string prompt, DateTimeOffset dueAtUtc, string workspaceMode = WorkspaceModes.Chat, DateTimeOffset? now = null, int? repeatEveryMinutes = null)
+    public ScheduledTask Schedule(string prompt, DateTimeOffset dueAtUtc, string workspaceMode = WorkspaceModes.Chat, DateTimeOffset? now = null, int? repeatEveryMinutes = null, string? conversationId = null)
     {
         ValidatePrompt(prompt);
         if (workspaceMode is not (WorkspaceModes.Chat or WorkspaceModes.CodingAgent)) throw new ArgumentException("The scheduled workspace mode is invalid.", nameof(workspaceMode));
@@ -43,7 +43,8 @@ public sealed class ScheduledTaskStore
         if (dueAtUtc > current.AddYears(1)) throw new ArgumentException("A scheduled task cannot be more than one year away.", nameof(dueAtUtc));
         var tasks = Load().ToList();
         if (tasks.Count >= MaxTasks) throw new InvalidOperationException($"At most {MaxTasks} scheduled tasks can be saved.");
-        var task = new ScheduledTask { Prompt = prompt.Trim(), WorkspaceMode = workspaceMode, DueAtUtc = dueAtUtc, RepeatEveryMinutes = repeatEveryMinutes, CreatedAtUtc = current };
+        if (conversationId is { Length: > 128 }) throw new ArgumentException("The conversation ID is invalid.", nameof(conversationId));
+        var task = new ScheduledTask { Prompt = prompt.Trim(), ConversationId = string.IsNullOrWhiteSpace(conversationId) ? null : conversationId.Trim(), WorkspaceMode = workspaceMode, DueAtUtc = dueAtUtc, RepeatEveryMinutes = repeatEveryMinutes, CreatedAtUtc = current };
         tasks.Add(task);
         Save(tasks);
         return task;
@@ -152,6 +153,7 @@ public sealed class ScheduledTaskStore
         {
             if (string.IsNullOrWhiteSpace(task.Id) || task.Id.Length > 128 || !ids.Add(task.Id)) throw new InvalidDataException("The scheduled task store contains an invalid or duplicate ID.");
             ValidatePrompt(task.Prompt);
+            if (task.ConversationId is { Length: > 128 } || task.ConversationId?.Any(char.IsControl) == true) throw new InvalidDataException("The scheduled task contains an invalid conversation ID.");
             ValidateRepeat(task.RepeatEveryMinutes);
             if (task.RunCount < 0) throw new InvalidDataException("The scheduled task store contains an invalid run count.");
             if (task.WorkspaceMode is not (WorkspaceModes.Chat or WorkspaceModes.CodingAgent)) throw new InvalidDataException("The scheduled task store contains an invalid workspace mode.");

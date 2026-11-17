@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
+import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
 import type { Message, Model, Route } from "../../app/types";
 import { Button, Card, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
@@ -8,6 +8,7 @@ import { ModelPicker } from "../../components/ui/ModelPicker";
 import { ChatMessage } from "./ChatMessage";
 import { ChatComposer } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";
+import { ChatSchedulesPanel } from "./ChatSchedulesPanel";
 import type { TaskEnvironment } from "../../../shared/contracts";
 import type { ChatResponseMode } from "./useChatWorkspace";
 import { loadChatDraft, saveChatDraft } from "./chatDraftStore";
@@ -61,6 +62,7 @@ type ChatPageProps = {
   busy: boolean;
   taskBusy: string | null;
   tasks: DesktopTask[];
+  scheduledTasks: DesktopScheduledTask[];
   attachments: ChatAttachment[];
   queuedMessages: DesktopQueuedMessage[];
   conversationId: string | null;
@@ -82,6 +84,7 @@ type ChatPageProps = {
   onSelectConversation: (id: string) => void;
   onNewWorkspaceTab: () => void;
   onTaskAction: (id: string, operation: "cancel" | "retry") => void;
+  onOpenFile: (path: string) => void;
   onExport: () => void;
   onFork: () => void;
   onForkFromMessage: (index: number) => void;
@@ -91,10 +94,12 @@ type ChatPageProps = {
   onArchive: () => void;
   onRenameConversation: (title: string) => Promise<boolean>;
   onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, conversationId?: string | null) => Promise<boolean>;
+  onScheduleTask: (draft: import("../../../shared/contracts").ScheduledTaskDraft) => Promise<boolean>;
+  onTransitionScheduledTask: (id: string, operation: "pause" | "resume" | "cancel" | "runNow") => Promise<boolean>;
   workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ workspaceTabId, capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, workspaceMode = "conversation" }: ChatPageProps) {
+export function ChatPage({ workspaceTabId, capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onOpenFile, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onTransitionScheduledTask, workspaceMode = "conversation" }: ChatPageProps) {
   const capacityEstimate = estimateModelCapacity(models.find((item) => item.model === model), capacity);
   const [draft, setDraft] = useState(() => readChatDraft(workspaceTabId, conversationId));
   const latestDraftRef = useRef(draft);
@@ -263,7 +268,7 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
     <div className={`chat-layout${messages.length === 0 ? " is-start-screen" : ""}`}>
       <main className="chat-column">
         <section className="conversation-surface" aria-label="Conversation">
-          {threadTasks.map((task) => <article className={`thread-run-card thread-run-${task.status}`} key={task.id}><div className="thread-run-heading"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>{task.resultSummary && <p>{task.resultSummary}</p>}{(task.changedFiles?.length || task.artifactLabels?.length) ? <div className="thread-run-files">{(task.changedFiles?.length ? task.changedFiles : task.artifactLabels ?? []).map((file) => <code key={file}>{file}</code>)}</div> : null}<div className="thread-run-actions">{["queued", "running", "verifying"].includes(task.status) && <Button variant="ghost" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "cancel")}>Stop</Button>}{["failed", "blocked"].includes(task.status) && <Button variant="secondary" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "retry")}>Retry</Button>}{task.status === "completed" && <Button variant="secondary" type="button" onClick={() => onNavigate("coding")}>Review changes</Button>}</div></article>)}
+          {threadTasks.map((task) => <article className={`thread-run-card thread-run-${task.status}`} key={task.id}><div className="thread-run-heading"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>{task.resultSummary && <p>{task.resultSummary}</p>}{(task.changedFiles?.length || task.artifactLabels?.length) ? <div className="thread-run-files">{(task.changedFiles?.length ? task.changedFiles : task.artifactLabels ?? []).map((file) => <code key={file}>{file}</code>)}</div> : null}<div className="thread-run-actions">{["queued", "running", "verifying"].includes(task.status) && <Button variant="ghost" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "cancel")}>Stop</Button>}{["failed", "blocked"].includes(task.status) && <Button variant="secondary" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "retry")}>Retry</Button>}{task.status === "completed" && <Button variant="secondary" type="button" onClick={() => { const file = task.changedFiles?.[0]; if (file && workspaceMode === "project") onOpenFile(file); onNavigate("coding"); }}>{task.changedFiles?.length ? "Review first file" : "Review changes"}</Button>}</div></article>)}
           {messages.length === 0 ? (
             <div className="chat-empty-surface"><section className="chat-start-screen">
               <img src={SKAI_WOLF_ICON} alt="" /><p className="section-kicker">SKAI DESKTOP</p>
@@ -281,6 +286,7 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
           )}
         </section>
         <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment) => onPlanTask(title, instruction, environment, conversationId)} />
+        <ChatSchedulesPanel conversationId={conversationId} scheduled={scheduledTasks} busyTask={taskBusy} onSchedule={onScheduleTask} onTransition={onTransitionScheduledTask} />
         {draftPersistenceWarning && <p className="chat-draft-save-warning" role="status">{draftPersistenceWarning}</p>}
         <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={updateDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} onAudioTranscript={(fileName, transcript) => onSetAttachments([...attachments, { fileName: `${fileName}.audio-transcript.txt`, mediaType: "text/plain", content: transcript }].slice(0, 5))} />
       </main>

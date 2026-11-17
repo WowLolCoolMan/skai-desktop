@@ -118,7 +118,9 @@ public static class AgentHostLoop
                 var responseJson = JsonSerializer.SerializeToElement(response.Result, JsonOptions);
                 var content = responseJson.TryGetProperty("content", out var contentValue) ? contentValue.GetString() : null;
                 if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException("The local model returned an empty scheduled result.");
-                CreateScheduledTaskStore().Complete(task.Id, succeeded: true, TrimScheduledOutcome(content));
+                var outcome = TrimScheduledOutcome(content);
+                CreateScheduledTaskStore().Complete(task.Id, succeeded: true, outcome);
+                AppendScheduledConversationResult(task, outcome);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -137,6 +139,18 @@ public static class AgentHostLoop
         var outcome = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
         if (outcome.Length == 0) return "Scheduled run completed without a summary.";
         return outcome.Length <= ScheduledTaskStore.MaxOutcomeCharacters ? outcome : outcome[..ScheduledTaskStore.MaxOutcomeCharacters];
+    }
+
+    private static void AppendScheduledConversationResult(ScheduledTask task, string outcome)
+    {
+        if (string.IsNullOrWhiteSpace(task.ConversationId)) return;
+        var store = CreateConversationStore();
+        var sessions = store.Load();
+        var session = sessions.SingleOrDefault(item => item.Id == task.ConversationId);
+        if (session is null) return;
+        session.Messages.Add(new ChatMessage("assistant", $"Scheduled run · {task.Prompt}\n\n{outcome}"));
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        store.Save(sessions);
     }
 
     private static AgentResponse Handle(AgentRequest request, OsNativeTtsService voice)
@@ -1750,6 +1764,7 @@ public static class AgentHostLoop
             .Select(task => new
             {
                 id = task.Id,
+                conversationId = task.ConversationId,
                 prompt = task.Prompt,
                 workspaceMode = task.WorkspaceMode,
                 dueAt = task.DueAtUtc,
@@ -1767,11 +1782,13 @@ public static class AgentHostLoop
         if (!DateTimeOffset.TryParse(dueAtText, out var dueAt))
             throw new InvalidOperationException("dueAt must be a valid date and time.");
         var repeat = OptionalInt(request, "repeatEveryMinutes");
+        var conversationId = OptionalString(request, "conversationId");
         var task = CreateScheduledTaskStore().Schedule(
             RequiredBoundedString(request, "prompt", ScheduledTaskStore.MaxPromptCharacters),
             dueAt.ToUniversalTime(),
             OptionalString(request, "workspaceMode") ?? WorkspaceModes.Chat,
-            repeatEveryMinutes: repeat);
+            repeatEveryMinutes: repeat,
+            conversationId: conversationId);
         return ScheduledTaskResponse(request, task);
     }
 
@@ -1795,6 +1812,7 @@ public static class AgentHostLoop
         new(ProtocolVersion, request.Id, true, new
         {
             id = task.Id,
+            conversationId = task.ConversationId,
             prompt = task.Prompt,
             workspaceMode = task.WorkspaceMode,
             dueAt = task.DueAtUtc,
