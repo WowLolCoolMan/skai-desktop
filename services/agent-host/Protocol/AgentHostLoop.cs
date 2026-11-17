@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
 using SkaiDesktop.Core.Services;
@@ -165,7 +166,7 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
+                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "persona.list", "persona.discover", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
             "system.capacity" => GetLocalCapacity(request),
             "airllm.status" => GetAirLlmStatus(request),
             "airllm.install.start" => StartAirLlmInstall(request),
@@ -233,10 +234,13 @@ public static class AgentHostLoop
             "settings.get" => GetSettings(request),
             "settings.save" => SaveSettings(request),
             "persona.list" => ListPersonas(request),
+            "persona.discover" => DiscoverPersonaAsync(request).GetAwaiter().GetResult(),
             "persona.research" => ResearchPersonaAsync(request).GetAwaiter().GetResult(),
             "persona.save" => SavePersona(request),
             "persona.remove" => RemovePersona(request),
             "persona.activate" => ActivatePersona(request),
+            "persona.memory.list" => ListPersonaMemory(request),
+            "persona.memory.clear" => ClearPersonaMemory(request),
             "persona.group.complete" => PersonaGroupCompleteAsync(request).GetAwaiter().GetResult(),
             "persona.source.add" => AddPersonaSource(request),
             "image.generate" => GenerateImageAsync(request).GetAwaiter().GetResult(),
@@ -1035,7 +1039,7 @@ public static class AgentHostLoop
         }
 
         var storedSettings = CreateSettingsStore().Load();
-        var requestedPersonaId = OptionalString(request, "personaId") ?? storedSettings.ActivePersonaId;
+        var requestedPersonaId = OptionalString(request, "personaId");
         SavedPersona? activePersona = null;
         if (!documentsOnly && !string.IsNullOrWhiteSpace(requestedPersonaId))
         {
@@ -1859,9 +1863,13 @@ public static class AgentHostLoop
 
     private static AgentResponse ListConversations(AgentRequest request)
     {
+        var scope = OptionalString(request, "scope") ?? "standard";
+        var personaId = OptionalString(request, "personaId");
         var includeArchived = request.Params?.TryGetProperty("includeArchived", out var archivedValue) == true
             && archivedValue.ValueKind == JsonValueKind.True;
+        if (scope is not ("standard" or "persona")) throw new InvalidOperationException("The conversation scope is invalid.");
         var conversations = CreateConversationStore().Load()
+            .Where(session => scope == "persona" ? (session.PersonaId is not null || session.IsPersonaGroup) && (string.IsNullOrWhiteSpace(personaId) || session.PersonaId == personaId || session.PersonaIds.Contains(personaId)) : session.PersonaId is null && !session.IsPersonaGroup)
             .Where(session => includeArchived || !session.Archived)
             .OrderByDescending(session => session.Pinned)
             .ThenByDescending(session => session.UpdatedAt)
@@ -1875,9 +1883,6 @@ public static class AgentHostLoop
                 modelProvider = session.ModelProvider,
                 modelSizeBytes = session.ModelSizeBytes,
                 modelContextLength = session.ModelContextLength,
-                personaId = session.PersonaId,
-                personaName = session.PersonaName,
-                personaSourceMode = session.PersonaSourceMode,
                 messages = session.Messages,
                 projectId = session.ProjectId,
                 projectName = session.ProjectName,
@@ -1895,7 +1900,11 @@ public static class AgentHostLoop
     private static AgentResponse SearchConversations(AgentRequest request)
     {
         var query = OptionalString(request, "query") ?? string.Empty;
-        var matches = ConversationSearchService.Search(CreateConversationStore().Load(), query)
+        var scope = OptionalString(request, "scope") ?? "standard";
+        var personaId = OptionalString(request, "personaId");
+        if (scope is not ("standard" or "persona")) throw new InvalidOperationException("The conversation scope is invalid.");
+        var matches = ConversationSearchService.Search(CreateConversationStore().Load()
+            .Where(session => scope == "persona" ? (session.PersonaId is not null || session.IsPersonaGroup) && (string.IsNullOrWhiteSpace(personaId) || session.PersonaId == personaId || session.PersonaIds.Contains(personaId)) : session.PersonaId is null && !session.IsPersonaGroup).ToList(), query)
             .Select(hit => new
             {
                 id = hit.Session.Id,
@@ -1906,9 +1915,6 @@ public static class AgentHostLoop
                 modelProvider = hit.Session.ModelProvider,
                 modelSizeBytes = hit.Session.ModelSizeBytes,
                 modelContextLength = hit.Session.ModelContextLength,
-                personaId = hit.Session.PersonaId,
-                personaName = hit.Session.PersonaName,
-                personaSourceMode = hit.Session.PersonaSourceMode,
                 messages = hit.Session.Messages,
                 projectId = hit.Session.ProjectId,
                 projectName = hit.Session.ProjectName,
@@ -1926,7 +1932,7 @@ public static class AgentHostLoop
     {
         var includeArchived = request.Params?.TryGetProperty("includeArchived", out var archivedValue) == true
             && archivedValue.ValueKind == JsonValueKind.True;
-        var sessions = CreateConversationStore().Load();
+        var sessions = CreateConversationStore().Load().Where(session => session.PersonaId is null && !session.IsPersonaGroup).ToList();
         if (!includeArchived) sessions = sessions.Where(session => !session.Archived).ToList();
         var markdown = ConversationMarkdownExporter.Serialize(sessions);
         return new(ProtocolVersion, request.Id, true, new { fileName = "skai-chat-export.md", markdown, conversationCount = sessions.Count });
@@ -1977,11 +1983,19 @@ public static class AgentHostLoop
         session.ModelProvider = OptionalString(request, "modelProvider");
         session.ModelSizeBytes = OptionalLong(request, "modelSizeBytes");
         session.ModelContextLength = OptionalInt(request, "modelContextLength");
-        session.PersonaId = OptionalString(request, "personaId");
-        var savedPersona = string.IsNullOrWhiteSpace(session.PersonaId) ? null : CreateSettingsStore().Load().SavedPersonas.SingleOrDefault(item => item.Id == session.PersonaId)
-            ?? (string.IsNullOrWhiteSpace(session.PersonaId) ? null : throw new KeyNotFoundException("The selected persona does not exist."));
-        session.PersonaName = savedPersona?.Name;
-        session.PersonaSourceMode = savedPersona?.SourceMode;
+        var requestedPersonaId = OptionalString(request, "personaId");
+        var savedPersona = string.IsNullOrWhiteSpace(requestedPersonaId) ? null : CreateSettingsStore().Load().SavedPersonas.SingleOrDefault(item => item.Id == requestedPersonaId)
+            ?? (string.IsNullOrWhiteSpace(requestedPersonaId) ? null : throw new KeyNotFoundException("The selected persona does not exist."));
+        var requestedPersonaIds = request.Params?.TryGetProperty("personaIds", out _) == true
+            ? OptionalStringList(request, "personaIds", 12, 128).Distinct(StringComparer.Ordinal).ToList()
+            : session.PersonaIds;
+        var isPersonaGroup = request.Params?.TryGetProperty("isPersonaGroup", out _) == true ? OptionalBoolean(request, "isPersonaGroup") : session.IsPersonaGroup;
+        session.IsPersonaGroup = isPersonaGroup && requestedPersonaIds.Count >= 2;
+        session.PersonaId = session.IsPersonaGroup ? null : savedPersona?.Id ?? (request.Params?.TryGetProperty("personaId", out _) != true ? session.PersonaId : null);
+        session.PersonaName = session.IsPersonaGroup ? "Persona group" : savedPersona?.Name;
+        session.PersonaSourceMode = session.IsPersonaGroup ? "group" : savedPersona?.SourceMode;
+        session.PersonaIds = requestedPersonaIds;
+        if (session.IsPersonaGroup) { session.PersonaId = null; session.PersonaName = "Persona group"; session.PersonaSourceMode = "group"; }
         var projectId = OptionalString(request, "projectId");
         if (string.IsNullOrWhiteSpace(projectId))
         {
@@ -2236,7 +2250,7 @@ public static class AgentHostLoop
         var settings = CreateSettingsStore().Load();
         return new(ProtocolVersion, request.Id, true, new
         {
-            activePersonaId = settings.ActivePersonaId,
+            activePersonaId = (string?)null,
             personas = settings.SavedPersonas.Select(PersonaResponse).ToArray(),
         });
     }
@@ -2244,13 +2258,10 @@ public static class AgentHostLoop
     private static AgentResponse ActivatePersona(AgentRequest request)
     {
         var id = OptionalString(request, "id");
-        var store = CreateSettingsStore();
-        var settings = store.Load();
+        var settings = CreateSettingsStore().Load();
         if (!string.IsNullOrWhiteSpace(id) && settings.SavedPersonas.All(persona => persona.Id != id))
             throw new KeyNotFoundException("The selected persona does not exist.");
-        settings.ActivePersonaId = string.IsNullOrWhiteSpace(id) ? null : id.Trim();
-        store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { activePersonaId = settings.ActivePersonaId });
+        return new(ProtocolVersion, request.Id, true, new { activePersonaId = (string?)null });
     }
 
     private static AgentResponse SavePersona(AgentRequest request)
@@ -2277,9 +2288,8 @@ public static class AgentHostLoop
         if (existing >= 0) settings.SavedPersonas[existing] = persona;
         else settings.SavedPersonas.Add(persona);
         settings.SavedPersonas = settings.SavedPersonas.Take(24).ToList();
-        settings.ActivePersonaId ??= persona.Id;
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { persona = PersonaResponse(persona), activePersonaId = settings.ActivePersonaId });
+        return new(ProtocolVersion, request.Id, true, new { persona = PersonaResponse(persona), activePersonaId = (string?)null });
     }
 
     private static AgentResponse RemovePersona(AgentRequest request)
@@ -2288,9 +2298,45 @@ public static class AgentHostLoop
         var store = CreateSettingsStore();
         var settings = store.Load();
         settings.SavedPersonas = settings.SavedPersonas.Where(persona => persona.Id != id).ToList();
-        if (settings.ActivePersonaId == id) settings.ActivePersonaId = null;
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { removed = true, activePersonaId = settings.ActivePersonaId });
+        return new(ProtocolVersion, request.Id, true, new { removed = true, activePersonaId = (string?)null });
+    }
+
+    private static AgentResponse ListPersonaMemory(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 128);
+        var persona = CreateSettingsStore().Load().SavedPersonas.SingleOrDefault(item => item.Id == id)
+            ?? throw new KeyNotFoundException("The persona does not exist.");
+        var turns = persona.Continuity ?? [];
+        return new(ProtocolVersion, request.Id, true, new { enabled = persona.PersonalContinuityEnabled, turns = turns.Select(turn => new { atUtc = turn.AtUtc, role = turn.Role, content = turn.Content }).ToArray() });
+    }
+
+    private static AgentResponse ClearPersonaMemory(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 128);
+        var store = CreateSettingsStore();
+        var settings = store.Load();
+        var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == id)
+            ?? throw new KeyNotFoundException("The persona does not exist.");
+        var removed = persona.Continuity?.Count ?? 0;
+        persona.Continuity = [];
+        persona.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        store.Save(settings);
+        return new(ProtocolVersion, request.Id, true, new { cleared = true, removed });
+    }
+
+    private static async Task<AgentResponse> DiscoverPersonaAsync(AgentRequest request)
+    {
+        var query = RequiredBoundedString(request, "query", 240);
+        var notes = OptionalString(request, "notes") ?? string.Empty;
+        if (notes.Length > 600 || notes.Any(char.IsControl)) throw new InvalidOperationException("Search notes exceed the safety limit.");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        var search = new WebSearchProvider();
+        IReadOnlyList<WebSearchResult> results;
+        try { results = await search.SearchAsync(string.Join(' ', new[] { $"\"{query}\"", notes, "person biography profile" }.Where(part => !string.IsNullOrWhiteSpace(part))), timeout.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested) { throw new TimeoutException("People search took too long. Try again with a fuller name."); }
+        var matches = results.Select(result => new { id = result.Url, title = result.Title, snippet = result.Snippet, url = result.Url }).ToArray();
+        return new(ProtocolVersion, request.Id, true, new { query, matches });
     }
 
     private static async Task<AgentResponse> ResearchPersonaAsync(AgentRequest request)
@@ -2304,46 +2350,87 @@ public static class AgentHostLoop
         var requestedUrls = OptionalStringList(request, "sourceUrls", 64, 2_000)
             .Where(url => Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var results = await search.SearchAsync(string.IsNullOrWhiteSpace(notes) ? query : $"{query} {notes}").ConfigureAwait(false);
-        var sources = new List<SavedPersonaSource>();
-        foreach (var result in results.Take(4))
+        var lanes = new[]
         {
-            WebPageText? page = null;
-            try { page = await search.FetchTextAsync(result.Url).ConfigureAwait(false); }
-            catch { /* A source may reject bounded text fetching; retain its search evidence. */ }
-            if (page?.PublishedDate is { } published && cutoff is { } sourceCutoff && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > sourceCutoff)
-                continue;
-            sources.Add(new SavedPersonaSource
+            (Category: "Biography", Terms: "biography official profile career education"),
+            (Category: "Conversation transcript", Terms: "podcast conversation transcript full episode"),
+            (Category: "Interview", Terms: "interview Q&A conversation with"),
+            (Category: "Video captions", Terms: "YouTube interview video captions transcript"),
+        };
+        using var searchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(9));
+        var searches = await Task.WhenAll(lanes.Select(async lane =>
+        {
+            try { return (lane.Category, Results: await search.SearchAsync($"\"{query}\" {notes} {lane.Terms}".Trim(), searchTimeout.Token).ConfigureAwait(false)); }
+            catch { return (lane.Category, Results: (IReadOnlyList<WebSearchResult>)Array.Empty<WebSearchResult>()); }
+        })).ConfigureAwait(false);
+        var candidates = searches.SelectMany(batch => batch.Results.Take(3).Select(result => (batch.Category, Result: result)))
+            .GroupBy(item => item.Result.Url, StringComparer.OrdinalIgnoreCase).Select(group => group.First()).ToList();
+        candidates.AddRange(requestedUrls.Take(16).Where(url => candidates.All(item => !item.Result.Url.Equals(url, StringComparison.OrdinalIgnoreCase)))
+            .Select(url => (Category: "Other reference", Result: new WebSearchResult(url, url, string.Empty))));
+        candidates = candidates.Take(28).ToList();
+        using var fetchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var fetchLimit = new SemaphoreSlim(6, 6);
+        var loaded = await Task.WhenAll(candidates.Select(async item =>
+        {
+            await fetchLimit.WaitAsync(fetchTimeout.Token).ConfigureAwait(false);
+            try
             {
-                Title = page?.Title ?? result.Title,
-                Url = result.Url,
-                Type = "search result",
-                ReliabilityNote = IsReputablePublicSource(result.Url) ? "Reputable public coverage candidate; review before saving." : "Unverified result; review before relying on it.",
-                PublishedDate = page?.PublishedDate ?? string.Empty,
-                Excerpt = (page?.Text ?? result.Snippet)[..Math.Min((page?.Text ?? result.Snippet).Length, 1_200)],
-            });
-        }
-        foreach (var url in requestedUrls.Take(16).Where(url => sources.All(source => !source.Url.Equals(url, StringComparison.OrdinalIgnoreCase))))
-        {
-            WebPageText? page = null;
-            try { page = await search.FetchTextAsync(url).ConfigureAwait(false); } catch { }
-            if (page?.PublishedDate is { } published && cutoff is { } sourceCutoff && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > sourceCutoff)
-                continue;
-            var excerpt = page?.Text ?? string.Empty;
-            sources.Add(new SavedPersonaSource { Title = page?.Title ?? url, Url = url, Type = "user-tagged public source", PublishedDate = page?.PublishedDate ?? string.Empty, ReliabilityNote = "User-selected public source; review identity and date before saving.", Excerpt = excerpt[..Math.Min(excerpt.Length, 1_200)] });
-        }
+                WebPageText? page = null;
+                try { page = await search.FetchTextAsync(item.Result.Url, fetchTimeout.Token).ConfigureAwait(false); }
+                catch { /* Keep search evidence when a publisher blocks bounded text retrieval. */ }
+                if (page?.PublishedDate is { } published && cutoff is { } sourceCutoff && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > sourceCutoff)
+                    return null;
+                var title = page?.Title ?? item.Result.Title;
+                var excerpt = page?.Text ?? item.Result.Snippet;
+                var category = page?.SourceType ?? CategorizePersonaSource(item.Category, title, item.Result.Url, excerpt);
+                var reputable = IsReputablePublicSource(item.Result.Url);
+                return new SavedPersonaSource
+                {
+                    Title = title,
+                    Url = item.Result.Url,
+                    AuthorOrPublisher = Uri.TryCreate(item.Result.Url, UriKind.Absolute, out var sourceUri) ? sourceUri.Host : string.Empty,
+                    Type = category,
+                    ReliabilityNote = reputable ? "Official, educational, or established editorial source; check the linked evidence." : category.Contains("transcript", StringComparison.OrdinalIgnoreCase) ? "Third-party transcript; compare against its linked audio or video for speaker and transcription errors." : "Public-source lead; confirm the identity and details before relying on it.",
+                    PublishedDate = page?.PublishedDate ?? string.Empty,
+                    Excerpt = excerpt[..Math.Min(excerpt.Length, 8_000)],
+                };
+            }
+            finally { fetchLimit.Release(); }
+        })).ConfigureAwait(false);
+        var sources = loaded.Where(source => source is not null).Cast<SavedPersonaSource>().ToList();
         var reputableCount = sources.Count(source => IsReputablePublicSource(source.Url));
         var qualified = sources.Count >= 2 && reputableCount >= 1;
+        var categoryCounts = new
+        {
+            biographies = sources.Count(source => source.Type == "Biography"),
+            conversationTranscripts = sources.Count(source => source.Type == "Conversation transcript"),
+            interviews = sources.Count(source => source.Type == "Interview"),
+            videoCaptions = sources.Count(source => source.Type == "Video captions"),
+            videoReferences = sources.Count(source => source.Type == "Video reference"),
+            otherReferences = sources.Count(source => source.Type == "Other reference"),
+            total = sources.Count,
+        };
         return new(ProtocolVersion, request.Id, true, new
         {
             query,
             publicFigureQualified = qualified,
             qualification = qualified
-                ? "This search found multiple results including reputable public coverage. Confirm the selected person before saving."
-                : "We may not have the right person, or this person may not be public. Review the matches or use From my own material.",
-            candidates = sources.Select((source, index) => new { id = $"source-{index + 1}", name = source.Title, description = source.Excerpt[..Math.Min(source.Excerpt.Length, 280)], evidence = source.ReliabilityNote, url = source.Url }).ToArray(),
+                ? "Research is grouped into biographies, conversation transcripts, interviews, and video-caption sources. Review the sources and counts before saving."
+                : "The research returned too little trusted coverage to confirm public status. Review every source before saving or add a known official source.",
+            categoryCounts,
             sources,
         });
+    }
+
+    private static string CategorizePersonaSource(string suggested, string title, string url, string excerpt)
+    {
+        var text = $"{title} {url} {excerpt}";
+        if (Regex.IsMatch(url, @"(?:wikipedia\.org|britannica\.com)/", RegexOptions.IgnoreCase) || Regex.IsMatch(text, @"\b(?:biography|biographical|official profile|about (?:him|her|them)|early life|alumni|career profile)\b", RegexOptions.IgnoreCase)) return "Biography";
+        if (Regex.IsMatch(url, @"(?:youtube\.com|youtu\.be)/", RegexOptions.IgnoreCase)) return "Video reference";
+        if (suggested == "Conversation transcript" && Regex.IsMatch(text, @"\btranscript\b", RegexOptions.IgnoreCase)) return "Conversation transcript";
+        if (Regex.IsMatch(text, @"\b(?:podcast|episode)\b.{0,80}\btranscript\b|\btranscript\b.{0,80}\b(?:podcast|episode)\b", RegexOptions.IgnoreCase)) return "Conversation transcript";
+        if (Regex.IsMatch(text, @"\b(?:interview|Q\s*&\s*A|in conversation with)\b", RegexOptions.IgnoreCase)) return "Interview";
+        return suggested;
     }
 
     private static async Task<AgentResponse> PersonaGroupCompleteAsync(AgentRequest request)
@@ -2499,7 +2586,7 @@ public static class AgentHostLoop
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
         var host = uri.Host.ToLowerInvariant();
-        return host.EndsWith("wikipedia.org", StringComparison.Ordinal) || host.EndsWith("britannica.com", StringComparison.Ordinal) || host.EndsWith("reuters.com", StringComparison.Ordinal) || host.EndsWith("bbc.com", StringComparison.Ordinal) || host.EndsWith("nytimes.com", StringComparison.Ordinal) || host.EndsWith("theguardian.com", StringComparison.Ordinal);
+        return host.EndsWith("wikipedia.org", StringComparison.Ordinal) || host.EndsWith("britannica.com", StringComparison.Ordinal) || host.EndsWith("reuters.com", StringComparison.Ordinal) || host.EndsWith("bbc.com", StringComparison.Ordinal) || host.EndsWith("nytimes.com", StringComparison.Ordinal) || host.EndsWith("theguardian.com", StringComparison.Ordinal) || host.EndsWith("mythical.com", StringComparison.Ordinal) || host.EndsWith("ncsu.edu", StringComparison.Ordinal) || host.EndsWith("wired.com", StringComparison.Ordinal);
     }
 
     private static AgentResponse SaveSettings(AgentRequest request)

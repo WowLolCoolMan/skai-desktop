@@ -103,6 +103,8 @@ export type DesktopConversation = {
   personaId?: string | null;
   personaName?: string | null;
   personaSourceMode?: string | null;
+  personaIds?: string[];
+  isPersonaGroup?: boolean;
   airLlmCompatible?: boolean;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string; attachments?: ChatAttachment[] }>;
   projectId?: string | null;

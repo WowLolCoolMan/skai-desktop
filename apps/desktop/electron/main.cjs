@@ -382,9 +382,14 @@ function movePetForBehavior(mode, targetBounds) {
   const relative = grid.clampPetPosition(petBehaviorWalk.positionAt(elapsed));
   const x = Math.trunc(area.x + relative.x);
   const y = Math.trunc(area.y + relative.y);
+  // Face the direction of the segment currently being traversed. The target's
+  // final direction is not sufficient when the grid path bends around an
+  // obstacle; using it throughout the walk can make Blaze visibly walk
+  // backwards on a detour.
+  const movementFacing = petBehaviorWalk.facingAt(elapsed) || petActivity.facing;
   try {
     petWindow.setPosition(x, y);
-    if (mode === "approach") setPetActivity("walk", petBehaviorTarget?.facing ?? 1);
+    setPetActivity("walk", movementFacing);
   } catch {
     petMotionEngine.unregister("behavior-walk");
     petBehaviorWalk = null;
@@ -479,14 +484,18 @@ function performNextPetBehaviorAction() {
     setPetAttackScene(true);
     const aim = petBehaviorAimPoint();
     setPetActivity("pounce", petBehaviorTarget?.facing ?? 1, aim, true);
-    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 760);
+    // Keep the attack state alive long enough for the anticipation, lunge,
+    // contact effect, and recovery frames to read as one deliberate action.
+    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1150);
     return;
   }
   if (action === "fire-breath") {
     setPetAttackScene(true);
     const aim = petBehaviorAimPoint();
     setPetActivity("fire-breath", petBehaviorTarget?.facing ?? 1, aim, true);
-    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1500);
+    // The breath animation loops under a longer, single-owned attack window so
+    // the charge, sustained breath, impact, and recovery all remain visible.
+    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 2600);
     return;
   }
   setPetActivity(action, petActivity.facing);
@@ -1154,7 +1163,7 @@ function scheduleUpdateCheck() {
 
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "tasks.list",
-  "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.group.complete", "persona.source.add",
+  "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add",
   "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);

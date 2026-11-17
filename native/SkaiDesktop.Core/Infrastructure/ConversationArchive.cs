@@ -89,6 +89,7 @@ public static class ConversationArchive
             if (!ChatResponseModes.IsValid(session.ResponseMode)) session.ResponseMode = ChatResponseModes.Think;
             if (session.FolderName?.Length > 80) session.FolderName = session.FolderName[..80];
             session.Tags ??= [];
+            session.PersonaIds ??= [];
             if (session.Tags.Count > 8 || session.Tags.Any(tag => string.IsNullOrWhiteSpace(tag) || tag.Length > 32 || tag.Any(char.IsControl)))
                 throw new InvalidDataException("A conversation contains an invalid tag list.");
             session.Tags = session.Tags

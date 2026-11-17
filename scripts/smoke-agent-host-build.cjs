@@ -5,8 +5,6 @@ const { spawnSync } = require("node:child_process");
 function ensureSmokeAgentHostBuild(root) {
   const output = path.join(root, ".tmp", "agent-host-smoke");
   const assembly = path.join(output, "SkaiDesktop.AgentHost.dll");
-  if (fs.existsSync(assembly)) return assembly;
-
   const result = spawnSync("dotnet", [
     "build",
     path.join(root, "services", "agent-host", "SkaiDesktop.AgentHost.csproj"),

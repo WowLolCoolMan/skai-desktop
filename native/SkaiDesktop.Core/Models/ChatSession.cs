@@ -23,6 +23,9 @@ public sealed class ChatSession
     public string? PersonaId { get; set; }
     public string? PersonaName { get; set; }
     public string? PersonaSourceMode { get; set; }
+    /// <summary>Additional persona identities for a group conversation; group context never updates individual continuity.</summary>
+    public List<string> PersonaIds { get; set; } = [];
+    public bool IsPersonaGroup { get; set; }
     public bool IncludeProjectFilesInChat { get; set; }
     public string? FolderName { get; set; }
     /// <summary>Whether this chat is pinned above other chats in its list.</summary>

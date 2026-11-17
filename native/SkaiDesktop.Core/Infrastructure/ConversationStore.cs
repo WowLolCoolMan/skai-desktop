@@ -40,6 +40,7 @@ public sealed class ConversationStore
                 session.BaseMessages ??= [];
                 session.Branches ??= [];
                 session.Tags ??= [];
+                session.PersonaIds ??= [];
                 session.Mode ??= WorkspaceModes.Chat;
             }
             return sessions;

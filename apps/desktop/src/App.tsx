@@ -14,7 +14,7 @@ export default function App() {
   const workspace = useDesktopWorkspace();
   const shellStyle = { "--skai-sidebar-width": `${workspace.sidebarWidth}px` } as CSSProperties;
   const mainContentRoute = workspace.route === "settings" ? workspace.settingsReturnRoute : workspace.routeState.route;
-  const hideThreadSidebar = ["marketplace", "projects", "images", "pet-workshop", "voice-workbench", "usage"].includes(workspace.route);
+  const hideThreadSidebar = ["marketplace", "projects", "images", "pet-workshop", "voice-workbench", "usage", "persona-workshop", "personas", "persona-groups"].includes(workspace.route);
   return <ErrorBoundary><div className={`app-shell ${workspace.sidebarCollapsed ? "sidebar-collapsed" : ""} ${hideThreadSidebar ? "thread-sidebar-hidden" : ""}`} style={shellStyle}>
     <a className="skip-link" href="#main-content">Skip to content</a>
     <Toolbar route={workspace.route} connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onToggleSidebar={workspace.toggleSidebar} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />

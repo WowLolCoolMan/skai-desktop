@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentResponse, DesktopConversation, DesktopPersona, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, RuntimeHealth, ScheduledTaskDraft, TaskEnvironment } from "../../shared/contracts";
 import { PRODUCT_DISPLAY_NAME } from "../../shared/productIdentity";
 import type { AppRouteActions, AppRouteState } from "./AppRouteView";
-import { initializeNavigation, navigate, readNavigationState, routeFromLocation, type NavigationState } from "./navigation";
+import { initializeNavigation, navigate, navigatePersonaWorkshop, readNavigationState, routeFromLocation, type NavigationState } from "./navigation";
 import type { ConnectionState, CorpusDocument, MemoryEntry, Model, Route, ThemeMode } from "./types";
 import { createAgentClient } from "../services/agentClient";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR, localEndpointOrFallback, localProviderOrFallback } from "../services/localOnly";
@@ -141,7 +141,6 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [localGpuBudgetBytes, setLocalGpuBudgetBytes] = useState(0);
   const [models, setModels] = useState<Model[]>([]);
   const [personas, setPersonas] = useState<DesktopPersona[]>([]);
-  const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<DesktopTask[]>([]);
   const [scheduledTasks, setScheduledTasks] = useState<DesktopScheduledTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -189,9 +188,8 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     if (connection !== "ready") return;
     void request("persona.list").then((response) => {
       if (!response.ok) return;
-      const result = response.result as { personas?: DesktopPersona[]; activePersonaId?: string | null };
+      const result = response.result as { personas?: DesktopPersona[] };
       setPersonas(result.personas ?? []);
-      setActivePersonaId(result.activePersonaId ?? null);
     });
   }, [connection, request]);
 
@@ -207,13 +205,14 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     setError(null);
     if (nextRoute === "workbench") nextRoute = route === "coding" ? "coding" : "chat";
     if (nextRoute === "settings" && route !== "settings") setSettingsReturnRoute(route);
-    navigate(nextRoute);
+    if (nextRoute === "personas") navigatePersonaWorkshop("library");
+    else if (nextRoute === "persona-groups") navigatePersonaWorkshop("groups");
+    else navigate(nextRoute);
   }, [route]);
   const goBack = useCallback(() => { if (navigation.index > 0) window.history.back(); }, [navigation.index]);
   const goForward = useCallback(() => { if (navigation.index < navigation.length - 1) window.history.forward(); }, [navigation.index, navigation.length]);
   const coding = useCodingWorkspace({ request, connection, onError: setError, onNavigate });
-  const chat = useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata: models.find((entry) => entry.model === model), mode: agentMode, project: route === "coding" ? coding.selectedProject : null, personaId: activePersonaId, personaVoiceProfileId: personas.find((persona) => persona.id === activePersonaId)?.voiceProfileId ?? null, onConversationModelRestore: (savedModel, savedProvider) => { if (savedModel) setModel(savedModel); if (savedProvider) setProvider(localProviderOrFallback(savedProvider)); }, onConversationPersonaRestore: (savedPersonaId) => { if (savedPersonaId !== undefined) setActivePersonaId(savedPersonaId ?? null); }, onError: setError });
-  const onPersonaChange = useCallback((id: string | null) => { setActivePersonaId(id); void request("persona.activate", { id }); }, [request]);
+  const chat = useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata: models.find((entry) => entry.model === model), mode: agentMode, project: route === "coding" ? coding.selectedProject : null, onConversationModelRestore: (savedModel, savedProvider) => { if (savedModel) setModel(savedModel); if (savedProvider) setProvider(localProviderOrFallback(savedProvider)); }, onError: setError });
   const openCommandPalette = useCallback(() => setCommandOpen(true), []);
   const closeCommandPalette = useCallback(() => setCommandOpen(false), []);
   const toggleSidebar = useCallback(() => setSidebarCollapsed((value) => !value), []);
@@ -478,8 +477,6 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   };  const routeActions: AppRouteActions = { onNavigate, onSelectConversation: selectConversation, onNewWorkspaceTab: openNewWorkspaceTab, onSend: chat.sendMessage, onRewritePrompt: chat.rewritePrompt, onStartTemporaryChat: chat.startNewChat, onQueue: chat.queueMessage, onRemoveQueued: chat.removeQueuedMessage, onAttach: chat.pickAttachments, onFilesDropped: chat.importDroppedFiles, onRemoveAttachment: (index) => chat.setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index)), onSetAttachments: (attachments) => chat.setAttachments(attachments), onModelChange: selectModel, onResponseModeChange: chat.setResponseMode, onProviderChange: (nextProvider) => { const selectedProvider = localProviderOrFallback(nextProvider); setProvider(selectedProvider); localStorage.setItem("skai.provider", selectedProvider); if (!isLocalEndpoint(endpoint)) setEndpoint(defaultEndpoint); }, onExportConversations: chat.exportConversations, onFork: () => void chat.forkConversation(), onForkFromMessage: (index) => void chat.forkConversation(index), onRetryMessage: (index) => void chat.retryMessage(index), onEditMessage: chat.editMessage, onTogglePinned: () => void chat.updateConversationMetadata({ pinned: !(chat.activeConversation?.pinned ?? false) }), onArchive: () => void chat.updateConversationMetadata({ archived: !(chat.activeConversation?.archived ?? false) }), onRenameConversation: (title) => chat.updateConversationMetadata({ title }), onPickFolder: coding.pickProjectFolder, onSaveProject: coding.saveProject, onOpenProject: openProjectTab, onOpenFile: (path) => void coding.openProjectFile(path), onCloseFile: () => void coding.closeProjectFile(), onDraftChange: coding.setFileDraft, onSaveFile: () => void coding.saveProjectFile(), onUndoFile: () => void coding.undoProjectFile(), onRunTerminal: (projectId, command, cwd) => void coding.runTerminal(projectId, command, cwd), onRefreshGitStatus: () => void coding.refreshGitStatus(), onLoadGitDiff: () => void coding.loadGitDiff(), onCommitGitChanges: coding.commitGitChanges, onPlanTask: planTask, onTaskAction: (id, operation) => void transitionTask(id, operation), onSettingsChange: (key, value) => { if (key === "themeMode") setThemeMode(value as ThemeMode); if (key === "accentColor") setAccentColor(String(value)); if (key === "density") setDensity(String(value)); if (key === "backdrop") setBackdrop(String(value)); if (key === "reduceMotion") setReduceMotion(Boolean(value)); if (key === "petVisible") setPetVisible(Boolean(value)); if (key === "petWander") setPetWander(Boolean(value)); if (key === "petInteractionDemo") setPetInteractionDemo(Boolean(value)); if (key === "petSpriteDataUrl") { setPetSpriteDataUrl(String(value)); localStorage.setItem("skai.pet.sprite", String(value)); } if (key === "developerMode") setDeveloperMode(Boolean(value)); if (key === "memoryInjectionEnabled") setMemoryInjectionEnabled(Boolean(value)); if (key === "smartPromptRewritingEnabled") setSmartPromptRewritingEnabled(Boolean(value)); if (key === "provider") setProvider(localProviderOrFallback(String(value))); if (key === "model") setModel(String(value)); if (key === "endpoint") { setEndpoint(String(value)); localStorage.setItem("skai.endpoint", String(value)); } if (key === "ollamaContextWindowTokens") { const parsed = Number(value); if ([0, 32768, 131072, 1048576].includes(parsed)) setOllamaContextWindowTokens(parsed); } if (key === "localRamBudgetBytes") { const parsed = Number(value); if (Number.isFinite(parsed) && parsed >= 0) setLocalRamBudgetBytes(parsed); } if (key === "localGpuBudgetBytes") { const parsed = Number(value); if (Number.isFinite(parsed) && parsed >= 0) setLocalGpuBudgetBytes(parsed); } }, onSaveSettings: saveSettings, onDiscoverModels: () => void discoverModels(), onPullModel: pullModel, onSelectModel: (nextModel) => { selectModel(nextModel); onNavigate("chat"); }, onImageChange: (key, value) => { if (key === "provider") { const next = value === "diffusers" ? "diffusers" : "comfyui"; setImageProvider(next); localStorage.setItem("skai.imageProvider", next); } if (key === "endpoint") setImageEndpoint(value); if (key === "prompt") setImagePrompt(value); if (key === "workflow") setImageWorkflow(value); }, onGenerateImage: (source) => void generateImage(source), onRetryWorkbench: () => void loadWorkbench(), onTransitionTask: (id, operation) => void transitionTask(id, operation), onExecuteTask: (id) => void executeTask(id), onScheduleTask: scheduleTask, onTransitionScheduledTask: transitionScheduledTask, onRetryMemory: () => void loadMemory(), onSearchMemory: (query) => void loadMemory(query), onSaveMemory: saveMemory, onToggleMemory: (entry) => void toggleMemory(entry), onRemoveMemory: removeMemory, onExportMemory: () => void exportMemory(), onRunProjectCommand: (projectId, command, cwd) => void coding.runTerminal(projectId, command, cwd) };
 
   routeState.personas = personas;
-  routeState.activePersonaId = activePersonaId;
-  routeActions.onPersonaChange = onPersonaChange;
   routeActions.onImportCorpus = () => void importCorpus();
   routeActions.onPickImageSource = pickImageSource;
   routeActions.onCancelModelPull = cancelModelPull;

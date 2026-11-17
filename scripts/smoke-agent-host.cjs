@@ -102,7 +102,7 @@ async function run() {
   if (!modeReply.ok || modeReply.result?.content !== "mode smoke reply" || !capturedModelRequest?.messages?.some(message => message.role === "system" && message.content.includes("Security / Risky")))
     throw new Error("chat.complete did not forward the user-selected response mode to the selected local model.");
   const health = await request("runtime.health");
-  if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call"))
+  if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call") || !health.result?.capabilities?.includes("persona.discover"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
   const capacity = await request("system.capacity");
   if (!capacity.ok || capacity.result?.scheduler?.activeTaskCount !== 0 || capacity.result?.scheduler?.queuedTaskCount !== 0 || capacity.result?.scheduler?.executionSlotLimit !== 1)
@@ -193,6 +193,43 @@ async function run() {
   if (!saved.ok || typeof saved.result?.id !== "string") throw new Error("conversation.save did not return a local identity.");
   const after = await request("conversations.list");
   if (!after.ok || after.result.length !== 1 || after.result[0].title !== "Protocol smoke" || after.result[0].responseMode !== "security") throw new Error("conversation response mode persistence round-trip failed.");
+  const persona = await request("persona.save", { persona: { name: "Workshop persona", sourceMode: "own-material", sourceMaterial: "A focused, kind persona used for workflow verification.", personalContinuityEnabled: true } });
+  if (!persona.ok || !persona.result?.persona?.id) throw new Error("persona.save did not create a Workshop persona.");
+  const personaId = persona.result.persona.id;
+  const secondPersona = await request("persona.save", { persona: { name: "Group persona", sourceMode: "own-material", sourceMaterial: "A second group participant." } });
+  if (!secondPersona.ok || !secondPersona.result?.persona?.id) throw new Error("persona.save did not create a second group persona.");
+  const personaThread = await request("conversation.save", { title: "Persona workshop thread", personaId, messages: [{ role: "user", content: "Keep this inside the workshop." }] });
+  const groupThread = await request("conversation.save", { title: "Persona group thread", isPersonaGroup: true, personaIds: [personaId, secondPersona.result.persona.id], messages: [] });
+  if (!personaThread.ok || !groupThread.ok) throw new Error("Persona and group conversations could not be saved.");
+  const groupModelRequests = [];
+  const groupModelServer = http.createServer((request, response) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", chunk => { body += chunk; });
+    request.on("end", () => {
+      groupModelRequests.push(JSON.parse(body));
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end('data: {"choices":[{"delta":{"content":"persona group smoke reply"}}]}\n\ndata: [DONE]\n\n');
+    });
+  });
+  pendingSmokeServers.add(groupModelServer);
+  await new Promise(resolve => groupModelServer.listen(0, "127.0.0.1", resolve));
+  const groupPort = groupModelServer.address().port;
+  const groupReply = await request("persona.group.complete", { personaIds: [personaId, secondPersona.result.persona.id], messages: [{ role: "user", content: "What should we make together?" }], provider: "Local API", endpoint: `http://127.0.0.1:${groupPort}/v1`, model: "persona-group-smoke-model" });
+  await new Promise(resolve => groupModelServer.close(resolve));
+  pendingSmokeServers.delete(groupModelServer);
+  if (!groupReply.ok || groupReply.result?.turns?.length !== 2 || groupReply.result.turns.some(turn => turn.content !== "persona group smoke reply") || groupReply.result.memoryScope !== "group-only" || groupModelRequests.length !== 2 || groupModelRequests.some(modelRequest => !modelRequest.messages.some(message => message.role === "system" && message.content.includes("AI simulation of"))))
+    throw new Error(`persona.group.complete did not produce isolated, labeled replies for each selected persona: ${JSON.stringify(groupReply)}`);
+  const standardChats = await request("conversations.list");
+  const personaChats = await request("conversations.list", { scope: "persona" });
+  if (!standardChats.ok || standardChats.result.some(item => item.id === personaThread.result.id || item.id === groupThread.result.id) || !personaChats.ok || !personaChats.result.some(item => item.id === personaThread.result.id) || !personaChats.result.some(item => item.id === groupThread.result.id)) throw new Error(`Persona conversations were not isolated from standard chat history: standard=${JSON.stringify(standardChats.result)}, persona=${JSON.stringify(personaChats.result)}`);
+  const memoryList = await request("persona.memory.list", { id: personaId });
+  if (!memoryList.ok || memoryList.result.enabled !== true || !Array.isArray(memoryList.result.turns)) throw new Error("persona.memory.list did not return local persona continuity.");
+  const memoryClear = await request("persona.memory.clear", { id: personaId });
+  const memoryAfterClear = await request("persona.memory.list", { id: personaId });
+  if (!memoryClear.ok || memoryClear.result.cleared !== true || !memoryAfterClear.ok || memoryAfterClear.result.turns.length !== 0) throw new Error("Persona memory clear did not persist.");
+  await request("persona.remove", { id: personaId });
+  await request("persona.remove", { id: secondPersona.result.persona.id });
   const changedMode = await request("conversation.metadata.save", { id: saved.result.id, responseMode: "coding" });
   if (!changedMode.ok) throw new Error("conversation.metadata.save could not change response mode.");
   const forkedMode = await request("conversation.fork", { id: saved.result.id });
@@ -347,7 +384,7 @@ async function run() {
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
   await new Promise(resolve => scheduledModelServer.close(resolve));
   pendingSmokeServers.delete(scheduledModelServer);
-  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, local task planning, scheduled automation lifecycle, and direct host lifecycle.");
+  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, two-persona group replies, local task planning, scheduled automation lifecycle, and direct host lifecycle.");
 }
 
 async function stopHost() {
