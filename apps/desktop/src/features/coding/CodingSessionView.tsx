@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import Editor, { DiffEditor } from "@monaco-editor/react";
+import { DiffEditor, Editor } from "./monacoLazy";
 import { useMonacoTheme } from "../../theme/useMonacoTheme";
 import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";

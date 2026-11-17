@@ -1,0 +1,7 @@
+/* ===== Bundled Monaco (loaded with the editor) =====
+   In the active coding page the editor shell is height: 100% with min-height: 0 inside
+   an auto-sized grid row, so it collapsed to a few pixels once Monaco actually loaded.
+   Keep a usable editor height (the base rule's intent was 330px). */
+.app-content-coding .coding-page-active .monaco-editor-shell,
+.app-content-coding .coding-page-active .monaco-diff-shell { min-height: 320px; }
+.monaco-loading { display: grid; place-items: center; min-height: 160px; color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }

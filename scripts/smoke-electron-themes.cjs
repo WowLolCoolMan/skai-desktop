@@ -20,7 +20,7 @@ if (!fs.existsSync(executable)) {
 
 // Isolated profile: a running Skai instance would otherwise take the single-instance lock and the smoke launch would exit.
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", SRAI_PROJECTS_PATH: path.join(smokeUserDataDir, "projects.json"), SRAI_UNDO_PATH: path.join(smokeUserDataDir, "undo.json") }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
@@ -75,7 +75,7 @@ function connect(target) {
     }
   };
   const close = () => socket.close();
-  return { open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }), send, evaluate, callFunction, close };
+  return { socket, open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }), send, evaluate, callFunction, close };
 }
 async function terminateChild() {
   if (child.exitCode !== null || child.signalCode !== null) return;
@@ -254,6 +254,28 @@ async function main() {
   fs.mkdirSync(outputDir, { recursive: true });
   // Best effort: on a busy desktop the compositor may not hand over a frame in time.
   await devtools.send("Page.captureScreenshot", { format: "png" }).then((shot) => fs.writeFileSync(path.join(outputDir, "user-theme-problem.png"), Buffer.from(shot.data, "base64"))).catch(() => {});
+
+  // Bundled Monaco: opening a file in the coding view loads the editor from the app itself
+  // (no CDN; the CSP would block one) and paints it with the theme's code surface.
+  await devtools.send("Network.enable");
+  const remote = [];
+  const watchNetwork = (event) => { try { const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data)); if (message.method === "Network.requestWillBeSent" && /^https?:/.test(message.params.request.url) && !/127\.0\.0\.1|localhost/.test(message.params.request.url)) remote.push(message.params.request.url); } catch { /* ignore */ } };
+  const projectDir = path.join(smokeUserDataDir, "monaco-project");
+  fs.mkdirSync(projectDir, { recursive: true });
+  fs.writeFileSync(path.join(projectDir, "hello.ts"), "// theme check\nconst answer: number = 42;\n");
+  const saved = await devtools.evaluate(`window.skaiAgent.request("project.save", { name: "Theme smoke", folderPaths: [${JSON.stringify(projectDir)}] }).then((response) => response.ok)`);
+  if (!saved) throw new Error("Could not register the smoke project for the Monaco check.");
+  await devtools.evaluate("location.hash = '#/projects'; location.reload(); 1");
+  await sleep(3500);
+  const socket = devtools.socket;
+  socket?.addEventListener("message", watchNetwork);
+  await waitFor(devtools.evaluate, "Boolean([...document.querySelectorAll('button, a, [role=button]')].find((item) => item.textContent?.includes('Theme smoke'))?.click() ?? false) || Boolean(document.querySelector('.project-file-list'))", Boolean, "smoke project card");
+  await waitFor(devtools.evaluate, "Boolean([...document.querySelectorAll('button')].find((item) => item.textContent?.includes('hello.ts'))?.click() ?? false) || Boolean(document.querySelector('.monaco-editor'))", Boolean, "smoke project file");
+  const monacoState = JSON.parse(await waitFor(devtools.evaluate, "JSON.stringify({ editor: Boolean(document.querySelector('.monaco-editor .view-lines')), background: document.querySelector('.monaco-editor .monaco-editor-background') ? getComputedStyle(document.querySelector('.monaco-editor .monaco-editor-background')).backgroundColor : '', height: Math.round(document.querySelector('.monaco-editor-shell')?.getBoundingClientRect().height ?? 0), codeSurface: getComputedStyle(document.documentElement).getPropertyValue('--skai-color-code-surface').trim() })", (value) => JSON.parse(value).editor, "bundled Monaco editor to load"));
+  const toRgb = (hex) => { const digits = hex.replace("#", ""); return `rgb(${[0, 2, 4].map((i) => parseInt(digits.slice(i, i + 2), 16)).join(", ")})`; };
+  if (monacoState.codeSurface.startsWith("#") && monacoState.background !== toRgb(monacoState.codeSurface)) throw new Error(`Monaco does not follow the theme: ${JSON.stringify(monacoState)}`);
+  if (monacoState.height < 300) throw new Error(`The Monaco editor collapsed to ${monacoState.height}px.`);
+  if (remote.some((url) => /jsdelivr|unpkg|cdn/i.test(url))) throw new Error(`Monaco was fetched from a CDN: ${remote.join(", ")}`);
 
   devtools.close();
   console.log(`Packaged theme acceptance passed: ${JSON.stringify({ states, constrained, userTheme: { liveReload: true, keptLastGood: keptCanvas } })}`);

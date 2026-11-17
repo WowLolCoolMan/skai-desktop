@@ -495,3 +495,30 @@ Round 13 was pushed as bb5b5b6.
   (`script-src 'self'`) blocks it. The editor most likely never loads in the packaged app, and a remote fetch
   goes against the local-only design. Reported to the user. Because of this, the Monaco theme could only be
   typechecked, not seen running in the packaged build.
+
+### Round 15: Monaco bundled locally (user's request), editor height fix
+
+Round 14 was pushed as 2dd3c86.
+
+- **Why:** `@monaco-editor/react` had no loader config, so the packaged renderer fetched Monaco from `cdn.jsdelivr.net`, which the
+  production CSP blocks. In the packaged app the coding editor never loaded. With the user's go-ahead, Monaco is now bundled.
+- **What's bundled:** `src/features/coding/monacoSetup.ts` has the core editor API (`monaco-editor/editor/editor.api`, through the
+  package's `exports` map), the editor features the coding view uses (find, folding, brackets, comments, clipboard, context menu,
+  hover, multicursor, the diff editor and more), Monarch syntax highlighting for every language `languageForPath()` returns (JSON
+  reuses the JavaScript tokenizer), and the single core `editor.worker` (built by Vite, loaded from the app). The TypeScript, JSON,
+  CSS and HTML language services are **left out**, so there's highlighting but no IntelliSense or validation: including them cost
+  about +13 MB. `monaco-modules.d.ts` declares the subpaths that ship without types.
+- **Lazy loading:** `monacoLazy.tsx` exposes the same `Editor`/`DiffEditor` API through `React.lazy` with a "Loading editor…" fallback,
+  so Monaco loads only when a file is first opened. `CodingSessionView.tsx` changes one import line.
+- **Size:** renderer `dist` 22 MB → 26 MB (a 3.3 MB on-demand Monaco chunk plus a 0.3 MB worker). The startup bundle is
+  746 KB → 730 KB.
+- **Editor height:** once Monaco really loaded, its shell collapsed to 7 px. In the active coding page it's `height: 100%;
+  min-height: 0` inside an auto-sized grid row. `monaco.css`, which loads with the editor, restores a 320 px minimum (the base
+  rule already meant 330 px).
+- **Verified in the packaged app:** opening a `.ts` file mounts Monaco with the `skai` theme (background = the code surface;
+  keyword, comment, variable and punctuation colors from the syntax tokens), with no remote requests, CSP refusals, worker errors
+  or exceptions. `smoke:electron:themes` now checks this too: it registers a throwaway project (the agent host gets
+  `SRAI_PROJECTS_PATH`/`SRAI_UNDO_PATH` inside the smoke profile, so real projects are never touched), opens the file, and fails
+  on a CDN request, a background that isn't the code surface, or an editor under 300 px.
+- **Not changed (owner's layout, reported):** in the coding view's chat column the empty-state heading ("What would you like to
+  work on?") overlaps the Local task card at 1440x900. The editor column is narrow at that width.
