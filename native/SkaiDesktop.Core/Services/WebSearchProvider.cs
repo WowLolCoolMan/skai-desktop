@@ -3,6 +3,7 @@
 // Depends on: HttpClient, BoundedHttpContent. Used by Agent Host chat when web search is enabled.
 
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using SkaiDesktop.Core.Infrastructure;
@@ -71,7 +72,9 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                 var fallbackHtml = await BoundedHttpContent.ReadTextAsync(fallbackResponse.Content, timeout.Token, "Fallback web search response");
                 foreach (Match match in BingResultRegex.Matches(fallbackHtml))
                 {
-                    if (!Uri.TryCreate(WebUtility.HtmlDecode(match.Groups["url"].Value), UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https")) continue;
+                    var rawUrl = WebUtility.HtmlDecode(match.Groups["url"].Value);
+                    var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
+                    if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https")) continue;
                     var title = Clean(match.Groups["title"].Value, 200);
                     var snippet = Clean(match.Groups["snippet"].Value, 700);
                     if (title.Length == 0) continue;
@@ -84,7 +87,8 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                     foreach (Match match in BingTitleRegex.Matches(fallbackHtml).Take(8))
                     {
                         var rawUrl = WebUtility.HtmlDecode(match.Groups["url"].Value);
-                        if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https")) continue;
+                        var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
+                        if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https")) continue;
                         var title = Clean(match.Groups["title"].Value, 200);
                         if (title.Length == 0) continue;
                         results.Add(new WebSearchResult(title, absolute.AbsoluteUri, "Public search result. Open the source to review identity and details."));
@@ -94,6 +98,26 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
             }
         }
         return results;
+    }
+
+    private static string? UnwrapBingResultUrl(string href)
+    {
+        if (!Uri.TryCreate(href, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return null;
+        if (!uri.Host.Equals("bing.com", StringComparison.OrdinalIgnoreCase)
+            && !uri.Host.EndsWith(".bing.com", StringComparison.OrdinalIgnoreCase)) return href;
+        if (!uri.AbsolutePath.Equals("/ck/a", StringComparison.OrdinalIgnoreCase)) return href;
+        var encodedTarget = System.Web.HttpUtility.ParseQueryString(uri.Query).Get("u");
+        if (string.IsNullOrWhiteSpace(encodedTarget) || !encodedTarget.StartsWith("a1", StringComparison.Ordinal)) return null;
+        try
+        {
+            var base64 = encodedTarget[2..].Replace('-', '+').Replace('_', '/');
+            base64 = base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=');
+            var target = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+            return Uri.TryCreate(target, UriKind.Absolute, out var targetUri) && targetUri.Scheme is "http" or "https"
+                ? targetUri.AbsoluteUri
+                : null;
+        }
+        catch (FormatException) { return null; }
     }
 
     /// <summary>Fetch a small text-only excerpt for an explicitly selected research result.</summary>

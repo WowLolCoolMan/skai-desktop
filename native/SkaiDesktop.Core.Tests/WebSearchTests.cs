@@ -2,6 +2,7 @@
 // Uses TestSupport (Check, StubHandler, …). Run by Program.cs.
 
 using System.Net;
+using System.Text;
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
 using SkaiDesktop.Core.Services;
@@ -20,5 +21,17 @@ internal static class WebSearchTests
         var searchResults = await searchProvider.SearchAsync("Uno Linux");
         Check(searchResults.Count == 1 && searchResults[0].Title == "Local & private", "web search decodes and extracts result titles");
         Check(searchResults[0].Url == "https://example.org/docs" && searchResults[0].Snippet == "Read official docs.", "web search returns safe HTTP source URLs and clean snippets");
+
+        var target = "https://example.org/people/rhett";
+        var targetToken = "a1" + Convert.ToBase64String(Encoding.UTF8.GetBytes(target)).TrimEnd('=');
+        var bingSearchProvider = new WebSearchProvider(new HttpClient(new StubHandler((request, _) =>
+        {
+            var html = request.RequestUri?.Host == "html.duckduckgo.com"
+                ? "<html>No results</html>"
+                : $"<ol><li class=\"b_algo\"><h2><a href=\"https://www.bing.com/ck/a?u={targetToken}&amp;ntb=1\">Rhett McLaughlin</a></h2><p>Official profile.</p></li></ol>";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(html) });
+        })));
+        var bingResults = await bingSearchProvider.SearchAsync("Rhett McLaughlin");
+        Check(bingResults.Count == 1 && bingResults[0].Url == target, "Bing tracking links are unwrapped to the original public source before use");
     }
 }
