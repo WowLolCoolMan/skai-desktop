@@ -112,6 +112,7 @@ function applyTheme(theme: ThemeDefinition | null) {
     const accent = parseCssColor(options.accent);
     if (accent) {
       set("--skai-color-accent", options.accent);
+      set("--skai-color-accent-text", options.accent);
       set("--skai-color-accent-strong", `color-mix(in srgb, ${options.accent} 82%, ${scheme() === "light" ? "black" : "white"})`);
       // Pure white or black text, whichever contrasts more (not theme colors: contrast extremes).
       const candidates = ["white", "black"].map((value) => ({ value, ratio: contrastRatio(parseCssColor(value)!, accent) }));

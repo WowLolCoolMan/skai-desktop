@@ -162,8 +162,78 @@ async function main() {
     return parsed;
   };
 
+  // Contrast sweep: every visible text element against its real (alpha-composited)
+  // background must meet WCAG AA (4.5:1, 3:1 for large text). Gradients, art, the editor
+  // and disabled controls are skipped. Runs on Settings and Chat in dark and light.
+  const CONTRAST_SCAN = `(() => {
+  const parse = (v) => { const m = v.match(/rgba?\\(([^)]+)\\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p[3] === undefined ? 1 : p[3]]; };
+  const over = (top, base) => [0,1,2].map((i) => top[i] * top[3] + base[i] * (1 - top[3])).concat(1);
+  const lum = (c) => c.slice(0,3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [0.2126,0.7152,0.0722][i], 0);
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const bgOf = (el) => {
+    const stack = [];
+    for (let n = el; n; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.backgroundImage && cs.backgroundImage !== 'none' && !cs.backgroundImage.includes('url(')) return { gradient: true };
+      const c = parse(cs.backgroundColor);
+      if (c && c[3] > 0) { stack.push(c); if (c[3] >= 0.999) break; }
+    }
+    let base = parse(getComputedStyle(document.documentElement).backgroundColor) || [255,255,255,1];
+    if (base[3] < 1) base = [255,255,255,1];
+    for (const c of stack.reverse()) base = over(c, base);
+    return { color: base };
+  };
+  const out = [];
+  const seen = new Set();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const text = node.textContent.trim();
+    if (!text || text.length < 2) continue;
+    const el = node.parentElement;
+    if (!el || seen.has(el) || el.closest('.monaco-editor, .pet-window-root, svg, .theme-card-mini, [aria-hidden="true"]')) continue;
+    seen.add(el);
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || Number(cs.opacity) < 0.1) continue;
+    let opacity = 1; for (let n = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+    const fg = parse(cs.color); if (!fg) continue;
+    const bg = bgOf(el); if (bg.gradient) continue;
+    const disabled = el.closest('button:disabled, [aria-disabled="true"], input:disabled');
+    if (disabled) continue;
+    const fgc = over([fg[0], fg[1], fg[2], fg[3] * opacity], bg.color);
+    const value = ratio(fgc, bg.color);
+    const size = parseFloat(cs.fontSize), weight = Number(cs.fontWeight) || 400;
+    const large = size >= 24 || (size >= 18.66 && weight >= 700);
+    const min = large ? 3 : 4.5;
+    if (value < min) out.push({ text: text.slice(0, 40), ratio: Math.round(value * 100) / 100, size: Math.round(size), cls: (el.className && typeof el.className === 'string' ? el.className : el.tagName).slice(0, 50), parent: (el.parentElement?.className || '').toString().slice(0, 40), color: cs.color, opacity: Math.round(opacity*100)/100 });
+  }
+  return JSON.stringify(out);
+})()`;
+  const contrastSweep = async (label) => {
+    const failures = [];
+    for (const route of ["settings", "chat"]) {
+      await devtools.evaluate(`location.hash = '#/${route}'; window.dispatchEvent(new PopStateEvent('popstate')); 1`);
+      await sleep(900);
+      if (route === "settings") { await devtools.evaluate("[...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === 'Appearance')?.click(); 1"); await sleep(400); }
+      for (const item of JSON.parse(await devtools.evaluate(CONTRAST_SCAN))) failures.push(`${label} ${route}: "${item.text}" ${item.ratio}:1 (${item.cls})`);
+    }
+    await devtools.evaluate("location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate')); 1");
+    await sleep(700);
+    await devtools.evaluate("[...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === 'Appearance')?.click(); 1");
+    await waitFor(devtools.evaluate, "document.querySelector('.settings-content select')?.value", (value) => typeof value === "string", "Appearance controls after the contrast sweep");
+    if (failures.length) throw new Error(`Text below WCAG AA:\n${failures.slice(0, 20).join("\n")}`);
+  };
+
   const states = [];
   for (const [theme, backdrop] of [["dark", "none"], ["light", "deep-sea"], ["system", "deep-space"]]) states.push(await setAppearance(theme, backdrop));
+  await setAppearance("dark", "none");
+  await contrastSweep("Skai Dark");
+  await setAppearance("light", "none");
+  await contrastSweep("Skai Light");
+  await setAppearance("light", "deep-sea");
+  await contrastSweep("Skai Light + Deep sea backdrop");
   await devtools.send("Emulation.setDeviceMetricsOverride", { width: 960, height: 640, deviceScaleFactor: 1, mobile: false });
   const constrained = await setAppearance("light", "deep-space");
   await devtools.send("Emulation.clearDeviceMetricsOverride");

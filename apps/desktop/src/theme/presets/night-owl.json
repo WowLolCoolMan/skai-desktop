@@ -27,6 +27,13 @@
     },
     {
       "theme": "Night Owl Light",
+      "key": "accent-text",
+      "from": "#2aa298",
+      "to": "#1d6e67",
+      "reason": "2.37:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Night Owl Light",
       "key": "danger-text",
       "from": "#de3d3b",
       "to": "#b63230",
@@ -104,6 +111,7 @@
         "text-muted": "#a2aabc",
         "accent": "#82aaff",
         "accent-strong": "#c792ea",
+        "accent-text": "#82aaff",
         "on-accent": "#000000",
         "danger": "#ef5350",
         "danger-text": "#f3807e",
@@ -182,6 +190,7 @@
         "text-muted": "#5f5e70",
         "accent": "#2aa298",
         "accent-strong": "#288ed7",
+        "accent-text": "#1d6e67",
         "on-accent": "#000000",
         "danger": "#de3d3b",
         "danger-text": "#b63230",
@@ -207,7 +216,7 @@
         "code-text": "#403f53",
         "inline-code-text": "#1d6e67",
         "attachment-text": "#1d6e67",
-        "user-bubble": "#2aa29821",
+        "user-bubble": "#2aa29817",
         "user-bubble-border": "#2aa29857",
         "brand-mark": "#2aa298",
         "on-brand-mark": "#000000",

@@ -6,6 +6,13 @@
   "adjusted": [
     {
       "theme": "Tokyo Night Storm",
+      "key": "accent-text",
+      "from": "#7aa2f7",
+      "to": "#82a8f7",
+      "reason": "4.28:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Tokyo Night Storm",
       "key": "danger-text",
       "from": "#f7768e",
       "to": "#f8869c",
@@ -38,6 +45,13 @@
       "from": "#6172b0",
       "to": "#46527f",
       "reason": "2.78:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Tokyo Night Day",
+      "key": "accent-text",
+      "from": "#2e7de9",
+      "to": "#1e539a",
+      "reason": "2.41:1 on this theme's surfaces, below 4.5:1"
     },
     {
       "theme": "Tokyo Night Day",
@@ -118,6 +132,7 @@
         "text-muted": "#a9b1d6",
         "accent": "#7aa2f7",
         "accent-strong": "#bb9af7",
+        "accent-text": "#7aa2f7",
         "on-accent": "#000000",
         "danger": "#f7768e",
         "danger-text": "#f7768e",
@@ -196,6 +211,7 @@
         "text-muted": "#a9b1d6",
         "accent": "#7aa2f7",
         "accent-strong": "#bb9af7",
+        "accent-text": "#82a8f7",
         "on-accent": "#000000",
         "danger": "#f7768e",
         "danger-text": "#f8869c",
@@ -274,6 +290,7 @@
         "text-muted": "#46527f",
         "accent": "#2e7de9",
         "accent-strong": "#9854f1",
+        "accent-text": "#1e539a",
         "on-accent": "#000000",
         "danger": "#f52a65",
         "danger-text": "#a21c43",
@@ -299,7 +316,7 @@
         "code-text": "#2e51a0",
         "inline-code-text": "#005a79",
         "attachment-text": "#005a79",
-        "user-bubble": "#2e7de921",
+        "user-bubble": "#2e7de917",
         "user-bubble-border": "#2e7de957",
         "brand-mark": "#2e7de9",
         "on-brand-mark": "#000000",

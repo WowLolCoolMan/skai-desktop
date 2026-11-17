@@ -91,6 +91,10 @@
                 "$ref": "#/$defs/color",
                 "description": "Sets --skai-color-accent-strong"
               },
+              "accent-text": {
+                "$ref": "#/$defs/color",
+                "description": "Sets --skai-color-accent-text"
+              },
               "on-accent": {
                 "$ref": "#/$defs/color",
                 "description": "Sets --skai-color-on-accent"

@@ -6,6 +6,13 @@
   "adjusted": [
     {
       "theme": "Nord",
+      "key": "accent-text",
+      "from": "#88c0d0",
+      "to": "#8fc4d3",
+      "reason": "4.31:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Nord",
       "key": "danger-text",
       "from": "#bf616a",
       "to": "#dfb0b5",
@@ -76,6 +83,7 @@
         "text-muted": "#d8dee9",
         "accent": "#88c0d0",
         "accent-strong": "#81a1c1",
+        "accent-text": "#8fc4d3",
         "on-accent": "#000000",
         "danger": "#bf616a",
         "danger-text": "#dfb0b5",

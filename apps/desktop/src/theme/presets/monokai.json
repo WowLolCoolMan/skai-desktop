@@ -48,6 +48,7 @@
         "text-muted": "#aca78f",
         "accent": "#a6e22e",
         "accent-strong": "#66d9ef",
+        "accent-text": "#a6e22e",
         "on-accent": "#000000",
         "danger": "#f92672",
         "danger-text": "#fc81ad",

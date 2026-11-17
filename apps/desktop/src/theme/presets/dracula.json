@@ -13,6 +13,13 @@
     },
     {
       "theme": "Dracula",
+      "key": "accent-text",
+      "from": "#bd93f9",
+      "to": "#c6a2fa",
+      "reason": "4.00:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Dracula",
       "key": "danger-text",
       "from": "#ff5555",
       "to": "#ff9696",
@@ -48,6 +55,7 @@
         "text-muted": "#aab3ce",
         "accent": "#bd93f9",
         "accent-strong": "#ff79c6",
+        "accent-text": "#c6a2fa",
         "on-accent": "#000000",
         "danger": "#ff5555",
         "danger-text": "#ff9696",

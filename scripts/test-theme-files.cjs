@@ -158,11 +158,14 @@ test("presets: text, on-accent and every gradient stop pass contrast", () => {
     const preset = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
     for (const theme of preset.themes) {
       const colors = { ...skai.find((entry) => entry.appearance === theme.appearance).colors, ...theme.colors };
+      colors["accent-text"] ??= colors.accent; // tokens.css default: accent-text follows the accent
       const canvas = rgba(colors.canvas);
       const color = (key) => over(rgba(colors[key]), canvas);
       const check = (fg, bg, bgName, minimum) => { const value = ratio(fg, bg); if (value < minimum) failures.push(`${file} ${theme.name}: ${bgName} ${value.toFixed(2)}:1 < ${minimum}`); };
       for (const background of ["canvas", "surface", "surface-raised"]) for (const text of ["text", "text-muted"]) check(color(text), color(background), `${text} on ${background}`, 4.5);
       for (const text of ["sidebar-text", "sidebar-muted"]) check(color(text), color("sidebar"), `${text} on sidebar`, 4.5);
+      for (const background of ["canvas", "surface", "surface-raised"]) check(color("accent-text"), color(background), `accent-text on ${background}`, 4.5);
+      check(color("text"), over(rgba(colors["user-bubble"]), color("canvas")), "text on user-bubble", 4.5);
       // High-contrast themes: 7:1 for text and on-accent. Every theme: the focus ring (accent) 3:1.
       const strict = /high contrast/i.test(theme.name) ? 7 : 4.5;
       if (strict > 4.5) for (const background of ["canvas", "surface", "surface-raised", "sidebar"]) for (const text of ["text", "text-muted"]) check(color(text), color(background), `${text} on ${background} (high contrast)`, 7);

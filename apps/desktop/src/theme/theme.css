@@ -105,7 +105,7 @@
 .appearance-preview { display: grid; gap: var(--skai-space-2); margin-bottom: var(--skai-space-3); }
 .appearance-preview-card { display: grid; gap: var(--skai-space-2); padding: var(--skai-space-4); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-surface); }
 .appearance-preview-card h3 { margin: 0; color: var(--skai-color-text); font-size: calc(var(--skai-text-3xl) * var(--skai-heading-scale)); }
-.appearance-preview-eyebrow { margin: 0; color: var(--skai-color-accent); font-size: var(--skai-text-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.appearance-preview-eyebrow { margin: 0; color: var(--skai-color-accent-text); font-size: var(--skai-text-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .appearance-preview-reading { margin: 0; color: var(--skai-color-text); }
 .appearance-preview-reading a { color: var(--skai-color-link); }
 .appearance-preview-bubble { justify-self: end; max-width: 80%; padding: var(--skai-space-2) var(--skai-space-3); border: 1px solid var(--skai-color-user-bubble-border); border-radius: var(--skai-radius-xl); color: var(--skai-color-text); background: var(--skai-color-user-bubble); font-size: var(--skai-text-base); }

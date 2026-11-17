@@ -172,7 +172,7 @@ Each key under `colors` sets one CSS token: `canvas` sets `--skai-color-canvas`,
 | Surfaces | `canvas`, `surface`, `surface-raised`, `surface-soft` | App background, panels and cards, raised controls and menus, hover fills |
 | Lines | `border`, `border-strong` | Default borders, hover or emphasized borders |
 | Text | `text`, `text-muted` | Body text, secondary text |
-| Accent | `accent`, `accent-strong`, `on-accent` | Selection, primary actions, links; its darker step; text on an accent fill |
+| Accent | `accent`, `accent-strong`, `accent-text`, `on-accent` | Selection, primary actions and the focus ring; its stronger step; the accent used as text (labels, links, active tabs; defaults to `accent`, set it when the accent is under 4.5:1 on your background); text on an accent fill |
 | Status | `success`, `warning`, `info`, `danger`, `danger-text`, `danger-strong`, `favorite` | Status dots and messages, error text and headings, starred items |
 | Focus and selection | `focus-ring`, `selection`, `link` | Keyboard focus ring, selected text, links (default: the accent) |
 | Scrollbars | `scrollbar-thumb`, `scrollbar-track` | Scrollbars |

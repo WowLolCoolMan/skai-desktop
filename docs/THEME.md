@@ -541,3 +541,31 @@ Round 15 was pushed as f9a648b. The user asked to open the app; it runs from a c
   became `--skai-art-<area>-<n>` tokens in `tokens.css` `:root` (mechanical, idempotent script; same values). They're
   illustrations, the same in every theme, and not theme-file keys. The audit baseline drops from 59 to **3**, the pet pixel
   editor's paint colors in `PetWorkshopPage.tsx`, which are data rather than UI.
+
+### Round 17: contrast sweep across screens and themes (refinements)
+
+Round 16 was pushed as 389cfb0.
+
+- **Sweep:** for every visible text element on each screen (chat, coding, images, marketplace, memory, models, pet workshop,
+  projects, usage, settings), the text color, after its own and its ancestors' opacity, is checked against its real
+  background: the alpha-composited stack of ancestor fills. AA is 4.5:1, or 3:1 for large text. Gradients, art, the editor,
+  hidden or disabled controls are skipped. It ran across Skai Dark and Light, Catppuccin Latte, Synthwave Dark, High Contrast
+  Light, Gruvbox Dark, Ayu Light, Nord and Solarized Light.
+- **Found and fixed:**
+  - **Accent used as text.** Section kickers, eyebrows, links, active tabs, the active pet-animation tab and "Available in
+    Skai" use the accent as text, and in light palettes whose accent only meets the 3:1 focus-ring rule (Ayu Light,
+    Solarized Light) they were 2.9–3.2:1. The new key **`accent-text`** (`--skai-color-accent-text`, default = the accent;
+    `--skai-color-link` now follows it) takes those uses: 48 `color: var(--skai-color-accent)` declarations in `styles.css`
+    and mine in `src/theme/*.css`. Fills, borders and the focus ring keep the accent. The generator sets `accent-text`
+    with the same nudge-only-if-failing rule, the accent override sets it too, and `test:themes` checks `accent-text` at
+    4.5:1 on canvas, surface and raised for every preset.
+  - **Message actions** (Copy / Edit / Fork) sat at `opacity: .72` on muted text (about 3.0:1); the opacity is removed.
+  - **Skai Light `--skai-color-sidebar-subtle`** `#61708a` → `#5b687f` (sidebar chat history, 4.42:1 → AA).
+  - **Light themes' user bubble** tint is 9% instead of 13%, so text on it stays at 4.5:1 (Solarized Light was 4.45:1).
+    The test checks text on the bubble for every preset.
+  - **Backdrops in light mode (existing bug):** the deep-sea and deep-space backdrops set pale accents made for dark
+    (`#67e8f9`, `#b5a5ff`). In light they gave 1.35–1.45:1 label text and white-on-cyan Primary buttons. Light now uses
+    `#0e7490` and `#5b4bc4` (5:1+); dark is unchanged.
+- **Kept as a check:** `smoke:electron:themes` runs the same sweep on Settings and Chat in Skai Dark, Skai Light, and Skai
+  Light with the deep-sea backdrop, and fails on any text under AA. After the fixes, all seven themes in the broad sweep
+  had zero failures.

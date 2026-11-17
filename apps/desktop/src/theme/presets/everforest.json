@@ -69,6 +69,13 @@
     },
     {
       "theme": "Everforest Light",
+      "key": "accent-text",
+      "from": "#7f9101",
+      "to": "#616e01",
+      "reason": "2.94:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Everforest Light",
       "key": "danger-text",
       "from": "#f85552",
       "to": "#b83f3d",
@@ -146,6 +153,7 @@
         "text-muted": "#adb7af",
         "accent": "#a7c080",
         "accent-strong": "#83c092",
+        "accent-text": "#a7c080",
         "on-accent": "#000000",
         "danger": "#e67e80",
         "danger-text": "#eda0a1",
@@ -224,6 +232,7 @@
         "text-muted": "#606b5f",
         "accent": "#7f9101",
         "accent-strong": "#35a77c",
+        "accent-text": "#616e01",
         "on-accent": "#000000",
         "danger": "#f85552",
         "danger-text": "#b83f3d",
@@ -249,7 +258,7 @@
         "code-text": "#5c6a72",
         "inline-code-text": "#257557",
         "attachment-text": "#257557",
-        "user-bubble": "#7f910121",
+        "user-bubble": "#7f910117",
         "user-bubble-border": "#7f910157",
         "brand-mark": "#7f9101",
         "on-brand-mark": "#000000",

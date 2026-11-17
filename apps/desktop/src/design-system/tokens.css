@@ -82,7 +82,10 @@
   --skai-color-on-accent: #17131f;
   --skai-color-focus-ring: var(--skai-color-accent);
   --skai-color-selection: color-mix(in srgb, var(--skai-color-accent) 32%, transparent);
-  --skai-color-link: var(--skai-color-accent);
+  /* Theme: the accent as TEXT (labels, links, active tabs). Same as the accent unless a theme
+     needs a darker/lighter step to reach 4.5:1; fills, borders and the focus ring keep --skai-color-accent. */
+  --skai-color-accent-text: var(--skai-color-accent);
+  --skai-color-link: var(--skai-color-accent-text);
   --skai-color-scrollbar-thumb: color-mix(in srgb, var(--skai-color-text) 22%, transparent);
   --skai-color-scrollbar-track: transparent;
   --skai-color-success: #5ee0ad;
@@ -220,7 +223,8 @@
   --skai-color-sidebar-strong: #18213a;
   /* Theme: was #66748b, 4.18:1 on the light sidebar; darkened to pass AA (4.5:1). */
   --skai-color-sidebar-muted: #5b687f;
-  --skai-color-sidebar-subtle: #61708a;
+  /* Theme: was #61708a, 4.42:1 on the light sidebar (sidebar chat history); darkened to pass AA. */
+  --skai-color-sidebar-subtle: #5b687f;
   --skai-color-sidebar-icon: #61718b;
   --skai-color-sidebar-hover: rgba(24, 33, 58, 0.06);
   --skai-color-sidebar-history-hover: rgba(24, 33, 58, 0.05);
@@ -290,6 +294,19 @@ optgroup {
 
 [data-backdrop="deep-space"] {
   --skai-color-accent: #b5a5ff;
+}
+
+/* Theme: the backdrop accents above are pale (made for dark). On light surfaces they were
+   1.4:1 as label/link text and under white button text, so light gets deeper shades of
+   the same hues (5:1+ on the light canvas, white text on them passes too). */
+[data-scheme="light"][data-backdrop="deep-sea"] {
+  --skai-color-accent: #0e7490;
+  --skai-color-accent-strong: #155e75;
+}
+
+[data-scheme="light"][data-backdrop="deep-space"] {
+  --skai-color-accent: #5b4bc4;
+  --skai-color-accent-strong: #4a3aa8;
 }
 
 [data-density="compact"] {

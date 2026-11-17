@@ -13,6 +13,13 @@
     },
     {
       "theme": "One Dark",
+      "key": "accent-text",
+      "from": "#61afef",
+      "to": "#64b1ef",
+      "reason": "4.48:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "One Dark",
       "key": "danger-text",
       "from": "#e06c75",
       "to": "#e89299",
@@ -59,6 +66,13 @@
       "from": "#696c77",
       "to": "#676a75",
       "reason": "4.38:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "One Light",
+      "key": "accent-text",
+      "from": "#4078f2",
+      "to": "#3665cb",
+      "reason": "3.39:1 on this theme's surfaces, below 4.5:1"
     },
     {
       "theme": "One Light",
@@ -118,6 +132,7 @@
         "text-muted": "#a5aab4",
         "accent": "#61afef",
         "accent-strong": "#c678dd",
+        "accent-text": "#64b1ef",
         "on-accent": "#000000",
         "danger": "#e06c75",
         "danger-text": "#e89299",
@@ -196,6 +211,7 @@
         "text-muted": "#676a75",
         "accent": "#4078f2",
         "accent-strong": "#a626a4",
+        "accent-text": "#3665cb",
         "on-accent": "#000000",
         "danger": "#ca1243",
         "danger-text": "#ca1243",
@@ -221,7 +237,7 @@
         "code-text": "#383a42",
         "inline-code-text": "#016f9e",
         "attachment-text": "#016f9e",
-        "user-bubble": "#4078f221",
+        "user-bubble": "#4078f217",
         "user-bubble-border": "#4078f257",
         "brand-mark": "#4078f2",
         "on-brand-mark": "#000000",

@@ -6,6 +6,13 @@
   "adjusted": [
     {
       "theme": "Kanagawa Wave",
+      "key": "accent-text",
+      "from": "#7e9cd8",
+      "to": "#83a0da",
+      "reason": "4.31:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Kanagawa Wave",
       "key": "danger-text",
       "from": "#e46876",
       "to": "#e9838f",
@@ -45,6 +52,13 @@
       "from": "#e46876",
       "to": "#e9838f",
       "reason": "3.69:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Kanagawa Lotus",
+      "key": "accent-text",
+      "from": "#4d699b",
+      "to": "#445c88",
+      "reason": "3.72:1 on this theme's surfaces, below 4.5:1"
     },
     {
       "theme": "Kanagawa Lotus",
@@ -125,6 +139,7 @@
         "text-muted": "#c8c093",
         "accent": "#7e9cd8",
         "accent-strong": "#957fb8",
+        "accent-text": "#83a0da",
         "on-accent": "#000000",
         "danger": "#e46876",
         "danger-text": "#e9838f",
@@ -203,6 +218,7 @@
         "text-muted": "#43436c",
         "accent": "#4d699b",
         "accent-strong": "#624c83",
+        "accent-text": "#445c88",
         "on-accent": "#ffffff",
         "danger": "#c84053",
         "danger-text": "#a03342",
@@ -228,7 +244,7 @@
         "code-text": "#545464",
         "inline-code-text": "#45605b",
         "attachment-text": "#45605b",
-        "user-bubble": "#4d699b21",
+        "user-bubble": "#4d699b17",
         "user-bubble-border": "#4d699b57",
         "brand-mark": "#4d699b",
         "on-brand-mark": "#ffffff",

@@ -20,6 +20,13 @@
     },
     {
       "theme": "Solarized Dark",
+      "key": "accent-text",
+      "from": "#268bd2",
+      "to": "#70b2e1",
+      "reason": "2.87:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Solarized Dark",
       "key": "danger-text",
       "from": "#dc322f",
       "to": "#ec908f",
@@ -94,6 +101,13 @@
       "from": "#657b83",
       "to": "#576a71",
       "reason": "3.64:1 on this theme's surfaces, below 4.5:1"
+    },
+    {
+      "theme": "Solarized Light",
+      "key": "accent-text",
+      "from": "#268bd2",
+      "to": "#1e6ca4",
+      "reason": "3.00:1 on this theme's surfaces, below 4.5:1"
     },
     {
       "theme": "Solarized Light",
@@ -174,6 +188,7 @@
         "text-muted": "#9eacad",
         "accent": "#268bd2",
         "accent-strong": "#6c71c4",
+        "accent-text": "#70b2e1",
         "on-accent": "#000000",
         "danger": "#dc322f",
         "danger-text": "#ec908f",
@@ -252,6 +267,7 @@
         "text-muted": "#576a71",
         "accent": "#268bd2",
         "accent-strong": "#6c71c4",
+        "accent-text": "#1e6ca4",
         "on-accent": "#000000",
         "danger": "#dc322f",
         "danger-text": "#c22c29",
@@ -277,7 +293,7 @@
         "code-text": "#566c73",
         "inline-code-text": "#1e746d",
         "attachment-text": "#1e746d",
-        "user-bubble": "#268bd221",
+        "user-bubble": "#268bd217",
         "user-bubble-border": "#268bd257",
         "brand-mark": "#268bd2",
         "on-brand-mark": "#000000",

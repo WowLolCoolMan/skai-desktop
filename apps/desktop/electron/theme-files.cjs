@@ -14,7 +14,7 @@ const MAX_META = 160;
 // their own prefix; everything else is --skai-color-<key>.
 const COLOR_KEYS = [
   "canvas", "surface", "surface-raised", "surface-soft", "border", "border-strong",
-  "text", "text-muted", "accent", "accent-strong", "on-accent", "danger", "danger-text", "danger-strong",
+  "text", "text-muted", "accent", "accent-strong", "accent-text", "on-accent", "danger", "danger-text", "danger-strong",
   "success", "warning", "info", "favorite", "focus-ring", "selection", "link",
   "scrollbar-thumb", "scrollbar-track", "overlay", "shadow",
   "sidebar", "sidebar-text", "sidebar-strong", "sidebar-muted", "sidebar-subtle", "sidebar-icon",
