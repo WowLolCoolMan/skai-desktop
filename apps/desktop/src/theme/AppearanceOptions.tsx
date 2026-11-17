@@ -32,7 +32,7 @@ export function AppearancePreview() {
         <h3>{state.active?.name ?? "Skai"}</h3>
         <p className="appearance-preview-reading message-content">Replies read like this, with <code>inline code</code> and a <a href="#preview" onClick={(event) => event.preventDefault()}>link</a>.</p>
         <div className="appearance-preview-bubble">Your messages look like this.</div>
-        <pre className="appearance-preview-code"><code>{"const theme = \"" + (state.active?.name ?? "Skai") + "\";"}</code></pre>
+        <pre className="appearance-preview-code" tabIndex={0}><code>{"const theme = \"" + (state.active?.name ?? "Skai") + "\";"}</code></pre>
         <div className="appearance-preview-actions"><Button type="button" variant="primary" tabIndex={-1}>Primary</Button><Button type="button" tabIndex={-1}>Secondary</Button></div>
       </div>
       <div className="appearance-preview-reset">

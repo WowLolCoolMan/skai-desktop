@@ -25,6 +25,8 @@
     "check:hygiene": "node scripts/check-repo-hygiene.cjs",
     "check:release-config": "node scripts/validate-release-config.cjs",
     "check:pet-assets": "node scripts/validate-pet-assets.cjs",
+    "build:motion-pets": "python scripts/build-motion-pets.py",
+    "check:motion-pet-assets": "python scripts/validate-motion-pet-assets.py",
     "audit:release-workflow": "node scripts/audit-release-workflow.cjs",
     "package:electron": "node scripts/package-electron.cjs",
     "package:windows:installer": "node scripts/package-windows-installer.cjs",

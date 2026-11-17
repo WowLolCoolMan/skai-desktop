@@ -1,0 +1,171 @@
+{
+  "format": "motion",
+  "version": 1,
+  "id": "byte",
+  "displayName": "Byte",
+  "description": "Skai Motion companion: Byte.",
+  "geometry": {
+    "width": 256,
+    "height": 256,
+    "pixelsPerUnit": 2,
+    "footAnchor": {
+      "x": 128,
+      "y": 245
+    }
+  },
+  "clips": {
+    "idle": {
+      "file": "clips/idle.webp",
+      "frames": 11,
+      "playbackRate": 1
+    },
+    "run": {
+      "file": "clips/run.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "review": {
+      "file": "clips/review.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "running": {
+      "file": "clips/running.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "waiting": {
+      "file": "clips/waiting.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "waving": {
+      "file": "clips/waving.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "jumping": {
+      "file": "clips/jumping.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "failed": {
+      "file": "clips/failed.webp",
+      "frames": 8,
+      "playbackRate": 1
+    },
+    "malicious": {
+      "file": "clips/malicious.webp",
+      "frames": 8,
+      "playbackRate": 1
+    }
+  },
+  "animations": {
+    "idle": {
+      "play": "loop",
+      "loop": "idle"
+    },
+    "running-right": {
+      "play": "loop",
+      "loop": "run"
+    },
+    "running-left": {
+      "play": "loop",
+      "loop": "run"
+    },
+    "review": {
+      "play": "loop",
+      "loop": "review"
+    },
+    "running": {
+      "play": "loop",
+      "loop": "running"
+    },
+    "waiting": {
+      "play": "loop",
+      "loop": "waiting"
+    },
+    "waving": {
+      "play": "once",
+      "clip": "waving"
+    },
+    "jumping": {
+      "play": "once",
+      "clip": "jumping"
+    },
+    "failed": {
+      "play": "once",
+      "clip": "failed"
+    },
+    "malicious": {
+      "play": "loop",
+      "loop": "malicious"
+    }
+  },
+  "bindings": {
+    "idle": [
+      {
+        "animation": "idle"
+      }
+    ],
+    "movement": {
+      "left": "running-left",
+      "right": "running-right"
+    },
+    "contexts": {
+      "thinking": [
+        {
+          "animation": "review"
+        }
+      ],
+      "working": [
+        {
+          "animation": "running"
+        }
+      ],
+      "editing": [
+        {
+          "animation": "running"
+        }
+      ],
+      "running": [
+        {
+          "animation": "running"
+        }
+      ],
+      "testing": [
+        {
+          "animation": "waiting"
+        }
+      ],
+      "waiting": [
+        {
+          "animation": "waiting"
+        }
+      ]
+    },
+    "events": {
+      "waving": [
+        {
+          "animation": "waving"
+        }
+      ],
+      "success": [
+        {
+          "animation": "jumping"
+        }
+      ],
+      "error": [
+        {
+          "animation": "failed"
+        }
+      ],
+      "celebrating": [
+        {
+          "animation": "jumping"
+        }
+      ]
+    }
+  },
+  "activities": []
+}

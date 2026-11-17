@@ -18,7 +18,6 @@ import {
   voiceProfiles,
 } from "../../services/nativeTts";
 
-type PluginFilter = "All" | "Skills" | "Tools" | "Installed";
 type Skill = {
   id: string;
   name: string;
@@ -75,6 +74,34 @@ const WORKBENCH_PROFILES_KEY = "skai.voice.workbench.profiles";
 const WORKBENCH_NOTICE_KEY = "skai.voice.workbench.rightsNoticeAcknowledged";
 const VOICE_CLIPS_DB = "skai-voice-workbench";
 const VOICE_CLIPS_STORE = "clips";
+
+type MarketplaceHubSection = "Discover" | "Staff Picks" | "Models" | "MCP Servers" | "Skills" | "Plugins" | "Installed";
+type StaffPickKind = "Model" | "MCP server" | "Skill" | "Plugin" | "Voice pack" | "Persona" | "Highlight";
+type StaffPickAction =
+  | { label: string; type: "external"; url: string }
+  | { label: string; type: "section"; section: MarketplaceHubSection; query?: string }
+  | { label: string; type: "route"; route: Route };
+type StaffPick = { id: string; kind: StaffPickKind; title: string; description: string; details: string; publisher: string; icon: "model" | "activity" | "sparkle" | "terminal" | "project" | "image"; actions: StaffPickAction[] };
+
+// Developers can curate any marketplace resource or a general highlight here.
+// Type-specific installs should route into the corresponding reviewed catalog flow.
+const staffPicks: StaffPick[] = [
+  { id: "sophon-realtime", kind: "Model", title: "Sophon-Realtime v1", description: "Open full-duplex speech-to-speech by Adventists.ai, with expressive voice and interruption handling.", details: "Apache-2.0 · Recommended Tag build: about 42 GB and an 80 GB GPU · Self-hosting requires Linux and CUDA.", publisher: "Adventists.ai", icon: "activity", actions: [{ label: "Open model card", type: "external", url: "https://huggingface.co/adventists-ai/Sophon-Realtime-v1" }, { label: "Browse models", type: "section", section: "Models", query: "adventists-ai/Sophon-Realtime-v1" }] },
+  { id: "lfm3-omni-2b", kind: "Model", title: "LFM3-Omni-2B", description: "Compact all-in-one model from Liquid AI for text, images, video, and audio, with text or speech output.", details: "LFM Open License v1.0 · 32K context · GGUF is supported by llama.cpp for local use.", publisher: "Liquid AI", icon: "model", actions: [{ label: "Open model card", type: "external", url: "https://huggingface.co/LiquidAI/LFM3-Omni-2B" }, { label: "Find GGUF build", type: "section", section: "Models", query: "LiquidAI/LFM3-Omni-2B-GGUF" }] },
+];
+
+function StaffPicksPanel({ onNavigate, onNavigateRoute }: { onNavigate: (section: MarketplaceHubSection, query?: string) => void; onNavigateRoute: (route: Route) => void }) {
+  const iconFor: Record<StaffPickKind, StaffPick["icon"]> = { Model: "model", "MCP server": "terminal", Skill: "sparkle", Plugin: "project", "Voice pack": "activity", Persona: "sparkle", Highlight: "image" };
+  return <section className="marketplace-staff-picks" aria-label="Developer staff picks">
+    <header className="plugins-topbar"><div><h2>Staff Picks</h2><p className="page-description">Developer-curated models, skills, voices, personas, plugins, servers, and other things worth a look.</p></div></header>
+    {staffPicks.length === 0 ? <EmptyState title="No staff picks yet" description="Developer-curated Marketplace highlights will appear here." /> : <div className="marketplace-staff-picks-list">{staffPicks.map((pick) => <article className="marketplace-developer-pick" key={pick.id}>
+      <div className="marketplace-developer-pick-mark" aria-hidden="true"><NavIcon name={iconFor[pick.kind] ?? pick.icon} /></div>
+      <div className="marketplace-developer-pick-copy"><div className="marketplace-developer-pick-heading"><h3>{pick.title}</h3><span className="marketplace-developer-favorite"><span aria-hidden="true">★</span> Developer Favorite</span><StatusBadge tone="neutral">{pick.kind}</StatusBadge></div><p>{pick.description}</p><small>{pick.details} · {pick.publisher}</small></div>
+      <div className="marketplace-developer-pick-actions">{pick.actions.map((action) => <Button key={`${pick.id}:${action.label}`} variant={action.type === "section" ? "primary" : "secondary"} type="button" onClick={() => { if (action.type === "external") void window.skaiAgent?.updates?.open(action.url); else if (action.type === "section") onNavigate(action.section, action.query); else onNavigateRoute(action.route); }}>{action.label}</Button>)}</div>
+    </article>)}</div>}
+  </section>;
+}
+
 
 function openVoiceClipStore(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
@@ -301,14 +328,8 @@ export function PluginsPage({
   onNavigate?: (route: Route) => void;
   onSelectAirLlmModel?: (model: Model) => void;
 } = {}) {
-  const [view, setView] = useState<"catalog" | "models">("catalog");
-  const [catalogSection, setCatalogSection] = useState<"Discover" | "Tools">(
-    "Discover",
-  );
-  const [toolsView, setToolsView] = useState<"Catalog" | "Installed">(
-    "Catalog",
-  );
-  const [filter, setFilter] = useState<PluginFilter>("All");
+  const [view, setView] = useState<"catalog" | "models" | "installed" | "staff-picks">("catalog");
+  const [catalogSection, setCatalogSection] = useState<MarketplaceHubSection>("Discover");
   const [query, setQuery] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
@@ -326,15 +347,13 @@ export function PluginsPage({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const changeCatalogSection = (next: "Discover" | "Tools") => {
-    setView("catalog");
+  const changeCatalogSection = (next: MarketplaceHubSection, nextQuery?: string) => {
     setCatalogSection(next);
-    setToolsView("Catalog");
-    setFilter("All");
-    setQuery(
-      localStorage.getItem(`skai.marketplace.query.${next.toLowerCase()}`) ??
-        "",
-    );
+    setView(next === "Models" ? "models" : next === "Installed" ? "installed" : next === "Staff Picks" ? "staff-picks" : "catalog");
+    if (!["Models", "Installed", "Staff Picks"].includes(next)) {
+      setQuery(nextQuery ?? localStorage.getItem(`skai.marketplace.query.${next.toLowerCase()}`) ?? "");
+      setSelectedId(null);
+    }
   };
 
   const load = async () => {
@@ -396,14 +415,10 @@ export function PluginsPage({
   useEffect(() => {
     if (view === "catalog")
       localStorage.setItem(
-        `skai.marketplace.query.${
-          catalogSection === "Tools" && toolsView === "Installed"
-            ? "installed"
-            : catalogSection.toLowerCase()
-        }`,
+        `skai.marketplace.query.${catalogSection.toLowerCase()}`,
         query,
       );
-  }, [catalogSection, query, toolsView, view]);
+  }, [catalogSection, query, view]);
 
   const entries = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -469,24 +484,24 @@ export function PluginsPage({
           : "Marketplace catalog",
     }));
     return [...skillEntries, ...toolEntries].filter((entry) => {
-      const filterMatch =
-        filter === "All" ||
-        (filter === "Skills" && entry.kind === "Skills") ||
-        (filter === "Tools" && entry.kind === "Tools") ||
-        (filter === "Installed" && entry.installed);
       return (
-        filterMatch &&
         (!term ||
           `${entry.name} ${entry.description} ${entry.category} ${entry.access} ${entry.source}`
             .toLowerCase()
             .includes(term))
       );
     });
-  }, [filter, query, skills, tools]);
-  const selected = entries.find((entry) => entry.id === selectedId) ?? null;
+  }, [query, skills, tools]);
+  const sectionEntries = useMemo(() => entries.filter((entry) => {
+    if (catalogSection === "Skills") return entry.kind === "Skills";
+    if (catalogSection === "MCP Servers") return entry.kind === "Tools" && (entry.id === "tool:rea" || /mcp/i.test(entry.category));
+    if (catalogSection === "Plugins") return entry.kind === "Tools" && entry.id !== "tool:rea" && !/mcp/i.test(entry.category);
+    return true;
+  }), [catalogSection, entries]);
+  const selected = sectionEntries.find((entry) => entry.id === selectedId) ?? null;
   const groupedEntries = useMemo(() => {
-    const groups = new Map<string, typeof entries>();
-    for (const entry of entries)
+    const groups = new Map<string, typeof sectionEntries>();
+    for (const entry of sectionEntries)
       groups.set(
         entry.category || (entry.kind === "Skills" ? "Skills" : "Tools"),
         [
@@ -499,7 +514,7 @@ export function PluginsPage({
     return [...groups.entries()].sort(([left], [right]) =>
       left.localeCompare(right),
     );
-  }, [entries]);
+  }, [sectionEntries]);
   const connectMcp = async () => {
     if (!serverId.trim() || !endpoint.trim()) return;
     setMcpBusy(true);
@@ -691,89 +706,33 @@ export function PluginsPage({
         aria-label="Marketplace sections"
       >
         <p className="plugins-customize-title">Marketplace</p>
-        <button
-          type="button"
-          className={
-            catalogSection === "Discover" && view === "catalog"
-              ? "is-active"
-              : ""
-          }
-          onClick={() => changeCatalogSection("Discover")}
-        >
-          <NavIcon name="sparkle" />
-          Discover
-        </button>
-        <button
-          type="button"
-          className={view === "models" ? "is-active" : ""}
-          onClick={() => setView("models")}
-        >
-          <NavIcon name="model" />
-          Models
-        </button>
-        <button
-          type="button"
-          className={
-            catalogSection === "Tools" && view === "catalog" ? "is-active" : ""
-          }
-          onClick={() => changeCatalogSection("Tools")}
-        >
-          <NavIcon name="terminal" />
-          Tools
-        </button>
-        {catalogSection === "Tools" && view === "catalog" && (
-          <div className="plugins-tools-subnav" role="tablist" aria-label="Tools views">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={toolsView === "Catalog"}
-              className={toolsView === "Catalog" ? "is-active" : ""}
-              onClick={() => {
-                setToolsView("Catalog");
-                setFilter("All");
-                setSelectedId(null);
-                setQuery(localStorage.getItem("skai.marketplace.query.tools") ?? "");
-              }}
-            >
-              Catalog
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={toolsView === "Installed"}
-              className={toolsView === "Installed" ? "is-active" : ""}
-              onClick={() => {
-                setToolsView("Installed");
-                setFilter("Installed");
-                setSelectedId(null);
-                setQuery(localStorage.getItem("skai.marketplace.query.installed") ?? "");
-              }}
-            >
-              Installed
-            </button>
-          </div>
-        )}
+        {([
+          ["Discover", "sparkle"],
+          ["Staff Picks", "sparkle"],
+          ["Models", "model"],
+          ["MCP Servers", "terminal"],
+          ["Skills", "sparkle"],
+          ["Plugins", "project"],
+          ["Installed", "memory"],
+        ] as const).map(([item, icon]) => <button key={item} type="button" className={catalogSection === item ? "is-active" : ""} aria-current={catalogSection === item ? "page" : undefined} onClick={() => changeCatalogSection(item)}><NavIcon name={icon} />{item}</button>)}
       </aside>
       <div className="plugins-main">
-        {view === "models" ? (
+        {view === "models" || view === "installed" ? (
           <MarketplacePage
-            initialSection="Models"
-            onBack={() => setView("catalog")}
+            initialSection={view === "models" ? "Models" : "Installed"}
+            initialQuery={view === "models" ? query : undefined}
+            onBack={() => changeCatalogSection("Discover")}
             onNavigate={onNavigate}
             onSelectAirLlmModel={onSelectAirLlmModel}
           />
+        ) : view === "staff-picks" ? (
+          <StaffPicksPanel onNavigate={changeCatalogSection} onNavigateRoute={(route) => onNavigate?.(route)} />
         ) : (
           <>
             <header className="plugins-topbar">
               <h2>
-                {catalogSection === "Discover"
-                  ? "Discover"
-                  : toolsView === "Installed"
-                    ? "Installed"
-                    : "Tools"}{" "}
-                <span className="plugins-count">
-                  {entries.length} {toolsView === "Installed" ? "installed" : "available in Skai"}
-                </span>
+                {catalogSection}
+                <span className="plugins-count">{sectionEntries.length} {catalogSection === "Discover" ? "available in Skai" : catalogSection.toLowerCase()}</span>
               </h2>
               <div className="plugins-topbar-actions">
                 <label className="plugins-search">
@@ -781,7 +740,7 @@ export function PluginsPage({
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder={toolsView === "Installed" ? "Search installed tools" : "Search marketplace"}
+                    placeholder={`Search ${catalogSection.toLowerCase()}`}
                   />
                 </label>
                 <Button
@@ -794,7 +753,7 @@ export function PluginsPage({
                 >
                   <NavIcon name="refresh" />
                 </Button>
-                {catalogSection === "Tools" && toolsView === "Catalog" && (
+                {catalogSection === "MCP Servers" && (
                   <Button
                     variant="primary"
                     className="plugins-add-button"
@@ -826,16 +785,15 @@ export function PluginsPage({
                 title="Loading Marketplace…"
                 description="Reading tools and skills available in Skai."
               />
-            ) : entries.length === 0 ? (
+            ) : sectionEntries.length === 0 ? (
               <EmptyState
                 title="No matching items"
-                description={toolsView === "Installed" ? "No installed tools match this search." : "Try another search or choose a different category."}
+                description="Try another search or choose a different category."
                 action={
                   <Button
                     variant="secondary"
                     onClick={() => {
                       setQuery("");
-                      setFilter("All");
                     }}
                   >
                     Clear filters
@@ -1031,6 +989,7 @@ export function PluginsPage({
                 </aside>
               </div>
             )}
+            {catalogSection === "MCP Servers" && <>
             <Card className="plugins-mcp-note" id="plugins-mcp-connections">
               <div className="plugins-mcp-copy">
                 <p className="section-kicker">MCP CONNECTIONS</p>
@@ -1307,6 +1266,7 @@ export function PluginsPage({
                 </div>
               </Card>
             )}
+            </>}
           </>
         )}
       </div>

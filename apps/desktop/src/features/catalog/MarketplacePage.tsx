@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Model, Route } from "../../app/types";
-import type { AgentResponse } from "../../../shared/contracts";
+import type { AgentResponse, DesktopPersona } from "../../../shared/contracts";
 import { Button, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
@@ -41,12 +41,12 @@ function marketplacePreference<T>(key: string, fallback: T): T {
 
 // Embedded in the unified Marketplace catalog (PluginsPage) for the hub sections that catalog
 // does not cover itself: remote model search/install, Diffusers LoRAs and the local inventory.
-const EMBEDDED_SECTIONS: Section[] = ["Models"];
+const EMBEDDED_SECTIONS: Section[] = ["Models", "Installed"];
 
-export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSection = "Discover", onBack }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; initialSection?: Section; onBack?: () => void }) {
+export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSection = "Discover", onBack, initialQuery }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; initialSection?: Section; onBack?: () => void; initialQuery?: string }) {
   const [section, setSection] = useState<Section>(initialSection);
   const [filter, setFilter] = useState<Filter>("All");
-  const [query, setQuery] = useState(() => marketplacePreference(`query.${initialSection.toLowerCase()}`, ""));
+  const [query, setQuery] = useState(() => initialQuery ?? marketplacePreference(`query.${initialSection.toLowerCase()}`, ""));
   const [selectedId, setSelectedId] = useState(items[0].id);
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
   const [catalog, setCatalog] = useState<MarketplaceCatalog | null>(null);
@@ -66,6 +66,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const [reviewModel, setReviewModel] = useState<MarketplaceModel | null>(null);
   const [installedModels, setInstalledModels] = useState<Array<{ model: string; vision: string; capabilities: string[]; provider?: string }>>([]);
   const [installedConnections, setInstalledConnections] = useState<Array<{ connectionId: string; serverId: string; transport: string; state: string }>>([]);
+  const [installedPersonas, setInstalledPersonas] = useState<DesktopPersona[]>([]);
   const [installedInventoryError, setInstalledInventoryError] = useState<string | null>(null);
   const [installedLoading, setInstalledLoading] = useState(false);
   const [installedError, setInstalledError] = useState<string | null>(null);
@@ -156,11 +157,12 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   useEffect(() => {
     if (section !== "Installed") return;
     void loadInstalledModels();
-    void Promise.all([request("marketplace.image-assets.list"), request("mcp.connections.list")]).then(([assets, connections]) => {
-      const errors = [assets, connections].filter((response) => !response.ok).map((response) => response.error?.message).filter(Boolean);
+    void Promise.all([request("marketplace.image-assets.list"), request("mcp.connections.list"), request("persona.list")]).then(([assets, connections, personas]) => {
+      const errors = [assets, connections, personas].filter((response) => !response.ok).map((response) => response.error?.message).filter(Boolean);
       setInstalledInventoryError(errors.join(" ") || null);
       if (assets.ok) setInstalledImageAssets((assets.result as typeof installedImageAssets) ?? []);
       if (connections.ok) setInstalledConnections(((connections.result as { connections?: typeof installedConnections }).connections ?? []));
+      if (personas.ok) setInstalledPersonas(((personas.result as { personas?: DesktopPersona[] }).personas ?? []));
     }).catch(() => setInstalledInventoryError("Some installed tools could not be refreshed."));
   }, [section]);
   useEffect(() => { if (onBack && section === "Models") void loadInstalledModels(); }, [section, onBack]);
@@ -322,16 +324,6 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   ];
   const modelResults = <section className="marketplace-remote-results" aria-label="Remote model sources">
     <div className="panel-heading"><div><p className="section-kicker">REMOTE MODEL SOURCES</p><h3>Models for local runtimes</h3><p className="panel-subtitle">GGUF packages install through compatible runtimes. Transformers repositories use the optional AirLLM route and download weights on first use.</p></div><StatusBadge tone={modelError ? "warning" : "success"}>{modelLoading ? "Polling" : modelError ? "Partial" : "Live catalog"}</StatusBadge></div>
-    <article className="marketplace-developer-pick">
-      <div className="marketplace-developer-pick-mark" aria-hidden="true"><NavIcon name="activity" /></div>
-      <div className="marketplace-developer-pick-copy"><div className="marketplace-developer-pick-heading"><h4>Sophon-Realtime v1</h4><span className="marketplace-developer-favorite" aria-label="Developer Favorite"><span aria-hidden="true">★</span> Developer Favorite</span></div><p>Open full-duplex speech-to-speech by Adventists.ai. It listens and speaks in real time, with expressive voice and interruption handling.</p><small>Apache-2.0 · Recommended Tag build: about 42 GB and an 80 GB GPU · Self-hosting requires Linux and CUDA; use the official card for hosted API options.</small></div>
-      <Button variant="secondary" type="button" onClick={() => void window.skaiAgent?.updates?.open("https://huggingface.co/adventists-ai/Sophon-Realtime-v1")}>View model card</Button>
-    </article>
-    <article className="marketplace-developer-pick">
-      <div className="marketplace-developer-pick-mark" aria-hidden="true"><NavIcon name="model" /></div>
-      <div className="marketplace-developer-pick-copy"><div className="marketplace-developer-pick-heading"><h4>LFM3-Omni-2B</h4><span className="marketplace-developer-favorite" aria-label="Developer Favorite"><span aria-hidden="true">★</span> Developer Favorite</span></div><p>Compact 2.17B all-in-one model from Liquid AI for text, images, video, and audio, with text or speech output.</p><small>LFM Open License v1.0 · 32K context · GGUF is supported by llama.cpp for local use; Skai can hand off its GGUF download to a configured LM Studio server.</small></div>
-      <div className="marketplace-developer-pick-actions"><Button variant="secondary" type="button" onClick={() => void window.skaiAgent?.updates?.open("https://huggingface.co/LiquidAI/LFM3-Omni-2B")}>View model card</Button><Button variant="primary" type="button" onClick={() => { const nextQuery = "LiquidAI/LFM3-Omni-2B-GGUF"; setQuery(nextQuery); setProvider("All providers"); setSize("Any size"); setSelectedRemoteModelId(null); void searchModels(nextQuery); }}>Find GGUF build</Button></div>
-    </article>
     <div className="marketplace-model-controls marketplace-model-filters"><label>Task<select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}>{taskOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}><option>All providers</option><option>Hugging Face</option><option>ModelScope</option><option>AirLLM</option></select></label><label>Library<select value={libraryFilter} onChange={(event) => setLibraryFilter(event.target.value)}>{libraryOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>App/runtime<select value={appFilter} onChange={(event) => setAppFilter(event.target.value)}>{appOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Max model size<select value={size} onChange={(event) => setSize(event.target.value)}><option>Any size</option><option value="8">8 GB</option><option value="14">14 GB</option><option value="24">24 GB</option><option value="40">40 GB</option></select></label><label>Hardware estimate<select value={hardwareFilter} onChange={(event) => setHardwareFilter(event.target.value)}><option>Any hardware</option><option value="8">Up to 8 GB model</option><option value="14">Up to 14 GB model</option><option value="24">Up to 24 GB model</option></select></label><label className="settings-toggle"><span><strong>Include abliterated</strong><small>Only show explicit uncensored/abliterated labels.</small></span><input type="checkbox" checked={uncensored} onChange={(event) => { setUncensored(event.target.checked); void searchModels(query, event.target.checked); }} /></label></div>
     <p className="marketplace-honesty">Task, library, and runtime filters use tags supplied by each model catalog. Hardware filtering is only a model-size estimate; it does not inspect your device or predict exact memory use.</p>
     {modelError && <p className="marketplace-honesty" role="status">{modelError}</p>}
@@ -387,7 +379,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
           </section>
         ) : section === "Installed" ? (
           <div className="marketplace-installed-pane">
-            <div className="panel-heading"><div><p className="section-kicker">LOCAL INVENTORY</p><h3>Installed and connected</h3><p className="panel-subtitle">Models, skills, voices, image assets, built-ins, and MCP servers available to Skai on this device.</p></div><div className="marketplace-model-actions"><StatusBadge tone={installedError || installedInventoryError ? "warning" : installedLoading ? "neutral" : "success"}>{installedLoading ? "Refreshing" : `${installedModels.length + (catalog?.skills.filter((item) => item.installed).length ?? 0) + (catalog?.voices.filter((item) => item.installed).length ?? 0) + (catalog?.tools.filter((item) => item.builtIn).length ?? 0) + installedImageAssets.length + installedConnections.length} items`}</StatusBadge><Button variant="secondary" disabled={installedLoading} onClick={() => void loadInstalledModels()}>{installedLoading ? "Refreshing…" : "Refresh inventory"}</Button></div></div>
+            <div className="panel-heading"><div><p className="section-kicker">LOCAL INVENTORY</p><h3>Installed and connected</h3><p className="panel-subtitle">Models, skills, voices, image assets, built-ins, and MCP servers available to Skai on this device.</p></div><div className="marketplace-model-actions"><StatusBadge tone={installedError || installedInventoryError ? "warning" : installedLoading ? "neutral" : "success"}>{installedLoading ? "Refreshing" : `${installedModels.length + (catalog?.skills.filter((item) => item.installed).length ?? 0) + (catalog?.voices.filter((item) => item.installed).length ?? 0) + (catalog?.tools.filter((item) => item.builtIn).length ?? 0) + installedImageAssets.length + installedConnections.length + installedPersonas.length} items`}</StatusBadge><Button variant="secondary" disabled={installedLoading} onClick={() => void loadInstalledModels()}>{installedLoading ? "Refreshing…" : "Refresh inventory"}</Button></div></div>
             <label className="marketplace-installed-search"><span className="sr-only">Search installed items</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search installed tools and local items…" aria-label="Search installed items" /></label>
             {(installedError || installedInventoryError) && <div className="marketplace-honesty" role="status">{[installedError, installedInventoryError].filter(Boolean).join(" ")}</div>}
             {(() => {
@@ -404,6 +396,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
                 group("Skai built-ins", (catalog?.tools ?? []).filter((item) => item.builtIn).map((item) => ({ id: `tool:${item.id}`, name: item.name, detail: item.description, state: "Built in", icon: "terminal" as NavIconName }))),
                 group("Skills", (catalog?.skills ?? []).filter((item) => item.installed).map((item) => ({ id: `skill:${item.id}`, name: item.name, detail: `${item.source} · ${item.enabled ? "Enabled" : "Disabled"}`, state: item.enabled ? "Enabled" : "Installed", icon: "sparkle" as NavIconName }))),
                 group("Voice profiles", (catalog?.voices ?? []).filter((item) => item.installed).map((item) => ({ id: `voice:${item.id}`, name: item.name, detail: `${item.runtime} · ${item.size}`, state: "Available locally", icon: "activity" as NavIconName }))),
+                group("Personas", installedPersonas.map((item) => ({ id: `persona:${item.id}`, name: item.name, detail: `${item.sourceMode === "public-research" ? "Public research" : "Own material"} · ${item.roles}`, state: "Available in Skai", icon: "sparkle" as NavIconName }))),
                 group("Image assets", installedImageAssets.map((item) => ({ id: `asset:${item.id}`, name: item.id, detail: `${item.repository} · ${formatSize(item.sizeBytes)}`, state: "Installed locally", icon: "image" as NavIconName, remove: () => void removeImageAsset(item.id) }))),
               ];
               return rows.some(Boolean) ? rows : <EmptyState title={query ? "No matching installed items" : "No installed items discovered"} description={query ? "Try another search term." : "Connect a local model runtime or install a compatible tool to see it here."} action={query ? <Button variant="ghost" onClick={() => setQuery("")}>Clear search</Button> : undefined} />;
