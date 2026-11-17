@@ -3,6 +3,7 @@ import type { ThemePicks } from "../../shared/contracts";
 import { Button } from "../components/ui/Primitives";
 import { themeEngine, themeStore } from "./themeEngine";
 import { FontSettings } from "./FontSettings";
+import { GradientEditor } from "./GradientEditor";
 import "./theme.css";
 
 // Theme: Appearance controls for theme files: a light pick and a dark pick
@@ -48,6 +49,7 @@ export function ThemeSettings() {
         <input type="checkbox" checked={state.animateBackground} onChange={(event) => void themeEngine.setAnimateBackground(event.target.checked)} />
         <span><strong>Animate background</strong><small>Slowly moves the theme's canvas gradient. Stays still while reduced motion is on.</small></span>
       </label>
+      <GradientEditor />
       <FontSettings />
       {state.problems.length > 0 && (
         <div className="theme-settings-problems" role="status">

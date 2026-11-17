@@ -131,6 +131,56 @@ test("fonts: signatures and file-name families", () => {
   assert.equal(fontsModule.familyFromFileName("....ttf"), null);
 });
 
+// Contrast for every shipped preset (WCAG 2.x). Keys a preset leaves out use the Skai
+// defaults for its appearance. Text must pass on every background and against EVERY
+// gradient stop on the surface it sits on (SURFACE_TEXT mirrors src/theme/gradients.ts).
+const SURFACE_TEXT = { canvas: ["text", "text-muted"], sidebar: ["sidebar-text", "sidebar-muted"], toolbar: ["text"], rail: ["sidebar-icon"], composer: ["text"], "user-bubble": ["text"], "primary-button": ["on-accent"], "brand-mark": ["on-brand-mark"], "empty-state": ["text", "text-muted"], backdrop: ["text"] };
+function rgba(value) {
+  const hex = /^#([0-9a-f]{3,8})$/i.exec(value);
+  if (hex) {
+    let digits = hex[1];
+    if (digits.length <= 4) digits = [...digits].map((d) => d + d).join("");
+    return [0, 2, 4].map((i) => parseInt(digits.slice(i, i + 2), 16)).concat(digits.length === 8 ? parseInt(digits.slice(6, 8), 16) / 255 : 1);
+  }
+  const fn = /^rgb\(([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)$/.exec(value);
+  return fn ? [Number(fn[1]), Number(fn[2]), Number(fn[3]), fn[4] === undefined ? 1 : Number(fn[4])] : null;
+}
+const over = (top, base) => [0, 1, 2].map((i) => top[i] * top[3] + base[i] * (1 - top[3])).concat(1);
+const lum = (c) => c.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+
+test("presets: text, on-accent and every gradient stop pass contrast", () => {
+  const skai = buildSkaiFamily().themes;
+  const dir = path.dirname(presetPath);
+  const failures = [];
+  for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".json"))) {
+    const preset = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+    for (const theme of preset.themes) {
+      const colors = { ...skai.find((entry) => entry.appearance === theme.appearance).colors, ...theme.colors };
+      const canvas = rgba(colors.canvas);
+      const color = (key) => over(rgba(colors[key]), canvas);
+      const check = (fg, bg, bgName, minimum) => { const value = ratio(fg, bg); if (value < minimum) failures.push(`${file} ${theme.name}: ${bgName} ${value.toFixed(2)}:1 < ${minimum}`); };
+      for (const background of ["canvas", "surface", "surface-raised"]) for (const text of ["text", "text-muted"]) check(color(text), color(background), `${text} on ${background}`, 4.5);
+      for (const text of ["sidebar-text", "sidebar-muted"]) check(color(text), color("sidebar"), `${text} on sidebar`, 4.5);
+      check(color("on-accent"), color("accent"), "on-accent on accent", 4.5);
+      for (const [surface, gradient] of Object.entries(theme.gradients ?? {})) {
+        const stops = typeof gradient === "string" ? [gradient] : gradient.stops.map((stop) => stop.color);
+        for (const text of SURFACE_TEXT[surface]) stops.forEach((stop, index) => check(color(text), over(rgba(stop), canvas), `${text} on ${surface} stop ${index + 1}`, surface === "rail" ? 3 : 4.5));
+      }
+    }
+  }
+  assert.deepEqual(failures, []);
+});
+
+test("gradient presets are original Skai themes with light and dark variants", () => {
+  for (const file of ["aurora.json", "sunset.json", "deep-sea.json", "synthwave.json"]) {
+    const preset = JSON.parse(fs.readFileSync(path.join(path.dirname(presetPath), file), "utf8"));
+    assert.match(preset.license, /^Original Skai Desktop theme/);
+    assert.deepEqual(preset.themes.map((theme) => theme.appearance).sort(), ["dark", "light"]);
+    assert.ok(preset.themes.every((theme) => Object.keys(theme.gradients ?? {}).length >= 2), `${file} needs gradients`);
+  }
+});
+
 async function serviceTests() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-theme-test-"));
   const opened = [];
@@ -154,6 +204,17 @@ async function serviceTests() {
     assert.equal((await service.handle("appearance.editTheme", { id: "user:my-skai-dark.json/Skai Dark (mine)" })).ok, true);
     assert.deepEqual(opened, [path.join(dir, "themes", "my-skai-dark.json")]);
     assert.equal(await service.handle("appearance.unknown", {}), null);
+    // Gradient editor saves: only into a user theme file, validated, and removable.
+    const mine = "user:my-skai-dark.json/Skai Dark (mine)";
+    const gradient = { gradient: "linear", angle: 135, stops: [{ color: "#304050", at: 1 }, { color: "#102030", at: 0 }] };
+    assert.equal((await service.handle("appearance.saveThemeGradient", { id: mine, surface: "canvas", gradient })).ok, true);
+    const written = JSON.parse(fs.readFileSync(path.join(dir, "themes", "my-skai-dark.json"), "utf8")).themes[0].gradients.canvas;
+    assert.deepEqual(written, { gradient: "linear", angle: 135, stops: [{ color: "#102030", at: 0 }, { color: "#304050", at: 1 }] });
+    assert.equal((await service.handle("appearance.saveThemeGradient", { id: "builtin:Skai/Skai Dark", surface: "canvas", gradient })).ok, false);
+    await assert.rejects(service.handle("appearance.saveThemeGradient", { id: mine, surface: "canvas", gradient: { gradient: "linear", stops: [{ color: "url(x)", at: 0 }, { color: "#000", at: 1 }] } }));
+    await assert.rejects(service.handle("appearance.saveThemeGradient", { id: mine, surface: "title-bar", gradient }));
+    assert.equal((await service.handle("appearance.saveThemeGradient", { id: mine, surface: "canvas", gradient: null })).ok, true);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "themes", "my-skai-dark.json"), "utf8")).themes[0].gradients.canvas, undefined);
     // Custom fonts: real signature + caps; junk, oversize and symlinks are reported, not loaded.
     const fontsDir = path.join(dir, "fonts");
     fs.writeFileSync(path.join(fontsDir, "Good-Sans.ttf"), Buffer.concat([Buffer.from([0, 1, 0, 0]), Buffer.alloc(60)]));

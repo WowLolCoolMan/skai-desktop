@@ -6,7 +6,7 @@
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
-const { parseThemeFile, parseFont, validateThemeFamily, buildSchema, colorKeyForToken, FONT_ROLES, MAX_FILE_BYTES } = require("./theme-files.cjs");
+const { parseThemeFile, parseFont, parseGradient, GRADIENT_SURFACES, validateThemeFamily, buildSchema, colorKeyForToken, FONT_ROLES, MAX_FILE_BYTES } = require("./theme-files.cjs");
 const { listCustomFonts, readCustomFont, listInstalledFonts } = require("./theme-fonts.cjs");
 const { base16ToFamily } = require("./theme-base16.cjs");
 
@@ -227,6 +227,31 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
     }
     if (method === "appearance.getThemes") return { v: 1, ok: true, result: await snapshot() };
     if (method === "appearance.saveThemeSelection") return { v: 1, ok: true, result: await savePicks(params) };
+    // Gradient editor: set (or clear) one surface's gradient in the user's own theme file.
+    if (method === "appearance.saveThemeGradient") {
+      const file = userFile(params?.id);
+      const themeName = String(params?.id ?? "").replace(/^user:[^/]+\//, "");
+      if (!file) return { v: 1, ok: false, error: { code: "BUILT_IN_THEME", message: "Built-in themes are read-only. Duplicate it as your theme first." } };
+      if (!GRADIENT_SURFACES.includes(params?.surface)) throw new Error("Unknown gradient surface.");
+      let gradientValue = null;
+      if (params?.gradient !== null) {
+        const parsed = parseGradient(params?.gradient);
+        if (!parsed) throw new Error("The gradient is not valid.");
+        gradientValue = parsed.gradient === "solid" ? parsed.color : { gradient: parsed.gradient, angle: parsed.angle, stops: parsed.stops };
+      }
+      const stat = await fsp.lstat(file);
+      if (!stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error("That theme file can't be edited.");
+      const raw = JSON.parse(await fsp.readFile(file, "utf8"));
+      const theme = Array.isArray(raw?.themes) ? raw.themes.find((entry) => entry?.name === themeName) : null;
+      if (!theme) throw new Error("That theme was not found in its file.");
+      theme.gradients = theme.gradients && typeof theme.gradients === "object" && !Array.isArray(theme.gradients) ? theme.gradients : {};
+      if (gradientValue === null) delete theme.gradients[params.surface]; else theme.gradients[params.surface] = gradientValue;
+      const checked = validateThemeFamily(raw, path.basename(file));
+      if (!checked.family) throw new Error(checked.problems[0]?.problem ?? "The theme file would become invalid.");
+      await fsp.writeFile(file, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+      scheduleReload();
+      return { v: 1, ok: true, result: { surface: params.surface } };
+    }
     if (method === "appearance.saveAppearanceOptions") {
       if (typeof params?.animateBackground !== "boolean") throw new Error("animateBackground must be true or false.");
       await writeAppearance({ animateBackground: params.animateBackground });

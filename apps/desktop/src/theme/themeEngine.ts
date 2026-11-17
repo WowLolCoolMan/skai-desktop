@@ -1,4 +1,4 @@
-import type { AgentResponse, CustomFont, ThemeDefinition, ThemeFamily, ThemeFont, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
+import type { AgentResponse, CustomFont, ThemeDefinition, ThemeFamily, ThemeFont, ThemeGradient, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
 import { buildFontRoles, FONT_ROLES, type FontRole, type FontRoles } from "./fontRoles";
 import { GRADIENT_SURFACES, gradientContrastWarnings, gradientCss, type ContrastWarning, type GradientSurface } from "./gradients";
 
@@ -53,12 +53,14 @@ export type ThemeState = {
   contrastWarnings: ContrastWarning[];
   // Appearance: slow canvas gradient drift (only while reduced motion is off).
   animateBackground: boolean;
+  // Gradient editor: unsaved drafts shown live on top of the active theme (null = no gradient).
+  previewGradients: Partial<Record<GradientSurface, ThemeGradient | null>>;
   active: ThemeDefinition | null;
   loaded: boolean;
   notice: { tone: "info" | "error"; text: string } | null;
 };
 
-let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], contrastWarnings: [], animateBackground: false, scheme: "dark", active: null, loaded: false, notice: null };
+let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], contrastWarnings: [], animateBackground: false, previewGradients: {}, scheme: "dark", active: null, loaded: false, notice: null };
 const listeners = new Set<() => void>();
 let applied: string[] = [];
 let request: Request | null = null;
@@ -106,7 +108,7 @@ function applyTheme(theme: ThemeDefinition | null) {
   for (const surface of GRADIENT_SURFACES) delete root.dataset[datasetKey(surface)];
   const gradients: Partial<Record<GradientSurface, NonNullable<ThemeDefinition["gradients"][string]>>> = {};
   for (const surface of GRADIENT_SURFACES) {
-    const gradient = theme?.gradients?.[surface];
+    const gradient = surface in state.previewGradients ? state.previewGradients[surface] : theme?.gradients?.[surface];
     const css = gradient ? gradientCss(gradient) : null;
     if (!gradient || !css) continue;
     set(`--skai-bg-${surface}`, css);
@@ -131,7 +133,7 @@ export function effectiveFonts(theme: ThemeDefinition | null, current: ThemeStat
 function update(patch: Partial<ThemeState>) {
   const next = { ...state, ...patch };
   next.active = resolveActive(next);
-  const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || !state.loaded;
+  const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || next.previewGradients !== state.previewGradients || !state.loaded;
   state = next;
   if (changed) { applyTheme(state.active); state = { ...state, contrastWarnings }; }
   document.documentElement.dataset.skaiAnimateBackground = String(state.animateBackground);
@@ -273,6 +275,31 @@ export const themeEngine = {
     update({ userFonts });
     const response = await call("appearance.saveFonts", { fonts: { [role]: font && Object.keys(font).length ? font : null } });
     if (response && !response.ok) notify("error", response.error?.message ?? "The font settings could not be saved.");
+  },
+  // Gradient editor: show a draft live (undefined drops the draft for that surface).
+  previewGradient(surface: GradientSurface, gradient: ThemeGradient | null | undefined) {
+    const previewGradients = { ...state.previewGradients };
+    if (gradient === undefined) delete previewGradients[surface]; else previewGradients[surface] = gradient;
+    update({ previewGradients });
+  },
+  clearPreviews() { update({ previewGradients: {} }); },
+  // Save a gradient into the user's own copy of the active theme. A built-in theme is
+  // duplicated first ("Duplicate as my theme"), then the copy is edited.
+  async saveGradient(surface: GradientSurface, gradient: ThemeGradient | null) {
+    let id = state.active?.id;
+    if (!id) return false;
+    if (!id.startsWith("user:")) {
+      const duplicated = await call("appearance.duplicateTheme", { theme: state.active });
+      if (!duplicated?.ok) { notify("error", duplicated?.error?.message ?? "The theme could not be duplicated."); return false; }
+      id = (duplicated.result as { id: string }).id;
+      await themeEngine.select(state.scheme === "light" ? "lightTheme" : "darkTheme", id);
+      notify("info", `Built-in themes are read-only, so it was copied to ${(duplicated.result as { file: string }).file} first.`);
+    }
+    const response = await call("appearance.saveThemeGradient", { id, surface, gradient });
+    if (!response?.ok) { notify("error", response?.error?.message ?? "The gradient could not be saved."); return false; }
+    await themeEngine.reload();
+    themeEngine.previewGradient(surface, undefined);
+    return true;
   },
   async setAnimateBackground(enabled: boolean) {
     update({ animateBackground: enabled });

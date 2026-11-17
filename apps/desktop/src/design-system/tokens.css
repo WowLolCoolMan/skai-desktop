@@ -157,7 +157,8 @@
   --skai-color-sidebar: #eef1f6;
   --skai-color-sidebar-text: #263044;
   --skai-color-sidebar-strong: #18213a;
-  --skai-color-sidebar-muted: #66748b;
+  /* Theme: was #66748b, 4.18:1 on the light sidebar; darkened to pass AA (4.5:1). */
+  --skai-color-sidebar-muted: #5b687f;
   --skai-color-sidebar-subtle: #61708a;
   --skai-color-sidebar-icon: #61718b;
   --skai-color-sidebar-hover: rgba(24, 33, 58, 0.06);

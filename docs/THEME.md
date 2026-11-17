@@ -344,3 +344,34 @@ because main moved during the checks).
 - **Scroll check** (real display, Settings page, 4 s of rAF-driven scrolling, solid vs four gradient surfaces,
   two rounds each): average frame 4.4–4.6 ms solid vs 4.4–4.9 ms with gradients; p95 8.2–8.4 vs 8.0–8.4 ms;
   no frame over 25 ms in either.
+
+### Round 10: gradient editor and gradient presets (Phase 5, part 2)
+
+Round 9 was pushed as b460b85.
+
+- **Editor:** `src/theme/GradientEditor.tsx` (new), in Appearance between the theme controls and Fonts. It has a surface
+  picker (● marks surfaces with a gradient), Solid/Linear/Radial/Conic, an angle dial (pointer drag or arrow keys) plus
+  slider, a stop bar (click to add, drag to move, up to 8, at least 2), stop color and position, a live preview on the app
+  (`themeEngine.previewGradient`, dropped on Cancel or when leaving), and a per-stop contrast warning for the draft.
+  **Save** goes through `themeEngine.saveGradient`, which duplicates a built-in theme first and switches to the copy, then
+  calls the new shell method `appearance.saveThemeGradient`. That method only edits a user theme file (plain name
+  in the folder), validates the gradient, re-validates the whole family, and writes it; `null` removes the gradient.
+- **Presets:** `aurora.json`, `sunset.json`, `deep-sea.json` and `synthwave.json` (new built-in families, each light and
+  dark), with gradients on canvas, sidebar, primary button and brand mark, plus surface, text, accent and sidebar colors.
+  `license` is "Original Skai Desktop theme".
+- **Contrast test for every preset** (`test:themes`): text and muted text on canvas, surface and raised surface; sidebar
+  text and muted on sidebar; on-accent on accent (all ≥ 4.5:1); and every gradient stop against the text on that
+  surface (≥ 4.5:1, rail icons ≥ 3:1). Keys a preset omits use the Skai defaults for its appearance, and translucent
+  colors are blended over the canvas. On its first run it caught three failures, each fixed by adjusting only the
+  failing token:
+  - Deep Sea Light app mark stop 1, `#0284c7` → `#0369a1` (was 4.10:1 against white).
+  - Sunset Dark app mark stop 2, `#db2777` → `#ec4899` (was 3.85:1 against its dark text).
+  - **Skai Light `--skai-color-sidebar-muted`, `#66748b` → `#5b687f`** (was 4.18:1 on the light sidebar, an existing
+    AA failure; the token has a comment explaining why).
+- **Fixed in the theme UI:** disabled buttons in the theme settings now look disabled (`styles.css` has no global
+  `:disabled` rule; this also fixes "Edit current theme" on built-ins looking clickable).
+- **Smoke:** picks Synthwave Dark (gradient painted, no contrast warning). It then uses the editor to switch the canvas to
+  Radial (checks the live preview) and Save, and checks `my-synthwave-dark.json` was created with the radial canvas, the
+  preset's other gradients kept, and the copy active. The smoke helper now finds a select by its label's own text, not
+  `includes()`: the editor's "Backdrop …" option text was matching the Backdrop lookup.
+- **Screens:** `.theme-shots/r10/` has Synthwave Dark and Aurora Light (chat and editor).

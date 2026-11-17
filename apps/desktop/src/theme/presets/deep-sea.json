@@ -1,0 +1,178 @@
+{
+  "$schema": "../../../../../docs/theme.schema.json",
+  "name": "Deep Sea",
+  "author": "Skai Desktop",
+  "license": "Original Skai Desktop theme (same license as the app)",
+  "themes": [
+    {
+      "name": "Deep Sea Dark",
+      "appearance": "dark",
+      "colors": {
+        "canvas": "#04121c",
+        "surface": "#0a1b28",
+        "surface-raised": "#0f2434",
+        "border": "rgb(200 230 250 / 0.16)",
+        "border-strong": "rgb(200 230 250 / 0.28)",
+        "text": "#e3f2fa",
+        "text-muted": "#96b6c9",
+        "accent": "#38bdf8",
+        "accent-strong": "#0ea5e9",
+        "on-accent": "#031522",
+        "sidebar": "#03101a",
+        "sidebar-text": "#e3f2fa",
+        "sidebar-strong": "#e3f2fa",
+        "sidebar-muted": "#96b6c9",
+        "sidebar-subtle": "#96b6c9",
+        "sidebar-icon": "#96b6c9",
+        "brand-mark": "#0ea5e9",
+        "on-brand-mark": "#031522"
+      },
+      "gradients": {
+        "canvas": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#04121c",
+              "at": 0
+            },
+            {
+              "color": "#062433",
+              "at": 0.5
+            },
+            {
+              "color": "#0a1830",
+              "at": 1
+            }
+          ]
+        },
+        "sidebar": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#03101a",
+              "at": 0
+            },
+            {
+              "color": "#05192a",
+              "at": 1
+            }
+          ]
+        },
+        "primary-button": {
+          "gradient": "linear",
+          "angle": 120,
+          "stops": [
+            {
+              "color": "#38bdf8",
+              "at": 0
+            },
+            {
+              "color": "#2dd4bf",
+              "at": 1
+            }
+          ]
+        },
+        "brand-mark": {
+          "gradient": "radial",
+          "stops": [
+            {
+              "color": "#7dd3fc",
+              "at": 0
+            },
+            {
+              "color": "#0284c7",
+              "at": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Deep Sea Light",
+      "appearance": "light",
+      "colors": {
+        "canvas": "#f0f9ff",
+        "surface": "#ffffff",
+        "surface-raised": "#e4f2fb",
+        "border": "rgb(12 40 60 / 0.14)",
+        "border-strong": "rgb(12 40 60 / 0.24)",
+        "text": "#0c2233",
+        "text-muted": "#3e5a6e",
+        "accent": "#0369a1",
+        "accent-strong": "#075985",
+        "on-accent": "#ffffff",
+        "sidebar": "#e6f4fc",
+        "sidebar-text": "#0c2233",
+        "sidebar-strong": "#0c2233",
+        "sidebar-muted": "#3e5a6e",
+        "sidebar-subtle": "#3e5a6e",
+        "sidebar-icon": "#3e5a6e",
+        "brand-mark": "#075985",
+        "on-brand-mark": "#ffffff"
+      },
+      "gradients": {
+        "canvas": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#f0f9ff",
+              "at": 0
+            },
+            {
+              "color": "#e3f3fd",
+              "at": 0.5
+            },
+            {
+              "color": "#eef6fb",
+              "at": 1
+            }
+          ]
+        },
+        "sidebar": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#e6f4fc",
+              "at": 0
+            },
+            {
+              "color": "#e2eff8",
+              "at": 1
+            }
+          ]
+        },
+        "primary-button": {
+          "gradient": "linear",
+          "angle": 120,
+          "stops": [
+            {
+              "color": "#0369a1",
+              "at": 0
+            },
+            {
+              "color": "#0f766e",
+              "at": 1
+            }
+          ]
+        },
+        "brand-mark": {
+          "gradient": "radial",
+          "stops": [
+            {
+              "color": "#0369a1",
+              "at": 0
+            },
+            {
+              "color": "#075985",
+              "at": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

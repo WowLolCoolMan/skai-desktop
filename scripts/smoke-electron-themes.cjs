@@ -122,7 +122,7 @@ async function main() {
   await waitFor(devtools.evaluate, "document.querySelector('.settings-content select')?.value", (value) => typeof value === "string", "Appearance controls");
 
   const setAppearance = async (theme, backdrop) => {
-    const selected = await devtools.callFunction("function (theme, backdrop) { const labels = [...document.querySelectorAll('.settings-content label')]; const set = (labelText, value) => { const select = labels.find((label) => label.textContent?.includes(labelText))?.querySelector('select'); if (!select) return false; select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); return true; }; return { theme: set('Color theme', theme), backdrop: set('Backdrop', backdrop) } }", [theme, backdrop]);
+    const selected = await devtools.callFunction("function (theme, backdrop) { const labels = [...document.querySelectorAll('.settings-content label')]; const set = (labelText, value) => { const select = labels.find((label) => label.firstChild?.nodeType === Node.TEXT_NODE && label.firstChild.textContent?.trim() === labelText)?.querySelector('select'); if (!select) return false; select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); return true; }; return { theme: set('Color theme', theme), backdrop: set('Backdrop', backdrop) } }", [theme, backdrop]);
     if (!selected?.theme || !selected?.backdrop) throw new Error(`Appearance controls were not found for ${theme}/${backdrop}`);
     const state = await waitFor(devtools.evaluate, "JSON.stringify((() => { const root = document.documentElement; const styles = getComputedStyle(root); return { theme: root.dataset.theme, backdrop: root.dataset.backdrop, canvas: styles.getPropertyValue('--skai-color-canvas').trim(), accent: styles.getPropertyValue('--skai-color-accent').trim(), overflow: Math.max(root.scrollWidth, document.body.scrollWidth) <= window.innerWidth + 1, width: window.innerWidth }; })())", (value) => { try { const parsed = JSON.parse(value); return parsed.theme === theme && parsed.backdrop === backdrop; } catch { return false; } }, `${theme}/${backdrop} state`);
     const parsed = JSON.parse(state);
@@ -176,6 +176,20 @@ async function main() {
   const writeTheme = (canvas) => fs.writeFileSync(themeFile, JSON.stringify({ name: "Smoke", license: "CC0-1.0", themes: [{ name: "Smoke Dark", appearance: "dark", colors: { canvas }, fonts: { reading: { family: "Smoke Missing Serif, DejaVu Serif", size: 15, lineHeight: 1.7 }, code: { family: "DejaVu Sans Mono", size: 13 } }, gradients: { canvas: { gradient: "linear", angle: 135, stops: [{ color: "#304050", at: 1 }, { color: canvas, at: 0 }] }, "primary-button": { gradient: "radial", stops: [{ color: "#17131f", at: 0 }, { color: "#b39af5", at: 1 }] } } }] }));
   const canvasToken = "getComputedStyle(document.documentElement).getPropertyValue('--skai-color-canvas').trim()";
   await setAppearance("dark", "none");
+  // Built-in gradient preset: picking it paints its canvas gradient with no contrast warnings.
+  const pickDark = (id) => devtools.callFunction("function (id) { const select = [...document.querySelectorAll('.settings-content label')].find((label) => label.textContent?.startsWith('Dark theme'))?.querySelector('select'); if (!select) return false; select.value = id; select.dispatchEvent(new Event('change', { bubbles: true })); return select.value === id; }", [id]);
+  if (!(await pickDark("builtin:Synthwave/Synthwave Dark"))) throw new Error("The Synthwave Dark preset is missing from the Dark theme picker.");
+  const preset = JSON.parse(await waitFor(devtools.evaluate, "JSON.stringify({ flag: document.documentElement.hasAttribute('data-skai-gradient-canvas'), painted: getComputedStyle(document.querySelector('.app-main')).backgroundImage, warning: Boolean(document.querySelector('.theme-settings-contrast')) })", (value) => JSON.parse(value).flag, "Synthwave Dark gradient to apply"));
+  if (!preset.painted.startsWith("linear-gradient") || preset.warning) throw new Error(`Synthwave Dark did not apply cleanly: ${JSON.stringify(preset)}`);
+  // Gradient editor: switch the canvas to radial (previews live), save. A built-in theme is
+  // duplicated first, then the change is written into the copy and that copy is active.
+  await devtools.evaluate("[...document.querySelectorAll('.gradient-editor-kinds button')].find((button) => button.textContent === 'Radial')?.click(); 1");
+  await waitFor(devtools.evaluate, "getComputedStyle(document.querySelector('.app-main')).backgroundImage", (value) => typeof value === "string" && value.startsWith("radial-gradient"), "radial draft to preview live");
+  await devtools.evaluate("[...document.querySelectorAll('.gradient-editor-actions button')].find((button) => button.textContent?.startsWith('Save'))?.click(); 1");
+  const copyFile = path.join(smokeUserDataDir, "themes", "my-synthwave-dark.json");
+  const savedCopy = JSON.parse(await waitFor(async () => (fs.existsSync(copyFile) ? fs.readFileSync(copyFile, "utf8") : "null"), "", (value) => { try { return JSON.parse(value)?.themes?.[0]?.gradients?.canvas?.gradient === "radial"; } catch { return false; } }, "edited gradient saved into a duplicated theme"));
+  await waitFor(devtools.evaluate, "document.documentElement.dataset.themeId", (value) => value === "user:my-synthwave-dark.json/Synthwave Dark (mine)", "duplicated theme to become active");
+  if (savedCopy.themes[0].gradients["primary-button"]?.gradient !== "linear") throw new Error("Duplicating lost the preset's other gradients.");
   fs.mkdirSync(themesDir, { recursive: true });
   writeTheme("#102030");
   await waitFor(devtools.evaluate, "[...document.querySelectorAll('.settings-content option')].some((option) => option.value === 'user:smoke.json/Smoke Dark')", Boolean, "user theme to load from the themes folder");

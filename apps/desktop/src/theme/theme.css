@@ -45,3 +45,28 @@
 .theme-settings-toggle input { margin-top: 3px; accent-color: var(--skai-color-accent); }
 .theme-settings-toggle span { display: grid; gap: 2px; }
 .theme-settings-toggle small { color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+
+/* ===== Gradient editor ===== */
+.gradient-editor { display: grid; gap: var(--skai-space-3); padding: var(--skai-space-3); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.gradient-editor-heading > div { display: grid; gap: var(--skai-space-1); }
+.gradient-editor-heading span { color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+.gradient-editor-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--skai-space-3); }
+.gradient-editor-row label { display: grid; gap: var(--skai-space-1); color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+.settings-content .gradient-editor-row select, .gradient-editor-row input[type="number"] { min-height: 36px; padding: 0 var(--skai-space-2); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); }
+.gradient-editor-row input[type="color"] { width: 64px; height: 36px; padding: 2px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }
+.gradient-editor-kinds { display: inline-flex; padding: 2px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }
+.gradient-editor-kinds button { min-height: 30px; padding: 0 var(--skai-space-3); border: 0; border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: transparent; cursor: pointer; }
+.gradient-editor-kinds button.is-active { color: var(--skai-color-text); background: var(--skai-color-surface-raised); }
+.gradient-editor-angle { display: flex; align-items: center; gap: var(--skai-space-2); color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+.gradient-editor-angle svg { cursor: grab; touch-action: none; }
+.gradient-editor-angle circle { fill: var(--skai-color-surface); stroke: var(--skai-color-border-strong); stroke-width: 2; }
+.gradient-editor-angle line { stroke: var(--skai-color-accent); stroke-width: 3; stroke-linecap: round; }
+.gradient-editor-preview { height: 72px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); }
+.gradient-editor-bar { position: relative; height: 24px; margin: 0 var(--skai-space-2); border: 1px solid var(--skai-color-border-strong); border-radius: var(--skai-radius-pill); cursor: copy; touch-action: none; }
+.gradient-editor-stop { position: absolute; top: 50%; width: 18px; height: 18px; padding: 0; border: 2px solid var(--skai-color-text); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--skai-color-canvas); cursor: grab; }
+.gradient-editor-stop.is-selected { width: 22px; height: 22px; border-color: var(--skai-color-accent); }
+.gradient-editor-warning { margin: 0; color: var(--skai-color-warning); font-size: var(--skai-text-md); }
+.gradient-editor-actions { display: flex; flex-wrap: wrap; gap: var(--skai-space-2); }
+/* Disabled controls in the theme settings read as disabled (styles.css has no global rule). */
+.theme-settings button:disabled { cursor: not-allowed; opacity: .55; }
+.gradient-editor-kinds button { font-size: var(--skai-text-base); }

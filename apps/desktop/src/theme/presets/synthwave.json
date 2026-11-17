@@ -1,0 +1,188 @@
+{
+  "$schema": "../../../../../docs/theme.schema.json",
+  "name": "Synthwave",
+  "author": "Skai Desktop",
+  "license": "Original Skai Desktop theme (same license as the app)",
+  "themes": [
+    {
+      "name": "Synthwave Dark",
+      "appearance": "dark",
+      "colors": {
+        "canvas": "#120b24",
+        "surface": "#1a1030",
+        "surface-raised": "#23163d",
+        "border": "rgb(230 210 255 / 0.16)",
+        "border-strong": "rgb(230 210 255 / 0.28)",
+        "text": "#f5ecff",
+        "text-muted": "#c4b2de",
+        "accent": "#f472b6",
+        "accent-strong": "#e879f9",
+        "on-accent": "#24071a",
+        "sidebar": "#0f0920",
+        "sidebar-text": "#f5ecff",
+        "sidebar-strong": "#f5ecff",
+        "sidebar-muted": "#c4b2de",
+        "sidebar-subtle": "#c4b2de",
+        "sidebar-icon": "#c4b2de",
+        "brand-mark": "#e879f9",
+        "on-brand-mark": "#24071a"
+      },
+      "gradients": {
+        "canvas": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#120b24",
+              "at": 0
+            },
+            {
+              "color": "#24103a",
+              "at": 0.6
+            },
+            {
+              "color": "#331034",
+              "at": 1
+            }
+          ]
+        },
+        "sidebar": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#0f0920",
+              "at": 0
+            },
+            {
+              "color": "#1c0c2c",
+              "at": 1
+            }
+          ]
+        },
+        "primary-button": {
+          "gradient": "linear",
+          "angle": 100,
+          "stops": [
+            {
+              "color": "#f472b6",
+              "at": 0
+            },
+            {
+              "color": "#a78bfa",
+              "at": 1
+            }
+          ]
+        },
+        "brand-mark": {
+          "gradient": "conic",
+          "angle": 0,
+          "stops": [
+            {
+              "color": "#f472b6",
+              "at": 0
+            },
+            {
+              "color": "#a78bfa",
+              "at": 0.5
+            },
+            {
+              "color": "#f472b6",
+              "at": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Synthwave Light",
+      "appearance": "light",
+      "colors": {
+        "canvas": "#fdf4ff",
+        "surface": "#ffffff",
+        "surface-raised": "#f6ecfb",
+        "border": "rgb(40 20 60 / 0.14)",
+        "border-strong": "rgb(40 20 60 / 0.24)",
+        "text": "#26103a",
+        "text-muted": "#5b4670",
+        "accent": "#a21caf",
+        "accent-strong": "#86198f",
+        "on-accent": "#ffffff",
+        "sidebar": "#f8eefc",
+        "sidebar-text": "#26103a",
+        "sidebar-strong": "#26103a",
+        "sidebar-muted": "#5b4670",
+        "sidebar-subtle": "#5b4670",
+        "sidebar-icon": "#5b4670",
+        "brand-mark": "#86198f",
+        "on-brand-mark": "#ffffff"
+      },
+      "gradients": {
+        "canvas": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#fdf4ff",
+              "at": 0
+            },
+            {
+              "color": "#f5f3ff",
+              "at": 0.6
+            },
+            {
+              "color": "#fff1f2",
+              "at": 1
+            }
+          ]
+        },
+        "sidebar": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#f8eefc",
+              "at": 0
+            },
+            {
+              "color": "#f3eefb",
+              "at": 1
+            }
+          ]
+        },
+        "primary-button": {
+          "gradient": "linear",
+          "angle": 100,
+          "stops": [
+            {
+              "color": "#a21caf",
+              "at": 0
+            },
+            {
+              "color": "#6d28d9",
+              "at": 1
+            }
+          ]
+        },
+        "brand-mark": {
+          "gradient": "conic",
+          "angle": 0,
+          "stops": [
+            {
+              "color": "#a21caf",
+              "at": 0
+            },
+            {
+              "color": "#6d28d9",
+              "at": 0.5
+            },
+            {
+              "color": "#a21caf",
+              "at": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

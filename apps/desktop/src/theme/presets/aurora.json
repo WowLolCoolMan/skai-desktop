@@ -1,0 +1,180 @@
+{
+  "$schema": "../../../../../docs/theme.schema.json",
+  "name": "Aurora",
+  "author": "Skai Desktop",
+  "license": "Original Skai Desktop theme (same license as the app)",
+  "themes": [
+    {
+      "name": "Aurora Dark",
+      "appearance": "dark",
+      "colors": {
+        "canvas": "#0b1220",
+        "surface": "#111b2b",
+        "surface-raised": "#172437",
+        "border": "rgb(200 230 240 / 0.16)",
+        "border-strong": "rgb(200 230 240 / 0.28)",
+        "text": "#e6f1f5",
+        "text-muted": "#a3b8c4",
+        "accent": "#5eead4",
+        "accent-strong": "#2dd4bf",
+        "on-accent": "#04201c",
+        "sidebar": "#0c1524",
+        "sidebar-text": "#e6f1f5",
+        "sidebar-strong": "#e6f1f5",
+        "sidebar-muted": "#a3b8c4",
+        "sidebar-subtle": "#a3b8c4",
+        "sidebar-icon": "#a3b8c4",
+        "brand-mark": "#2dd4bf",
+        "on-brand-mark": "#04201c"
+      },
+      "gradients": {
+        "canvas": {
+          "gradient": "linear",
+          "angle": 160,
+          "stops": [
+            {
+              "color": "#0b1220",
+              "at": 0
+            },
+            {
+              "color": "#0d2229",
+              "at": 0.55
+            },
+            {
+              "color": "#17143a",
+              "at": 1
+            }
+          ]
+        },
+        "sidebar": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#0c1524",
+              "at": 0
+            },
+            {
+              "color": "#0e1d26",
+              "at": 1
+            }
+          ]
+        },
+        "primary-button": {
+          "gradient": "linear",
+          "angle": 120,
+          "stops": [
+            {
+              "color": "#5eead4",
+              "at": 0
+            },
+            {
+              "color": "#93c5fd",
+              "at": 1
+            }
+          ]
+        },
+        "brand-mark": {
+          "gradient": "linear",
+          "angle": 135,
+          "stops": [
+            {
+              "color": "#2dd4bf",
+              "at": 0
+            },
+            {
+              "color": "#818cf8",
+              "at": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Aurora Light",
+      "appearance": "light",
+      "colors": {
+        "canvas": "#f2fbf9",
+        "surface": "#ffffff",
+        "surface-raised": "#eaf4f2",
+        "border": "rgb(18 40 60 / 0.14)",
+        "border-strong": "rgb(18 40 60 / 0.24)",
+        "text": "#122030",
+        "text-muted": "#475766",
+        "accent": "#0f766e",
+        "accent-strong": "#115e59",
+        "on-accent": "#ffffff",
+        "sidebar": "#e9f5f2",
+        "sidebar-text": "#122030",
+        "sidebar-strong": "#122030",
+        "sidebar-muted": "#475766",
+        "sidebar-subtle": "#475766",
+        "sidebar-icon": "#475766",
+        "brand-mark": "#115e59",
+        "on-brand-mark": "#ffffff"
+      },
+      "gradients": {
+        "canvas": {
+          "gradient": "linear",
+          "angle": 160,
+          "stops": [
+            {
+              "color": "#f2fbf9",
+              "at": 0
+            },
+            {
+              "color": "#eef3ff",
+              "at": 0.55
+            },
+            {
+              "color": "#f5f0ff",
+              "at": 1
+            }
+          ]
+        },
+        "sidebar": {
+          "gradient": "linear",
+          "angle": 180,
+          "stops": [
+            {
+              "color": "#e9f5f2",
+              "at": 0
+            },
+            {
+              "color": "#eaeefb",
+              "at": 1
+            }
+          ]
+        },
+        "primary-button": {
+          "gradient": "linear",
+          "angle": 120,
+          "stops": [
+            {
+              "color": "#0f766e",
+              "at": 0
+            },
+            {
+              "color": "#1d4ed8",
+              "at": 1
+            }
+          ]
+        },
+        "brand-mark": {
+          "gradient": "linear",
+          "angle": 135,
+          "stops": [
+            {
+              "color": "#0f766e",
+              "at": 0
+            },
+            {
+              "color": "#4338ca",
+              "at": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

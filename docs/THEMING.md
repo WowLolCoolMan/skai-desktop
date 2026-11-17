@@ -7,7 +7,7 @@ The schema is `docs/theme.schema.json`; most editors use it for completion when 
 > Status: theme files, light/dark picks, the themes folder, live reload, Edit, Duplicate,
 > Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Fonts work: theme
 > fonts, the font picker, your overrides and a custom fonts folder (Phase 4). Gradients are
-> applied too (Phase 5); a gradient editor and gradient presets come next.
+> applied too, with a gradient editor and four gradient presets (Phase 5).
 
 ## Using a theme
 
@@ -143,6 +143,19 @@ A plain color string works too.
 `gradient` is `linear`, `radial` or `conic`. `angle` (0–360°, default 180) applies to linear and conic.
 `stops` has 2–8 entries with `at` from 0 to 1. Skai builds the CSS from these values itself (stops
 sorted by `at`), and a surface without a gradient keeps its normal solid color.
+
+**Gradient presets** (built in, light and dark each): **Aurora**, **Sunset**, **Deep Sea** and
+**Synthwave**. These are original Skai themes, with gradients on the canvas, sidebar, primary buttons and
+app mark.
+
+**Gradient editor** (Settings → Appearance → Gradients): pick a surface, choose Solid, Linear, Radial or
+Conic, and set the angle with the dial (drag, or arrow keys) or the slider. Click the stop bar to add a stop,
+drag stops to move them, and set each stop's color and position. **Remove stop** keeps at least two, and
+**Add stop** allows up to eight. Every change shows on the app straight away. **Save** writes the gradient
+into your own copy of the theme. A built-in theme is first duplicated to `my-<name>.json` and switched to,
+and its other gradients and colors come along. **Cancel** drops the draft, and **Remove gradient** clears
+the surface's gradient in your copy. The editor shows the same per-stop contrast warning as below while
+you edit.
 
 **Contrast:** text has to stay readable against *every* stop, not just the average. Appearance lists
 any stop where the text on that surface falls below 4.5:1 (3:1 for rail icons), naming the surface,
