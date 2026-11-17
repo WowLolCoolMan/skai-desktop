@@ -209,7 +209,7 @@
   --skai-color-border: rgba(24, 35, 60, 0.14);
   --skai-color-border-strong: rgba(24, 35, 60, 0.22);
   --skai-color-text: #18213a;
-  --skai-color-text-muted: #5b6680;
+  --skai-color-text-muted: #555f79;
   --skai-color-code-surface: #eef1f7;
   --skai-color-code-text: #1f2a44;
   --skai-color-danger: #b4233a;
@@ -222,9 +222,9 @@
   --skai-color-sidebar-text: #263044;
   --skai-color-sidebar-strong: #18213a;
   /* Theme: was #66748b, 4.18:1 on the light sidebar; darkened to pass AA (4.5:1). */
-  --skai-color-sidebar-muted: #5b687f;
+  --skai-color-sidebar-muted: #555f79;
   /* Theme: was #61708a, 4.42:1 on the light sidebar (sidebar chat history); darkened to pass AA. */
-  --skai-color-sidebar-subtle: #5b687f;
+  --skai-color-sidebar-subtle: #555f79;
   --skai-color-sidebar-icon: #61718b;
   --skai-color-sidebar-hover: rgba(24, 33, 58, 0.06);
   --skai-color-sidebar-history-hover: rgba(24, 33, 58, 0.05);

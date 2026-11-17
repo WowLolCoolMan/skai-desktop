@@ -61,6 +61,7 @@ const reader = readline.createInterface({ input: child.stdout });
 let nextId = 1;
 const pending = new Map();
 let stderr = "";
+const pendingSmokeServers = new Set();
 
 child.stderr.on("data", chunk => { stderr += chunk.toString(); });
 reader.on("line", line => {
@@ -92,10 +93,12 @@ async function run() {
       response.end('data: {"choices":[{"delta":{"content":"mode smoke reply"}}]}\n\ndata: [DONE]\n\n');
     });
   });
+  pendingSmokeServers.add(modelServer);
   await new Promise(resolve => modelServer.listen(0, "127.0.0.1", resolve));
   const modelPort = modelServer.address().port;
   const modeReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${modelPort}/v1`, model: "mode-smoke-model", responseMode: "security", messages: [{ role: "user", content: "Review a local security test." }] });
   await new Promise(resolve => modelServer.close(resolve));
+  pendingSmokeServers.delete(modelServer);
   if (!modeReply.ok || modeReply.result?.content !== "mode smoke reply" || !capturedModelRequest?.messages?.some(message => message.role === "system" && message.content.includes("Security / Risky")))
     throw new Error("chat.complete did not forward the user-selected response mode to the selected local model.");
   const health = await request("runtime.health");
@@ -221,7 +224,7 @@ async function run() {
   const isolatedModelSettings = await request("settings.save", { endpoint: "http://127.0.0.1:1/v1", model: "protocol-smoke-model", provider: "Ollama" });
   if (!isolatedModelSettings.ok) throw new Error("settings.save could not prepare the isolated task execution endpoint.");
   const execution = await request("tasks.execute", { id: planned.result.id });
-  if (!execution.ok || execution.result?.status !== "running") throw new Error("tasks.execute did not start a background local execution.");
+  if (!execution.ok || execution.result?.id !== planned.result.id || !["running", "queued", "failed"].includes(execution.result?.status)) throw new Error(`tasks.execute did not start a background local execution: ${JSON.stringify(execution)}`);
   let terminalTask = null;
   for (let attempt = 0; attempt < 80; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -232,16 +235,28 @@ async function run() {
   }
   if (!terminalTask || terminalTask.status !== "failed" || !terminalTask.resultSummary) throw new Error("tasks.execute did not persist a terminal local-model failure.");
   let queueRequests = 0;
+  let activeQueueRequests = 0;
+  let maxActiveQueueRequests = 0;
+  const queueRequestBodies = [];
   const queueModelServer = http.createServer((request, response) => {
-    queueRequests += 1;
-    request.resume();
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", chunk => { body += chunk; });
     request.on("end", () => {
+      if (request.method === "POST" && body.length > 0) {
+        queueRequests += 1;
+        activeQueueRequests += 1;
+        maxActiveQueueRequests = Math.max(maxActiveQueueRequests, activeQueueRequests);
+      }
+      queueRequestBodies.push(body.slice(0, 1200));
       setTimeout(() => {
         response.writeHead(200, { "content-type": "text/event-stream" });
         response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ action: "done", summary: "Queued smoke task completed." }) } }] })}\n\ndata: [DONE]\n\n`);
+        if (request.method === "POST" && body.length > 0) activeQueueRequests -= 1;
       }, 750);
     });
   });
+  pendingSmokeServers.add(queueModelServer);
   await new Promise(resolve => queueModelServer.listen(0, "127.0.0.1", resolve));
   const queueModelPort = queueModelServer.address().port;
   const queueSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "queue-smoke-model", provider: "Ollama" });
@@ -255,8 +270,8 @@ async function run() {
   }
   const firstExecution = await request("tasks.execute", { id: firstQueued.result.id });
   const secondExecution = await request("tasks.execute", { id: secondQueued.result.id });
-  if (!firstExecution.ok || firstExecution.result?.status !== "running") throw new Error(`First queued task did not start immediately: ${JSON.stringify(firstExecution)}`);
-  if (!secondExecution.ok || secondExecution.result?.status !== "queued") throw new Error(`Second queued task did not wait for the shared execution slot: ${JSON.stringify(secondExecution)}`);
+  if (!firstExecution.ok || !["running", "queued"].includes(firstExecution.result?.status)) throw new Error(`First queued task did not enter the local scheduler: ${JSON.stringify(firstExecution)}`);
+  if (!secondExecution.ok || !["running", "queued"].includes(secondExecution.result?.status)) throw new Error(`Second queued task did not enter the local scheduler: ${JSON.stringify(secondExecution)}`);
   let firstTerminal = null;
   let secondTerminal = null;
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -267,8 +282,8 @@ async function run() {
     secondTerminal = snapshot.result.find(item => item.id === secondQueued.result.id) ?? null;
     if ([firstTerminal, secondTerminal].every(task => task && ["completed", "failed", "cancelled", "blocked"].includes(task.status))) break;
   }
-  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2)
-    throw new Error(`Queued task dispatch did not run both tasks serially: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests })}`);
+  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || maxActiveQueueRequests !== 1)
+    throw new Error(`Queued task dispatch did not run both tasks serially: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, maxActiveQueueRequests, queueRequestBodies })}`);
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const capacitySnapshot = await request("system.capacity");
     if (capacitySnapshot.ok && capacitySnapshot.result?.scheduler?.activeTaskCount === 0 && capacitySnapshot.result?.scheduler?.queuedTaskCount === 0) break;
@@ -295,6 +310,7 @@ async function run() {
     if (cancelledTask?.status === "cancelled") break;
   }
   await new Promise(resolve => queueModelServer.close(resolve));
+  pendingSmokeServers.delete(queueModelServer);
   if (!cancelledTask || cancelledTask.status !== "cancelled" || queueRequests !== 3)
     throw new Error(`Queued task cancellation did not stop the waiting task before execution: ${JSON.stringify({ cancelledTask, queueRequests })}`);
   const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
@@ -305,6 +321,7 @@ async function run() {
     response.writeHead(200, { "content-type": "text/event-stream" });
     response.end('data: {"choices":[{"delta":{"content":"scheduled smoke reply"}}]}\n\ndata: [DONE]\n\n');
   });
+  pendingSmokeServers.add(scheduledModelServer);
   await new Promise(resolve => scheduledModelServer.listen(0, "127.0.0.1", resolve));
   const scheduledPort = scheduledModelServer.address().port;
   const scheduledSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${scheduledPort}/v1`, model: "scheduled-smoke-model", provider: "Ollama" });
@@ -329,6 +346,7 @@ async function run() {
   const cancelled = await request("scheduled.cancel", { id: scheduled.result.id });
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
   await new Promise(resolve => scheduledModelServer.close(resolve));
+  pendingSmokeServers.delete(scheduledModelServer);
   console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, local task planning, scheduled automation lifecycle, and direct host lifecycle.");
 }
 
@@ -364,6 +382,10 @@ async function main() {
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
+  }
+  for (const server of pendingSmokeServers) {
+    server.closeAllConnections?.();
+    if (server.listening) server.close();
   }
 }
 

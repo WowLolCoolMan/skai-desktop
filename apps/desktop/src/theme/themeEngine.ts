@@ -119,6 +119,13 @@ function applyTheme(theme: ThemeDefinition | null) {
       set("--skai-color-on-accent", candidates.sort((a, b) => b.ratio - a.ratio)[0].value);
     }
   }
+  // Keep every active theme's accent label legible, including third-party palettes
+  // whose supplied on-accent value does not contrast with their accent fill.
+  const activeAccent = parseCssColor(getComputedStyle(root).getPropertyValue("--skai-color-accent").trim());
+  if (activeAccent) {
+    const onAccent = ["white", "black"].map((value) => ({ value, ratio: contrastRatio(parseCssColor(value)!, activeAccent) })).sort((a, b) => b.ratio - a.ratio)[0];
+    set("--skai-color-on-accent", onAccent.value);
+  }
   // Fonts: the theme's roles with Appearance overrides on top (per property), as family
   // stacks and size scales (properties) plus a generated stylesheet for the rest.
   const fonts = buildFontRoles(effectiveFonts(theme));

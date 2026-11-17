@@ -132,6 +132,8 @@ export class PetSpritePlayer {
     this.context.imageSmoothingEnabled = true;
     this.context.drawImage(image, sx, sy, cellWidth, cellHeight, 0, 0, this.canvas.width, this.canvas.height);
     playback.lastFrame = frame;
+    // Expose the current decoded frame for diagnostics and packaged smoke tests.
+    this.canvas.dataset.frame = String(frame);
   }
 
   private clear(): void {

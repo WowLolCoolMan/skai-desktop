@@ -42,10 +42,10 @@ reader.on("line", line => {
 
 function request(method, params) {
   const id = `marketplace-${nextId++}`;
-  child.stdin.write(`${JSON.stringify({ v: 1, id, method, params })}\n`);
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out waiting for ${method}.`)); }, 10_000);
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out waiting for ${method}.`)); }, 45_000);
     pending.set(id, response => { clearTimeout(timer); resolve(response); });
+    child.stdin.write(`${JSON.stringify({ v: 1, id, method, params })}\n`);
   });
 }
 

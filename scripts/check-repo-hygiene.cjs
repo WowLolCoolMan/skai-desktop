@@ -7,7 +7,7 @@ const LARGE_FILE_ALLOWLIST = new Set([
   // Editable source masters are required to regenerate Blaze's shipped sprite strips.
   "assets/pets/blaze-source-rest.png",
   "assets/pets/blaze-source-walk.png",
-  // Shipped Blaze fire-breath atlas is runtime content; keep it tracked until the atlas pipeline can split it.
+  // Runtime transparent animation atlas; lossless recompression offers little until atlas splitting is supported.
   "assets/pets/generated/blaze-fire-breath-body-v2-atlas.png",
 ]);
 

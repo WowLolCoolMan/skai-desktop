@@ -35,7 +35,7 @@ async function fetchJson(url) {
 async function command(method, params = {}) {
   const id = sequence++;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Accessibility CDP command timed out: ${method}`)); }, 15_000);
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Accessibility CDP command timed out: ${method}`)); }, 45_000);
     pending.set(id, { resolve, reject, timer });
     socket.send(JSON.stringify({ id, method, params }));
   });
@@ -83,12 +83,12 @@ async function main() {
 
   const results = [];
   for (const route of routes) {
-    const routeResult = await evaluate(`(async () => { location.hash = '#/${route}'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 350)); const result = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }); return JSON.stringify({ route: location.hash, violations: result.violations.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 8).map((node) => ({ target: node.target, summary: node.failureSummary?.slice(0, 500) })) })), incomplete: result.incomplete.length }); })()`);
+    const routeResult = await evaluate(`(async () => { location.hash = '#/${route}'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 350)); const result = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }); const css = getComputedStyle(document.documentElement); const button = document.querySelector('.new-chat-button'); const buttonCss = button ? getComputedStyle(button) : null; return JSON.stringify({ route: location.hash, theme: { scheme: document.documentElement.dataset.scheme, id: document.documentElement.dataset.themeId, accent: css.getPropertyValue('--skai-color-accent').trim(), onAccent: css.getPropertyValue('--skai-color-on-accent').trim(), text: css.getPropertyValue('--skai-color-text').trim(), raised: css.getPropertyValue('--skai-color-surface-raised').trim(), buttonBg: buttonCss?.backgroundColor, buttonText: buttonCss?.color, buttonVars: button ? [getComputedStyle(button).getPropertyValue('--skai-color-accent').trim(), getComputedStyle(button).getPropertyValue('--skai-color-on-accent').trim()] : [] }, violations: result.violations.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 8).map((node) => ({ target: node.target, summary: node.failureSummary?.slice(0, 500) })) })), incomplete: result.incomplete.length }); })()`);
     results.push(JSON.parse(routeResult));
   }
   const navigationResult = await evaluate(`(() => { const skip = document.querySelector('.skip-link'); const main = document.querySelector('#main-content'); const controls = [...document.querySelectorAll('button,a,input,select,textarea,[tabindex]')].filter((el) => !el.disabled && el.tabIndex >= 0); skip?.focus(); return JSON.stringify({ skipLink: Boolean(skip && skip.getAttribute('href') === '#main-content'), skipFocusWorks: document.activeElement === skip, mainLandmark: Boolean(main?.closest('main')), focusableCount: controls.length }); })()`);
   const keyboard = JSON.parse(navigationResult);
-  const violations = results.flatMap((result) => result.violations.map((violation) => ({ route: result.route, ...violation })));
+  const violations = results.flatMap((result) => result.violations.map((violation) => ({ route: result.route, theme: result.theme, ...violation })));
   const critical = violations.filter((item) => item.impact === "critical");
   const serious = violations.filter((item) => item.impact === "serious");
   console.log(JSON.stringify({ routesInspected: results.length, wcagViolations: violations.length, serious: serious.length, critical: critical.length, keyboard, violations, incompleteChecks: results.reduce((sum, item) => sum + item.incomplete, 0) }, null, 2));

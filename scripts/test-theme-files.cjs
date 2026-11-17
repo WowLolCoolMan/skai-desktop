@@ -72,11 +72,11 @@ test("every color key maps to a token defined in tokens.css", () => {
 });
 
 test("skai.json is in sync with tokens.css", () => {
-  assert.equal(fs.readFileSync(presetPath, "utf8"), serialize(buildSkaiFamily()), "skai.json is stale: run node scripts/theme-generate.cjs --write");
+  assert.equal(fs.readFileSync(presetPath, "utf8").replace(/\r\n/g, "\n"), serialize(buildSkaiFamily()), "skai.json is stale: run node scripts/theme-generate.cjs --write");
 });
 
 test("docs/theme.schema.json is in sync with the validator", () => {
-  assert.equal(fs.readFileSync(schemaPath, "utf8"), serialize(buildSchema()), "theme.schema.json is stale: run node scripts/theme-generate.cjs --write");
+  assert.equal(fs.readFileSync(schemaPath, "utf8").replace(/\r\n/g, "\n"), serialize(buildSchema()), "theme.schema.json is stale: run node scripts/theme-generate.cjs --write");
 });
 
 test("every shipped preset is valid with no problems and has a license", () => {
@@ -183,10 +183,10 @@ test("presets: text, on-accent and every gradient stop pass contrast", () => {
 test("community presets are generated from their recorded sources and licensed permissively", () => {
   for (const { id, json } of community.buildFamilies()) {
     const file = path.join(community.presetDir, `${id}.json`);
-    assert.equal(fs.readFileSync(file, "utf8"), community.serialize(json), `${id}.json is stale: run node scripts/theme-community.cjs --write`);
+    assert.equal(fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n"), community.serialize(json), `${id}.json is stale: run node scripts/theme-community.cjs --write`);
     assert.match(json.license, /^(MIT|Apache-2\.0|Original Skai Desktop theme)/, `${id} license`);
   }
-  assert.equal(fs.readFileSync(community.noticesPath, "utf8"), community.buildNotices(), "licenses/THEME-PALETTES.md is stale: run node scripts/theme-community.cjs --write");
+  assert.equal(fs.readFileSync(community.noticesPath, "utf8").replace(/\r\n/g, "\n"), community.buildNotices(), "licenses/THEME-PALETTES.md is stale: run node scripts/theme-community.cjs --write");
   for (const entry of Object.values(community.SOURCES)) if (entry.copyright) assert.ok(community.buildNotices().includes(entry.copyright), `${entry.name} copyright missing from the notices`);
 });
 

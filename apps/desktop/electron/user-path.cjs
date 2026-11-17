@@ -27,24 +27,24 @@ function compareVersionsDescending(a, b) {
 }
 
 /** Candidate per-user bin directories, most preferred first. */
-function userToolDirectories({ env = process.env, home = os.homedir(), readdir = (dir) => fs.readdirSync(dir) } = {}) {
-  const dataHome = env.XDG_DATA_HOME || path.join(home, ".local", "share");
-  const nvmDir = env.NVM_DIR || path.join(home, ".nvm");
+function userToolDirectories({ env = process.env, home = os.homedir(), readdir = (dir) => fs.readdirSync(dir), pathApi = path } = {}) {
+  const dataHome = env.XDG_DATA_HOME || pathApi.join(home, ".local", "share");
+  const nvmDir = env.NVM_DIR || pathApi.join(home, ".nvm");
   const candidates = [
-    path.join(home, ".local", "bin"),
-    path.join(home, "bin"),
-    env.VOLTA_HOME ? path.join(env.VOLTA_HOME, "bin") : path.join(home, ".volta", "bin"),
-    path.join(dataHome, "fnm", "aliases", "default", "bin"),
-    path.join(home, ".fnm", "aliases", "default", "bin"),
-    path.join(dataHome, "mise", "shims"),
-    path.join(env.ASDF_DATA_DIR || path.join(home, ".asdf"), "shims"),
-    path.join(env.PYENV_ROOT || path.join(home, ".pyenv"), "shims"),
-    path.join(home, ".bun", "bin"),
+    pathApi.join(home, ".local", "bin"),
+    pathApi.join(home, "bin"),
+    env.VOLTA_HOME ? pathApi.join(env.VOLTA_HOME, "bin") : pathApi.join(home, ".volta", "bin"),
+    pathApi.join(dataHome, "fnm", "aliases", "default", "bin"),
+    pathApi.join(home, ".fnm", "aliases", "default", "bin"),
+    pathApi.join(dataHome, "mise", "shims"),
+    pathApi.join(env.ASDF_DATA_DIR || pathApi.join(home, ".asdf"), "shims"),
+    pathApi.join(env.PYENV_ROOT || pathApi.join(home, ".pyenv"), "shims"),
+    pathApi.join(home, ".bun", "bin"),
   ];
   // nvm has no stable "current" link; use the newest installed Node.
   try {
-    const versions = readdir(path.join(nvmDir, "versions", "node")).filter((name) => /^v\d/.test(name)).sort(compareVersionsDescending);
-    if (versions.length) candidates.splice(3, 0, path.join(nvmDir, "versions", "node", versions[0], "bin"));
+    const versions = readdir(pathApi.join(nvmDir, "versions", "node")).filter((name) => /^v\d/.test(name)).sort(compareVersionsDescending);
+    if (versions.length) candidates.splice(3, 0, pathApi.join(nvmDir, "versions", "node", versions[0], "bin"));
   } catch { /* nvm not installed */ }
   return candidates;
 }
@@ -53,17 +53,17 @@ function userToolDirectories({ env = process.env, home = os.homedir(), readdir =
  * Return PATH with existing per-user tool directories appended (Linux only).
  * Directories already on PATH are not repeated.
  */
-function augmentUserPath({ platform = process.platform, env = process.env, home = os.homedir(), exists = (dir) => fs.existsSync(dir), readdir } = {}) {
+function augmentUserPath({ platform = process.platform, env = process.env, home = os.homedir(), exists = (dir) => fs.existsSync(dir), readdir, delimiter = path.delimiter, pathApi = path } = {}) {
   const current = env.PATH || "";
   if (platform !== "linux" || !home) return current;
-  const entries = current.split(path.delimiter).filter(Boolean);
+  const entries = current.split(delimiter).filter(Boolean);
   const seen = new Set(entries);
-  for (const directory of userToolDirectories({ env, home, readdir })) {
+  for (const directory of userToolDirectories({ env, home, readdir, pathApi })) {
     if (seen.has(directory) || !exists(directory)) continue;
     entries.push(directory);
     seen.add(directory);
   }
-  return entries.join(path.delimiter);
+  return entries.join(delimiter);
 }
 
 module.exports = { augmentUserPath, userToolDirectories };

@@ -21,6 +21,7 @@ const steps = [
   "smoke:agent-host",
   "smoke:marketplace-host",
   "test",
+  "test:update-policy",
   "smoke:task-replan",
   "smoke:electron:artifact",
   "smoke:electron:accessibility",

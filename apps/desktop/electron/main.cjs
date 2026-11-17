@@ -14,6 +14,7 @@ const { normalizePetBehaviorSettings, randomAttackSequence } = require("./pet-at
 const { createPetMotionEngine } = require("./pet-motion-engine.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
 const { augmentUserPath } = require("./user-path.cjs");
+const { shouldDownloadAvailableUpdate } = require("./update-policy.cjs");
 const { createThemeService } = require("./theme-service.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
@@ -112,6 +113,7 @@ let updateSnapshot = { status: "idle", available: false, message: "Updates have 
 let updateChecksEnabled = true;
 let updateDownloadToken = null;
 let updateCheckInFlight = false;
+let updateCheckWasManual = false;
 
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
@@ -1100,6 +1102,10 @@ function configureAutoUpdater() {
   autoUpdater.allowPrerelease = false;
   autoUpdater.on("checking-for-update", () => publishUpdateState("checking", { message: "Checking the stable release channel…" }));
   autoUpdater.on("update-available", (info) => {
+    if (!shouldDownloadAvailableUpdate({ enabled: updateChecksEnabled, manualCheck: updateCheckWasManual })) {
+      publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Automatic downloads are off; use Check for updates to download it.` });
+      return;
+    }
     publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Starting a background download…` });
     updateDownloadToken = new CancellationToken();
     const token = updateDownloadToken;
@@ -1130,13 +1136,14 @@ async function checkForUpdates(force = false) {
   if (!app.isPackaged || process.platform === "darwin") return { ...updateSnapshot, available: false, currentVersion, releaseUrl, message: "Updates are available in packaged Windows and Linux builds." };
   if (updateCheckInFlight || ["downloading", "downloaded"].includes(updateSnapshot.status)) return { ...updateSnapshot, currentVersion, releaseUrl };
   updateCheckInFlight = true;
+  updateCheckWasManual = force;
   try {
     await autoUpdater.checkForUpdates();
     return { ...updateSnapshot, currentVersion, releaseUrl };
   } catch (error) {
     publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "Update check failed. You can retry from Settings." });
     return { ...updateSnapshot, currentVersion, releaseUrl };
-  } finally { updateCheckInFlight = false; }
+  } finally { updateCheckInFlight = false; updateCheckWasManual = false; }
 }
 function scheduleUpdateCheck() {
   if (updateCheckTimer) clearInterval(updateCheckTimer);

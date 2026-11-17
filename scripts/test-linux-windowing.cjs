@@ -49,9 +49,9 @@ assert.equal(isTrayLikelyVisible({ platform: "linux", env: i3, statusNotifierHos
   const present = new Set(["/home/u/.local/bin", "/home/u/.nvm/versions/node/v22.11.0/bin", "/home/u/.pyenv/shims"]);
   const readdir = (dir) => { if (dir === "/home/u/.nvm/versions/node") return ["v18.20.0", "v22.11.0", "v9.0.0", "system"]; throw new Error("ENOENT"); };
   const env = { PATH: "/usr/bin:/home/u/.local/bin" };
-  assert.equal(augmentUserPath({ platform: "linux", env, home, exists: (dir) => present.has(dir), readdir }), "/usr/bin:/home/u/.local/bin:/home/u/.nvm/versions/node/v22.11.0/bin:/home/u/.pyenv/shims");
+  assert.equal(augmentUserPath({ platform: "linux", env, home, exists: (dir) => present.has(dir), readdir, delimiter: ":", pathApi: require("node:path").posix }), "/usr/bin:/home/u/.local/bin:/home/u/.nvm/versions/node/v22.11.0/bin:/home/u/.pyenv/shims");
   assert.equal(augmentUserPath({ platform: "win32", env, home, exists: () => true, readdir }), env.PATH);
-  assert.equal(augmentUserPath({ platform: "linux", env: { PATH: "" }, home, exists: () => false, readdir }), "");
+  assert.equal(augmentUserPath({ platform: "linux", env: { PATH: "" }, home, exists: () => false, readdir, delimiter: ":", pathApi: require("node:path").posix }), "");
 }
 
 // X11 compositor probe: unparsable or unreachable displays are "unknown" (null), never a false "no compositor".
