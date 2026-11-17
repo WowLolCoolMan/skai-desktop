@@ -248,8 +248,9 @@ optgroup {
   --skai-space-6: 32px;
 }
 
+/* Theme: Appearance → Motion "Full" (<html data-motion="full">) opts out of the OS setting. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  html:not([data-motion="full"]) *, html:not([data-motion="full"]) *::before, html:not([data-motion="full"]) *::after {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;

@@ -1,6 +1,6 @@
-import type { AgentResponse, CustomFont, ThemeDefinition, ThemeFamily, ThemeFont, ThemeGradient, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
+import type { AgentResponse, AppearanceOptions, CustomFont, ThemeDefinition, ThemeFamily, ThemeFont, ThemeGradient, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
 import { buildFontRoles, FONT_ROLES, type FontRole, type FontRoles } from "./fontRoles";
-import { GRADIENT_SURFACES, gradientContrastWarnings, gradientCss, type ContrastWarning, type GradientSurface } from "./gradients";
+import { contrastRatio, GRADIENT_SURFACES, gradientContrastWarnings, gradientCss, parseCssColor, type ContrastWarning, type GradientSurface } from "./gradients";
 
 // Theme engine (renderer). Built-in presets ship in src/theme/presets; user themes
 // arrive from the main process already validated (electron/theme-service.cjs).
@@ -9,6 +9,9 @@ import { GRADIENT_SURFACES, gradientContrastWarnings, gradientCss, type Contrast
 
 type Request = (method: string, params?: Record<string, unknown>) => Promise<AgentResponse>;
 type RawFamily = { name: string; author?: string; license?: string; themes: { name: string; appearance: "light" | "dark"; colors?: Record<string, string>; fonts?: ThemeDefinition["fonts"]; gradients?: Record<string, string | { gradient: "linear" | "radial" | "conic"; angle?: number; stops: { color: string; at: number }[] }> }[] };
+
+export const DEFAULT_OPTIONS: AppearanceOptions = { animateBackground: false, textScale: 1, cornerStyle: "default", chatWidth: "default", messageStyle: "bubbles", motion: "system", accent: null };
+const RADIUS_SCALE: Record<AppearanceOptions["cornerStyle"], number> = { square: 0, subtle: 0.5, default: 1, round: 1.5 };
 
 export const DEFAULT_PICKS: ThemePicks = { lightTheme: "builtin:Skai/Skai Light", darkTheme: "builtin:Skai/Skai Dark" };
 // The Skai family is what tokens.css already defines, so it applies nothing inline
@@ -55,6 +58,8 @@ export type ThemeState = {
   animateBackground: boolean;
   // Gradient editor: unsaved drafts shown live on top of the active theme (null = no gradient).
   previewGradients: Partial<Record<GradientSurface, ThemeGradient | null>>;
+  // Appearance options (appearance.json): text size, corners, chat width, message style, motion, accent.
+  options: AppearanceOptions;
   // Gallery: a theme shown on the app before it is applied (its own light/dark scheme).
   previewThemeId: string | null;
   active: ThemeDefinition | null;
@@ -62,7 +67,7 @@ export type ThemeState = {
   notice: { tone: "info" | "error"; text: string } | null;
 };
 
-let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], contrastWarnings: [], animateBackground: false, previewGradients: {}, previewThemeId: null, scheme: "dark", active: null, loaded: false, notice: null };
+let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], contrastWarnings: [], animateBackground: false, previewGradients: {}, previewThemeId: null, options: { ...DEFAULT_OPTIONS }, scheme: "dark", active: null, loaded: false, notice: null };
 const listeners = new Set<() => void>();
 let applied: string[] = [];
 let request: Request | null = null;
@@ -100,10 +105,29 @@ function applyTheme(theme: ThemeDefinition | null) {
       if (/^--skai-[a-z0-9-]+$/.test(property) && SAFE_COLOR.test(value)) set(property, value);
     }
   }
+  // Accent override (Appearance): the chosen color, a stronger step, and whichever of
+  // white / black / the canvas reads best on it as on-accent text.
+  const options = state.options;
+  if (options.accent && /^#[0-9a-f]{6}$/i.test(options.accent)) {
+    const accent = parseCssColor(options.accent);
+    if (accent) {
+      set("--skai-color-accent", options.accent);
+      set("--skai-color-accent-strong", `color-mix(in srgb, ${options.accent} 82%, ${scheme() === "light" ? "black" : "white"})`);
+      // Pure white or black text, whichever contrasts more (not theme colors: contrast extremes).
+      const candidates = ["white", "black"].map((value) => ({ value, ratio: contrastRatio(parseCssColor(value)!, accent) }));
+      set("--skai-color-on-accent", candidates.sort((a, b) => b.ratio - a.ratio)[0].value);
+    }
+  }
   // Fonts: the theme's roles with Appearance overrides on top (per property), as family
   // stacks and size scales (properties) plus a generated stylesheet for the rest.
   const fonts = buildFontRoles(effectiveFonts(theme));
   for (const [property, value] of Object.entries(fonts.properties)) set(property, value);
+  // Text size multiplies the UI font role's scale; corner style sets the radius scale.
+  if (options.textScale !== 1 || fonts.properties["--skai-text-scale"]) set("--skai-text-scale", (Number(fonts.properties["--skai-text-scale"] ?? 1) * options.textScale).toFixed(4));
+  if (options.cornerStyle !== "default") set("--skai-radius-scale", String(RADIUS_SCALE[options.cornerStyle]));
+  root.dataset.chatWidth = options.chatWidth;
+  root.dataset.messageStyle = options.messageStyle;
+  root.dataset.motion = options.motion;
   let style = document.getElementById("skai-font-roles");
   if (!fonts.css) style?.remove();
   else {
@@ -136,10 +160,12 @@ export function effectiveFonts(theme: ThemeDefinition | null, current: ThemeStat
   return merged;
 }
 
+const scheme = () => (document.documentElement.dataset.scheme === "light" ? "light" : "dark");
+
 function update(patch: Partial<ThemeState>) {
   const next = { ...state, ...patch };
   next.active = resolveActive(next);
-  const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || next.previewGradients !== state.previewGradients || next.previewThemeId !== state.previewThemeId || !state.loaded;
+  const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || next.previewGradients !== state.previewGradients || next.previewThemeId !== state.previewThemeId || next.options !== state.options || !state.loaded;
   state = next;
   if (changed) { applyTheme(state.active); state = { ...state, contrastWarnings }; }
   document.documentElement.dataset.skaiAnimateBackground = String(state.animateBackground);
@@ -147,7 +173,7 @@ function update(patch: Partial<ThemeState>) {
 }
 
 function receive(snapshot: ThemeSnapshot) {
-  update({ user: snapshot.families, problems: snapshot.problems, picks: snapshot.picks, themesDir: snapshot.themesDir, fontsDir: snapshot.fontsDir ?? "", userFonts: (snapshot.fonts ?? {}) as FontRoles, animateBackground: Boolean(snapshot.animateBackground), loaded: true });
+  update({ user: snapshot.families, problems: snapshot.problems, picks: snapshot.picks, themesDir: snapshot.themesDir, fontsDir: snapshot.fontsDir ?? "", userFonts: (snapshot.fonts ?? {}) as FontRoles, animateBackground: Boolean(snapshot.options?.animateBackground ?? snapshot.animateBackground), options: { ...DEFAULT_OPTIONS, ...(snapshot.options ?? {}) }, loaded: true });
   void loadCustomFonts(snapshot.customFonts ?? []);
 }
 
@@ -316,6 +342,19 @@ export const themeEngine = {
     await themeEngine.reload();
     themeEngine.previewGradient(surface, undefined);
     return true;
+  },
+  // Appearance options: apply at once, then save to appearance.json.
+  async setOption<K extends keyof AppearanceOptions>(key: K, value: AppearanceOptions[K]) {
+    update({ options: { ...state.options, [key]: value }, ...(key === "animateBackground" ? { animateBackground: Boolean(value) } : {}) });
+    const response = await call("appearance.saveAppearanceOptions", { [key]: value });
+    if (response && !response.ok) notify("error", response.error?.message ?? "The setting could not be saved.");
+  },
+  // Reset appearance: theme picks, fonts and options back to the defaults (theme files are kept).
+  async resetAppearance() {
+    update({ options: { ...DEFAULT_OPTIONS }, animateBackground: false, userFonts: {}, picks: { ...DEFAULT_PICKS }, previewThemeId: null, previewGradients: {} });
+    const response = await call("appearance.resetAppearance");
+    if (response && !response.ok) notify("error", response.error?.message ?? "Appearance could not be reset.");
+    else notify("info", "Appearance is back to the defaults. Your theme and font files were kept.");
   },
   async setAnimateBackground(enabled: boolean) {
     update({ animateBackground: enabled });

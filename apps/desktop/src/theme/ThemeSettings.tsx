@@ -5,6 +5,7 @@ import { themeEngine, themeStore } from "./themeEngine";
 import { FontSettings } from "./FontSettings";
 import { GradientEditor } from "./GradientEditor";
 import { ThemeGallery } from "./ThemeGallery";
+import { AppearanceOptions } from "./AppearanceOptions";
 import "./theme.css";
 
 // Theme: Appearance controls for theme files: a light pick and a dark pick
@@ -51,6 +52,7 @@ export function ThemeSettings() {
         <input type="checkbox" checked={state.animateBackground} onChange={(event) => void themeEngine.setAnimateBackground(event.target.checked)} />
         <span><strong>Animate background</strong><small>Slowly moves the theme's canvas gradient. Stays still while reduced motion is on.</small></span>
       </label>
+      <AppearanceOptions />
       <GradientEditor />
       <FontSettings />
       {state.problems.length > 0 && (

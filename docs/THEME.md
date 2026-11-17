@@ -442,3 +442,38 @@ Round 11 was pushed as 1803dc9.
 - **Smoke:** checks there are at least 37 cards. It clicks Catppuccin Latte in dark mode (expects the light scheme and
   that theme id), clicks Apply (expects `lightTheme` in `appearance.json`), and checks the app returns to its dark scheme.
 - **Screens:** `.theme-shots/r12/gallery-dark.png` and `gallery-preview-dawn.png` (Rosé Pine Dawn previewed from dark mode).
+
+### Round 13: the rest of Appearance (Phase 7)
+
+Round 12 was pushed as b5c6383.
+
+- **Options** (`appearance.json`, validated in `theme-service.cjs` on read and save; the new shell method
+  `appearance.resetAppearance` resets picks, fonts and options and keeps files):
+  - `textScale`: multiplied into `--skai-text-scale` with the UI font role's size.
+  - `cornerStyle`: sets `--skai-radius-scale` 0, 0.5, 1 or 1.5.
+  - `chatWidth` and `messageStyle`: `<html data-chat-width|data-message-style>` plus `src/theme/appearance.css`. The
+    defaults match no rule, so the owner's chat styles are untouched.
+  - `motion`: system/reduce/full. "Reduce" stills like the Reduced motion switch. "Full" now opts out of the OS
+    setting: the `tokens.css` `prefers-reduced-motion` block and the animate-background rule skip
+    `[data-motion="full"]`.
+  - `accent`: the override color, `accent-strong` mixed from it, and whichever of white or black reads best as
+    on-accent. Swatches come from the active theme's ANSI palette, with a color picker for anything else, and a
+    warning shows under 3:1.
+- **UI:** `src/theme/AppearanceOptions.tsx` (new). `AppearancePreview` sits at the very top of Appearance (one more
+  line in `SettingsPage.tsx`) with a live preview card and **Reset appearance…** with a confirm step. The
+  "Layout and motion" controls sit between the theme pickers and the gradient editor.
+- **Audit bug fixed:** `audit:theme-tokens` stripped `/* … */` with a regex, so the string `"./presets/*.json"` in
+  `themeEngine.ts` hid about half the file from the audit. It now uses a string-aware scanner. Re-running it found
+  only this round's two new literals (now the `white`/`black` contrast keywords) and nothing hidden in other files.
+- **Tests:** options are validated on save and read (out-of-range scale, unknown style, a `;` in the accent and
+  unknown keys are refused), and reset restores the defaults. **Smoke:** clicks Corners Square, Chat width Wide
+  and the first accent swatch (checks the radius scale, attribute and inline accent), then Reset appearance with
+  its confirm step (checks the screen and `appearance.json`).
+- **Screens:** `.theme-shots/r13/` has Appearance at the top, the options, chat with Cards + Wide + round corners +
+  a palette accent, and 760x560 (no horizontal overflow).
+- **Not done, needs the user's call:**
+  - **Sidebar and rail sections.** The owner's sidebar is already drag-resizable and remembers its width; hiding
+    sections would mean editing his navigation.
+  - **The existing Accent select (Cyan/Violet/Amber/Rose) still does nothing.** No CSS reads `data-accent`, and its
+    stored default is "cyan", so wiring it up would turn everyone's accent cyan. The new accent override does the
+    job; the old select should probably be removed or merged.

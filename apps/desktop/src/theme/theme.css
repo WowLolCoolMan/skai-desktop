@@ -100,3 +100,31 @@
 .theme-card-name { overflow: hidden; font-size: var(--skai-text-base); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .theme-card-meta { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
 .theme-gallery-filters input, .theme-gallery-preview-bar { font-size: var(--skai-text-base); }
+
+/* ===== Appearance preview card and options ===== */
+.appearance-preview { display: grid; gap: var(--skai-space-2); margin-bottom: var(--skai-space-3); }
+.appearance-preview-card { display: grid; gap: var(--skai-space-2); padding: var(--skai-space-4); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-surface); }
+.appearance-preview-card h3 { margin: 0; color: var(--skai-color-text); font-size: calc(var(--skai-text-3xl) * var(--skai-heading-scale)); }
+.appearance-preview-eyebrow { margin: 0; color: var(--skai-color-accent); font-size: var(--skai-text-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.appearance-preview-reading { margin: 0; color: var(--skai-color-text); }
+.appearance-preview-reading a { color: var(--skai-color-link); }
+.appearance-preview-bubble { justify-self: end; max-width: 80%; padding: var(--skai-space-2) var(--skai-space-3); border: 1px solid var(--skai-color-user-bubble-border); border-radius: var(--skai-radius-xl); color: var(--skai-color-text); background: var(--skai-color-user-bubble); font-size: var(--skai-text-base); }
+html[data-skai-gradient-user-bubble] .appearance-preview-bubble { background: var(--skai-bg-user-bubble); }
+.appearance-preview-code { margin: 0; padding: var(--skai-space-2) var(--skai-space-3); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-code-text); background: var(--skai-color-code-surface); font-family: var(--skai-font-code); font-size: calc(var(--skai-text-md) * var(--skai-code-scale)); overflow-x: auto; }
+.appearance-preview-actions { display: flex; gap: var(--skai-space-2); }
+.appearance-preview-reset { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--skai-space-2); color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+.appearance-options { display: grid; gap: var(--skai-space-3); padding: var(--skai-space-3); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.appearance-option { display: grid; grid-template-columns: minmax(110px, 160px) 1fr; align-items: center; gap: var(--skai-space-3); }
+.appearance-option > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+.appearance-option .gradient-editor-kinds { justify-self: start; }
+.appearance-range { display: flex; align-items: center; gap: var(--skai-space-2); }
+.appearance-range input { width: min(260px, 100%); accent-color: var(--skai-color-accent); }
+.appearance-range output { min-width: 44px; color: var(--skai-color-text); font-size: var(--skai-text-md); }
+.appearance-accents { display: flex; flex-wrap: wrap; align-items: center; gap: var(--skai-space-2); }
+.appearance-accent { width: 26px; height: 26px; padding: 0; border: 2px solid var(--skai-color-border-strong); border-radius: 50%; cursor: pointer; }
+.appearance-accent.is-active, .appearance-accent-theme.is-active { outline: 2px solid var(--skai-color-focus-ring); outline-offset: 2px; }
+.appearance-accent-theme { min-height: 28px; padding: 0 var(--skai-space-3); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text); background: var(--skai-color-surface); font-size: var(--skai-text-md); cursor: pointer; }
+.appearance-accent-custom { display: inline-flex; align-items: center; gap: var(--skai-space-1); color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }
+.appearance-accent-custom input { width: 34px; height: 26px; padding: 0; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); background: transparent; }
+.appearance-options-note { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+@media (max-width: 760px) { .appearance-option { grid-template-columns: 1fr; } }

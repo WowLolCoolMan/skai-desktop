@@ -239,6 +239,18 @@ async function main() {
   }
   const savedPicks = JSON.parse(fs.readFileSync(path.join(smokeUserDataDir, "appearance.json"), "utf8"));
   if (savedPicks.darkTheme !== "user:smoke.json/Smoke Dark") throw new Error(`The theme pick was not saved to appearance.json: ${JSON.stringify(savedPicks)}`);
+  // Appearance options: corners, chat width and an accent from the theme's palette apply at
+  // once; Reset appearance (with its confirm step) restores the defaults on screen and on disk.
+  const clickOption = (group, text) => devtools.callFunction("function (group, text) { const radios = document.querySelector(`.appearance-options [aria-label='${group}']`); const button = [...(radios?.querySelectorAll('button') ?? [])].find((item) => item.textContent === text); button?.click(); return Boolean(button); }", [group, text]);
+  if (!(await clickOption("Corners", "Square")) || !(await clickOption("Chat width", "Wide"))) throw new Error("Appearance option controls were not found.");
+  await devtools.evaluate("document.querySelector('.appearance-accent')?.click(); 1");
+  const optionState = JSON.parse(await waitFor(devtools.evaluate, "JSON.stringify({ radius: getComputedStyle(document.documentElement).getPropertyValue('--skai-radius-scale').trim(), width: document.documentElement.dataset.chatWidth, accent: document.documentElement.style.getPropertyValue('--skai-color-accent') })", (value) => { const parsed = JSON.parse(value); return parsed.radius === "0" && parsed.width === "wide" && parsed.accent.startsWith("#"); }, "appearance options to apply"));
+  await devtools.evaluate("[...document.querySelectorAll('.appearance-preview-reset button')].find((button) => button.textContent?.startsWith('Reset appearance'))?.click(); 1");
+  await devtools.evaluate("[...document.querySelectorAll('.appearance-preview-reset button')].find((button) => button.textContent === 'Reset')?.click(); 1");
+  await waitFor(devtools.evaluate, "JSON.stringify([getComputedStyle(document.documentElement).getPropertyValue('--skai-radius-scale').trim(), document.documentElement.dataset.chatWidth, document.documentElement.style.getPropertyValue('--skai-color-accent')])", (value) => value === JSON.stringify(["1", "default", ""]), "Reset appearance to restore the defaults");
+  const afterReset = JSON.parse(fs.readFileSync(path.join(smokeUserDataDir, "appearance.json"), "utf8"));
+  if (afterReset.cornerStyle !== "default" || afterReset.accent !== null || afterReset.darkTheme !== "builtin:Skai/Skai Dark") throw new Error(`Reset appearance did not reset appearance.json: ${JSON.stringify(afterReset)}`);
+  void optionState;
   fs.mkdirSync(outputDir, { recursive: true });
   // Best effort: on a busy desktop the compositor may not hand over a frame in time.
   await devtools.send("Page.captureScreenshot", { format: "png" }).then((shot) => fs.writeFileSync(path.join(outputDir, "user-theme-problem.png"), Buffer.from(shot.data, "base64"))).catch(() => {});

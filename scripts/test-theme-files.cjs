@@ -230,6 +230,13 @@ async function serviceTests() {
     await assert.rejects(service.handle("appearance.saveThemeGradient", { id: mine, surface: "title-bar", gradient }));
     assert.equal((await service.handle("appearance.saveThemeGradient", { id: mine, surface: "canvas", gradient: null })).ok, true);
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "themes", "my-skai-dark.json"), "utf8")).themes[0].gradients.canvas, undefined);
+    // Appearance options: validated on save and read; reset restores every default.
+    assert.equal((await service.handle("appearance.saveAppearanceOptions", { textScale: 1.2, cornerStyle: "round", chatWidth: "wide", messageStyle: "cards", motion: "full", accent: "#3366ff" })).ok, true);
+    assert.deepEqual((await service.snapshot()).options, { animateBackground: false, textScale: 1.2, cornerStyle: "round", chatWidth: "wide", messageStyle: "cards", motion: "full", accent: "#3366ff" });
+    for (const bad of [{ textScale: 3 }, { cornerStyle: "pointy" }, { accent: "red" }, { accent: "#33f; x" }, { motion: true }, { sidebarSecret: 1 }]) await assert.rejects(service.handle("appearance.saveAppearanceOptions", bad), JSON.stringify(bad));
+    assert.equal((await service.handle("appearance.resetAppearance", {})).ok, true);
+    const reset = await service.snapshot();
+    assert.deepEqual([reset.options.textScale, reset.options.cornerStyle, reset.options.accent, reset.picks.darkTheme, reset.fonts], [1, "default", null, "builtin:Skai/Skai Dark", {}]);
     // Custom fonts: real signature + caps; junk, oversize and symlinks are reported, not loaded.
     const fontsDir = path.join(dir, "fonts");
     fs.writeFileSync(path.join(fontsDir, "Good-Sans.ttf"), Buffer.concat([Buffer.from([0, 1, 0, 0]), Buffer.alloc(60)]));

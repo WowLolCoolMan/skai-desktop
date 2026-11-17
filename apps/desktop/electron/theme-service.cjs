@@ -13,6 +13,17 @@ const { base16ToFamily } = require("./theme-base16.cjs");
 const MAX_THEME_FILES = 64;
 const MAX_ID = 200;
 const SCHEMA_FILE = "theme.schema.json";
+// Appearance options in appearance.json (Phase 7). Each is validated; anything else is ignored.
+const OPTION_RULES = {
+  animateBackground: (value) => typeof value === "boolean",
+  textScale: (value) => typeof value === "number" && Number.isFinite(value) && value >= 0.8 && value <= 1.5,
+  cornerStyle: (value) => ["square", "subtle", "default", "round"].includes(value),
+  chatWidth: (value) => ["narrow", "default", "wide", "full"].includes(value),
+  messageStyle: (value) => ["bubbles", "flat", "cards"].includes(value),
+  motion: (value) => ["system", "reduce", "full"].includes(value),
+  accent: (value) => value === null || (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)),
+};
+const DEFAULT_OPTIONS = { animateBackground: false, textScale: 1, cornerStyle: "default", chatWidth: "default", messageStyle: "bubbles", motion: "system", accent: null };
 const DEFAULT_PICKS = { lightTheme: "builtin:Skai/Skai Light", darkTheme: "builtin:Skai/Skai Dark" };
 
 function createThemeService({ userDataPath, getWindow, shell, dialog }) {
@@ -25,7 +36,7 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
 
   // appearance.json: theme picks plus the user's font role overrides (validated like theme fonts).
   async function readAppearance() {
-    const defaults = { picks: { ...DEFAULT_PICKS }, fonts: {}, animateBackground: false };
+    const defaults = { picks: { ...DEFAULT_PICKS }, fonts: {}, options: { ...DEFAULT_OPTIONS } };
     let json;
     try {
       const stat = await fsp.stat(appearancePath);
@@ -43,7 +54,13 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
       if (font) fonts[role] = font;
       else problems.push({ file: "appearance.json", key: `fonts.${role}`, problem: "was ignored (unknown role or invalid values)" });
     }
-    return { picks: { lightTheme: pick(json?.lightTheme, DEFAULT_PICKS.lightTheme), darkTheme: pick(json?.darkTheme, DEFAULT_PICKS.darkTheme) }, fonts, animateBackground: json?.animateBackground === true, problems };
+    const options = { ...DEFAULT_OPTIONS };
+    for (const [key, valid] of Object.entries(OPTION_RULES)) {
+      if (json?.[key] === undefined) continue;
+      if (valid(json[key])) options[key] = json[key];
+      else problems.push({ file: "appearance.json", key, problem: "has an invalid value and was ignored" });
+    }
+    return { picks: { lightTheme: pick(json?.lightTheme, DEFAULT_PICKS.lightTheme), darkTheme: pick(json?.darkTheme, DEFAULT_PICKS.darkTheme) }, fonts, options, problems };
   }
   const readPicks = async () => ({ picks: (await readAppearance()).picks });
 
@@ -93,7 +110,7 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
 
   async function snapshot() {
     const [{ families, problems }, appearance, custom] = await Promise.all([readThemes(), readAppearance(), listCustomFonts(fontsDir)]);
-    return { families, problems: [...problems, ...appearance.problems, ...custom.problems], picks: appearance.picks, fonts: appearance.fonts, animateBackground: appearance.animateBackground, customFonts: custom.fonts, themesDir, fontsDir };
+    return { families, problems: [...problems, ...appearance.problems, ...custom.problems], picks: appearance.picks, fonts: appearance.fonts, options: appearance.options, animateBackground: appearance.options.animateBackground, customFonts: custom.fonts, themesDir, fontsDir };
   }
 
   async function push() {
@@ -253,9 +270,19 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
       return { v: 1, ok: true, result: { surface: params.surface } };
     }
     if (method === "appearance.saveAppearanceOptions") {
-      if (typeof params?.animateBackground !== "boolean") throw new Error("animateBackground must be true or false.");
-      await writeAppearance({ animateBackground: params.animateBackground });
-      return { v: 1, ok: true, result: { animateBackground: params.animateBackground } };
+      const patch = {};
+      for (const [key, value] of Object.entries(params && typeof params === "object" ? params : {})) {
+        if (!OPTION_RULES[key]) throw new Error(`Unknown appearance option: ${key}`);
+        if (!OPTION_RULES[key](value)) throw new Error(`${key} has an invalid value.`);
+        patch[key] = value;
+      }
+      await writeAppearance(patch);
+      return { v: 1, ok: true, result: patch };
+    }
+    // Reset appearance: theme picks, fonts and every option back to the defaults (theme files are kept).
+    if (method === "appearance.resetAppearance") {
+      await writeAppearance({ ...DEFAULT_PICKS, fonts: {}, ...DEFAULT_OPTIONS });
+      return { v: 1, ok: true, result: { picks: DEFAULT_PICKS, options: DEFAULT_OPTIONS } };
     }
     if (method === "appearance.saveFonts") return { v: 1, ok: true, result: await saveFonts(params) };
     if (method === "appearance.listFonts") return { v: 1, ok: true, result: await listInstalledFonts() };

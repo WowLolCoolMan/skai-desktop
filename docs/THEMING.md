@@ -21,6 +21,25 @@ re-reads everything by hand. A file with mistakes doesn't block anything: the pr
 under the buttons (file, key, what's wrong), and a theme that was already working stays as it was
 until the file is fixed. Your picks are saved in `appearance.json`.
 
+## Layout and motion
+
+Settings → Appearance starts with a **preview card** that shows the current look live (heading, reading
+text with inline code and a link, your message bubble, code, primary and secondary buttons), and
+**Reset appearance…**, which asks first. Reset returns theme picks, fonts and every option below to the
+defaults and keeps your theme and font files. The options are saved in `appearance.json`:
+
+| Option | Values | Effect |
+|---|---|---|
+| `textScale` | 0.8–1.5 (Text size slider, 80–150%) | Scales all interface text (multiplies the UI font role's size) |
+| `cornerStyle` | `square`, `subtle`, `default`, `round` | Corner radius scale 0, 0.5, 1, 1.5 |
+| `chatWidth` | `narrow`, `default`, `wide`, `full` | Width of the reply column and your message bubble |
+| `messageStyle` | `bubbles`, `flat`, `cards` | Bubbles (default); Flat swaps your bubble for an accent rule; Cards puts replies in cards too |
+| `motion` | `system`, `reduce`, `full` | Follow the OS; always reduce; or keep animations even when the OS asks to reduce |
+| `accent` | `null` or `#rrggbb` | Overrides the theme's accent. Swatches come from the theme's own palette, or use Custom. Text on the accent switches to white or black automatically, and a warning shows when the accent is under 3:1 |
+| `animateBackground` | `true` / `false` | Slow drift of a canvas gradient (only while motion isn't reduced) |
+
+The existing **Reduced motion** switch also stills the app, and **Interface density** keeps working as before.
+
 ## Theme gallery
 
 Settings → Appearance opens with the **Theme gallery**: a card for every theme, showing a mini preview

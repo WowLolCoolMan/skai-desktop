@@ -29,10 +29,27 @@ const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entr
   return entry.isDirectory() ? walk(full) : /\.(css|ts|tsx)$/.test(entry.name) ? [full] : [];
 });
 
+// Remove comments but never text inside strings ("./presets/*.json" is not a comment).
+function stripComments(text, lineComments) {
+  let out = "";
+  let quote = null;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (quote) {
+      out += char;
+      if (char === "\\") { out += text[i + 1] ?? ""; i += 1; } else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "/" && text[i + 1] === "*") { const end = text.indexOf("*/", i + 2); i = end < 0 ? text.length : end + 1; continue; }
+    if (lineComments && char === "/" && text[i + 1] === "/") { const end = text.indexOf("\n", i); i = end < 0 ? text.length : end - 1; continue; }
+    if (char === "\"" || char === "'" || char === "`") quote = char;
+    out += char;
+  }
+  return out;
+}
+
 function countLiterals(file) {
-  let text = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  // In TS/TSX, ignore // comments.
-  if (!file.endsWith(".css")) text = text.replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const text = stripComments(fs.readFileSync(file, "utf8"), !file.endsWith(".css"));
   const counts = {};
   for (const [kind, pattern] of Object.entries(kinds)) {
     if (!kindApplies(kind, file)) continue;

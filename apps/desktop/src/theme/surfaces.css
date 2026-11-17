@@ -22,5 +22,5 @@ html[data-skai-gradient-backdrop][data-backdrop] .app-main::before { background:
    the user turned it on AND reduced motion is off (both checked by src/theme). */
 html[data-skai-gradient-canvas][data-skai-animate-background="true"] .app-main { background-size: 200% 200% !important; animation: skai-background-drift 40s ease-in-out infinite alternate; }
 @keyframes skai-background-drift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
-@media (prefers-reduced-motion: reduce) { html[data-skai-animate-background] .app-main { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { html[data-skai-animate-background]:not([data-motion="full"]) .app-main { animation: none !important; } }
 html[data-reduce-motion="true"][data-skai-animate-background] .app-main { animation: none !important; }

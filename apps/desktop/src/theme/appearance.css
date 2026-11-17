@@ -1,0 +1,29 @@
+/* ===== Appearance options (Settings → Appearance) =====
+   src/theme sets <html data-chat-width|data-message-style|data-motion>. The default value of
+   each matches nothing here, so the owner's styles apply unchanged until a user picks
+   something else. !important beats the stacked component rules in styles.css. */
+
+/* Chat width: the reading column and your message bubble. */
+html[data-chat-width="narrow"] .app-content-chat .conversation-surface .chat-message .message-content { max-width: 620px !important; }
+html[data-chat-width="narrow"] .app-content-chat .conversation-surface .chat-message.user { max-width: min(540px, 88%) !important; }
+html[data-chat-width="wide"] .app-content-chat .conversation-surface .chat-message .message-content { max-width: 1040px !important; }
+html[data-chat-width="wide"] .app-content-chat .conversation-surface .chat-message.user { max-width: min(960px, 88%) !important; }
+html[data-chat-width="full"] .app-content-chat .conversation-surface .chat-message .message-content { max-width: none !important; }
+html[data-chat-width="full"] .app-content-chat .conversation-surface .chat-message.user { max-width: 94% !important; }
+
+/* Message style: "flat" drops your bubble for an accent rule; "cards" puts replies in cards too. */
+html[data-message-style="flat"] .app-content-chat .conversation-surface .chat-message.user { padding: 4px 0 4px var(--skai-space-3) !important; border: 0 !important; border-left: 3px solid var(--skai-color-accent) !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+html[data-message-style="cards"] .app-content-chat .conversation-surface .chat-message.assistant { padding: var(--skai-space-3) var(--skai-space-4) !important; border: 1px solid var(--skai-color-border) !important; border-radius: var(--skai-radius-xl) !important; background: var(--skai-color-surface) !important; }
+
+/* Motion: "reduce" stills the app like the Reduced motion switch; "full" ignores the OS setting. */
+html[data-motion="reduce"],
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion="reduce"] .app-main { animation: none !important; }
