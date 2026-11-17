@@ -4,6 +4,7 @@ import { Button } from "../components/ui/Primitives";
 import { themeEngine, themeStore } from "./themeEngine";
 import { FontSettings } from "./FontSettings";
 import { GradientEditor } from "./GradientEditor";
+import { ThemeGallery } from "./ThemeGallery";
 import "./theme.css";
 
 // Theme: Appearance controls for theme files: a light pick and a dark pick
@@ -27,6 +28,7 @@ export function ThemeSettings() {
   );
   return (
     <div className="theme-settings">
+      <ThemeGallery />
       <div className="settings-field">{picker("lightTheme", "light", "Light theme")}{picker("darkTheme", "dark", "Dark theme")}</div>
       <div className="theme-settings-actions">
         <Button type="button" onClick={() => void themeEngine.openFolder()}>Open themes folder</Button>

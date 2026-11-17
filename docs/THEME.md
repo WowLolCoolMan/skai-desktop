@@ -424,3 +424,21 @@ Round 10 was pushed as 23c52db.
 - **Not done:** the plan's "borders ≥ 3:1". `--skai-color-border-strong` is a translucent hairline at about 1.8:1 in
   Skai Dark, and raising every border to 3:1 would change the whole look. It's left for the user to decide.
 - **Screens:** `.theme-shots/r11/` (Skai Light, Catppuccin Mocha, Gruvbox Light).
+
+### Round 12: theme gallery (Phase 6, part 2)
+
+Round 11 was pushed as 1803dc9.
+
+- **Gallery:** `src/theme/ThemeGallery.tsx` (new), at the top of Appearance. Each card has a mini preview (sidebar,
+  heading and muted lines, accent button; canvas and primary-button gradients drawn with `gradientCss`), 8 swatches
+  (canvas, surface, text, accent, danger, success, warning, info), the name, light/dark, "in use" for the current
+  picks, and the family's license as a tooltip. Missing keys use the Skai defaults for that appearance, and every
+  color is re-checked against the plain-color pattern before it reaches a style. It has search (name, family,
+  author), an All/Light/Dark filter, and a **Your themes** section before **Built-in**, with an empty-state hint.
+- **Preview, then apply:** `themeEngine.previewTheme(id)` shows a theme on the whole app in its own scheme
+  (`data-scheme` follows the previewed theme) without saving. A sticky bar offers **Apply as light/dark theme**
+  (`themeEngine.applyTheme` saves the matching pick; if the theme's scheme isn't the one in use, a notice says how
+  to see it) and **Cancel**. Leaving Appearance ends the preview.
+- **Smoke:** checks there are at least 37 cards. It clicks Catppuccin Latte in dark mode (expects the light scheme and
+  that theme id), clicks Apply (expects `lightTheme` in `appearance.json`), and checks the app returns to its dark scheme.
+- **Screens:** `.theme-shots/r12/gallery-dark.png` and `gallery-preview-dawn.png` (Rosé Pine Dawn previewed from dark mode).

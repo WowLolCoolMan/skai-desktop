@@ -190,6 +190,15 @@ async function main() {
   const savedCopy = JSON.parse(await waitFor(async () => (fs.existsSync(copyFile) ? fs.readFileSync(copyFile, "utf8") : "null"), "", (value) => { try { return JSON.parse(value)?.themes?.[0]?.gradients?.canvas?.gradient === "radial"; } catch { return false; } }, "edited gradient saved into a duplicated theme"));
   await waitFor(devtools.evaluate, "document.documentElement.dataset.themeId", (value) => value === "user:my-synthwave-dark.json/Synthwave Dark (mine)", "duplicated theme to become active");
   if (savedCopy.themes[0].gradients["primary-button"]?.gradient !== "linear") throw new Error("Duplicating lost the preset's other gradients.");
+  // Gallery: every built-in theme has a card; clicking a light card in dark mode previews it
+  // in its own scheme without saving; Apply makes it the light pick (saved to appearance.json).
+  const cards = await devtools.evaluate("document.querySelectorAll('.theme-card').length");
+  if (cards < 37) throw new Error(`The theme gallery shows ${cards} cards, expected at least 37.`);
+  await devtools.evaluate("[...document.querySelectorAll('.theme-card')].find((card) => card.querySelector('.theme-card-name')?.textContent === 'Catppuccin Latte')?.click(); 1");
+  await waitFor(devtools.evaluate, "JSON.stringify([document.documentElement.dataset.scheme, document.documentElement.dataset.themeId])", (value) => value === JSON.stringify(["light", "builtin:Catppuccin/Catppuccin Latte"]), "gallery preview in the theme's own scheme");
+  await devtools.evaluate("[...document.querySelectorAll('.theme-gallery-preview-bar button')].find((button) => button.textContent?.startsWith('Apply'))?.click(); 1");
+  await waitFor(async () => (fs.existsSync(path.join(smokeUserDataDir, "appearance.json")) ? fs.readFileSync(path.join(smokeUserDataDir, "appearance.json"), "utf8") : "{}"), "", (value) => JSON.parse(value).lightTheme === "builtin:Catppuccin/Catppuccin Latte", "gallery Apply to save the light pick");
+  await waitFor(devtools.evaluate, "document.documentElement.dataset.scheme", (value) => value === "dark", "app to return to its own (dark) scheme after Apply");
   fs.mkdirSync(themesDir, { recursive: true });
   writeTheme("#102030");
   await waitFor(devtools.evaluate, "[...document.querySelectorAll('.settings-content option')].some((option) => option.value === 'user:smoke.json/Smoke Dark')", Boolean, "user theme to load from the themes folder");

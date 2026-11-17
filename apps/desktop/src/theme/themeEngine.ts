@@ -55,12 +55,14 @@ export type ThemeState = {
   animateBackground: boolean;
   // Gradient editor: unsaved drafts shown live on top of the active theme (null = no gradient).
   previewGradients: Partial<Record<GradientSurface, ThemeGradient | null>>;
+  // Gallery: a theme shown on the app before it is applied (its own light/dark scheme).
+  previewThemeId: string | null;
   active: ThemeDefinition | null;
   loaded: boolean;
   notice: { tone: "info" | "error"; text: string } | null;
 };
 
-let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], contrastWarnings: [], animateBackground: false, previewGradients: {}, scheme: "dark", active: null, loaded: false, notice: null };
+let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], contrastWarnings: [], animateBackground: false, previewGradients: {}, previewThemeId: null, scheme: "dark", active: null, loaded: false, notice: null };
 const listeners = new Set<() => void>();
 let applied: string[] = [];
 let request: Request | null = null;
@@ -76,6 +78,8 @@ export function allThemes(current: ThemeState = state) {
 }
 
 function resolveActive(next: ThemeState): ThemeDefinition | null {
+  const preview = next.previewThemeId ? allThemes(next).find((entry) => entry.theme.id === next.previewThemeId)?.theme : null;
+  if (preview) return preview;
   const id = next.scheme === "light" ? next.picks.lightTheme : next.picks.darkTheme;
   const fallback = next.scheme === "light" ? DEFAULT_PICKS.lightTheme : DEFAULT_PICKS.darkTheme;
   const themes = allThemes(next);
@@ -88,6 +92,8 @@ function applyTheme(theme: ThemeDefinition | null) {
   applied = [];
   const set = (property: string, value: string) => { root.style.setProperty(property, value); applied.push(property); };
   root.dataset.themeId = theme?.id ?? "";
+  // A gallery preview shows the theme in its own scheme; otherwise the mode's scheme applies.
+  root.dataset.scheme = state.previewThemeId && theme ? theme.appearance : state.scheme;
   // Colors: the built-in Skai family is what tokens.css already defines.
   if (theme && !theme.id.startsWith(`builtin:${CSS_DEFAULT_FAMILY}/`)) {
     for (const [property, value] of Object.entries(theme.colors)) {
@@ -133,7 +139,7 @@ export function effectiveFonts(theme: ThemeDefinition | null, current: ThemeStat
 function update(patch: Partial<ThemeState>) {
   const next = { ...state, ...patch };
   next.active = resolveActive(next);
-  const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || next.previewGradients !== state.previewGradients || !state.loaded;
+  const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || next.previewGradients !== state.previewGradients || next.previewThemeId !== state.previewThemeId || !state.loaded;
   state = next;
   if (changed) { applyTheme(state.active); state = { ...state, contrastWarnings }; }
   document.documentElement.dataset.skaiAnimateBackground = String(state.animateBackground);
@@ -283,6 +289,16 @@ export const themeEngine = {
     update({ previewGradients });
   },
   clearPreviews() { update({ previewGradients: {} }); },
+  // Gallery: preview a theme on the whole app without saving anything (null ends it).
+  previewTheme(id: string | null) { if (id !== state.previewThemeId) update({ previewThemeId: id, previewGradients: {} }); },
+  // Gallery: make the previewed theme the light or dark pick (by its appearance).
+  async applyTheme(id: string) {
+    const theme = allThemes().find((entry) => entry.theme.id === id)?.theme;
+    if (!theme) return;
+    update({ previewThemeId: null });
+    await themeEngine.select(theme.appearance === "light" ? "lightTheme" : "darkTheme", id);
+    if (theme.appearance !== state.scheme) notify("info", `${theme.name} is now your ${theme.appearance} theme. Set Color theme to ${theme.appearance === "light" ? "Light" : "Dark"} or System to see it.`);
+  },
   // Save a gradient into the user's own copy of the active theme. A built-in theme is
   // duplicated first ("Duplicate as my theme"), then the copy is edited.
   async saveGradient(surface: GradientSurface, gradient: ThemeGradient | null) {

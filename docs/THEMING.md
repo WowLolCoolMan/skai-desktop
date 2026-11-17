@@ -21,6 +21,15 @@ re-reads everything by hand. A file with mistakes doesn't block anything: the pr
 under the buttons (file, key, what's wrong), and a theme that was already working stays as it was
 until the file is fixed. Your picks are saved in `appearance.json`.
 
+## Theme gallery
+
+Settings → Appearance opens with the **Theme gallery**: a card for every theme, showing a mini preview
+(sidebar, text, accent button, and the theme's background gradient if it has one) and color swatches. Search by
+name, filter by Light or Dark, and find your own themes in **Your themes** at the top. Clicking a card previews it
+on the whole app, in its own light or dark scheme, without saving anything. **Apply** makes it your light or dark
+theme (matching its appearance), and **Cancel** or leaving Settings ends the preview. Hover a card to see its
+license.
+
 ## Built-in themes
 
 | Family | Themes | License |
