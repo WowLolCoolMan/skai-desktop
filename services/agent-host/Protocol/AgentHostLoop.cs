@@ -2422,8 +2422,8 @@ public static class AgentHostLoop
         persona.Personality = BoundPersonaText(persona.Personality, 8_000);
         persona.Timeline = BoundPersonaText(persona.Timeline, 12_000);
         persona.SourceMaterial = BoundPersonaText(persona.SourceMaterial, 200_000);
-        if (persona.SourceMode == "public-research" && (!persona.IsPublicFigure || persona.Sources.Count == 0 || !persona.Sources.Any(source => IsReputablePublicSource(source.Url))))
-            throw new InvalidOperationException("Public-figure personas require confirmed public evidence. If the person is private or unclear, use From my own material.");
+        if (persona.SourceMode == "public-research" && persona.Sources.Count == 0)
+            throw new InvalidOperationException("Research a name before saving a researched persona so the card retains the sources and warning context.");
         if (persona.SourceMode == "own-material" && persona.SourceMaterial.Length == 0 && persona.Instructions.Length == 0)
             throw new InvalidOperationException("Add your own notes, messages, memories, or persona description before saving.");
         persona.VerifiedQuotes = persona.VerifiedQuotes?.Take(32).Where(quote => quote is not null && !string.IsNullOrWhiteSpace(quote.Text)).ToList() ?? [];
