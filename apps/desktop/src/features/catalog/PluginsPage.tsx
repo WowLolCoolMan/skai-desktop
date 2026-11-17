@@ -305,6 +305,9 @@ export function PluginsPage({
   const [catalogSection, setCatalogSection] = useState<"Discover" | "Tools">(
     "Discover",
   );
+  const [toolsView, setToolsView] = useState<"Catalog" | "Installed">(
+    "Catalog",
+  );
   const [filter, setFilter] = useState<PluginFilter>("All");
   const [query, setQuery] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -326,6 +329,7 @@ export function PluginsPage({
   const changeCatalogSection = (next: "Discover" | "Tools") => {
     setView("catalog");
     setCatalogSection(next);
+    setToolsView("Catalog");
     setFilter("All");
     setQuery(
       localStorage.getItem(`skai.marketplace.query.${next.toLowerCase()}`) ??
@@ -392,10 +396,14 @@ export function PluginsPage({
   useEffect(() => {
     if (view === "catalog")
       localStorage.setItem(
-        `skai.marketplace.query.${catalogSection.toLowerCase()}`,
+        `skai.marketplace.query.${
+          catalogSection === "Tools" && toolsView === "Installed"
+            ? "installed"
+            : catalogSection.toLowerCase()
+        }`,
         query,
       );
-  }, [catalogSection, query, view]);
+  }, [catalogSection, query, toolsView, view]);
 
   const entries = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -713,6 +721,38 @@ export function PluginsPage({
           <NavIcon name="terminal" />
           Tools
         </button>
+        {catalogSection === "Tools" && view === "catalog" && (
+          <div className="plugins-tools-subnav" role="tablist" aria-label="Tools views">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={toolsView === "Catalog"}
+              className={toolsView === "Catalog" ? "is-active" : ""}
+              onClick={() => {
+                setToolsView("Catalog");
+                setFilter("All");
+                setSelectedId(null);
+                setQuery(localStorage.getItem("skai.marketplace.query.tools") ?? "");
+              }}
+            >
+              Catalog
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={toolsView === "Installed"}
+              className={toolsView === "Installed" ? "is-active" : ""}
+              onClick={() => {
+                setToolsView("Installed");
+                setFilter("Installed");
+                setSelectedId(null);
+                setQuery(localStorage.getItem("skai.marketplace.query.installed") ?? "");
+              }}
+            >
+              Installed
+            </button>
+          </div>
+        )}
       </aside>
       <div className="plugins-main">
         {view === "models" ? (
@@ -726,9 +766,13 @@ export function PluginsPage({
           <>
             <header className="plugins-topbar">
               <h2>
-                {catalogSection === "Discover" ? "Discover" : "Tools"}{" "}
+                {catalogSection === "Discover"
+                  ? "Discover"
+                  : toolsView === "Installed"
+                    ? "Installed"
+                    : "Tools"}{" "}
                 <span className="plugins-count">
-                  {entries.length} available in Skai
+                  {entries.length} {toolsView === "Installed" ? "installed" : "available in Skai"}
                 </span>
               </h2>
               <div className="plugins-topbar-actions">
@@ -737,7 +781,7 @@ export function PluginsPage({
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search marketplace"
+                    placeholder={toolsView === "Installed" ? "Search installed tools" : "Search marketplace"}
                   />
                 </label>
                 <Button
@@ -750,7 +794,7 @@ export function PluginsPage({
                 >
                   <NavIcon name="refresh" />
                 </Button>
-                {catalogSection === "Tools" && (
+                {catalogSection === "Tools" && toolsView === "Catalog" && (
                   <Button
                     variant="primary"
                     className="plugins-add-button"
@@ -785,7 +829,7 @@ export function PluginsPage({
             ) : entries.length === 0 ? (
               <EmptyState
                 title="No matching items"
-                description="Try another search or choose a different category."
+                description={toolsView === "Installed" ? "No installed tools match this search." : "Try another search or choose a different category."}
                 action={
                   <Button
                     variant="secondary"
