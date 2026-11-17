@@ -16,6 +16,10 @@ public sealed class ChatSession
     public string? ProjectInstructions { get; set; }
     public string Mode { get; set; } = WorkspaceModes.Chat;
     public string ResponseMode { get; set; } = ChatResponseModes.Think;
+    public string? Model { get; set; }
+    public string? ModelProvider { get; set; }
+    public long? ModelSizeBytes { get; set; }
+    public int? ModelContextLength { get; set; }
     public bool IncludeProjectFilesInChat { get; set; }
     public string? FolderName { get; set; }
     /// <summary>Whether this chat is pinned above other chats in its list.</summary>

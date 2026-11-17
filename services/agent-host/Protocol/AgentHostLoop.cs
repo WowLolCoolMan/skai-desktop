@@ -1835,6 +1835,10 @@ public static class AgentHostLoop
                 title = session.Title,
                 mode = session.Mode,
                 responseMode = ChatResponseModes.IsValid(session.ResponseMode) ? session.ResponseMode : ChatResponseModes.Think,
+                model = session.Model,
+                modelProvider = session.ModelProvider,
+                modelSizeBytes = session.ModelSizeBytes,
+                modelContextLength = session.ModelContextLength,
                 messages = session.Messages,
                 projectId = session.ProjectId,
                 projectName = session.ProjectName,
@@ -1859,6 +1863,10 @@ public static class AgentHostLoop
                 title = hit.Session.Title,
                 mode = hit.Session.Mode,
                 responseMode = ChatResponseModes.IsValid(hit.Session.ResponseMode) ? hit.Session.ResponseMode : ChatResponseModes.Think,
+                model = hit.Session.Model,
+                modelProvider = hit.Session.ModelProvider,
+                modelSizeBytes = hit.Session.ModelSizeBytes,
+                modelContextLength = hit.Session.ModelContextLength,
                 messages = hit.Session.Messages,
                 projectId = hit.Session.ProjectId,
                 projectName = hit.Session.ProjectName,
@@ -1923,6 +1931,10 @@ public static class AgentHostLoop
             if (!ChatResponseModes.IsValid(requestedResponseMode)) throw new InvalidOperationException("The conversation response mode is invalid.");
             session.ResponseMode = requestedResponseMode;
         }
+        session.Model = OptionalString(request, "model");
+        session.ModelProvider = OptionalString(request, "modelProvider");
+        session.ModelSizeBytes = OptionalLong(request, "modelSizeBytes");
+        session.ModelContextLength = OptionalInt(request, "modelContextLength");
         var projectId = OptionalString(request, "projectId");
         if (string.IsNullOrWhiteSpace(projectId))
         {
@@ -1975,6 +1987,10 @@ public static class AgentHostLoop
             ProjectInstructions = source.ProjectInstructions,
             Mode = source.Mode,
             ResponseMode = ChatResponseModes.IsValid(source.ResponseMode) ? source.ResponseMode : ChatResponseModes.Think,
+            Model = source.Model,
+            ModelProvider = source.ModelProvider,
+            ModelSizeBytes = source.ModelSizeBytes,
+            ModelContextLength = source.ModelContextLength,
             IncludeProjectFilesInChat = source.IncludeProjectFilesInChat,
             FolderName = source.FolderName,
             ForkedFrom = source.Id,

@@ -15,6 +15,7 @@ type ChatWorkspaceOptions = {
   modelMetadata?: { model: string; provider?: string; sizeBytes?: number | null; contextLength?: number | null };
   mode: "ChatBot" | "Coding Agent";
   project?: { id: string; name: string; instructions?: string } | null;
+  onConversationModelRestore?: (model: string | null | undefined, provider: string | null | undefined) => void;
   onError: (message: string | null) => void;
 };
 
@@ -52,7 +53,7 @@ function skillMentions(messages: Array<{ content: string }>) {
   return [...ids].slice(0, 4);
 }
 
-export function useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata, mode, project, onError }: ChatWorkspaceOptions) {
+export function useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata, mode, project, onConversationModelRestore, onError }: ChatWorkspaceOptions) {
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -74,6 +75,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         const savedConversationId = localStorage.getItem("skai.conversation.active");
         const first = loaded.find((conversation) => conversation.id === savedConversationId) ?? loaded.find((conversation) => (conversation.mode ?? "ChatBot") === modeRef.current);
         if (first) {
+          onConversationModelRestore?.(first.model, first.modelProvider);
           setConversationId(first.id);
           localStorage.setItem("skai.conversation.active", first.id);
           setMessages(first.messages.filter((item) => item.role !== "system") as Message[]);
@@ -93,7 +95,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   const saveConversation = async (nextMessages: Message[], id = conversationId) => {
     const existingTitle = id ? conversations.find((conversation) => conversation.id === id)?.title : undefined;
     const title = existingTitle || nextMessages.find((item) => item.role === "user")?.content.slice(0, 80) || "New chat";
-    const response = await request("conversation.save", { id: id ?? undefined, title, mode, responseMode, messages: nextMessages, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) });
+    const response = await request("conversation.save", { id: id ?? undefined, title, mode, responseMode, model, modelProvider: provider, modelSizeBytes: modelMetadata?.sizeBytes ?? null, modelContextLength: modelMetadata?.contextLength ?? null, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) });
     if (!response.ok) { onError(response.error?.message ?? "Conversation could not be saved."); return id; }
     const savedId = (response.result as { id: string }).id;
     setConversationId(savedId);
@@ -316,6 +318,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const selected = conversations.find((conversation) => conversation.id === id);
     if (!selected) return;
     setConversationId(selected.id);
+    onConversationModelRestore?.(selected.model, selected.modelProvider);
     localStorage.setItem("skai.conversation.active", selected.id);
     setMessages(selected.messages.filter((item) => item.role !== "system") as Message[]);
     const selectedResponseMode = normalizeResponseMode(selected.responseMode);
