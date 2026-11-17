@@ -228,7 +228,11 @@ async function run() {
   const memoryClear = await request("persona.memory.clear", { id: personaId });
   const memoryAfterClear = await request("persona.memory.list", { id: personaId });
   if (!memoryClear.ok || memoryClear.result.cleared !== true || !memoryAfterClear.ok || memoryAfterClear.result.turns.length !== 0) throw new Error("Persona memory clear did not persist.");
-  await request("persona.remove", { id: personaId });
+  const removedPersona = await request("persona.remove", { id: personaId });
+  const remainingPersonas = await request("persona.list");
+  const repeatedRemoval = await request("persona.remove", { id: personaId });
+  if (!removedPersona.ok || removedPersona.result?.removed !== true || !remainingPersonas.ok || remainingPersonas.result?.personas?.some(item => item.id === personaId) || !repeatedRemoval.ok || repeatedRemoval.result?.removed !== false)
+    throw new Error("persona.remove did not persist the deletion or report an already-removed persona accurately.");
   await request("persona.remove", { id: secondPersona.result.persona.id });
   const changedMode = await request("conversation.metadata.save", { id: saved.result.id, responseMode: "coding" });
   if (!changedMode.ok) throw new Error("conversation.metadata.save could not change response mode.");

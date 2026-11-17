@@ -2297,9 +2297,12 @@ public static class AgentHostLoop
         var id = RequiredBoundedString(request, "id", 128);
         var store = CreateSettingsStore();
         var settings = store.Load();
+        var beforeCount = settings.SavedPersonas.Count;
         settings.SavedPersonas = settings.SavedPersonas.Where(persona => persona.Id != id).ToList();
+        var removed = settings.SavedPersonas.Count < beforeCount;
+        if (!removed) return new(ProtocolVersion, request.Id, true, new { removed = false, activePersonaId = (string?)null });
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { removed = true, activePersonaId = (string?)null });
+        return new(ProtocolVersion, request.Id, true, new { removed, activePersonaId = (string?)null });
     }
 
     private static AgentResponse ListPersonaMemory(AgentRequest request)
