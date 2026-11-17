@@ -227,6 +227,110 @@ cancellation, permission review, and local credential handling.
 - [ ] MLX optimization for Apple Silicon.
 - [ ] Windows AI Foundry routing.
 
+## Additional high-value proposals (2026-11-16)
+
+These candidates were reviewed before being added. They are proposals, not
+committed release promises. Existing items elsewhere in this backlog remain the
+source of truth when a proposal overlaps a broader planned capability.
+
+### Chat and user workflow
+
+- [ ] Context preview showing which messages, files, memories, and project
+  instructions will be sent before a request starts.
+- [ ] Context receipt showing what the model actually received, including
+  omitted, truncated, or summarized content.
+- [ ] Attachment citations that jump to the exact page, section, or passage in
+  a local document.
+- [ ] Decision bookmarks for pinning important answers inside a chat without
+  pinning the entire conversation.
+- [ ] Project context controls for choosing which folders and instruction sets
+  a thread can use.
+- [ ] Per-thread or per-project local model and generation settings.
+- [ ] Universal keyboard switcher for finding chats, projects, files, tasks,
+  and models from one search.
+- [ ] Reusable task brief templates with instructions and verification steps.
+- [ ] Context size warnings before a request exceeds the selected model's
+  practical context budget.
+- [ ] Accessibility controls for contrast, text size, focus behavior, and
+  reduced motion in one place.
+- [ ] Workspace export and import for moving selected chats, settings, skills,
+  and task templates between local installs.
+- [ ] Data retention controls for choosing how long local histories, generated
+  media, and task logs are kept.
+
+### Coding workspace and agent review
+
+- [ ] Review and apply agent patches as one explicit, reviewable action.
+- [ ] Inline diff comments that can be sent back as agent guidance for specific
+  changed lines.
+- [ ] A consolidated approval inbox for pending file writes, commands, and
+  integrations, showing the scope and reason for each request.
+- [ ] A task change timeline linking what the agent read, proposed, changed,
+  and verified.
+- [ ] Worktree review and recovery to inspect isolated changes, apply selected
+  files, or recover work after an interrupted run.
+- [ ] Repository map showing key folders, entry points, and dependencies.
+- [ ] Per-project run profiles for saving build, launch, and verification
+  commands for reviewed use.
+- [ ] Verification evidence panel placing command output and results beside
+  the files changed by a task.
+- [ ] App preview pane for a local web app beside its task conversation and
+  editor, with an explicit port and origin.
+- [ ] Project setup guide that detects missing runtimes or dependencies and
+  explains local setup steps.
+- [ ] Project preflight checks for required files, runtimes, repository state,
+  and configured verification commands before a task starts.
+- [ ] Configuration drift detection for noticing when project settings or
+  environment assumptions differ from the last successful run.
+- [ ] Local secret-exposure warnings for proposed changes that appear to add
+  credentials, private keys, or other secret-shaped values.
+- [ ] Citation validity checks that identify missing or mismatched references
+  in model answers before export or handoff.
+- [ ] Stale task detection for plans that refer to files or project state that
+  changed after the plan was created.
+- [ ] Project readiness watcher that updates readiness when required files,
+  runtimes, or repository state change.
+- [ ] Saved local model evaluation sets for comparing results against the same
+  prompts over time.
+
+### Background reliability and local operations
+
+- [ ] Automatic bounded local backups with versioned snapshots and a clear
+  restore path.
+- [ ] Crash recovery for restoring drafts, open files, and in-progress task
+  state after an app or Agent Host restart.
+- [ ] Database integrity checks with safe recovery for corrupted local
+  conversation or settings stores.
+- [ ] External file change detection for files open in Monaco, with reload or
+  compare options.
+- [ ] Incremental project indexing that re-indexes changed files only and
+  respects visible exclusions and local storage limits.
+- [ ] Background verification queue for explicitly approved checks, with
+  pause and cancel controls.
+- [ ] Task restart recovery to resume or safely mark interrupted tasks after
+  an app or Agent Host restart.
+- [ ] Resource-aware task scheduling that limits simultaneous model requests
+  based on available local memory and compute.
+- [ ] Idle model management to offer unloading unused models or keeping
+  selected models warm with a clear resource cost.
+- [ ] Resumable model downloads with integrity verification before use.
+- [ ] Local runtime health monitor for configured model servers, with
+  actionable diagnostics.
+- [ ] Hardware suitability advisor to estimate whether a model and context
+  size fit available local memory before loading.
+- [ ] Per-run resource summary showing local inference duration, memory use,
+  and request size.
+- [ ] User-reviewed redacted diagnostics bundle that excludes prompts,
+  attachments, and secrets by default.
+- [ ] Searchable local action history for approvals, file writes, task
+  transitions, and settings changes.
+- [ ] Workspace storage manager for reviewing cached models, old snapshots,
+  and generated media before cleanup.
+- [ ] Update rollback support that preserves the previous local app version
+  and provides a recovery path if an update fails.
+- [ ] Scheduled maintenance controls for choosing when local indexing,
+  backups, and cache cleanup may run.
+
 ## Reference
 
 The backlog was collected from product research and the requested capability

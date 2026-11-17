@@ -39,6 +39,13 @@ wandering and defaults to a randomized 30–60 second interval. The interval,
 trigger states, enabled flag, and available actions are configurable per pet.
 Reduced motion and disabling behavior remain available.
 
+Custom profiles can compose an ordered routine in Pet Workshop by adding,
+removing, and reordering actions. Cursor approach is inserted automatically
+before a pounce or fire-breath step. Older profiles and built-in personalities
+keep their existing randomized behavior unless an ordered routine is explicitly
+saved. Cursor attacks recheck that the pointer is still on the same display and
+near its captured position before each attack; the pet never moves or clicks it.
+
 ## Workshop and local generation
 
 Workshop exposes built-ins as read-only construction references and lets users

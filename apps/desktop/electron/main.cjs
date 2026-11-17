@@ -5,10 +5,13 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const readline = require("node:readline");
 const { createHash, randomUUID } = require("node:crypto");
+const { autoUpdater } = require("electron-updater");
+const { CancellationToken } = require("builder-util-runtime");
 const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
 const { listVisibleWindows } = require("./pet-surfaces.cjs");
 const { normalizePetBehaviorSettings, randomAttackSequence } = require("./pet-attack.cjs");
+const { createPetMotionEngine } = require("./pet-motion-engine.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
 const { augmentUserPath } = require("./user-path.cjs");
 const { createThemeService } = require("./theme-service.cjs");
@@ -93,7 +96,9 @@ let petMotion = { wander: true, reduceMotion: false, interactionDemo: false };
 function osPrefersReducedMotion() {
   try { return Boolean(systemPreferences.getAnimationSettings?.().prefersReducedMotion); } catch { return false; }
 }
-let petActivity = { state: "idle", facing: 1 };
+let petActivityGeneration = 0;
+let petActivity = { state: "idle", facing: 1, generation: petActivityGeneration };
+const petMotionEngine = createPetMotionEngine({ onError: (id, error) => console.warn(`[pet-motion] stopping ${id} after an update error`, error instanceof Error ? error.message : String(error)) });
 const pendingPetMessages = [];
 const PET_WINDOW_WIDTH = 220;
 const PET_WINDOW_HEIGHT = 190;
@@ -103,6 +108,10 @@ const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production",
 const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let updateCheckTimer;
+let updateSnapshot = { status: "idle", available: false, message: "Updates have not been checked yet." };
+let updateChecksEnabled = true;
+let updateDownloadToken = null;
+let updateCheckInFlight = false;
 
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
@@ -181,7 +190,7 @@ function petBounds() {
 
 function stopPetWander() {
   if (petWanderPauseTimer) clearTimeout(petWanderPauseTimer);
-  if (petWanderStepTimer) clearTimeout(petWanderStepTimer);
+  petMotionEngine.unregister("wander");
   petWanderPauseTimer = undefined;
   petWanderStepTimer = undefined;
   petWanderWalk = null;
@@ -191,13 +200,14 @@ function stopPetWander() {
   if (!petEntranceMoving) setPetActivity("idle");
 }
 
-function setPetActivity(state, facing = petActivity.facing, target = undefined) {
+function setPetActivity(state, facing = petActivity.facing, target = undefined, restart = false) {
   const allowedStates = new Set(["idle", "walk", "thinking", "coding", "coding_malicious", "stuck", "needs-attention", "angry", "pounce", "fire-breath", "celebrate", "curious-scan", "ember-curl", "star-orbit", "rock-roll", "sprout-stretch"]);
   const nextState = allowedStates.has(state) ? state : "idle";
   const nextFacing = facing === -1 ? -1 : 1;
   const nextTarget = target && Number.isFinite(target.x) && Number.isFinite(target.y) ? { x: target.x, y: target.y } : undefined;
-  if (petActivity.state === nextState && petActivity.facing === nextFacing && petActivity.target?.x === nextTarget?.x && petActivity.target?.y === nextTarget?.y) return;
-  petActivity = { state: nextState, facing: nextFacing, ...(nextTarget ? { target: nextTarget } : {}) };
+  if (!restart && petActivity.state === nextState && petActivity.facing === nextFacing && petActivity.target?.x === nextTarget?.x && petActivity.target?.y === nextTarget?.y) return;
+  petActivityGeneration += 1;
+  petActivity = { state: nextState, facing: nextFacing, generation: petActivityGeneration, ...(nextTarget ? { target: nextTarget } : {}) };
   if (petReady && petWindow && !petWindow.isDestroyed()) petWindow.webContents.send("pet:activity", petActivity);
 }
 
@@ -249,6 +259,7 @@ function petBehaviorCanRun() {
 function clearPetBehaviorTimers() {
   if (petBehaviorPauseTimer) clearTimeout(petBehaviorPauseTimer);
   if (petBehaviorStepTimer) clearTimeout(petBehaviorStepTimer);
+  petMotionEngine.unregister("behavior-walk");
   petBehaviorPauseTimer = undefined;
   petBehaviorStepTimer = undefined;
 }
@@ -359,12 +370,13 @@ function makePetBehaviorWalk(fromBounds, toBounds, speed = 380) {
 
 function movePetForBehavior(mode, targetBounds) {
   if (!petBehaviorRunning || !petBehaviorCanRun() || !petBehaviorWalk || !petWindow || petWindow.isDestroyed()) {
+    petMotionEngine.unregister("behavior-walk");
     petBehaviorWalk = null;
     petBehaviorStepTimer = undefined;
     return;
   }
   const { area, grid } = petWanderLayout();
-  const elapsed = (Date.now() - petBehaviorWalkStartedAt) / 1000;
+  const elapsed = (performance.now() - petBehaviorWalkStartedAt) / 1000;
   const relative = grid.clampPetPosition(petBehaviorWalk.positionAt(elapsed));
   const x = Math.trunc(area.x + relative.x);
   const y = Math.trunc(area.y + relative.y);
@@ -372,6 +384,7 @@ function movePetForBehavior(mode, targetBounds) {
     petWindow.setPosition(x, y);
     if (mode === "approach") setPetActivity("walk", petBehaviorTarget?.facing ?? 1);
   } catch {
+    petMotionEngine.unregister("behavior-walk");
     petBehaviorWalk = null;
     petBehaviorStepTimer = undefined;
     if (mode === "return") finishPetBehavior();
@@ -379,6 +392,7 @@ function movePetForBehavior(mode, targetBounds) {
     return;
   }
   if (petBehaviorWalk.isFinished(elapsed)) {
+    petMotionEngine.unregister("behavior-walk");
     petBehaviorWalk = null;
     petBehaviorStepTimer = undefined;
     if (mode === "approach") {
@@ -388,7 +402,6 @@ function movePetForBehavior(mode, targetBounds) {
     } else finishPetBehavior();
     return;
   }
-  petBehaviorStepTimer = setTimeout(() => movePetForBehavior(mode, targetBounds), 55);
 }
 
 function startPetBehaviorWalk(mode, targetBounds) {
@@ -407,7 +420,8 @@ function startPetBehaviorWalk(mode, targetBounds) {
     return;
   }
   petBehaviorWalkMode = mode;
-  petBehaviorWalkStartedAt = Date.now();
+  petBehaviorWalkStartedAt = performance.now();
+  petMotionEngine.register("behavior-walk", () => movePetForBehavior(mode, targetBounds));
   movePetForBehavior(mode, targetBounds);
 }
 
@@ -444,6 +458,16 @@ function performNextPetBehaviorAction() {
     } else finishPetBehavior();
     return;
   }
+  if ((action === "pounce" || action === "fire-breath") && petBehaviorCursorTarget) {
+    const cursor = screen.getCursorScreenPoint();
+    if (!petCursorIsInScene(cursor) || Math.hypot(cursor.x - petBehaviorCursorTarget.x, cursor.y - petBehaviorCursorTarget.y) > 22) {
+      // A composed routine may have non-cursor steps before its attack. Recheck
+      // the target at the point of impact so those steps never turn into a
+      // surprise chase when the user moves the pointer.
+      stopPetBehavior(true);
+      return;
+    }
+  }
   if (action === "approach-cursor") {
     if (petBehaviorTarget && petBehaviorCursorTarget) startPetBehaviorWalk("approach", petBehaviorTarget.position);
     else performNextPetBehaviorAction();
@@ -452,14 +476,14 @@ function performNextPetBehaviorAction() {
   if (action === "pounce") {
     setPetAttackScene(true);
     const aim = petBehaviorAimPoint();
-    setPetActivity("pounce", petBehaviorTarget?.facing ?? 1, aim);
+    setPetActivity("pounce", petBehaviorTarget?.facing ?? 1, aim, true);
     petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 760);
     return;
   }
   if (action === "fire-breath") {
     setPetAttackScene(true);
     const aim = petBehaviorAimPoint();
-    setPetActivity("fire-breath", petBehaviorTarget?.facing ?? 1, aim);
+    setPetActivity("fire-breath", petBehaviorTarget?.facing ?? 1, aim, true);
     petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1500);
     return;
   }
@@ -478,7 +502,7 @@ function startPetBehaviorAttack() {
   petBehaviorOrigin = petWindow.getBounds();
   petBehaviorResumeWander = petActivity.state === "walk" || Boolean(petWanderWalk);
   if (petWanderPauseTimer) clearTimeout(petWanderPauseTimer);
-  if (petWanderStepTimer) clearTimeout(petWanderStepTimer);
+  petMotionEngine.unregister("wander");
   petWanderPauseTimer = undefined;
   petWanderStepTimer = undefined;
   petWanderWalk = null;
@@ -591,8 +615,10 @@ async function startPetWander() {
     return;
   }
   petWanderWalk = walk;
-  petWanderStartedAt = Date.now();
+  petWanderStartedAt = performance.now();
   petWanderLayoutSignature = signature;
+  petWanderStepTimer = "shared-motion-ticker";
+  petMotionEngine.register("wander", movePetTowardTarget);
   setPetActivity("walk");
   movePetTowardTarget();
 }
@@ -600,6 +626,7 @@ async function startPetWander() {
 function movePetTowardTarget() {
   if (petBehaviorRunning) return;
   if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible() || !petWanderWalk || !petMotion.wander || petMotion.reduceMotion || osPrefersReducedMotion() || petDragOffset) {
+    petMotionEngine.unregister("wander");
     petWanderStepTimer = undefined;
     petWanderMoving = false;
     return;
@@ -607,13 +634,14 @@ function movePetTowardTarget() {
   const { area, grid, signature } = petWanderLayout();
   if (signature !== petWanderLayoutSignature) {
     petWanderWalk = null;
+    petMotionEngine.unregister("wander");
     petWanderStepTimer = undefined;
     petWanderMoving = false;
     petWanderNextAt = Date.now() + 250;
     schedulePetWander();
     return;
   }
-  const elapsed = (Date.now() - petWanderStartedAt) / 1000;
+  const elapsed = (performance.now() - petWanderStartedAt) / 1000;
   const position = grid.clampPetPosition(petWanderWalk.positionAt(elapsed));
   const screenX = area.x + position.x;
   const screenY = area.y + position.y;
@@ -622,6 +650,7 @@ function movePetTowardTarget() {
   if (!Number.isSafeInteger(targetX) || !Number.isSafeInteger(targetY) || Math.abs(targetX) > 10_000_000 || Math.abs(targetY) > 10_000_000) {
     console.warn("[pet] Skipping wander step with invalid screen coordinates.");
     petWanderWalk = null;
+    petMotionEngine.unregister("wander");
     petWanderStepTimer = undefined;
     petWanderMoving = false;
     setPetActivity("idle");
@@ -636,6 +665,7 @@ function movePetTowardTarget() {
   } catch (error) {
     console.warn("[pet] Stopping wander after an invalid native window position.", { targetX, targetY, screenX, screenY, area }, error instanceof Error ? error.message : String(error));
     petWanderWalk = null;
+    petMotionEngine.unregister("wander");
     petWanderStepTimer = undefined;
     petWanderMoving = false;
     setPetActivity("idle");
@@ -648,11 +678,11 @@ function movePetTowardTarget() {
     petWanderMoving = false;
     setPetActivity("idle");
     petWanderNextAt = Date.now() + petWanderPlanner.nextRestSeconds() * 1000;
+    petMotionEngine.unregister("wander");
     petWanderStepTimer = undefined;
     schedulePetWander();
     return;
   }
-  petWanderStepTimer = setTimeout(movePetTowardTarget, 55);
 }
 
 function persistPetState() {
@@ -1039,122 +1069,80 @@ function createTray() {
   return tray;
 }
 
-function parseReleaseVersion(value) {
-  const match = String(value ?? "").replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/);
-  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+function updatePreferencesPath() { return path.join(app.getPath("userData"), "update-preferences.json"); }
+async function readUpdatePreference() {
+  try {
+    const preferences = JSON.parse(await fs.readFile(updatePreferencesPath(), "utf8"));
+    updateChecksEnabled = preferences?.enabled !== false;
+  } catch { updateChecksEnabled = true; }
+  return updateChecksEnabled;
 }
-
-function isNewerRelease(candidate, current) {
-  const next = parseReleaseVersion(candidate);
-  const installed = parseReleaseVersion(current);
-  if (!next || !installed) return false;
-  for (let index = 0; index < next.length; index += 1) {
-    if (next[index] !== installed[index]) return next[index] > installed[index];
-  }
-  return false;
+async function writeUpdatePreference(enabled) {
+  updateChecksEnabled = Boolean(enabled);
+  await fs.mkdir(app.getPath("userData"), { recursive: true });
+  const target = updatePreferencesPath();
+  const temporary = `${target}.${process.pid}.tmp`;
+  await fs.writeFile(temporary, JSON.stringify({ enabled: updateChecksEnabled }, null, 2), { mode: 0o600 });
+  await fs.rename(temporary, target);
+  if (!updateChecksEnabled && updateDownloadToken && !updateDownloadToken.cancelled) updateDownloadToken.cancel();
+  if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = undefined; }
+  if (updateChecksEnabled) scheduleUpdateCheck();
+  return updateChecksEnabled;
 }
-
-function updateAssetForPlatform(assets = []) {
-  const name = process.platform === "win32" ? "win-x64.zip" : process.platform === "linux" ? "linux-x64.tar.gz" : null;
-  if (!name) return null;
-  return assets.find((asset) => String(asset?.name ?? "").toLowerCase().endsWith(name)) ?? null;
+function publishUpdateState(status, details = {}) {
+  updateSnapshot = { status, available: ["available", "downloading", "downloaded"].includes(status), currentVersion: app.getVersion(), checkedAt: new Date().toISOString(), ...details };
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:state", updateSnapshot);
+  if (status === "available" && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", updateSnapshot);
 }
-
-function updateChecksumAsset(assets = []) {
-  return assets.find((asset) => /^sha256sums(?:[-_].*)?\.txt$/i.test(String(asset?.name ?? ""))) ?? null;
+function configureAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.on("checking-for-update", () => publishUpdateState("checking", { message: "Checking the stable release channel…" }));
+  autoUpdater.on("update-available", (info) => {
+    publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Starting a background download…` });
+    updateDownloadToken = new CancellationToken();
+    const token = updateDownloadToken;
+    void autoUpdater.downloadUpdate(token).catch((error) => {
+      if (token.cancelled) return;
+      publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "The update download failed. You can retry from Settings." });
+    });
+  });
+  autoUpdater.on("update-not-available", () => publishUpdateState("current", { available: false, message: "You are running the latest stable version." }));
+  autoUpdater.on("download-progress", (progress) => publishUpdateState("downloading", { available: true, version: autoUpdater.updateInfo?.version, percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total, message: `Downloading update… ${Math.round(progress.percent)}%` }));
+  autoUpdater.on("update-downloaded", (info) => {
+    updateDownloadToken = null;
+    publishUpdateState("downloaded", { available: true, version: info.version, message: `Version ${info.version} is verified and ready to install. Restart Skai to finish.` });
+  });
+  autoUpdater.on("update-cancelled", (info) => {
+    updateDownloadToken = null;
+    publishUpdateState("available", { available: true, version: info.version, message: "The update download was cancelled. You can check again to retry." });
+  });
+  autoUpdater.on("error", (error) => {
+    if (updateDownloadToken?.cancelled) return;
+    publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "Update check or download failed. You can retry from Settings." });
+  });
 }
-
-function checksumForAsset(checksumText, assetName) {
-  const escapedName = assetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = checksumText.match(new RegExp(`^([a-f0-9]{64})\\s+(?:\\*|)${escapedName}\\s*$`, "im"));
-  return match?.[1]?.toLowerCase() ?? null;
-}
-
-async function checkForUpdates() {
+async function checkForUpdates(force = false) {
   const currentVersion = app.getVersion();
   const releaseUrl = `https://github.com/${UPDATE_REPOSITORY}/releases/latest`;
+  if (!updateChecksEnabled && !force) return { ...updateSnapshot, available: false, currentVersion, releaseUrl, message: "Automatic update checks are turned off." };
+  if (!app.isPackaged || process.platform === "darwin") return { ...updateSnapshot, available: false, currentVersion, releaseUrl, message: "Updates are available in packaged Windows and Linux builds." };
+  if (updateCheckInFlight || ["downloading", "downloaded"].includes(updateSnapshot.status)) return { ...updateSnapshot, currentVersion, releaseUrl };
+  updateCheckInFlight = true;
   try {
-    const response = await fetch(`https://api.github.com/repos/${UPDATE_REPOSITORY}/releases/latest`, {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "Skai-Desktop-Update-Checker" },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (response.status === 404) return { available: false, currentVersion, channel: "stable", releaseUrl, checkedAt: new Date().toISOString(), message: "No stable release has been published yet." };
-    if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}.`);
-    const release = await response.json();
-    const version = String(release.tag_name ?? "");
-    const asset = updateAssetForPlatform(release.assets);
-    const checksumAsset = updateChecksumAsset(release.assets);
-    let sha256 = null;
-    if (asset && checksumAsset) {
-      const checksumResponse = await fetch(String(checksumAsset.browser_download_url), { signal: AbortSignal.timeout(10_000) });
-      if (checksumResponse.ok) sha256 = checksumForAsset(await checksumResponse.text(), String(asset.name));
-    }
-    const available = isNewerRelease(version, currentVersion);
-    return {
-      available,
-      currentVersion,
-      version: version.replace(/^v/i, ""),
-      channel: release.prerelease ? "preview" : "stable",
-      releaseUrl: String(release.html_url || releaseUrl),
-      downloadUrl: asset?.browser_download_url ?? String(release.html_url || releaseUrl),
-      assetName: asset?.name ?? null,
-      sha256,
-      checksumVerified: Boolean(sha256),
-      publishedAt: release.published_at ?? null,
-      checkedAt: new Date().toISOString(),
-      message: available ? `Skai Desktop ${version} is ready.` : "You are running the latest stable version.",
-    };
+    await autoUpdater.checkForUpdates();
+    return { ...updateSnapshot, currentVersion, releaseUrl };
   } catch (error) {
-    return { available: false, currentVersion, channel: "stable", releaseUrl, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : "Update check failed.", message: "Update check could not reach GitHub." };
-  }
+    publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "Update check failed. You can retry from Settings." });
+    return { ...updateSnapshot, currentVersion, releaseUrl };
+  } finally { updateCheckInFlight = false; }
 }
-
-async function downloadVerifiedUpdate(result) {
-  if (!result || typeof result !== "object" || !result.available || !result.downloadUrl || !result.assetName || !result.sha256) {
-    throw new Error("This release does not have a verifiable platform artifact yet.");
-  }
-  const parsed = new URL(String(result.downloadUrl));
-  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") throw new Error("Update downloads must come from the official GitHub release.");
-  const response = await fetch(parsed.toString(), { signal: AbortSignal.timeout(120_000) });
-  if (!response.ok || !response.body) throw new Error(`Update download failed with HTTP ${response.status}.`);
-  const directory = path.join(app.getPath("downloads"), "Skai Desktop Updates");
-  await fs.mkdir(directory, { recursive: true });
-  const target = path.join(directory, path.basename(String(result.assetName)));
-  const temporary = `${target}.${process.pid}.partial`;
-  const hash = createHash("sha256");
-  let bytes = 0;
-  const handle = await fs.open(temporary, "w");
-  try {
-    for await (const chunk of response.body) {
-      bytes += chunk.length;
-      if (bytes > 2 * 1024 * 1024 * 1024) throw new Error("Update artifact is larger than the safe download limit.");
-      hash.update(chunk);
-      await handle.write(chunk);
-    }
-  } finally {
-    await handle.close();
-  }
-  const actual = hash.digest("hex").toLowerCase();
-  if (actual !== String(result.sha256).toLowerCase()) {
-    await fs.rm(temporary, { force: true });
-    throw new Error("The downloaded update failed SHA-256 verification and was discarded.");
-  }
-  await fs.rm(target, { force: true });
-  await fs.rename(temporary, target);
-  await shell.openPath(directory);
-  return { ok: true, path: target, bytes, sha256: actual };
-}
-
 function scheduleUpdateCheck() {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
-  void checkForUpdates().then((result) => {
-    if (result.available && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", result);
-  });
-  updateCheckTimer = setInterval(() => {
-    void checkForUpdates().then((result) => {
-      if (result.available && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", result);
-    });
-  }, UPDATE_CHECK_INTERVAL_MS);
+  if (!updateChecksEnabled || !app.isPackaged || process.platform === "darwin") return;
+  void checkForUpdates();
+  updateCheckTimer = setInterval(() => { void checkForUpdates(); }, UPDATE_CHECK_INTERVAL_MS);
 }
 
 const allowedMethods = new Set([
@@ -1558,7 +1546,30 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("updates:check", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return { available: false, message: "Update checks are unavailable." };
-    return checkForUpdates();
+    return checkForUpdates(true);
+  });
+  ipcMain.handle("updates:get-state", (event) => BrowserWindow.fromWebContents(event.sender) ? { ...updateSnapshot, currentVersion: app.getVersion() } : null);
+  ipcMain.handle("updates:enabled", async (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return false;
+    return updateChecksEnabled;
+  });
+  ipcMain.handle("updates:set-enabled", async (event, enabled) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || typeof enabled !== "boolean") return updateChecksEnabled;
+    return writeUpdatePreference(enabled);
+  });
+  ipcMain.handle("updates:install", (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || updateSnapshot.status !== "downloaded") return false;
+    autoUpdater.quitAndInstall(false, true);
+    return true;
+  });
+  ipcMain.handle("updates:cancel-download", (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender) || updateSnapshot.status !== "downloading" || !updateDownloadToken) return false;
+    updateDownloadToken.cancel();
+    return true;
+  });
+  ipcMain.handle("updates:retry", async (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return updateSnapshot;
+    return checkForUpdates(true);
   });
   ipcMain.handle("updates:open", async (event, url) => {
     if (!BrowserWindow.fromWebContents(event.sender) || typeof url !== "string") return false;
@@ -1567,11 +1578,6 @@ app.whenReady().then(() => {
     if (parsed.protocol !== "https:" || !["github.com", "huggingface.co"].includes(parsed.hostname)) return false;
     await shell.openExternal(parsed.toString());
     return true;
-  });
-  ipcMain.handle("updates:download", async (event, result) => {
-    if (!BrowserWindow.fromWebContents(event.sender)) return { ok: false, error: "Update downloads are unavailable." };
-    try { return await downloadVerifiedUpdate(result); }
-    catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Update download failed." }; }
   });
   ipcMain.handle("plugins:open-downloads", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;
@@ -1645,7 +1651,8 @@ app.whenReady().then(() => {
   registerGlobalLauncher();
   void resolvePetSurface().finally(createPetWindow);
   createTray();
-  scheduleUpdateCheck();
+  configureAutoUpdater();
+  void readUpdatePreference().then(scheduleUpdateCheck);
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

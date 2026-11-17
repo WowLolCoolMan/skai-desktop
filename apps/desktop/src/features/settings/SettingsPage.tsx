@@ -114,6 +114,7 @@ export function SettingsPage(props: SettingsProps) {
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
   const [updateState, setUpdateState] = useState<UpdateCheckResult | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updateChecksEnabled, setUpdateChecksEnabled] = useState(true);
   const normalizedQuery = query.trim().toLowerCase();
   const visibleCategories = useMemo(() => categories.filter((category) => !normalizedQuery || `${category} ${categoryDescription(category)} ${categorySearchText[category]}`.toLowerCase().includes(normalizedQuery)), [normalizedQuery]);
   useEffect(() => {
@@ -124,8 +125,8 @@ export function SettingsPage(props: SettingsProps) {
   useEffect(() => {
     const updates = window.skaiAgent?.updates;
     if (!updates) return;
-    void updates.check().then(setUpdateState);
-    return updates.onAvailable(setUpdateState);
+    void updates.enabled().then((enabled) => { setUpdateChecksEnabled(enabled); if (enabled) void updates.state().then((state) => { if (state) setUpdateState(state); }); });
+    return updates.onState(setUpdateState);
   }, []);
   const change = (key: string, value: string | boolean) => { setSaveState("idle"); props.onChange(key, value); };
   const selectedOllamaModel = props.models.find((entry) => entry.model === props.model && (entry.provider ?? "").toLowerCase() === "ollama");
@@ -173,8 +174,8 @@ export function SettingsPage(props: SettingsProps) {
   const checkUpdates = async () => {
     if (checkingUpdates || !window.skaiAgent?.updates) return;
     setCheckingUpdates(true);
-    setUpdateState(await window.skaiAgent.updates.check());
-    setCheckingUpdates(false);
+    try { setUpdateState(await window.skaiAgent.updates.retry()); }
+    finally { setCheckingUpdates(false); }
   };
   const selectedProviderId = localProviderOrFallback(props.provider);
   const selectedProvider = providerChoices.find((choice) => choice.id === selectedProviderId) ?? providerChoices[0];
@@ -207,7 +208,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Storage" && <><div className="settings-callout"><strong>Workspace data is local</strong><span>Conversations, task plans, memory, and preferences are stored in the local Skai data directory.</span></div><div className="settings-model-actions"><Button variant="secondary" onClick={props.onExportMemory}>Export memory backup</Button><span>Exports a portable JSON backup without deleting anything.</span></div><p className="settings-help">There is no destructive “clear everything” button in the release candidate.</p></>}
 
-        {activeCategory === "Updates" && <><div className="settings-callout"><strong>Automatic update checks</strong><span>Skai checks the official GitHub release channel when it starts and every six hours. A release can be downloaded in-app only after its published SHA-256 checksum is found and verified.</span></div><div className="settings-provider-list"><div className="settings-provider-row"><span><strong>Installed version</strong><small>{updateState?.currentVersion ?? "Checking…"}</small></span><StatusBadge tone="neutral">Electron</StatusBadge></div><div className="settings-provider-row"><span><strong>Update status</strong><small>{updateState?.error ?? updateState?.message ?? "Checking the stable release channel…"}</small></span><StatusBadge tone={updateState?.available ? "success" : updateState?.error ? "warning" : "neutral"}>{updateState?.available ? `v${updateState.version} ready` : updateState ? "Up to date" : "Checking"}</StatusBadge></div></div><div className="settings-model-actions"><Button variant="secondary" disabled={checkingUpdates} onClick={() => void checkUpdates()}>{checkingUpdates ? "Checking…" : "Check for updates"}</Button>{updateState?.available && updateState.checksumVerified && <Button variant="primary" onClick={() => void window.skaiAgent?.updates?.download(updateState)}>Download verified update</Button>}</div><p className="settings-help">Portable Windows and Linux builds are delivered as signed release archives. Skai never installs an unverified artifact or runs a downloaded executable in the background.</p></>}
+        {activeCategory === "Updates" && <><div className="settings-callout"><strong>Automatic updates</strong><span>Skai checks the official stable channel at startup and every six hours. Available updates download in the background and are verified by the updater before you choose when to restart.</span></div><Toggle label="Check for and download updates automatically" detail="Turn this off to stop background checks and downloads. Manual checks remain available below." checked={updateChecksEnabled} onChange={(enabled) => { setUpdateChecksEnabled(enabled); void window.skaiAgent?.updates?.setEnabled(enabled); }} /><div className="settings-provider-list"><div className="settings-provider-row"><span><strong>Installed version</strong><small>{updateState?.currentVersion ?? "Checking…"}</small></span><StatusBadge tone="neutral">Skai Desktop</StatusBadge></div><div className="settings-provider-row"><span><strong>Update status</strong><small>{updateState?.error ?? updateState?.message ?? "Checking the stable release channel…"}{updateState?.status === "downloading" && ` (${updateState.percent ?? 0}%)`}</small></span><StatusBadge tone={updateState?.status === "error" ? "warning" : updateState?.status === "downloaded" ? "success" : "neutral"}>{updateState?.status === "downloaded" ? "Ready to restart" : updateState?.status === "downloading" ? "Downloading" : updateState?.status === "available" ? "Available" : updateState?.status === "error" ? "Needs attention" : updateState?.status === "current" ? "Up to date" : "Checking"}</StatusBadge></div></div><div className="settings-model-actions"><Button variant="secondary" disabled={checkingUpdates} onClick={() => void checkUpdates()}>{checkingUpdates ? "Checking…" : updateState?.status === "error" ? "Retry update" : "Check for updates"}</Button>{updateState?.status === "downloading" && <Button variant="ghost" onClick={() => void window.skaiAgent?.updates?.cancelDownload()}>Cancel download</Button>}{updateState?.status === "downloaded" && <Button variant="primary" onClick={() => void window.skaiAgent?.updates?.install()}>Restart to update</Button>}</div><p className="settings-help">Updates are supported for packaged Windows x64 and Linux x64 builds. Downloaded updates are verified before staging; Skai never restarts without your confirmation.</p></>}
 
         {activeCategory === "Advanced" && <><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Reduced motion" detail="Also controls pet wandering defaults and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /><p className="settings-help">Provider routing remains local-only. Diagnostics and motion settings apply across the workspace.</p></>}
 

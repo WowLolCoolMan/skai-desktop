@@ -14,23 +14,25 @@
     "start": "node scripts/launch-electron.cjs"
   },
   "dependencies": {
-    "@monaco-editor/react": "^4.7.0",
-    "@vitejs/plugin-react": "latest",
-    "concurrently": "latest",
-    "monaco-editor": "^0.57.0",
-    "react": "latest",
-    "react-dom": "latest",
-    "typescript": "latest",
-    "vite": "latest",
-    "wait-on": "latest"
+    "builder-util-runtime": "9.7.0",
+    "electron-updater": "6.8.11"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
+    "@monaco-editor/react": "4.7.0",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
     "axe-core": "4.14.0",
-    "electron": "latest",
-    "electron-builder": "26.18.0"
+    "concurrently": "10.0.7",
+    "electron": "45.3.1",
+    "electron-builder": "26.18.0",
+    "monaco-editor": "0.57.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "wait-on": "9.5.1"
   },
   "overrides": {
     "monaco-editor": {

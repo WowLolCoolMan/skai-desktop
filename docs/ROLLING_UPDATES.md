@@ -1,9 +1,22 @@
-# App updates through GitHub Releases
+# In-app updates
 
-The app checks its public GitHub Releases feed directly. The check does not require a Skai Desktop account or a service operated by the developer. Stable and beta tags use `vMAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH-beta.N` respectively.
+Packaged Windows x64 (per-user NSIS) and Linux x64 (AppImage) builds use
+`electron-updater` with the public GitHub Releases feed. The release workflow
+must attach the generated `latest.yml` / `latest-linux.yml` metadata and the
+matching installer / AppImage to the same immutable release.
 
-The update screen selects the newest matching published release, locates a compatible installer, and displays the SHA-256 digest supplied by GitHub’s release asset API. It links to that exact release page so users can review the release notes and download the installer themselves. Drafts, malformed tags, unsupported operating systems, missing digests, and unexpected GitHub URLs are ignored. If no release exists, the screen shows that state and keeps the download action disabled.
+Automatic checks and background downloads are enabled by default. Users can
+turn them off in **Settings → Updates**; a manual check remains available.
+Skai displays download progress, supports cancelling an active download, lets
+users defer installation, and restarts only after they choose **Restart to
+update**. `electron-updater` validates the download against the SHA-512 digest
+in the release metadata before staging. The current electron-builder 26 release
+does not cryptographically sign that metadata, so the manifest is authenticated
+by GitHub HTTPS. Windows binaries and installers also require Authenticode
+signing in the release workflow. Linux release artifacts are accompanied by
+detached GPG signatures and checksums; the app's updater does not currently
+verify those detached signatures itself.
 
-Checks are manual. This implementation does not silently download, install, replace, or roll back the app. It trusts GitHub’s published asset digest and directs the user to GitHub; independent publisher signatures and automatic installation remain future work. Windows ARM64 installers and formats beyond Windows x64 NSIS, macOS DMG, and Linux AppImage are not currently selected by the updater.
-
-To publish an update, create a version tag and use the repository release workflow to build the supported artifacts and attach them to a GitHub release. Keep release tags immutable after publication so the displayed version and asset digests remain meaningful.
+Updates are disabled for development runs and unsupported platforms. See the
+[release guide](RELEASING.md) for artifact names, workflow gates, and acceptance
+requirements. Keep published tags and their update metadata immutable.

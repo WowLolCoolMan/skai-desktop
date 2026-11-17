@@ -23,6 +23,7 @@ const steps = [
   "test",
   "smoke:task-replan",
   "smoke:electron:artifact",
+  "smoke:electron:accessibility",
   "smoke:electron:themes",
   "smoke:electron:overflow",
 ];

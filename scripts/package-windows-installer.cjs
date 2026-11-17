@@ -29,4 +29,9 @@ if (result.status !== 0) throw new Error(`electron-builder exited with status ${
 
 const installer = path.join(output, `Skai-Desktop-${version}-Setup-x64.exe`);
 if (!fs.existsSync(installer)) throw new Error(`electron-builder did not produce the expected installer: ${installer}`);
+const metadata = path.join(output, "latest.yml");
+if (!fs.existsSync(metadata)) throw new Error("electron-builder did not produce latest.yml; the NSIS update feed cannot work without it.");
+const metadataCheck = spawnSync(process.execPath, [path.join(root, "scripts", "validate-update-metadata.cjs"), metadata, output], { cwd: root, stdio: "inherit", shell: false });
+if (metadataCheck.error) throw metadataCheck.error;
+if (metadataCheck.status !== 0) throw new Error("Windows update metadata verification failed.");
 console.log(`Windows installer ready: ${installer}`);

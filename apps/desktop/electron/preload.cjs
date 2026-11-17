@@ -29,8 +29,18 @@ contextBridge.exposeInMainWorld("skaiAgent", {
   },
   updates: {
     check: () => ipcRenderer.invoke("updates:check"),
-    download: (result) => ipcRenderer.invoke("updates:download", result),
+    state: () => ipcRenderer.invoke("updates:get-state"),
     open: (url) => ipcRenderer.invoke("updates:open", String(url)),
+    enabled: () => ipcRenderer.invoke("updates:enabled"),
+    setEnabled: (enabled) => ipcRenderer.invoke("updates:set-enabled", Boolean(enabled)),
+    install: () => ipcRenderer.invoke("updates:install"),
+    cancelDownload: () => ipcRenderer.invoke("updates:cancel-download"),
+    retry: () => ipcRenderer.invoke("updates:retry"),
+    onState: (handler) => {
+      const listener = (_event, result) => handler(result);
+      ipcRenderer.on("updates:state", listener);
+      return () => ipcRenderer.removeListener("updates:state", listener);
+    },
     onAvailable: (handler) => {
       const listener = (_event, result) => handler(result);
       ipcRenderer.on("updates:available", listener);

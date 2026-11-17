@@ -82,6 +82,9 @@ jobs:
       - name: Smoke packaged Electron artifact
         run: xvfb-run -a npm run smoke:electron:artifact
 
+      - name: Smoke packaged accessibility and keyboard navigation
+        run: xvfb-run -a npm run smoke:electron:accessibility
+
       - name: UI matrix smoke (routes x window sizes x themes)
         run: xvfb-run -a npm run smoke:electron:ui-matrix
 

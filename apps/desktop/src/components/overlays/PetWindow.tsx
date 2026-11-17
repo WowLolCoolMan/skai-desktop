@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { PetActivity, PetBehaviorSettings, PetCompletionEvent, PetMotionSettings } from "../../../shared/contracts";
 import { defaultPetBehavior, getPetSpriteProfile, normalizePetBehavior, petPreferenceId, petStripFrameCount, readPetBehavior, readPetBlinkDuration, type PetAnimationId, type PetSpriteProfile } from "../../features/settings/petSprites";
+import { PetSpriteCanvas } from "../../features/pets/engine/PetSpriteCanvas";
 
 type PetPose = "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "success" | "error" | "needs-attention" | "angry" | "pounce" | "fire-breath" | "celebrate" | "curious-scan" | "ember-curl" | "star-orbit" | "rock-roll" | "sprout-stretch";
 type BuiltinPose = "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "success" | "error";
@@ -92,6 +93,7 @@ const BUILTIN_BLINK_STRIPS: Record<string, string> = {
 };
 const BLAZE_FIRE_BREATH = new URL("../../../../../assets/pets/generated/blaze-fire-breath-frames.png", import.meta.url).href;
 const BLAZE_FIRE_IMPACT = new URL("../../../../../assets/pets/generated/blaze-fire-impact-frames.png", import.meta.url).href;
+const BLAZE_FIRE_BREATH_BODY_V2 = new URL("../../../../../assets/pets/generated/blaze-fire-breath-body-v2-atlas.png", import.meta.url).href;
 
 // Native Wayland: the app cannot move its own windows, so the compositor drags
 // Percy (CSS app-region) and Percy stays put instead of walking in place.
@@ -114,6 +116,7 @@ function readPetCharacter() {
 
 export function PetWindow() {
   const [pose, setPose] = useState<PetPose>("walk");
+  const [poseGeneration, setPoseGeneration] = useState(0);
   const [bubble, setBubble] = useState<string | null>(null);
   const [bubbleKind, setBubbleKind] = useState<PetCompletionEvent["kind"]>("success");
   const [motion, setMotion] = useState<PetMotionSettings>({ wander: true, reduceMotion: false, interactionDemo: false });
@@ -198,6 +201,7 @@ export function PetWindow() {
       setBubble(event.text);
       setBubbleKind(event.kind);
       setPose(event.kind === "error" && /needs attention|requires approval|awaiting approval/i.test(event.text) ? "needs-attention" : event.kind);
+      setPoseGeneration((generation) => generation + 1);
       window.clearTimeout(bubbleTimer.current);
       window.clearTimeout(poseTimer.current);
       bubbleTimer.current = window.setTimeout(() => setBubble(null), 6500);
@@ -236,15 +240,23 @@ export function PetWindow() {
   // companion's artwork. Reuse that profile's idle strip instead and keep its
   // identity stable while the missing state is being displayed.
   const resolvedCustomStrip = customStrip ?? customProfile?.strips.idle;
-  const sheet = resolvedCustomStrip?.dataUrl ?? (BUILTIN_STRIPS[character] ?? BUILTIN_STRIPS.percy)[builtinPose];
   const animationPaused = motion.reduceMotion;
+  const usesBlazeAttackAtlas = character === "blaze" && activePose === "fire-breath" && !resolvedCustomStrip;
+  const sheet = usesBlazeAttackAtlas ? BLAZE_FIRE_BREATH_BODY_V2 : resolvedCustomStrip?.dataUrl ?? (BUILTIN_STRIPS[character] ?? BUILTIN_STRIPS.percy)[builtinPose];
   // Fit custom frames inside the companion canvas. A wide uploaded sprite should
   // never expand the always-on-top window across the desktop.
-  const frameScale = resolvedCustomStrip ? Math.min(128 / resolvedCustomStrip.frameWidth, 128 / resolvedCustomStrip.frameHeight) : 1;
-  const frameWidth = resolvedCustomStrip ? resolvedCustomStrip.frameWidth * frameScale : 128;
-  const frameHeight = resolvedCustomStrip ? resolvedCustomStrip.frameHeight * frameScale : 128;
-  const frameCount = resolvedCustomStrip ? petStripFrameCount(resolvedCustomStrip) : 11;
-  const spriteStyle = { backgroundImage: `url(${sheet})`, backgroundSize: `${frameWidth * frameCount}px ${frameHeight}px`, width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-strip-end": `${-frameWidth * (frameCount - 1)}px`, "--pet-frame-steps": frameCount - 1, "--pet-facing": activity.facing } as CSSProperties;
+  const sourceFrameWidth = usesBlazeAttackAtlas ? 1246 / 4 : resolvedCustomStrip?.frameWidth ?? 256;
+  const sourceFrameHeight = usesBlazeAttackAtlas ? 1263 / 4 : resolvedCustomStrip?.frameHeight ?? 256;
+  const frameScale = Math.min(128 / sourceFrameWidth, 128 / sourceFrameHeight);
+  const frameWidth = sourceFrameWidth * frameScale;
+  const frameHeight = sourceFrameHeight * frameScale;
+  const frameCount = usesBlazeAttackAtlas ? 16 : resolvedCustomStrip ? petStripFrameCount(resolvedCustomStrip) : 11;
+  const spriteColumns = usesBlazeAttackAtlas ? 4 : frameCount;
+  const spriteRows = usesBlazeAttackAtlas ? 4 : 1;
+  const spriteFps = usesBlazeAttackAtlas ? 18 : resolvedCustomStrip?.fps ?? (activePose === "walk" ? 16 : 13);
+  const spriteLoops = usesBlazeAttackAtlas ? false : resolvedCustomStrip?.loop ?? !["success", "error", "needs-attention", "pounce", "celebrate"].includes(activePose);
+  const spriteStyle = { width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-facing": activity.facing } as CSSProperties;
+  const spritePlaybackKey = `${activePose}:${activePose === pose ? poseGeneration : activity.generation ?? 0}`;
   const stillPose = !["walk", "success", "error", "needs-attention", "angry", "pounce", "fire-breath", "celebrate", "curious-scan", "ember-curl", "star-orbit", "rock-roll", "sprout-stretch"].includes(activePose);
   const blinkSheet = customProfile?.blink?.dataUrl ?? BUILTIN_BLINK_STRIPS[character];
   const blinkStrip = customProfile?.blink;
@@ -261,9 +273,9 @@ export function PetWindow() {
   const breathAngle = Math.atan2(breathDy, breathDx) * 180 / Math.PI;
   const fireWidth = Math.max(145, Math.min(270, breathLength + 24));
   const fireHeight = 158;
-  const fireSpriteStyle = { backgroundImage: `url(${BLAZE_FIRE_BREATH})`, backgroundSize: `${fireWidth * 8}px ${fireHeight}px`, width: `${fireWidth}px`, height: `${fireHeight}px`, left: `${mouthX}px`, top: `${105 - fireHeight / 2}px`, transform: `rotate(${breathAngle}deg)`, "--pet-fire-frame-width": `${fireWidth}px` } as CSSProperties;
+  const fireSpriteStyle = { width: `${fireWidth}px`, height: `${fireHeight}px`, left: `${mouthX}px`, top: `${105 - fireHeight / 2}px`, transform: `rotate(${breathAngle}deg)` } as CSSProperties;
   const impactSize = 150;
-  const impactSpriteStyle = { backgroundImage: `url(${BLAZE_FIRE_IMPACT})`, backgroundSize: `${impactSize * 8}px ${impactSize}px`, width: `${impactSize}px`, height: `${impactSize}px`, left: `${target.x - impactSize / 2}px`, top: `${target.y - impactSize / 2}px`, "--pet-impact-frame-width": `${impactSize}px` } as CSSProperties;
+  const impactSpriteStyle = { width: `${impactSize}px`, height: `${impactSize}px`, left: `${target.x - impactSize / 2}px`, top: `${target.y - impactSize / 2}px` } as CSSProperties;
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
     event.preventDefault();
@@ -320,7 +332,7 @@ export function PetWindow() {
     {bubble && <div className={`pet-window-bubble pet-window-bubble-${bubbleKind}`} role="status" aria-live="polite">{bubble}</div>}
     {activePose === "angry" && <span className={`pet-window-anger${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true"><i /><i /><i /></span>}
     {activePose === "pounce" && <span className={`pet-window-pounce-trail${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true"><i /><i /><i /></span>}
-    {activePose === "fire-breath" && <div className="pet-window-fire-scene" aria-hidden="true"><span className="pet-window-fire-sprite" style={fireSpriteStyle} /><span className="pet-window-fire-impact-sprite" style={impactSpriteStyle} /><span className="pet-window-target-lock" style={{ left: `${target.x}px`, top: `${target.y}px` }} /></div>}
+    {activePose === "fire-breath" && <div className="pet-window-fire-scene" aria-hidden="true"><PetSpriteCanvas clip={{ imageUrl: BLAZE_FIRE_BREATH, frameCount: 8, columns: 8, rows: 1, fps: 16, loop: true }} playbackKey={`fire:${activity.generation ?? 0}`} paused={animationPaused || !pageVisible} pixelWidth={256} pixelHeight={256} className="pet-window-fire-sprite" style={fireSpriteStyle} label="Blaze breathes fire" /><PetSpriteCanvas clip={{ imageUrl: BLAZE_FIRE_IMPACT, frameCount: 8, columns: 8, rows: 1, fps: 16, loop: false }} playbackKey={`impact:${activity.generation ?? 0}`} paused={animationPaused || !pageVisible} pixelWidth={256} pixelHeight={256} className="pet-window-fire-impact-sprite" style={impactSpriteStyle} label="Fire impact effect" /><span className="pet-window-target-lock" style={{ left: `${target.x}px`, top: `${target.y}px` }} /></div>}
     {activePose === "pounce" && <span className="pet-window-target-lock is-pounce-target" style={{ left: `${target.x}px`, top: `${target.y}px` }} aria-hidden="true" />}
     {activePose === "curious-scan" && <span className="pet-window-scanner" aria-hidden="true"><i /></span>}
     {activePose === "star-orbit" && <span className="pet-window-star-orbit" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i></span>}
@@ -328,7 +340,7 @@ export function PetWindow() {
     {activePose === "celebrate" && character === "percy" && <span className="pet-window-celebration" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i></span>}
     {stillPose && <span className={`pet-window-idle-life${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true" />}
     <div className="pet-window-art" style={{ width: `${frameWidth}px`, height: `${frameHeight}px` }}>
-      <div className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}${blinking ? " is-under-blink" : ""}${activity.facing === -1 ? " is-facing-left" : ""}`} style={spriteStyle} onAnimationEnd={(event) => { if (event.animationName.startsWith("pet-window-enter-")) setEntering(false); }} role="img" aria-label={`Animated ${companionName} companion`} {...dragHandlers} />
+      <PetSpriteCanvas clip={{ imageUrl: sheet, frameCount, columns: spriteColumns, rows: spriteRows, fps: spriteFps, loop: spriteLoops }} playbackKey={spritePlaybackKey} paused={animationPaused || !pageVisible} pixelWidth={sourceFrameWidth} pixelHeight={sourceFrameHeight} className={`pet-window-sprite pet-window-sprite-${activePose}${animationPaused ? " is-paused" : ""}${blinking ? " is-under-blink" : ""}${activity.facing === -1 ? " is-facing-left" : ""}`} style={spriteStyle} label={`Animated ${companionName} companion`} onAnimationEnd={(event) => { if (event.animationName.startsWith("pet-window-enter-")) setEntering(false); }} {...dragHandlers} />
       {blinking && blinkStyle && <div className={`pet-window-blink-sprite${activity.facing === -1 ? " is-facing-left" : ""}`} style={blinkStyle} aria-hidden="true" />}
     </div>
     {blinking && genericBlinkFallback && <div className={`pet-window-generic-blink${activity.facing === -1 ? " is-facing-left" : ""}`} style={{ "--pet-blink-duration": `${blinkDuration}ms` } as CSSProperties} aria-hidden="true" />}

@@ -15,6 +15,7 @@ function normalizePetBehaviorSettings(value) {
     minimumIntervalSeconds,
     maximumIntervalSeconds,
     actions,
+    orderedActions: settings.orderedActions === true,
   };
 }
 
@@ -24,15 +25,21 @@ function boundedInterval(value, fallback) {
 }
 
 function randomAttackSequence(settings, random = Math.random) {
-  const available = settings.actions.filter((action) => ACTIONS.includes(action));
+  const available = [...new Set(settings.actions.filter((action) => ACTIONS.includes(action)))];
   if (available.length === 0) return [];
-  const attacks = available.filter((action) => action === "pounce" || action === "fire-breath");
+  const steps = available.filter((action) => action !== "approach-cursor");
+  if (settings.orderedActions) {
+    const firstCursorAttack = steps.findIndex((action) => action === "pounce" || action === "fire-breath");
+    if (firstCursorAttack >= 0) steps.splice(firstCursorAttack, 0, "approach-cursor");
+    return steps;
+  }
+  const attacks = steps.filter((action) => action === "pounce" || action === "fire-breath");
   if (attacks.length === 0) {
-    const visualActions = available.filter((action) => !CURSOR_ACTIONS.includes(action));
+    const visualActions = steps.filter((action) => !CURSOR_ACTIONS.includes(action));
     return visualActions.length ? [visualActions[Math.floor(random() * visualActions.length)]] : [];
   }
   const selectedAttacks = attacks.filter(() => random() < 0.66);
-  if (selectedAttacks.length === 0 && attacks.length > 0) selectedAttacks.push(attacks[Math.floor(random() * attacks.length)]);
+  if (selectedAttacks.length === 0) selectedAttacks.push(attacks[Math.floor(random() * attacks.length)]);
   return ["approach-cursor", ...selectedAttacks];
 }
 

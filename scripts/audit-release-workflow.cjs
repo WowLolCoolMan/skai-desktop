@@ -37,6 +37,10 @@ requireContract("Electron Windows and Linux matrix", /rid:\s+win-x64[\s\S]*rid:\
 requireContract("Electron packaged smoke gate", /smoke:electron:artifact/);
 requireContract("Electron Windows signature evidence", /SIGNATURES-electron-win-x64\.txt/);
 requireContract("Electron Linux signature evidence", /SIGNATURES-electron-linux-x64\.txt/);
+requireContract("Linux updater-compatible AppImage build", /package:linux:appimage/);
+requireContract("Windows updater metadata is attached", /dist\/installer\/win-x64\/latest\.yml/);
+requireContract("Linux updater metadata and AppImage are attached", /latest-linux\.yml[\s\S]*Skai-Desktop-0\.1\.4-x64\.AppImage/);
+requireContract("AppImage metadata validator checks artifact integrity", /validate-update-metadata\.cjs/);
 requireContract("Electron release readiness gate", /ELECTRON_PACKAGED_READY/);
 requireContract("Release waits for Electron packaging", /needs:\s*\[electron\]/);
 requireContract("no legacy Uno packaging", { test: (text) => !/SkaiDesktop\.Native|NATIVE_MIGRATION_COMPLETE|\n  package:/.test(text) });

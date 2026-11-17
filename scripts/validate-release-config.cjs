@@ -25,6 +25,15 @@ for (const relative of ["package.json", path.join("apps", "desktop", "package.js
   }
 }
 
+try {
+  const desktop = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "package.json"), "utf8"));
+  const floating = Object.entries({ ...desktop.dependencies, ...desktop.devDependencies }).filter(([, version]) => /^(latest|next|canary|\*|\^?\d+\.x)$/i.test(String(version)));
+  if (floating.length) errors.push(`apps/desktop/package.json contains floating dependencies: ${floating.map(([name]) => name).join(", ")}`);
+  if (!desktop.dependencies?.["electron-updater"]) errors.push("apps/desktop/package.json must include the runtime electron-updater dependency");
+} catch (error) {
+  errors.push(`Unable to validate Electron dependencies: ${error.message}`);
+}
+
 if (packageVersions.length === 2 && packageVersions[0][1] !== packageVersions[1][1]) {
   errors.push(`Root and Electron package versions differ: ${packageVersions[0][1]} vs ${packageVersions[1][1]}`);
 }

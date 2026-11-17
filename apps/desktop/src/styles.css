@@ -181,14 +181,10 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .pet-window-root.is-compositor-drag, .pet-window-root.is-compositor-drag .pet-window-sprite { -webkit-app-region: drag; cursor: grab; }
 .pet-window-root:active { cursor: grabbing; }
 .pet-window-art { position: relative; z-index: 1; align-self: end; justify-self: center; }
-.pet-window-sprite { position: absolute; inset: 0; width: 128px; height: 128px; background-position: 0 0; background-repeat: no-repeat; background-size: 1280px 128px; image-rendering: auto; filter: drop-shadow(0 8px 9px var(--skai-art-pet-sprite-1)); -webkit-app-region: no-drag; }
+.pet-window-sprite { position: absolute; inset: 0; display: block; width: 128px; height: 128px; image-rendering: auto; filter: drop-shadow(0 8px 9px var(--skai-art-pet-sprite-1)); -webkit-app-region: no-drag; }
 .pet-window-sprite.is-facing-left { transform: scaleX(-1); }
-.pet-window-sprite-walk { animation: pet-window-walk 667ms steps(var(--pet-frame-steps, 10), end) infinite; }
-.pet-window-root.is-entering .pet-window-sprite-walk { animation: pet-window-walk 667ms steps(var(--pet-frame-steps, 10), end) infinite, pet-window-enter-from-left 1450ms cubic-bezier(.2,.72,.28,1) both; }
-.pet-window-root.is-entering .pet-window-sprite-walk.is-facing-left { animation: pet-window-walk 667ms steps(var(--pet-frame-steps, 10), end) infinite, pet-window-enter-from-right 1450ms cubic-bezier(.2,.72,.28,1) both; }
-.pet-window-sprite-idle { animation: pet-window-idle 833ms steps(var(--pet-frame-steps, 10), end) infinite; }
-.pet-window-sprite-thinking, .pet-window-sprite-coding, .pet-window-sprite-coding_malicious, .pet-window-sprite-stuck, .pet-window-sprite-needs-attention, .pet-window-sprite-angry, .pet-window-sprite-pounce, .pet-window-sprite-fire-breath { animation: pet-window-idle 667ms steps(var(--pet-frame-steps, 10), end) infinite; }
-.pet-window-sprite-success, .pet-window-sprite-error { animation: pet-window-success 667ms steps(var(--pet-frame-steps, 10), end) infinite; }
+.pet-window-root.is-entering .pet-window-sprite-walk { animation: pet-window-enter-from-left 1450ms cubic-bezier(.2,.72,.28,1) both; }
+.pet-window-root.is-entering .pet-window-sprite-walk.is-facing-left { animation: pet-window-enter-from-right 1450ms cubic-bezier(.2,.72,.28,1) both; }
 .pet-window-sprite.is-paused { animation-play-state: paused; }
 .pet-window-sprite.is-under-blink { visibility: hidden; }
 .pet-window-blink-sprite { position: absolute; inset: 0; z-index: 3; width: 128px; height: 128px; background-position: 0 0; background-repeat: no-repeat; image-rendering: auto; filter: drop-shadow(0 8px 9px var(--skai-art-pet-blink-1)); pointer-events: none; -webkit-app-region: no-drag; animation: pet-window-blink-strip var(--pet-blink-duration, 280ms) steps(var(--pet-blink-steps, 3), end) both; }
@@ -205,8 +201,8 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .pet-window-anger.is-facing-left { left: calc(50% - 62px); }
 .pet-window-fire-scene { position: absolute; inset: 0; z-index: 2; overflow: visible; pointer-events: none; }
 .pet-window-fire-sprite, .pet-window-fire-impact-sprite { position: absolute; display: block; background-repeat: no-repeat; image-rendering: auto; pointer-events: none; }
-.pet-window-fire-sprite { z-index: 2; transform-origin: 0 50%; filter: drop-shadow(0 0 12px var(--skai-art-pet-fire-1)); animation: pet-window-fire-strip 520ms steps(7,end) infinite alternate; }
-.pet-window-fire-impact-sprite { z-index: 3; filter: drop-shadow(0 0 16px var(--skai-art-pet-fire-2)); animation: pet-window-impact-strip 660ms steps(7,end) both; }
+.pet-window-fire-sprite { z-index: 2; transform-origin: 0 50%; filter: drop-shadow(0 0 12px var(--skai-art-pet-fire-1)); }
+.pet-window-fire-impact-sprite { z-index: 3; filter: drop-shadow(0 0 16px var(--skai-art-pet-fire-2)); }
 .pet-window-target-lock { position: absolute; z-index: 4; width: 42px; height: 42px; border: 2px solid var(--skai-art-pet-target-1); border-radius: 50%; box-shadow: 0 0 0 5px var(--skai-art-pet-target-2), inset 0 0 12px var(--skai-art-pet-target-3), 0 0 18px var(--skai-art-pet-target-4); transform: translate(-50%,-50%); animation: pet-window-lock 440ms ease-in-out infinite alternate; pointer-events: none; }
 .pet-window-target-lock::before, .pet-window-target-lock::after { position: absolute; content: ""; background: var(--skai-art-pet-target-5); }
 .pet-window-target-lock::before { top: 50%; left: -10px; width: 58px; height: 1px; }.pet-window-target-lock::after { top: -10px; left: 50%; width: 1px; height: 58px; }
@@ -1499,6 +1495,11 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .pet-workshop-animation-tabs button { display: grid; flex: 0 0 auto; gap: 4px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); padding: 8px 10px; text-align: left; color: inherit; background: var(--skai-color-surface-soft); cursor: pointer; font-size: var(--skai-text-sm); }
 .pet-workshop-animation-tabs button.is-active { border-color: var(--skai-color-accent); color: var(--skai-color-accent-text); }
 .pet-workshop-animation-tabs small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.pet-workshop-playback-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; margin: -8px 0 14px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.pet-workshop-playback-controls label { display: flex; align-items: center; gap: 9px; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+.pet-workshop-playback-controls input[type="range"] { width: 140px; accent-color: var(--skai-color-accent); }
+.pet-workshop-playback-controls output { min-width: 42px; color: var(--skai-color-text); font-family: var(--skai-font-mono); font-size: var(--skai-text-xs); }
+.pet-workshop-playback-controls .pet-workshop-loop-toggle input { accent-color: var(--skai-color-accent); }
 .pet-workshop-editor { border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-2xl); padding: 16px; background: color-mix(in srgb, var(--skai-color-surface-soft) 75%, transparent); }
 .pet-workshop-editor-heading h3 { margin: 0; font-size: calc(var(--skai-text-xl) * var(--skai-heading-scale)); }
 .pet-workshop-legacy { display: grid; grid-template-columns: auto 1fr 100px; align-items: center; gap: 12px; margin: 14px 0; border: 1px solid color-mix(in srgb, var(--skai-color-warning) 45%, transparent); border-radius: var(--skai-radius-lg); padding: 10px; font-size: var(--skai-text-sm); }

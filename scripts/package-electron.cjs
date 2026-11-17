@@ -52,6 +52,20 @@ fs.cpSync(electronDist, outputRoot, { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "dist"), path.join(appRoot, "dist"), { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "electron"), path.join(appRoot, "electron"), { recursive: true, force: true });
 fs.cpSync(path.join(desktopRoot, "package.json"), path.join(appRoot, "package.json"), { force: true });
+fs.cpSync(path.join(desktopRoot, "package-lock.json"), path.join(appRoot, "package-lock.json"), { force: true });
+const npmCli = process.env.npm_execpath;
+if (!npmCli) throw new Error("Run packaging through npm so the locked production dependencies can be staged reproducibly.");
+run(process.execPath, [npmCli, "ci", "--omit=dev", "--ignore-scripts", "--prefix", appRoot]);
+if (!fs.existsSync(path.join(appRoot, "node_modules", "electron-updater", "out", "main.js"))) {
+  throw new Error("The runtime electron-updater dependency was not staged into the packaged app.");
+}
+fs.writeFileSync(path.join(outputRoot, "resources", "app-update.yml"), [
+  "provider: github",
+  "owner: WowLolCoolMan",
+  "repo: skai-desktop",
+  "releaseType: release",
+  "",
+].join("\n"), "utf8");
 fs.mkdirSync(path.join(appRoot, "assets", "branding"), { recursive: true });
 fs.copyFileSync(path.join(root, "assets", "branding", "skaiwolficon.png"), path.join(appRoot, "assets", "branding", "skaiwolficon.png"));
 fs.renameSync(path.join(outputRoot, electronBinary), path.join(outputRoot, packagedBinary));

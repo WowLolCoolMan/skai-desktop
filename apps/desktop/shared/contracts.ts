@@ -212,6 +212,8 @@ export type PetMotionSettings = {
 export type PetActivity = {
   state: "idle" | "walk" | "thinking" | "coding" | "coding_malicious" | "stuck" | "needs-attention" | "angry" | "pounce" | "fire-breath" | "celebrate" | "curious-scan" | "ember-curl" | "star-orbit" | "rock-roll" | "sprout-stretch";
   facing: 1 | -1;
+  /** Monotonic clip generation so a repeated action restarts even in the same state. */
+  generation?: number;
   target?: { x: number; y: number };
 };
 
@@ -223,6 +225,8 @@ export type PetBehaviorSettings = {
   minimumIntervalSeconds: number;
   maximumIntervalSeconds: number;
   actions: PetAttackAction[];
+  /** Custom Workshop routines can opt into executing every action in order. */
+  orderedActions?: boolean;
 };
 
 export type PetCompletionEvent = {
@@ -266,6 +270,7 @@ export interface WindowBridge {
 export type UpdateCheckResult = {
   available: boolean;
   currentVersion: string;
+  status?: "idle" | "checking" | "current" | "available" | "downloading" | "downloaded" | "error";
   version?: string;
   channel?: string;
   releaseUrl?: string;
@@ -273,16 +278,23 @@ export type UpdateCheckResult = {
   assetName?: string | null;
   publishedAt?: string | null;
   checkedAt?: string;
-  sha256?: string | null;
-  checksumVerified?: boolean;
+  percent?: number;
+  transferred?: number;
+  total?: number;
   message: string;
   error?: string;
 };
 
 export interface UpdatesBridge {
   check(): Promise<UpdateCheckResult>;
-  download(result: UpdateCheckResult): Promise<{ ok: boolean; path?: string; bytes?: number; sha256?: string; error?: string }>;
+  state(): Promise<UpdateCheckResult | null>;
   open(url: string): Promise<boolean>;
+  enabled(): Promise<boolean>;
+  setEnabled(enabled: boolean): Promise<boolean>;
+  install(): Promise<boolean>;
+  cancelDownload(): Promise<boolean>;
+  retry(): Promise<UpdateCheckResult>;
+  onState(handler: (result: UpdateCheckResult) => void): () => void;
   onAvailable(handler: (result: UpdateCheckResult) => void): () => void;
 }
 

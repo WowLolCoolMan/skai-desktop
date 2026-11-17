@@ -12,28 +12,21 @@ export function UpdateNotice() {
     const updates = window.skaiAgent?.updates;
     if (!updates) return;
     let mounted = true;
-    void updates.check().then((result) => { if (mounted && result.available) { setUpdate(result); setOpen(true); } }).catch(() => {});
-    const remove = updates.onAvailable((result) => { if (result.available) { setUpdate(result); setOpen(true); } });
+    void updates.state().then((result) => { if (mounted && result?.available) { setUpdate(result); setOpen(true); } }).catch(() => {});
+    const remove = updates.onState((result) => { if (result.available || result.status === "downloaded") { setUpdate(result); setOpen(true); } });
     return () => { mounted = false; remove(); };
   }, []);
 
   if (!open || !update?.available) return null;
-  const downloadUpdate = async () => {
-    if (!update || !window.skaiAgent?.updates) return;
-    setBusy(true); setError(null);
-    const result = await window.skaiAgent.updates.download(update);
-    setBusy(false);
-    if (!result.ok) { setError(result.error ?? "The update could not be downloaded."); return; }
-    setOpen(false);
-  };
+  const install = () => { void window.skaiAgent?.updates?.install(); setOpen(false); };
+  const retry = () => { void window.skaiAgent?.updates?.retry().then(setUpdate); };
   return <div className="update-overlay" role="presentation"><section className="update-card" role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-description">
     <button className="update-close" type="button" onClick={() => setOpen(false)} aria-label="Dismiss update notification">×</button>
-    <h2 id="update-title">Update ready</h2>
-    <p id="update-description">Skai Desktop {update.version ? `v${update.version}` : "has a new release"} is verified and ready for review.</p>
-    <div className="update-progress" aria-label="Release verification complete"><span style={{ width: "100%" }} /></div>
-    <div className="update-progress-copy"><strong>Verified release</strong><span>{update.assetName ?? "Release artifact ready"}</span></div>
-    <p className="update-safety-note">Skai verifies the published SHA-256 checksum before saving the artifact. It never replaces the running app silently.</p>
-    {error && <p className="settings-help" role="alert">{error}</p>}
-    <div className="update-actions"><Button variant="ghost" onClick={() => setOpen(false)}>Later</Button><Button variant="primary" disabled={busy || !update.checksumVerified} onClick={() => void downloadUpdate()}>{busy ? "Downloading…" : "Download verified update"}</Button></div>
+    <h2 id="update-title">{update.status === "error" ? "Update needs attention" : update.status === "downloaded" ? "Update ready to install" : update.status === "downloading" ? "Downloading update" : "Update available"}</h2>
+    <p id="update-description">{update.message ?? `Skai Desktop ${update.version ? `v${update.version}` : "has a new release"} is available.`}</p>
+    <div className="update-progress" aria-label={update.status === "downloaded" ? "Update verified" : `Download ${update.percent ?? 0}%`}><span style={{ width: `${update.status === "downloaded" ? 100 : update.percent ?? 0}%` }} /></div>
+    <div className="update-progress-copy"><strong>{update.status === "downloaded" ? "Verified and staged" : update.status === "error" ? "Download/check failed" : "Background download"}</strong><span>{update.status === "downloading" ? `${update.percent ?? 0}%` : update.version ? `Version ${update.version}` : "Stable channel"}</span></div>
+    <p className="update-safety-note">Skai verifies the downloaded package before staging. The app restarts only when you choose to install.</p>
+    <div className="update-actions"><Button variant="ghost" onClick={() => setOpen(false)}>Later</Button>{update.status === "downloading" && <Button variant="ghost" onClick={() => void window.skaiAgent?.updates?.cancelDownload()}>Cancel download</Button>}{update.status === "downloaded" ? <Button variant="primary" onClick={install}>Restart to update</Button> : update.status === "error" ? <Button variant="primary" onClick={retry}>Retry</Button> : null}</div>
   </section></div>;
 }

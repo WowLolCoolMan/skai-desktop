@@ -29,7 +29,7 @@ export const PET_ACTIONS = [
 
 export type PetAnimationId = typeof PET_ANIMATIONS[number]["id"];
 export type PetActionId = PetAttackAction;
-export type PetStrip = { dataUrl: string; frameWidth: number; frameHeight: number; frameCount?: number };
+export type PetStrip = { dataUrl: string; frameWidth: number; frameHeight: number; frameCount?: number; fps?: number; loop?: boolean };
 export const PET_BLINK_DURATION_DEFAULT_MS = 280;
 export const PET_BLINK_DURATION_MIN_MS = 170;
 export const PET_BLINK_DURATION_MAX_MS = 700;
@@ -115,6 +115,7 @@ export function defaultPetBehavior(name: string, enabled?: boolean): PetBehavior
     minimumIntervalSeconds: 30,
     maximumIntervalSeconds: 60,
     actions,
+    orderedActions: false,
   };
 }
 
@@ -137,6 +138,7 @@ export function normalizePetBehavior(value: unknown, name = ""): PetBehaviorSett
     minimumIntervalSeconds,
     maximumIntervalSeconds,
     actions,
+    orderedActions: candidate.orderedActions === true,
   };
 }
 
@@ -148,6 +150,12 @@ function clampInterval(value: unknown, fallback: number): number {
 export function makePetAttackSequence(settings: PetBehaviorSettings, random = Math.random): PetActionId[] {
   const available = settings.actions.filter((action) => PET_ACTIONS.some((item) => item.id === action));
   if (available.length === 0) return [];
+  if (settings.orderedActions) {
+    const steps: PetActionId[] = available.filter((action) => action !== "approach-cursor");
+    const firstCursorAttack = steps.findIndex((action) => action === "pounce" || action === "fire-breath");
+    if (firstCursorAttack >= 0) steps.splice(firstCursorAttack, 0, "approach-cursor");
+    return steps;
+  }
   const attacks = available.filter((action) => action === "pounce" || action === "fire-breath");
   const selectedAttacks = attacks.filter(() => random() < 0.66);
   if (selectedAttacks.length === 0 && attacks.length > 0) selectedAttacks.push(attacks[Math.floor(random() * attacks.length)]);
@@ -223,7 +231,7 @@ export async function deletePetSpriteProfile(id: string): Promise<void> {
   }
 }
 
-export async function validatePetStrip(file: File, allowLegacySixFrames = false, legacyFrameWidth?: number, expectedFrameCount = PET_FRAME_COUNT): Promise<PetStrip> {
+export async function validatePetStrip(file: File, allowLegacySixFrames = false, legacyFrameWidth?: number, expectedFrameCount?: number, loop = true): Promise<PetStrip> {
   if (!(file.type === "image/png" || file.type === "image/webp")) throw new Error("Choose a PNG or WebP sprite strip.");
   if (file.size > 5 * 1024 * 1024) throw new Error("Each sprite strip must be 5 MB or smaller.");
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -241,11 +249,12 @@ export async function validatePetStrip(file: File, allowLegacySixFrames = false,
   const legacyWidthCount = allowLegacySixFrames && Number.isFinite(legacyFrameWidth)
     ? [10, 6].find((count) => image.naturalWidth === Number(legacyFrameWidth) * count)
     : undefined;
-  const frameCount = legacyWidthCount ?? (image.naturalWidth % expectedFrameCount === 0
-    ? expectedFrameCount
-    : allowLegacySixFrames ? [10, 6].find((count) => image.naturalWidth % count === 0) ?? 0 : 0);
+  const inferredCount = Array.from({ length: 29 }, (_, index) => 32 - index)
+    .filter((count) => image.naturalWidth % count === 0)
+    .sort((left, right) => Math.abs(image.naturalWidth / left / image.naturalHeight - 1) - Math.abs(image.naturalWidth / right / image.naturalHeight - 1))[0] ?? 0;
+  const frameCount = legacyWidthCount ?? expectedFrameCount ?? inferredCount;
   if (!frameCount || image.naturalWidth < frameCount || image.naturalHeight < 1)
-    throw new Error(`The strip must have ${expectedFrameCount} equal-width frames in one horizontal row.`);
+    throw new Error(expectedFrameCount === 4 ? "The blink strip must have 4 equal-width frames in one horizontal row." : "The sprite strip must have 4–32 equal-width frames in one horizontal row.");
   const frameWidth = image.naturalWidth / frameCount;
   if (frameWidth > 2048 || image.naturalHeight > 2048)
     throw new Error("Each frame must be 2048 pixels or smaller in either direction.");
@@ -255,9 +264,9 @@ export async function validatePetStrip(file: File, allowLegacySixFrames = false,
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Skai could not inspect this sprite strip.");
   context.drawImage(image, 0, 0);
-  if (frameCount === PET_FRAME_COUNT) {
+  if (loop && frameCount > 1) {
     const rest = context.getImageData(0, 0, frameWidth, image.naturalHeight);
-    context.putImageData(rest, frameWidth * (PET_FRAME_COUNT - 1), 0);
+    context.putImageData(rest, frameWidth * (frameCount - 1), 0);
   }
   if (expectedFrameCount === 4) validateBlinkMotion(context, frameWidth, image.naturalHeight);
   else validateAnimationMotion(context, frameWidth, image.naturalHeight, frameCount);
@@ -275,7 +284,7 @@ export async function validatePetStrip(file: File, allowLegacySixFrames = false,
     if (error instanceof Error && (error.message.startsWith("Use a transparent") || error.message.startsWith("Draw or import"))) throw error;
     throw new Error("Skai could not verify the strip transparency. Export it as a PNG or WebP with transparency and try again.");
   }
-  return { dataUrl: frameCount === PET_FRAME_COUNT ? canvas.toDataURL("image/png") : dataUrl, frameWidth, frameHeight: image.naturalHeight, frameCount };
+  return { dataUrl: loop ? canvas.toDataURL("image/png") : dataUrl, frameWidth, frameHeight: image.naturalHeight, frameCount };
 }
 
 function validateBlinkMotion(context: CanvasRenderingContext2D, frameWidth: number, frameHeight: number) {
@@ -410,8 +419,11 @@ export async function validatePetProfileImport(file: File): Promise<PetSpritePro
     try { blob = await (await fetch(dataUrl)).blob(); }
     catch { throw new Error(`${animation.label} could not be read from the profile.`); }
     if (blob.size > 5 * 1024 * 1024) throw new Error(`${animation.label} is larger than 5 MB.`);
-    const storedStrip = raw as { frameWidth?: unknown };
-    strips[animation.id] = await validatePetStrip(new File([blob], `${animation.id}.${blob.type === "image/webp" ? "webp" : "png"}`, { type: blob.type }), true, Number(storedStrip.frameWidth));
+    const storedStrip = raw as { frameWidth?: unknown; fps?: unknown; loop?: unknown };
+    const loop = storedStrip.loop !== false;
+    const validatedStrip = await validatePetStrip(new File([blob], `${animation.id}.${blob.type === "image/webp" ? "webp" : "png"}`, { type: blob.type }), true, Number(storedStrip.frameWidth), undefined, loop);
+    const fps = typeof storedStrip.fps === "number" && Number.isFinite(storedStrip.fps) ? Math.round(Math.max(1, Math.min(60, storedStrip.fps))) : undefined;
+    strips[animation.id] = { ...validatedStrip, ...(fps ? { fps } : {}), loop };
   }
   let blink: PetStrip | undefined;
   if (candidate.blink !== undefined) {

@@ -12,6 +12,8 @@ site](https://wowlolcoolman.github.io/skai-desktop/).
   local-first product boundary.
 - [Release readiness](RELEASE_READINESS.md) — current packaging and acceptance
   gaps.
+- [Release guide](RELEASING.md) — release targets, required verification, signing
+  gates, and update publishing contract.
 - [Production readiness gaps](PRODUCTION_READINESS_GAPS.md) — work required for
   a stable public desktop release.
 - [Changelog](../CHANGELOG.md) — released version history.

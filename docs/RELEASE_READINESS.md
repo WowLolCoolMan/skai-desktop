@@ -16,6 +16,9 @@ Target release: **0.1.4**. Status: **not ready to publish**.
 - `npm run check:pet-assets` passed for all 56 eleven-frame strips, exact rest-pose seams, visible motion, eleven-frame blinks, and Blaze's effects; `npm run test:pet` passed wander and attack behavior checks.
 - Additional project, conversation, queue, memory, and PDF protocol smokes passed against the isolated Agent Host build.
 - The portable Electron artifact now bundles the renderer, Electron runtime, and a self-contained Agent Host; its startup smoke verifies the rendered settings and pet surfaces.
+- The Windows x64 NSIS package was built locally in unsigned validation mode on 2026-11-16. Its `latest.yml` was checked against the installer’s actual size and SHA-512, and the packaged startup smoke passed with `electron-updater` and `app-update.yml` staged inside the app.
+- Packaged Windows production dependencies are installed from the pinned lockfile; build tools and renderer libraries are no longer shipped as runtime dependencies.
+- Automatic update checks, background downloads, progress reporting, a persistent opt-out, retry, verified staging, and an explicit restart action are wired for packaged Windows NSIS and Linux AppImage builds.
 - Packaged artifacts include a versioned executable/Agent Host/AirLLM SHA-256 manifest; the Windows release workflow refreshes and verifies the executable hash after Authenticode signing.
 - Electron Settings now has a usable surface for general routing, appearance, model discovery, local voice, local image workflows, agent controls, privacy, storage, updates, and advanced controls.
 - The optional companion window supports the built-in and custom pet profiles, position persistence, pointer dragging, keyboard movement, wandering, per-pet idle/walk actions, reduced motion, and hide controls. Blaze has a tested attack sequence and separate fire/impact sprite effects; visual timing and pointer behavior still need live acceptance.
@@ -34,7 +37,9 @@ documentation link after commit `21cb70f8` was pushed to `main`. See
 
 ## Release blockers
 
-1. A signed Electron installer/release asset and clean-machine install/upgrade/uninstall evidence are not available in this checkout. The release workflow now packages and smoke-tests Electron for Windows and Linux, but remains fail-closed until signing material and lifecycle evidence are supplied.
-2. Complete exact-artifact keyboard, accessibility, Linux compositor, and platform acceptance. Cloud model routing is deliberately outside the product boundary and is not a release blocker.
+1. The Windows installer produced here is unsigned and local-only. Configure a trusted Authenticode certificate and Linux signing key, then produce and validate signed release artifacts and clean-machine install/upgrade/uninstall evidence.
+2. Add a fail-closed cryptographic signature for update metadata; currently the binary digest is checked against metadata delivered over GitHub HTTPS, while GPG signatures are not checked by the app's updater.
+3. Build and run the Linux AppImage in Ubuntu 24.04, then exercise a real update from 0.1.3 to 0.1.4 on both platforms. The Windows installer and startup smoke pass locally, but the full download/install update loop and Linux target are not validated in this Windows checkout.
+4. Complete exact-artifact keyboard, accessibility, contrast, Linux compositor, and platform acceptance. Cloud model routing is deliberately outside the product boundary and is not a release blocker.
 
-The Windows smoke suite, pet-focused checks, and packaged UI matrix pass. Release 0.1.4 is still blocked until signed lifecycle evidence is produced, the current automated contrast failures are fixed, and the remaining live platform/accessibility acceptance is recorded.
+The Windows smoke suite, pet-focused checks, and packaged UI matrix pass. Release 0.1.4 is still blocked until signing and lifecycle evidence are produced, signed updater metadata is implemented, the update loop passes on clean Windows and Ubuntu installs, the current automated contrast failures are fixed, and the remaining live platform/accessibility acceptance is recorded.

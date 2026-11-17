@@ -44,10 +44,11 @@ public static class LegacyDataMigration
                 {
                     File.Move(temporary, target, overwrite: false);
                 }
-                catch (IOException) when (File.Exists(target))
+                catch (IOException)
                 {
-                    // Another Skai Desktop process completed this same
-                    // first-run copy after our initial existence check.
+                    // A competing process or a briefly locked destination must
+                    // not prevent the Agent Host from starting. The source is
+                    // retained, so a later launch can retry this copy.
                 }
             }
             finally

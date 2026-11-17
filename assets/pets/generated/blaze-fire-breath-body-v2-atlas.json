@@ -1,0 +1,13 @@
+{
+  "name": "Blaze fire-breath body v2",
+  "source": "Generated for Skai Desktop using its existing Blaze art as a visual reference.",
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16,
+    "frameOrder": "row-major",
+    "fps": 18,
+    "loop": false
+  },
+  "notes": "The image uses a transparent 4x4 atlas. Frames 1-4 wind up, 5-12 hold the breath pose, and 13-16 recover. Blaze's cursor-directed fire and impact remain separate effect layers."
+}

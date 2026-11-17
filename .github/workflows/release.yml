@@ -100,6 +100,12 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: xvfb-run -a npm run smoke:electron:accessibility
+      - name: Build updater-compatible Linux AppImage
+        if: runner.os == 'Linux'
+        run: npm run package:linux:appimage
+      - name: Verify Linux updater metadata against the exact AppImage
+        if: runner.os == 'Linux'
+        run: node scripts/validate-update-metadata.cjs dist/installer/linux-x64/latest-linux.yml dist/installer/linux-x64
       - name: Sign Windows Electron payload
         if: runner.os == 'Windows' && env.RELEASE_SIGNING_READY == 'true'
         shell: pwsh
@@ -231,6 +237,7 @@ jobs:
           Compress-Archive -Path (Join-Path $publish '*') -DestinationPath (Join-Path $root 'Skai-Desktop-electron-win-x64.zip')
           $installer = Join-Path $env:GITHUB_WORKSPACE 'dist/installer/win-x64/Skai-Desktop-0.1.4-Setup-x64.exe'
           Copy-Item $installer $root
+          Copy-Item (Join-Path $env:GITHUB_WORKSPACE 'dist/installer/win-x64/latest.yml') $root
           $checksums = @((Get-FileHash -Algorithm SHA256 (Join-Path $root 'Skai-Desktop-electron-win-x64.zip')), (Get-FileHash -Algorithm SHA256 (Join-Path $root 'Skai-Desktop-0.1.4-Setup-x64.exe')))
           $checksums | ForEach-Object { "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))" } | Set-Content -Encoding ascii (Join-Path $root 'SHA256SUMS-electron-win-x64.txt')
           if (Test-Path (Join-Path $env:RUNNER_TEMP 'SIGNATURES-electron-win-x64.txt')) { Copy-Item (Join-Path $env:RUNNER_TEMP 'SIGNATURES-electron-win-x64.txt') $root }
@@ -242,14 +249,19 @@ jobs:
           set -euo pipefail
           root="$RUNNER_TEMP/skai-electron"
           publish="$GITHUB_WORKSPACE/dist/electron/linux-x64"
+          appimage_dir="$GITHUB_WORKSPACE/dist/installer/linux-x64"
           mkdir -p "$root"
+          cp "$appimage_dir/Skai-Desktop-0.1.4-x64.AppImage" "$root/"
+          cp "$appimage_dir/latest-linux.yml" "$root/"
           cp docs/ELECTRON_DEFAULT_RUNTIME.md "$publish/"
           tar -czf "$root/Skai-Desktop-electron-linux-x64.tar.gz" -C "$publish" .
           sha256sum "$root/Skai-Desktop-electron-linux-x64.tar.gz" > "$root/SHA256SUMS-electron-linux-x64.txt"
           if [ "${RELEASE_SIGNING_READY:-}" = 'true' ]; then
             gpg --batch --yes --armor --detach-sign --output "$root/Skai-Desktop-electron-linux-x64.tar.gz.asc" "$root/Skai-Desktop-electron-linux-x64.tar.gz"
+            gpg --batch --yes --armor --detach-sign --output "$root/Skai-Desktop-0.1.4-x64.AppImage.asc" "$root/Skai-Desktop-0.1.4-x64.AppImage"
             gpg --batch --list-secret-keys --with-colons | awk -F: '$1 == "sec" { print "keyid=" $5; exit }' > "$root/SIGNATURES-electron-linux-x64.txt"
             printf 'signature=Skai-Desktop-electron-linux-x64.tar.gz.asc\n' >> "$root/SIGNATURES-electron-linux-x64.txt"
+            printf 'signature=Skai-Desktop-0.1.4-x64.AppImage.asc\n' >> "$root/SIGNATURES-electron-linux-x64.txt"
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -257,6 +269,10 @@ jobs:
           path: |
             ${{ runner.temp }}/skai-electron/Skai-Desktop-electron-*
             ${{ runner.temp }}/skai-electron/Skai-Desktop-0.1.4-Setup-x64.exe
+            ${{ runner.temp }}/skai-electron/Skai-Desktop-0.1.4-x64.AppImage
+            ${{ runner.temp }}/skai-electron/latest.yml
+            ${{ runner.temp }}/skai-electron/latest-linux.yml
+            ${{ runner.temp }}/skai-electron/Skai-Desktop-0.1.4-x64.AppImage.asc
             ${{ runner.temp }}/skai-electron/SIGNATURES-electron-*.txt
             ${{ runner.temp }}/skai-electron/SHA256SUMS-electron-*.txt
             ${{ runner.temp }}/skai-electron/windows-install-lifecycle-evidence.json
