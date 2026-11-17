@@ -99,10 +99,16 @@ export async function speakNativeResponse(text: string, force = false, profileId
   try {
     const native = await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate });
     if (native?.ok) return true;
-  } catch { /* Browser preview fallback below. */ }
+    window.dispatchEvent(new CustomEvent("skai:voice-fallback", { detail: { message: "The selected voice model failed to load. Using the native fallback voice." } }));
+  } catch {
+    window.dispatchEvent(new CustomEvent("skai:voice-fallback", { detail: { message: "The selected voice model failed to load. Using the native fallback voice." } }));
+  }
   if (!("speechSynthesis" in window)) return false;
   const localVoice = window.speechSynthesis.getVoices().find((voice) => voice.localService);
-  if (!localVoice) return false;
+  if (!localVoice) {
+    window.dispatchEvent(new CustomEvent("skai:voice-fallback", { detail: { message: "The voice model failed to load, and no native fallback voice is available on this device." } }));
+    return false;
+  }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(safeText.replace(/[`*_>#]/g, "").replace(/\s+/g, " ").trim().slice(0, 4000));
   utterance.voice = localVoice;
