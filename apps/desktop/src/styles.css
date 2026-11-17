@@ -54,8 +54,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .workspace-tab-status.is-queued { color: var(--skai-color-text-muted); }
 .workspace-tab-status.is-review { color: var(--skai-color-success); }
 .workspace-tab-status.is-attention { color: var(--skai-color-danger); }
-.workspace-tab-close, .workspace-tab-new { flex: 0 0 27px; width: 27px; height: 27px; margin: 4px 4px 0 0; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: transparent; font-size: var(--skai-text-xl); }
+.workspace-tab-close, .workspace-tab-new { flex: 0 0 27px; width: 27px; height: 27px; margin: 4px 4px 0 0; border: 1px solid transparent; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: transparent; font-size: var(--skai-text-xl); }
 .workspace-tab-close:hover, .workspace-tab-new:hover { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
+.workspace-tab-close:focus-visible, .workspace-tab-new:focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: 1px; }
 .workspace-tab-new { display: grid; flex: 0 0 28px; place-items: center; width: 28px; height: 28px; margin: 4px 0 0; }
 .workspace-tab-new .nav-icon { width: 15px; height: 15px; }
 .app-main > .app-content { min-height: 0; flex: 1 1 0; }
