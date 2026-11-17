@@ -33,20 +33,20 @@ STATE_FILES = {
 
 def frame_duration(state: str) -> int:
     return {
-        "idle": 220,
-        "run": 120,
-        "review": 150,
-        "running": 130,
-        "waiting": 180,
-        "waving": 110,
-        "jumping": 105,
-        "failed": 145,
-        "malicious": 125,
-        "pounce": 95,
-        "fire-breath": 100,
-        "fire-impact": 62,
-        "curious-scan": 150,
-        "ember-curl": 110,
+        "idle": 105,
+        "run": 70,
+        "review": 80,
+        "running": 75,
+        "waiting": 95,
+        "waving": 70,
+        "jumping": 65,
+        "failed": 75,
+        "malicious": 70,
+        "pounce": 65,
+        "fire-breath": 70,
+        "fire-impact": 55,
+        "curious-scan": 80,
+        "ember-curl": 75,
     }[state]
 
 def to_webp(source_path: Path, output_path: Path, duration: int, expected_frames: int | None = None) -> int:

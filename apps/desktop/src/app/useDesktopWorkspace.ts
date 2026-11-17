@@ -12,6 +12,17 @@ import { useCodingWorkspace } from "../features/coding/useCodingWorkspace";
 import { loadImageHistory, saveImageHistory, type ImageHistoryEntry } from "../features/catalog/imageHistory";
 import { useThemeEngine } from "../theme/useThemeEngine";
 
+function readPetInteractionDemoPreference(): boolean {
+  const preferenceKey = "skai.pet.interactionDemo";
+  const defaultOffMigrationKey = "skai.pet.interactionDemoDefaultOff.v1";
+  if (localStorage.getItem(defaultOffMigrationKey) !== "true") {
+    localStorage.setItem(preferenceKey, "false");
+    localStorage.setItem(defaultOffMigrationKey, "true");
+    return false;
+  }
+  return localStorage.getItem(preferenceKey) === "true";
+}
+
 export type DesktopWorkspace = {
   routeState: AppRouteState;
   routeActions: AppRouteActions;
@@ -161,7 +172,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [reduceMotion, setReduceMotion] = useState(() => readStoredBoolean("skai.reduceMotion", false));
   const [petVisible, setPetVisible] = useState(localStorage.getItem("skai.pet.visible") !== "false");
   const [petWander, setPetWander] = useState(localStorage.getItem("skai.pet.wander") !== "false");
-  const [petInteractionDemo, setPetInteractionDemo] = useState(localStorage.getItem("skai.pet.interactionDemo") === "true");
+  const [petInteractionDemo, setPetInteractionDemo] = useState(readPetInteractionDemoPreference);
   const [petCharacter, setPetCharacter] = useState(() => { const saved = localStorage.getItem("skai.pet.character"); return saved && (["percy", "byte", "ember", "blaze", "nova", "rocky", "sprout"].includes(saved) || saved.startsWith("custom:")) ? saved : "percy"; });
   const [petSpriteDataUrl, setPetSpriteDataUrl] = useState(() => localStorage.getItem("skai.pet.sprite") ?? "");
   const [developerMode, setDeveloperMode] = useState(false);
