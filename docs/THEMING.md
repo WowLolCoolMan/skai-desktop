@@ -21,6 +21,34 @@ re-reads everything by hand. A file with mistakes doesn't block anything: the pr
 under the buttons (file, key, what's wrong), and a theme that was already working stays as it was
 until the file is fixed. Your picks are saved in `appearance.json`.
 
+## Built-in themes
+
+| Family | Themes | License |
+|---|---|---|
+| Skai | Skai Dark, Skai Light | Original |
+| Aurora, Sunset, Deep Sea, Synthwave | Dark and Light each (gradient themes) | Original |
+| Skai High Contrast | High Contrast Dark, High Contrast Light (7:1) | Original |
+| Catppuccin | Latte, Frappé, Macchiato, Mocha | MIT |
+| Dracula | Dracula | MIT |
+| Nord | Nord | MIT |
+| Gruvbox | Gruvbox Dark, Gruvbox Light | MIT/X11 |
+| Tokyo Night | Tokyo Night, Storm, Day | Apache-2.0 |
+| Solarized | Solarized Dark, Solarized Light | MIT |
+| Rosé Pine | Rosé Pine, Moon, Dawn | MIT |
+| One | One Dark, One Light | MIT |
+| Everforest | Everforest Dark, Everforest Light | MIT |
+| Kanagawa | Kanagawa Wave, Kanagawa Lotus | MIT |
+| Night Owl | Night Owl, Night Owl Light | MIT |
+| Monokai | Monokai (as shipped in VS Code) | MIT |
+
+The community palettes are copied from each project's own repository and keep their copyright
+(see `licenses/THEME-PALETTES.md`). Every built-in theme passes an automated contrast check: text 4.5:1 on
+every background (7:1 for High Contrast), text on accent buttons 4.5:1, the focus ring (accent) 3:1, and
+every gradient stop. Where a palette color had to move to pass in this app, the preset lists the change
+(old color, new color, why) in its `adjusted` field. The Material Theme isn't included because no permissive
+license could be confirmed. GitHub and Ayu will be added once their palettes can be taken from a licensed
+source file.
+
 ## Appearance buttons (also in the command palette, under "Theme:")
 
 | Button | What it does |

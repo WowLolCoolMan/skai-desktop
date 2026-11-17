@@ -10,6 +10,7 @@ const { base16ToFamily, parseScheme } = require("../apps/desktop/electron/theme-
 const { createThemeService } = require("../apps/desktop/electron/theme-service.cjs");
 const fontsModule = require("../apps/desktop/electron/theme-fonts.cjs");
 const { buildSkaiFamily, buildSchema, serialize, presetPath, schemaPath } = require("./theme-generate.cjs");
+const community = require("./theme-community.cjs");
 
 const root = path.resolve(__dirname, "..");
 let passed = 0;
@@ -162,7 +163,11 @@ test("presets: text, on-accent and every gradient stop pass contrast", () => {
       const check = (fg, bg, bgName, minimum) => { const value = ratio(fg, bg); if (value < minimum) failures.push(`${file} ${theme.name}: ${bgName} ${value.toFixed(2)}:1 < ${minimum}`); };
       for (const background of ["canvas", "surface", "surface-raised"]) for (const text of ["text", "text-muted"]) check(color(text), color(background), `${text} on ${background}`, 4.5);
       for (const text of ["sidebar-text", "sidebar-muted"]) check(color(text), color("sidebar"), `${text} on sidebar`, 4.5);
-      check(color("on-accent"), color("accent"), "on-accent on accent", 4.5);
+      // High-contrast themes: 7:1 for text and on-accent. Every theme: the focus ring (accent) 3:1.
+      const strict = /high contrast/i.test(theme.name) ? 7 : 4.5;
+      if (strict > 4.5) for (const background of ["canvas", "surface", "surface-raised", "sidebar"]) for (const text of ["text", "text-muted"]) check(color(text), color(background), `${text} on ${background} (high contrast)`, 7);
+      check(color("on-accent"), color("accent"), "on-accent on accent", strict);
+      for (const background of ["canvas", "surface"]) check(color("accent"), color(background), `focus ring (accent) on ${background}`, 3);
       for (const [surface, gradient] of Object.entries(theme.gradients ?? {})) {
         const stops = typeof gradient === "string" ? [gradient] : gradient.stops.map((stop) => stop.color);
         for (const text of SURFACE_TEXT[surface]) stops.forEach((stop, index) => check(color(text), over(rgba(stop), canvas), `${text} on ${surface} stop ${index + 1}`, surface === "rail" ? 3 : 4.5));
@@ -170,6 +175,16 @@ test("presets: text, on-accent and every gradient stop pass contrast", () => {
     }
   }
   assert.deepEqual(failures, []);
+});
+
+test("community presets are generated from their recorded sources and licensed permissively", () => {
+  for (const { id, json } of community.buildFamilies()) {
+    const file = path.join(community.presetDir, `${id}.json`);
+    assert.equal(fs.readFileSync(file, "utf8"), community.serialize(json), `${id}.json is stale: run node scripts/theme-community.cjs --write`);
+    assert.match(json.license, /^(MIT|Apache-2\.0|Original Skai Desktop theme)/, `${id} license`);
+  }
+  assert.equal(fs.readFileSync(community.noticesPath, "utf8"), community.buildNotices(), "licenses/THEME-PALETTES.md is stale: run node scripts/theme-community.cjs --write");
+  for (const entry of Object.values(community.SOURCES)) if (entry.copyright) assert.ok(community.buildNotices().includes(entry.copyright), `${entry.name} copyright missing from the notices`);
 });
 
 test("gradient presets are original Skai themes with light and dark variants", () => {

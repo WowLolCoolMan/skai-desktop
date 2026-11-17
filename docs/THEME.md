@@ -375,3 +375,52 @@ Round 9 was pushed as b460b85.
   preset's other gradients kept, and the copy active. The smoke helper now finds a select by its label's own text, not
   `includes()`: the editor's "Backdrop …" option text was matching the Backdrop lookup.
 - **Screens:** `.theme-shots/r10/` has Synthwave Dark and Aurora Light (chat and editor).
+
+### Round 11: community palettes, licenses, contrast (Phase 6, part 1)
+
+Round 10 was pushed as 23c52db.
+
+- **Sources and licenses** were checked at each project's own repository (fetched today; values copied from the files,
+  not from memory):
+
+  | Project | License | Notes |
+  |---|---|---|
+  | Catppuccin | MIT | |
+  | Dracula | MIT | |
+  | Nord | MIT | |
+  | Gruvbox | MIT/X11 | Stated in the README; the repo has no LICENSE file |
+  | Tokyo Night (folke) | Apache-2.0 | Per LICENSE; the kitty extras say MIT, and both are permissive |
+  | Solarized | MIT | |
+  | Rosé Pine | MIT | |
+  | One Dark / Light (Atom) | MIT | hsl() resolved to hex |
+  | Everforest | MIT | medium background |
+  | Kanagawa | MIT | Wave + Lotus |
+  | Night Owl | MIT | |
+  | Monokai | MIT | VS Code's built-in Monokai file, "based on the original Monokai"; the original has no separate license |
+
+  **Skipped:** Material Theme (the repo is gone and its successor is proprietary; no permissive license could be
+  confirmed). **Not yet:** GitHub (its MIT theme repo doesn't commit the generated palette) and Ayu (palette files and
+  license not reached). Both are left for a later round.
+- **Generator** `scripts/theme-community.cjs` holds each palette with its source, license and copyright. It maps
+  palettes onto Skai's keys and writes `presets/<id>.json` plus `licenses/THEME-PALETTES.md` (every copyright line,
+  the MIT text, and an Apache-2.0 pointer to `licenses/Apache-2.0.txt`, extracted from the PdfPig license already in
+  the repo). `THIRD_PARTY_NOTICES.md` points at both. `test:themes` fails if either output is stale.
+- **Adjust only the failing token:** if a mapped color misses AA on this app's canvas, surface, raised and sidebar
+  backgrounds, only that token is nudged toward white (dark) or black (light) until it passes. Each change is
+  recorded in the preset's `adjusted` list (theme, key, old → new, ratio). There are 156 across 26 themes, mostly
+  status colors used as text (danger, success, warning, info, inline code, diff text). Core text needed changes
+  only for Tokyo Night Day and Solarized; muted text moved in about half the themes. Accent (the focus ring) moved
+  for Everforest Light to reach 3:1.
+- **High contrast:** original Skai High Contrast Dark and Light, tested at 7:1 for text and text on accent.
+- **Tests added:** high-contrast 7:1, the focus ring (accent) at 3:1 on canvas and surface for every theme, generated
+  presets and notices in sync, and permissive licenses only. 20 groups.
+- **Skai Light accent fixed** (found by the focus-ring test; first noted in round 2): `--skai-color-accent` `#b39af5`
+  → `#6d4fd8` (5.2:1), `accent-strong` → `#5a3ec4`, `on-accent` → `#ffffff`. Primary buttons in light are now deep
+  purple with white text, and accent text (section labels) passes AA.
+- **Fixed in `styles.css`** (three one-token swaps): three rules painted the accent behind text that wasn't the
+  on-accent token. `.chat-response-mode-options button.is-active` used `text` (about 1.6:1 in Skai Dark), the
+  sidebar context-menu button used `surface`, and `.skip-link` used `canvas`. All three now use
+  `--skai-color-on-accent`.
+- **Not done:** the plan's "borders ≥ 3:1". `--skai-color-border-strong` is a translucent hairline at about 1.8:1 in
+  Skai Dark, and raising every border to 3:1 would change the whole look. It's left for the user to decide.
+- **Screens:** `.theme-shots/r11/` (Skai Light, Catppuccin Mocha, Gruvbox Light).

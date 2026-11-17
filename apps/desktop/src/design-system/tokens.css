@@ -154,6 +154,11 @@
   --skai-color-code-surface: #eef1f7;
   --skai-color-code-text: #1f2a44;
   --skai-color-danger: #b4233a;
+  /* Theme: the dark theme's lavender accent (#b39af5) was 2.2:1 on light surfaces, too faint
+     for the focus ring and accent text; light gets its own accent with white text on it. */
+  --skai-color-accent: #6d4fd8;
+  --skai-color-accent-strong: #5a3ec4;
+  --skai-color-on-accent: #ffffff;
   --skai-color-sidebar: #eef1f6;
   --skai-color-sidebar-text: #263044;
   --skai-color-sidebar-strong: #18213a;
