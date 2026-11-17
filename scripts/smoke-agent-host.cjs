@@ -201,6 +201,29 @@ async function run() {
   const personaThread = await request("conversation.save", { title: "Persona workshop thread", personaId, messages: [{ role: "user", content: "Keep this inside the workshop." }] });
   const groupThread = await request("conversation.save", { title: "Persona group thread", isPersonaGroup: true, personaIds: [personaId, secondPersona.result.persona.id], messages: [] });
   if (!personaThread.ok || !groupThread.ok) throw new Error("Persona and group conversations could not be saved.");
+  const individualModelRequests = [];
+  const individualModelServer = http.createServer((request, response) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", chunk => { body += chunk; });
+    request.on("end", () => {
+      individualModelRequests.push(JSON.parse(body));
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end('data: {"choices":[{"delta":{"content":"individual persona smoke reply"}}]}\n\ndata: [DONE]\n\n');
+    });
+  });
+  pendingSmokeServers.add(individualModelServer);
+  await new Promise(resolve => individualModelServer.listen(0, "127.0.0.1", resolve));
+  const individualPort = individualModelServer.address().port;
+  const individualReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${individualPort}/v1`, model: "persona-individual-smoke-model", personaId, messages: [{ role: "user", content: "What do you know about this conversation?" }], responseMode: "think" });
+  await new Promise(resolve => individualModelServer.close(resolve));
+  pendingSmokeServers.delete(individualModelServer);
+  if (!individualReply.ok || individualReply.result?.content !== "individual persona smoke reply" || individualModelRequests.length !== 1 || !individualModelRequests[0].messages.some(message => message.role === "system" && message.content.includes("AI simulation of Workshop persona")))
+    throw new Error(`chat.complete did not use the selected persona profile: ${JSON.stringify(individualReply)}`);
+  const completedPersonaThread = await request("conversation.save", { id: personaThread.result.id, title: "Persona workshop thread", personaId, messages: [{ role: "user", content: "Keep this inside the workshop." }, { role: "user", content: "What do you know about this conversation?" }, { role: "assistant", content: individualReply.result.content }] });
+  const savedPersonaThreads = await request("conversations.list", { scope: "persona" });
+  if (!completedPersonaThread.ok || !savedPersonaThreads.ok || !savedPersonaThreads.result.some(thread => thread.id === personaThread.result.id && thread.messages.some(message => message.content === "individual persona smoke reply")))
+    throw new Error("The individual persona reply did not persist in its Persona Workshop thread.");
   const groupModelRequests = [];
   const groupModelServer = http.createServer((request, response) => {
     let body = "";
