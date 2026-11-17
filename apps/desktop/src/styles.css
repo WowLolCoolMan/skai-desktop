@@ -186,6 +186,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .persona-research-spinner { width: 28px; height: 28px; border: 2px solid var(--skai-color-border); border-top-color: var(--skai-color-accent); border-radius: 50%; animation: persona-research-spin .8s linear infinite; }
 @keyframes persona-research-spin { to { transform: rotate(360deg); } }
 .persona-evidence-summary { padding: 15px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 26%, var(--skai-color-border)); border-radius: var(--skai-radius-xl); background: color-mix(in srgb, var(--skai-color-accent) 4%, var(--skai-color-surface)); }
+.persona-step-actions { display: flex; justify-content: space-between; gap: 10px; padding-top: 4px; }
 .persona-evidence-heading > div { display: grid; gap: 4px; }
 .persona-evidence-heading .section-kicker { margin: 0; }
 .persona-evidence-heading p:last-child, .persona-evidence-note { max-width: 760px; margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.5; }
