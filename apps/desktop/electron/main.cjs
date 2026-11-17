@@ -4,7 +4,7 @@ const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const readline = require("node:readline");
-const { randomUUID } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
 const { listVisibleWindows } = require("./pet-surfaces.cjs");
@@ -1060,6 +1060,16 @@ function updateAssetForPlatform(assets = []) {
   return assets.find((asset) => String(asset?.name ?? "").toLowerCase().endsWith(name)) ?? null;
 }
 
+function updateChecksumAsset(assets = []) {
+  return assets.find((asset) => /^sha256sums(?:[-_].*)?\.txt$/i.test(String(asset?.name ?? ""))) ?? null;
+}
+
+function checksumForAsset(checksumText, assetName) {
+  const escapedName = assetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = checksumText.match(new RegExp(`^([a-f0-9]{64})\\s+(?:\\*|)${escapedName}\\s*$`, "im"));
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
 async function checkForUpdates() {
   const currentVersion = app.getVersion();
   const releaseUrl = `https://github.com/${UPDATE_REPOSITORY}/releases/latest`;
@@ -1073,6 +1083,12 @@ async function checkForUpdates() {
     const release = await response.json();
     const version = String(release.tag_name ?? "");
     const asset = updateAssetForPlatform(release.assets);
+    const checksumAsset = updateChecksumAsset(release.assets);
+    let sha256 = null;
+    if (asset && checksumAsset) {
+      const checksumResponse = await fetch(String(checksumAsset.browser_download_url), { signal: AbortSignal.timeout(10_000) });
+      if (checksumResponse.ok) sha256 = checksumForAsset(await checksumResponse.text(), String(asset.name));
+    }
     const available = isNewerRelease(version, currentVersion);
     return {
       available,
@@ -1082,6 +1098,8 @@ async function checkForUpdates() {
       releaseUrl: String(release.html_url || releaseUrl),
       downloadUrl: asset?.browser_download_url ?? String(release.html_url || releaseUrl),
       assetName: asset?.name ?? null,
+      sha256,
+      checksumVerified: Boolean(sha256),
       publishedAt: release.published_at ?? null,
       checkedAt: new Date().toISOString(),
       message: available ? `Skai Desktop ${version} is ready.` : "You are running the latest stable version.",
@@ -1089,6 +1107,42 @@ async function checkForUpdates() {
   } catch (error) {
     return { available: false, currentVersion, channel: "stable", releaseUrl, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : "Update check failed.", message: "Update check could not reach GitHub." };
   }
+}
+
+async function downloadVerifiedUpdate(result) {
+  if (!result || typeof result !== "object" || !result.available || !result.downloadUrl || !result.assetName || !result.sha256) {
+    throw new Error("This release does not have a verifiable platform artifact yet.");
+  }
+  const parsed = new URL(String(result.downloadUrl));
+  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") throw new Error("Update downloads must come from the official GitHub release.");
+  const response = await fetch(parsed.toString(), { signal: AbortSignal.timeout(120_000) });
+  if (!response.ok || !response.body) throw new Error(`Update download failed with HTTP ${response.status}.`);
+  const directory = path.join(app.getPath("downloads"), "Skai Desktop Updates");
+  await fs.mkdir(directory, { recursive: true });
+  const target = path.join(directory, path.basename(String(result.assetName)));
+  const temporary = `${target}.${process.pid}.partial`;
+  const hash = createHash("sha256");
+  let bytes = 0;
+  const handle = await fs.open(temporary, "w");
+  try {
+    for await (const chunk of response.body) {
+      bytes += chunk.length;
+      if (bytes > 2 * 1024 * 1024 * 1024) throw new Error("Update artifact is larger than the safe download limit.");
+      hash.update(chunk);
+      await handle.write(chunk);
+    }
+  } finally {
+    await handle.close();
+  }
+  const actual = hash.digest("hex").toLowerCase();
+  if (actual !== String(result.sha256).toLowerCase()) {
+    await fs.rm(temporary, { force: true });
+    throw new Error("The downloaded update failed SHA-256 verification and was discarded.");
+  }
+  await fs.rm(target, { force: true });
+  await fs.rename(temporary, target);
+  await shell.openPath(directory);
+  return { ok: true, path: target, bytes, sha256: actual };
 }
 
 function scheduleUpdateCheck() {
@@ -1513,6 +1567,11 @@ app.whenReady().then(() => {
     if (parsed.protocol !== "https:" || !["github.com", "huggingface.co"].includes(parsed.hostname)) return false;
     await shell.openExternal(parsed.toString());
     return true;
+  });
+  ipcMain.handle("updates:download", async (event, result) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return { ok: false, error: "Update downloads are unavailable." };
+    try { return await downloadVerifiedUpdate(result); }
+    catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Update download failed." }; }
   });
   ipcMain.handle("plugins:open-downloads", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;

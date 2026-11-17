@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("skaiAgent", {
   },
   updates: {
     check: () => ipcRenderer.invoke("updates:check"),
+    download: (result) => ipcRenderer.invoke("updates:download", result),
     open: (url) => ipcRenderer.invoke("updates:open", String(url)),
     onAvailable: (handler) => {
       const listener = (_event, result) => handler(result);

@@ -273,12 +273,15 @@ export type UpdateCheckResult = {
   assetName?: string | null;
   publishedAt?: string | null;
   checkedAt?: string;
+  sha256?: string | null;
+  checksumVerified?: boolean;
   message: string;
   error?: string;
 };
 
 export interface UpdatesBridge {
   check(): Promise<UpdateCheckResult>;
+  download(result: UpdateCheckResult): Promise<{ ok: boolean; path?: string; bytes?: number; sha256?: string; error?: string }>;
   open(url: string): Promise<boolean>;
   onAvailable(handler: (result: UpdateCheckResult) => void): () => void;
 }
