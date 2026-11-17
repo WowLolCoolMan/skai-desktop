@@ -314,3 +314,33 @@ Round 7 was pushed as 101d5bd.
   waits for the `FontFace` load, picks the font for UI through the bridge, checks the stack and the problem
   report, then clears the override.
 - **Screens:** `.theme-shots/r8-fonts-{dark,light}.png` show the Code picker open in both themes.
+
+**Round 8 push note:** after the pull, two checks were red on main from the owner's commits. `d07527f` added a
+raw `999px` radius (caught by `audit:theme-tokens`); he fixed it himself in `a6c1a7d`, and I took his version
+of the conflicting line. `a944933` removed the Agent Workbench, but `audit-electron-runtime` still read
+`WorkbenchTaskDetails.tsx`. With the user's approval, the task-cancel check now reads the chat task cards in
+`ChatPage.tsx`, keeping the same intent. Pushed as 0e3f64e on the third attempt (the first two were rejected
+because main moved during the checks).
+
+### Round 9: gradients (Phase 5, part 1)
+
+- **Surfaces:** `src/theme/surfaces.css` (new) paints `--skai-bg-<surface>` on canvas (`body`, `.app-main`), sidebar,
+  toolbar, rail, composer, user bubble, primary button, brand mark, empty state, and the existing `data-backdrop`
+  art layer. A rule only matches while `<html data-skai-gradient-<surface>>` is set, so without a theme gradient
+  nothing changes. There are no edits to `styles.css`, whose solid backgrounds sit in several stacked overrides.
+- **Building:** `src/theme/gradients.ts` (new) builds `linear-gradient(<angle>deg, …)`,
+  `radial-gradient(ellipse at center, …)` and `conic-gradient(from <angle>deg at 50% 50%, …)` from validated stops
+  (re-checked, sorted, positions as %). Built-in presets are normalized to the same shape the main process sends.
+- **Contrast against every stop:** after a theme applies, each gradient stop is checked against the text tokens
+  that sit on that surface (4.5:1; 3:1 for rail icons). Colors are normalized by the canvas parser and
+  translucent stops are blended over the canvas. Failures are listed in Appearance.
+- **Animate background:** `appearance.json` gains `animateBackground` (`appearance.saveAppearanceOptions`). Only the
+  canvas gradient drifts (40 s alternate), and only while reduced motion is off, in both the app setting and the OS.
+- **Audit:** `audit:theme-tokens` now also fails on `linear/radial/conic-gradient(` written in TS/TSX (components
+  must use the `--skai-bg-*` tokens). Gradient stops in CSS were already covered by the color rule.
+- **Smoke:** the user theme now carries a canvas gradient with unsorted stops and a low-contrast button gradient.
+  The test checks the exact built gradient, the attribute, that `.app-main` paints it, and that the button stop
+  is reported.
+- **Scroll check** (real display, Settings page, 4 s of rAF-driven scrolling, solid vs four gradient surfaces,
+  two rounds each): average frame 4.4–4.6 ms solid vs 4.4–4.9 ms with gradients; p95 8.2–8.4 vs 8.0–8.4 ms;
+  no frame over 25 ms in either.

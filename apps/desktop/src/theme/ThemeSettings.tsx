@@ -38,6 +38,16 @@ export function ThemeSettings() {
       </div>
       {state.themesDir && <span className="theme-settings-path" title={state.themesDir}>{state.themesDir}</span>}
       {state.notice && <div className={`theme-settings-notice is-${state.notice.tone}`} role="status"><span>{state.notice.text}</span><button type="button" onClick={() => themeEngine.dismissNotice()} aria-label="Dismiss">×</button></div>}
+      {state.contrastWarnings.length > 0 && (
+        <div className="theme-settings-contrast" role="status">
+          <strong>Some text may be hard to read on this theme's gradients.</strong>
+          <ul>{state.contrastWarnings.slice(0, 8).map((warning, index) => <li key={index}><code>{warning.surface}</code> stop {warning.stop} (<code>{warning.color}</code>) against <code>{warning.token.replace("--skai-color-", "")}</code>: {warning.ratio}:1, needs {warning.surface === "rail" ? 3 : 4.5}:1</li>)}</ul>
+        </div>
+      )}
+      <label className="theme-settings-toggle">
+        <input type="checkbox" checked={state.animateBackground} onChange={(event) => void themeEngine.setAnimateBackground(event.target.checked)} />
+        <span><strong>Animate background</strong><small>Slowly moves the theme's canvas gradient. Stays still while reduced motion is on.</small></span>
+      </label>
       <FontSettings />
       {state.problems.length > 0 && (
         <div className="theme-settings-problems" role="status">

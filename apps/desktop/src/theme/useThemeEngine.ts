@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { AgentResponse } from "../../shared/contracts";
 import type { ThemeMode } from "../app/types";
 import { themeEngine } from "./themeEngine";
+import "./surfaces.css";
 
 type Request = (method: string, params?: Record<string, unknown>) => Promise<AgentResponse>;
 

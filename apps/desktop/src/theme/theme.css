@@ -36,3 +36,12 @@
 @media (max-width: 900px) { .font-role-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } .font-role-family { grid-column: 1 / -1; } }
 .font-role-controls input[aria-invalid="true"] { border-color: var(--skai-color-danger); }
 .settings-content .font-role-controls select { min-height: 36px; padding: 0 var(--skai-space-2); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }
+
+/* ===== Gradient contrast warnings and animate toggle ===== */
+.theme-settings-contrast { display: grid; gap: var(--skai-space-2); padding: var(--skai-space-3); border: 1px solid color-mix(in srgb, var(--skai-color-warning) 45%, transparent); border-radius: var(--skai-radius-lg); color: var(--skai-color-text); background: color-mix(in srgb, var(--skai-color-warning) 8%, transparent); font-size: var(--skai-text-md); }
+.theme-settings-contrast ul { display: grid; gap: var(--skai-space-1); margin: 0; padding-left: var(--skai-space-4); }
+.theme-settings-contrast code { font-family: var(--skai-font-code); }
+.theme-settings-toggle { display: flex; align-items: flex-start; gap: var(--skai-space-2); cursor: pointer; }
+.theme-settings-toggle input { margin-top: 3px; accent-color: var(--skai-color-accent); }
+.theme-settings-toggle span { display: grid; gap: 2px; }
+.theme-settings-toggle small { color: var(--skai-color-text-muted); font-size: var(--skai-text-md); }

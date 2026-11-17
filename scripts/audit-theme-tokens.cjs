@@ -18,7 +18,11 @@ const kinds = {
   // px only in CSS: font-size and border-radius must use --skai-text-* / --skai-radius-*.
   fontSizes: /font-size:\s*[\d.]+px/g,
   radii: /border(?:-[a-z]+)*-radius:[^;}]*\d+px/g,
+  // Components never build gradients inline (TS/TSX): surfaces use the --skai-bg-* gradient
+  // tokens that src/theme/gradients.ts builds from validated theme stops.
+  inlineGradients: /\b(?:repeating-)?(?:linear|radial|conic)-gradient\(/g,
 };
+const kindApplies = (kind, file) => (kind === "inlineGradients" ? /\.tsx?$/.test(file) && !file.replaceAll("\\", "/").endsWith("src/theme/gradients.ts") : kind === "colors" || file.endsWith(".css"));
 
 const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const full = path.join(dir, entry.name);
@@ -31,6 +35,7 @@ function countLiterals(file) {
   if (!file.endsWith(".css")) text = text.replace(/(^|[^:])\/\/.*$/gm, "$1");
   const counts = {};
   for (const [kind, pattern] of Object.entries(kinds)) {
+    if (!kindApplies(kind, file)) continue;
     const count = (text.match(pattern) || []).length;
     if (count) counts[kind] = count;
   }
@@ -58,6 +63,7 @@ const advice = {
   colors: "Use a --skai-color-* token (add it to tokens.css in both palettes) or color-mix() on one.",
   fontSizes: "Use a --skai-text-* step.",
   radii: "Use a --skai-radius-* step.",
+  inlineGradients: "Use a --skai-bg-* gradient token (theme gradients are built in src/theme/gradients.ts).",
 };
 for (const [file, found] of Object.entries(counts)) {
   for (const [kind, count] of Object.entries(found)) {

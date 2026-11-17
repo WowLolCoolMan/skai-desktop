@@ -1,0 +1,26 @@
+/* ===== Theme gradients =====
+   A surface takes its gradient only when the active theme sets one: src/theme sets
+   --skai-bg-<surface> (built from validated stops) and <html data-skai-gradient-<surface>>.
+   !important beats the per-component solid backgrounds in styles.css; without the
+   attribute these rules don't match and nothing changes. Gradients are static, so they
+   are painted once and scrolling only moves content above them. */
+html[data-skai-gradient-canvas] body,
+html[data-skai-gradient-canvas] .app-main { background: var(--skai-bg-canvas) !important; }
+html[data-skai-gradient-sidebar] .app-sidebar { background: var(--skai-bg-sidebar) !important; }
+html[data-skai-gradient-toolbar] .app-toolbar { background: var(--skai-bg-toolbar) !important; }
+html[data-skai-gradient-rail] .global-rail { background: var(--skai-bg-rail) !important; }
+html[data-skai-gradient-composer] .chat-page .composer-card { background: var(--skai-bg-composer) !important; }
+html[data-skai-gradient-user-bubble] .message-bubble.user,
+html[data-skai-gradient-user-bubble] .app-content-chat .conversation-surface .chat-message.user { background: var(--skai-bg-user-bubble) !important; }
+html[data-skai-gradient-primary-button] .ui-button-primary { background: var(--skai-bg-primary-button) !important; }
+html[data-skai-gradient-brand-mark] .global-rail-mark { background: var(--skai-bg-brand-mark) !important; }
+html[data-skai-gradient-empty-state] .ui-empty,
+html[data-skai-gradient-empty-state] .chat-start-screen { background: var(--skai-bg-empty-state) !important; }
+html[data-skai-gradient-backdrop][data-backdrop] .app-main::before { background: var(--skai-bg-backdrop) !important; }
+
+/* "Animate background" (Appearance): a slow drift of the canvas gradient. Only when
+   the user turned it on AND reduced motion is off (both checked by src/theme). */
+html[data-skai-gradient-canvas][data-skai-animate-background="true"] .app-main { background-size: 200% 200% !important; animation: skai-background-drift 40s ease-in-out infinite alternate; }
+@keyframes skai-background-drift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+@media (prefers-reduced-motion: reduce) { html[data-skai-animate-background] .app-main { animation: none !important; } }
+html[data-reduce-motion="true"][data-skai-animate-background] .app-main { animation: none !important; }

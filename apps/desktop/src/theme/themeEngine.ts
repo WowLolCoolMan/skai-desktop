@@ -1,5 +1,6 @@
 import type { AgentResponse, CustomFont, ThemeDefinition, ThemeFamily, ThemeFont, ThemePicks, ThemeProblem, ThemeSnapshot } from "../../shared/contracts";
 import { buildFontRoles, FONT_ROLES, type FontRole, type FontRoles } from "./fontRoles";
+import { GRADIENT_SURFACES, gradientContrastWarnings, gradientCss, type ContrastWarning, type GradientSurface } from "./gradients";
 
 // Theme engine (renderer). Built-in presets ship in src/theme/presets; user themes
 // arrive from the main process already validated (electron/theme-service.cjs).
@@ -7,7 +8,7 @@ import { buildFontRoles, FONT_ROLES, type FontRole, type FontRoles } from "./fon
 // properties on <html>. Keys a theme leaves out keep the tokens.css default.
 
 type Request = (method: string, params?: Record<string, unknown>) => Promise<AgentResponse>;
-type RawFamily = { name: string; author?: string; license?: string; themes: { name: string; appearance: "light" | "dark"; colors?: Record<string, string>; fonts?: ThemeDefinition["fonts"] }[] };
+type RawFamily = { name: string; author?: string; license?: string; themes: { name: string; appearance: "light" | "dark"; colors?: Record<string, string>; fonts?: ThemeDefinition["fonts"]; gradients?: Record<string, string | { gradient: "linear" | "radial" | "conic"; angle?: number; stops: { color: string; at: number }[] }> }[] };
 
 export const DEFAULT_PICKS: ThemePicks = { lightTheme: "builtin:Skai/Skai Light", darkTheme: "builtin:Skai/Skai Dark" };
 // The Skai family is what tokens.css already defines, so it applies nothing inline
@@ -30,7 +31,8 @@ function builtinFamilies(): ThemeFamily[] {
       name: theme.name,
       appearance: theme.appearance,
       colors: Object.fromEntries(Object.entries(theme.colors ?? {}).map(([key, value]) => [tokenForColorKey(key), value])),
-      gradients: {},
+      // Same normalized shape the main process sends for user themes (validated by test:themes).
+      gradients: Object.fromEntries(Object.entries(theme.gradients ?? {}).map(([surface, value]) => [surface, typeof value === "string" ? { gradient: "solid" as const, color: value } : { gradient: value.gradient, angle: value.angle ?? 180, stops: [...value.stops].sort((a, b) => a.at - b.at) }])),
       fonts: theme.fonts ?? {},
     })),
   })).sort((a, b) => (a.name === CSS_DEFAULT_FAMILY ? -1 : b.name === CSS_DEFAULT_FAMILY ? 1 : a.name.localeCompare(b.name)));
@@ -47,12 +49,16 @@ export type ThemeState = {
   userFonts: FontRoles;
   customFonts: (CustomFont & { status: "loading" | "ready" | "failed" })[];
   scheme: "light" | "dark";
+  // Text that fails contrast against a gradient stop of the active theme.
+  contrastWarnings: ContrastWarning[];
+  // Appearance: slow canvas gradient drift (only while reduced motion is off).
+  animateBackground: boolean;
   active: ThemeDefinition | null;
   loaded: boolean;
   notice: { tone: "info" | "error"; text: string } | null;
 };
 
-let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], scheme: "dark", active: null, loaded: false, notice: null };
+let state: ThemeState = { builtins: builtinFamilies(), user: [], problems: [], picks: { ...DEFAULT_PICKS }, themesDir: "", fontsDir: "", userFonts: {}, customFonts: [], contrastWarnings: [], animateBackground: false, scheme: "dark", active: null, loaded: false, notice: null };
 const listeners = new Set<() => void>();
 let applied: string[] = [];
 let request: Request | null = null;
@@ -91,10 +97,27 @@ function applyTheme(theme: ThemeDefinition | null) {
   const fonts = buildFontRoles(effectiveFonts(theme));
   for (const [property, value] of Object.entries(fonts.properties)) set(property, value);
   let style = document.getElementById("skai-font-roles");
-  if (!fonts.css) { style?.remove(); return; }
-  if (!style) { style = document.createElement("style"); style.id = "skai-font-roles"; document.head.append(style); }
-  style.textContent = fonts.css;
+  if (!fonts.css) style?.remove();
+  else {
+    if (!style) { style = document.createElement("style"); style.id = "skai-font-roles"; document.head.append(style); }
+    style.textContent = fonts.css;
+  }
+  // Gradients: --skai-bg-<surface> plus <html data-skai-gradient-<surface>> (see surfaces.css).
+  for (const surface of GRADIENT_SURFACES) delete root.dataset[datasetKey(surface)];
+  const gradients: Partial<Record<GradientSurface, NonNullable<ThemeDefinition["gradients"][string]>>> = {};
+  for (const surface of GRADIENT_SURFACES) {
+    const gradient = theme?.gradients?.[surface];
+    const css = gradient ? gradientCss(gradient) : null;
+    if (!gradient || !css) continue;
+    set(`--skai-bg-${surface}`, css);
+    root.dataset[datasetKey(surface)] = "";
+    gradients[surface] = gradient;
+  }
+  const styles = getComputedStyle(root);
+  contrastWarnings = gradientContrastWarnings(gradients, (token) => styles.getPropertyValue(token).trim());
 }
+let contrastWarnings: ContrastWarning[] = [];
+const datasetKey = (surface: GradientSurface) => `skaiGradient${surface.replace(/(^|-)([a-z])/g, (_m, _d, c: string) => c.toUpperCase())}`;
 
 export function effectiveFonts(theme: ThemeDefinition | null, current: ThemeState = state): FontRoles {
   const merged: FontRoles = {};
@@ -110,12 +133,13 @@ function update(patch: Partial<ThemeState>) {
   next.active = resolveActive(next);
   const changed = next.active?.id !== state.active?.id || next.active !== state.active || next.userFonts !== state.userFonts || !state.loaded;
   state = next;
-  if (changed) applyTheme(state.active);
+  if (changed) { applyTheme(state.active); state = { ...state, contrastWarnings }; }
+  document.documentElement.dataset.skaiAnimateBackground = String(state.animateBackground);
   listeners.forEach((listener) => listener());
 }
 
 function receive(snapshot: ThemeSnapshot) {
-  update({ user: snapshot.families, problems: snapshot.problems, picks: snapshot.picks, themesDir: snapshot.themesDir, fontsDir: snapshot.fontsDir ?? "", userFonts: (snapshot.fonts ?? {}) as FontRoles, loaded: true });
+  update({ user: snapshot.families, problems: snapshot.problems, picks: snapshot.picks, themesDir: snapshot.themesDir, fontsDir: snapshot.fontsDir ?? "", userFonts: (snapshot.fonts ?? {}) as FontRoles, animateBackground: Boolean(snapshot.animateBackground), loaded: true });
   void loadCustomFonts(snapshot.customFonts ?? []);
 }
 
@@ -249,6 +273,11 @@ export const themeEngine = {
     update({ userFonts });
     const response = await call("appearance.saveFonts", { fonts: { [role]: font && Object.keys(font).length ? font : null } });
     if (response && !response.ok) notify("error", response.error?.message ?? "The font settings could not be saved.");
+  },
+  async setAnimateBackground(enabled: boolean) {
+    update({ animateBackground: enabled });
+    const response = await call("appearance.saveAppearanceOptions", { animateBackground: enabled });
+    if (response && !response.ok) notify("error", response.error?.message ?? "The setting could not be saved.");
   },
   async openFontsFolder() {
     const response = await call("appearance.openFontsFolder");

@@ -7,7 +7,7 @@ The schema is `docs/theme.schema.json`; most editors use it for completion when 
 > Status: theme files, light/dark picks, the themes folder, live reload, Edit, Duplicate,
 > Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Fonts work: theme
 > fonts, the font picker, your overrides and a custom fonts folder (Phase 4). Gradients are
-> validated now and applied in Phase 5.
+> applied too (Phase 5); a gradient editor and gradient presets come next.
 
 ## Using a theme
 
@@ -141,8 +141,17 @@ A plain color string works too.
 ```
 
 `gradient` is `linear`, `radial` or `conic`. `angle` (0–360°, default 180) applies to linear and conic.
-`stops` has 2–8 entries with `at` from 0 to 1. Skai builds the CSS from these values itself. Text must stay
-readable against every stop, not just the average.
+`stops` has 2–8 entries with `at` from 0 to 1. Skai builds the CSS from these values itself (stops
+sorted by `at`), and a surface without a gradient keeps its normal solid color.
+
+**Contrast:** text has to stay readable against *every* stop, not just the average. Appearance lists
+any stop where the text on that surface falls below 4.5:1 (3:1 for rail icons), naming the surface,
+the stop, the text color and the ratio. Translucent stops are measured over the canvas color.
+
+**Motion:** gradients don't move unless you turn on **Animate background** in Appearance. Even then
+only the canvas drifts, slowly, and it stops while reduced motion is on (the app's setting or the OS's).
+Static gradients don't affect scrolling: a scroll test on Settings measured the same frame times with
+and without four gradient surfaces.
 
 ## Fonts
 

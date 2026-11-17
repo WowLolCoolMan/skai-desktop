@@ -25,7 +25,7 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
 
   // appearance.json: theme picks plus the user's font role overrides (validated like theme fonts).
   async function readAppearance() {
-    const defaults = { picks: { ...DEFAULT_PICKS }, fonts: {} };
+    const defaults = { picks: { ...DEFAULT_PICKS }, fonts: {}, animateBackground: false };
     let json;
     try {
       const stat = await fsp.stat(appearancePath);
@@ -43,7 +43,7 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
       if (font) fonts[role] = font;
       else problems.push({ file: "appearance.json", key: `fonts.${role}`, problem: "was ignored (unknown role or invalid values)" });
     }
-    return { picks: { lightTheme: pick(json?.lightTheme, DEFAULT_PICKS.lightTheme), darkTheme: pick(json?.darkTheme, DEFAULT_PICKS.darkTheme) }, fonts, problems };
+    return { picks: { lightTheme: pick(json?.lightTheme, DEFAULT_PICKS.lightTheme), darkTheme: pick(json?.darkTheme, DEFAULT_PICKS.darkTheme) }, fonts, animateBackground: json?.animateBackground === true, problems };
   }
   const readPicks = async () => ({ picks: (await readAppearance()).picks });
 
@@ -93,7 +93,7 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
 
   async function snapshot() {
     const [{ families, problems }, appearance, custom] = await Promise.all([readThemes(), readAppearance(), listCustomFonts(fontsDir)]);
-    return { families, problems: [...problems, ...appearance.problems, ...custom.problems], picks: appearance.picks, fonts: appearance.fonts, customFonts: custom.fonts, themesDir, fontsDir };
+    return { families, problems: [...problems, ...appearance.problems, ...custom.problems], picks: appearance.picks, fonts: appearance.fonts, animateBackground: appearance.animateBackground, customFonts: custom.fonts, themesDir, fontsDir };
   }
 
   async function push() {
@@ -227,6 +227,11 @@ function createThemeService({ userDataPath, getWindow, shell, dialog }) {
     }
     if (method === "appearance.getThemes") return { v: 1, ok: true, result: await snapshot() };
     if (method === "appearance.saveThemeSelection") return { v: 1, ok: true, result: await savePicks(params) };
+    if (method === "appearance.saveAppearanceOptions") {
+      if (typeof params?.animateBackground !== "boolean") throw new Error("animateBackground must be true or false.");
+      await writeAppearance({ animateBackground: params.animateBackground });
+      return { v: 1, ok: true, result: { animateBackground: params.animateBackground } };
+    }
     if (method === "appearance.saveFonts") return { v: 1, ok: true, result: await saveFonts(params) };
     if (method === "appearance.listFonts") return { v: 1, ok: true, result: await listInstalledFonts() };
     if (method === "appearance.readCustomFont") {

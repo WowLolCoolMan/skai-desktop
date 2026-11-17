@@ -173,7 +173,7 @@ async function main() {
   // and a problem must be shown), and check the pick was saved to appearance.json.
   const themesDir = path.join(smokeUserDataDir, "themes");
   const themeFile = path.join(themesDir, "smoke.json");
-  const writeTheme = (canvas) => fs.writeFileSync(themeFile, JSON.stringify({ name: "Smoke", license: "CC0-1.0", themes: [{ name: "Smoke Dark", appearance: "dark", colors: { canvas }, fonts: { reading: { family: "Smoke Missing Serif, DejaVu Serif", size: 15, lineHeight: 1.7 }, code: { family: "DejaVu Sans Mono", size: 13 } } }] }));
+  const writeTheme = (canvas) => fs.writeFileSync(themeFile, JSON.stringify({ name: "Smoke", license: "CC0-1.0", themes: [{ name: "Smoke Dark", appearance: "dark", colors: { canvas }, fonts: { reading: { family: "Smoke Missing Serif, DejaVu Serif", size: 15, lineHeight: 1.7 }, code: { family: "DejaVu Sans Mono", size: 13 } }, gradients: { canvas: { gradient: "linear", angle: 135, stops: [{ color: "#304050", at: 1 }, { color: canvas, at: 0 }] }, "primary-button": { gradient: "radial", stops: [{ color: "#17131f", at: 0 }, { color: "#b39af5", at: 1 }] } } }] }));
   const canvasToken = "getComputedStyle(document.documentElement).getPropertyValue('--skai-color-canvas').trim()";
   await setAppearance("dark", "none");
   fs.mkdirSync(themesDir, { recursive: true });
@@ -186,6 +186,11 @@ async function main() {
   // size scale, and generated role rules. A missing first font must not break the stack.
   const fontState = JSON.parse(await devtools.evaluate("JSON.stringify({ reading: getComputedStyle(document.documentElement).getPropertyValue('--skai-font-reading').trim(), codeScale: getComputedStyle(document.documentElement).getPropertyValue('--skai-code-scale').trim(), roles: document.getElementById('skai-font-roles')?.textContent || '', messageFont: (() => { const probe = document.createElement('div'); probe.className = 'message-content'; document.body.append(probe); const style = getComputedStyle(probe); const result = { family: style.fontFamily, size: style.fontSize, lineHeight: style.lineHeight }; probe.remove(); return result; })() })"));
   if (!fontState.reading.startsWith('"Smoke Missing Serif", "DejaVu Serif",') || !/sans-serif$/.test(fontState.reading)) throw new Error(`Reading font stack is wrong: ${fontState.reading}`);
+  // Theme gradients: built by Skai from the validated stops (sorted by position), painted on
+  // the canvas, and checked for contrast against EVERY stop (dark on-accent text vs the dark
+  // first stop of the button gradient must be reported).
+  const gradientState = JSON.parse(await waitFor(devtools.evaluate, "JSON.stringify({ token: getComputedStyle(document.documentElement).getPropertyValue('--skai-bg-canvas').trim(), flag: document.documentElement.hasAttribute('data-skai-gradient-canvas'), painted: getComputedStyle(document.querySelector('.app-main')).backgroundImage, warning: document.querySelector('.theme-settings-contrast')?.textContent || '' })", (value) => JSON.parse(value).warning.includes("primary-button"), "gradient contrast warning"));
+  if (gradientState.token !== "linear-gradient(135deg, #102030 0%, #304050 100%)" || !gradientState.flag || !gradientState.painted.startsWith("linear-gradient")) throw new Error(`Canvas gradient was not applied: ${JSON.stringify(gradientState)}`);
   if (fontState.codeScale !== "1.0833") throw new Error(`Code size scale is wrong: ${fontState.codeScale}`);
   if (fontState.messageFont.size !== "15px" || !fontState.roles.includes("line-height: 1.7 !important")) throw new Error(`Reading role rules were not applied: ${JSON.stringify(fontState)}`);
   writeTheme("#203040");

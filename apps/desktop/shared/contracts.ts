@@ -251,7 +251,7 @@ export type ThemeFamily = { name: string; author: string; license: string; file?
 export type ThemeProblem = { file: string; key: string; problem: string };
 export type ThemePicks = { lightTheme: string; darkTheme: string };
 export type CustomFont = { family: string; file: string; bytes: number };
-export type ThemeSnapshot = { families: ThemeFamily[]; problems: ThemeProblem[]; picks: ThemePicks; fonts: Record<string, ThemeFont>; customFonts: CustomFont[]; themesDir: string; fontsDir: string };
+export type ThemeSnapshot = { families: ThemeFamily[]; problems: ThemeProblem[]; picks: ThemePicks; fonts: Record<string, ThemeFont>; customFonts: CustomFont[]; animateBackground?: boolean; themesDir: string; fontsDir: string };
 
 export interface AppearanceBridge {
   onChanged(handler: (snapshot: ThemeSnapshot) => void): () => void;
