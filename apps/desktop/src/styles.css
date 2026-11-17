@@ -526,7 +526,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .workbench-recovery-actions .ui-button { padding: 7px 9px; font-size: var(--skai-text-xs); }
 .ui-empty-icon .nav-icon { width: 18px; height: 18px; }
 .coding-page .page-header-coding-session h1 { font-size: calc(var(--skai-text-4xl) * var(--skai-heading-scale)); letter-spacing: -.035em; }
-.coding-session-grid { grid-template-columns: minmax(320px, .9fr) minmax(390px, 1.1fr); }
+.coding-session-grid { grid-template-columns: minmax(280px, .8fr) minmax(390px, 1.15fr) minmax(240px, .55fr); }
 .project-thread-panel { display: flex; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-surface); }
 .project-thread-panel > .chat-page { width: 100%; min-width: 0; min-height: 0; flex: 1; border: 0; border-radius: inherit; }
 .project-thread-panel .chat-header { display: none; }
@@ -536,6 +536,27 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .project-thread-panel .chat-rail { display: none; }
 .project-thread-panel .conversation-surface { min-height: 0; }
 .coding-session-grid > .coding-project-browser { min-width: 0; }
+.coding-task-inspector { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 14px; overflow: auto; padding: 16px; }
+.coding-task-inspector-heading, .coding-task-inspector-section-heading, .coding-task-item-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.coding-task-inspector-heading h3 { margin: 4px 0 0; color: var(--skai-color-text); font-size: calc(var(--skai-text-xl) * var(--skai-heading-scale)); letter-spacing: -.02em; }
+.coding-task-inspector-count { display: grid; min-width: 24px; min-height: 24px; place-items: center; padding: 3px 6px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-2xs); }
+.coding-task-inspector-count.is-active { color: var(--skai-color-accent-text); border-color: color-mix(in srgb, var(--skai-color-accent) 40%, var(--skai-color-border)); }
+.coding-task-inspector-count.is-attention { color: var(--skai-color-danger-text, var(--skai-color-danger)); border-color: color-mix(in srgb, var(--skai-color-danger) 40%, var(--skai-color-border)); }
+.coding-task-inspector-summary { display: flex; flex-wrap: wrap; gap: 8px; padding: 9px 0; border-top: 1px solid var(--skai-color-border); border-bottom: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-2xs); }
+.coding-task-inspector-summary strong, .coding-task-inspector-section-heading strong { color: var(--skai-color-text); }
+.coding-task-inspector-section { display: grid; gap: 9px; }
+.coding-task-inspector-section + .coding-task-inspector-section { padding-top: 14px; border-top: 1px solid var(--skai-color-border); }
+.coding-task-inspector-section-heading > span { flex: 0 0 auto; color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-2xs); }
+.coding-task-inspector-section p { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
+.coding-task-list { display: grid; gap: 8px; }
+.coding-task-item { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
+.coding-task-item-heading strong { min-width: 0; color: var(--skai-color-text); font-size: var(--skai-text-xs); line-height: 1.35; }
+.coding-task-item p { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-size: var(--skai-text-2xs); }
+.coding-task-item small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.coding-task-status-pill { flex: 0 0 auto; padding: 3px 5px; border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: var(--skai-color-surface); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); text-transform: uppercase; }
+.coding-task-status-pill.is-active { color: var(--skai-color-accent-text); }
+.coding-task-status-pill.is-attention { color: var(--skai-color-danger-text, var(--skai-color-danger)); }
+.coding-task-status-pill.is-queued { color: var(--skai-color-warning-text, var(--skai-color-warning)); }
 .capacity-popover { position: relative; display: flex; align-items: center; }
 .capacity-popover > summary { list-style: none; cursor: pointer; }
 .capacity-popover > summary::-webkit-details-marker { display: none; }
@@ -577,7 +598,8 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-coding .coding-overview-grid > .ui-card { height: 100%; }
 .app-content-coding .coding-projects-panel .ui-empty { min-height: min(46vh, 430px); }
 @media (max-height: 760px) and (min-width: 641px) { .app-content-coding .coding-page-active .coding-session-grid .coding-project-browser { grid-template-rows: auto auto auto minmax(260px, 1fr) auto; }.app-content-coding .coding-page-active .project-dock { max-height: 190px; } }
-@media (max-width: 900px) { .coding-session-grid { grid-template-columns: minmax(0, 1fr); flex: none; }.coding-activity-panel { max-height: 340px; } }
+@media (max-width: 1200px) { .coding-session-grid { grid-template-columns: minmax(280px, .8fr) minmax(390px, 1.2fr); }.coding-task-inspector { grid-column: 1 / -1; max-height: 320px; } }
+@media (max-width: 900px) { .coding-session-grid { grid-template-columns: minmax(0, 1fr); flex: none; }.coding-activity-panel { max-height: 340px; }.coding-task-inspector { grid-column: auto; max-height: none; } }
 .app-content-workbench { display: flex; min-height: 0; flex-direction: column; padding-bottom: 24px; overflow: hidden; }
 .app-content-workbench .workbench-page { display: flex; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
 .app-content-workbench .workbench-page > .page-header, .app-content-workbench .workbench-page > .workbench-overview, .app-content-workbench .workbench-page > .workbench-filter-bar { flex: 0 0 auto; }

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { DiffEditor, Editor } from "./monacoLazy";
 import { useMonacoTheme } from "../../theme/useMonacoTheme";
-import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
+import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreview, DesktopTask } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
 import { NavIcon } from "../../components/ui/NavIcon";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { ProjectFileTree } from "./ProjectFileTree";
+import { CodingTaskInspector } from "./CodingTaskInspector";
 
 function terminalStorageKey(projectId: string) {
   return `skai.coding.terminalOpen.${projectId}`;
@@ -32,6 +33,7 @@ type CodingSessionViewProps = {
   conversation?: ReactNode;
   projects: DesktopProject[];
   selectedProject: DesktopProject;
+  tasks: DesktopTask[];
   projectFiles: DesktopProjectFile[];
   selectedFile: string | null;
   filePreview: DesktopProjectPreview | null;
@@ -65,7 +67,7 @@ type CodingSessionViewProps = {
   onCreateGitPullRequest: (title: string, body: string) => Promise<boolean>;
 };
 
-export function CodingSessionView({ conversation, projects, selectedProject, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onPushGitChanges, onCreateGitPullRequest, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal }: CodingSessionViewProps) {
+export function CodingSessionView({ conversation, projects, selectedProject, tasks, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onPushGitChanges, onCreateGitPullRequest, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal }: CodingSessionViewProps) {
   // Theme: Monaco colors, syntax and font follow the active theme (src/theme/useMonacoTheme.ts).
   const monacoTheme = useMonacoTheme();
   const [openTabs, setOpenTabs] = useState<string[]>([]);
@@ -198,7 +200,7 @@ export function CodingSessionView({ conversation, projects, selectedProject, pro
         </div>
       </div>
       {terminalOpen && <div className="project-dock"><TerminalPanel projects={projects} initialProjectId={selectedProject.id} busy={terminalBusy} output={terminalOutput} exitCode={terminalExitCode} compact onRun={onRunTerminal} /></div>}
-    </Card></div>
+    </Card>{<CodingTaskInspector tasks={tasks} gitStatus={gitStatus} gitDiffReady={Boolean(gitDiff)} gitDiffBusy={gitDiffBusy} onReviewChanges={onLoadGitDiff} />}</div>
     <ModalDialog open={pullRequestOpen} onClose={() => setPullRequestOpen(false)} titleId="create-pull-request-title"><form onSubmit={(event) => { event.preventDefault(); void onCreateGitPullRequest(pullRequestTitle, pullRequestBody).then((created) => { if (created) setPullRequestOpen(false); }); }}><div className="dialog-heading"><div><p className="section-kicker">GITHUB WORKFLOW</p><h3 id="create-pull-request-title">Create pull request</h3><p>Uses the local GitHub CLI session. No token is entered into Skai Desktop.</p></div><button type="button" onClick={() => setPullRequestOpen(false)} aria-label="Close dialog">×</button></div><label>Title<input value={pullRequestTitle} onChange={(event) => setPullRequestTitle(event.target.value)} maxLength={256} /></label><label>Description<textarea value={pullRequestBody} onChange={(event) => setPullRequestBody(event.target.value)} maxLength={16000} rows={6} /></label><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setPullRequestOpen(false)}>Cancel</Button><Button variant="primary" type="submit" disabled={gitPullRequestBusy || !pullRequestTitle.trim()}>{gitPullRequestBusy ? "Creating…" : "Create pull request"}</Button></div></form></ModalDialog>
   </>;
 }
