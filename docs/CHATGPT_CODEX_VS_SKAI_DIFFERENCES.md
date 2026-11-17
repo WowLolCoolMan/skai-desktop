@@ -74,11 +74,11 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 |---|---|
 | Codex is designed around agent threads organized by projects. The user gives the task in the thread, can queue or steer follow-up work, and keeps the task discussion beside the repository context. Codex supports parallel agent work and isolated worktrees in its documented app workflow. | Coding Workspace provides a project file browser, Monaco editor, local Git actions, terminal, task planner, and an activity panel. The task planner saves a proposed local task; it explicitly does not start an agent or run tools. |
 | Agent work and its output remain attached to the thread that initiated it. A user can review the result and ask for another change in the same conversation. | Submitting a Coding Workspace task navigates to Agent Workbench. General Chat uses another task brief and may also navigate to Workbench. The project is appended to the coding task instruction, but the chat itself is not a project conversation. |
-| Codex's task orchestration includes multiple agents, long-running tasks, isolated work, and interoperability with Codex CLI/IDE history and configuration as documented by OpenAI. | Skai's capability matrix marks Coding Agent/Workbench partial: durable task state and approvals exist, but model-directed tool dispatch and project file edits remain gaps; current task execution returns model reasoning only. Parallel subagent execution and worktree isolation are backlog items. |
+| Codex's task orchestration includes multiple agents, long-running tasks, isolated work, and interoperability with Codex CLI/IDE history and configuration as documented by OpenAI. | Skai now has a bounded local action loop for project reads, writes, and commands with undo and task journaling. It still lacks Codex's multi-agent interoperability, richer progress inspector, parallel scheduling, and OS-level sandboxing. |
 
 **This is the most consequential product-flow gap.** Skai has the surrounding workspace tools, but users cannot yet make the Codex loop—ask for a project change, watch the agent perform it, inspect the diff, and continue in that same project conversation—as one continuous path.
 
-**Sources:** OpenAI [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/). Skai: [CodingSessionView.tsx](../apps/desktop/src/features/coding/CodingSessionView.tsx), [CodingActivityPanel.tsx](../apps/desktop/src/features/coding/CodingActivityPanel.tsx), [WorkbenchPage.tsx](../apps/desktop/src/features/agents/WorkbenchPage.tsx), [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md), [FUTURE_FEATURES.md](FUTURE_FEATURES.md).
+**Sources:** OpenAI [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/). Skai: [CodingPage.tsx](../apps/desktop/src/features/coding/CodingPage.tsx), [CodingSessionView.tsx](../apps/desktop/src/features/coding/CodingSessionView.tsx), [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md), [FUTURE_FEATURES.md](FUTURE_FEATURES.md).
 
 ### 5. Files, editor, terminal, and change review
 
@@ -238,8 +238,8 @@ The full evidence-backed status is maintained in [CAPABILITY_MATRIX.md](CAPABILI
 - [FUTURE_FEATURES.md](FUTURE_FEATURES.md) — explicit product boundary, unfinished coding-agent and workspace features.
 - [UI_REFERENCE_GUIDE.md](UI_REFERENCE_GUIDE.md) — screenshot references and product interaction goals.
 - [AppRouteView.tsx](../apps/desktop/src/app/AppRouteView.tsx) — route-to-page map.
-- [CodingPage.tsx](../apps/desktop/src/features/coding/CodingPage.tsx), [CodingSessionView.tsx](../apps/desktop/src/features/coding/CodingSessionView.tsx), [CodingActivityPanel.tsx](../apps/desktop/src/features/coding/CodingActivityPanel.tsx) — project and coding flow.
-- [ChatPage.tsx](../apps/desktop/src/features/chat/ChatPage.tsx), [WorkbenchPage.tsx](../apps/desktop/src/features/agents/WorkbenchPage.tsx) — conversation and task-manager flows.
+- [CodingPage.tsx](../apps/desktop/src/features/coding/CodingPage.tsx), [CodingSessionView.tsx](../apps/desktop/src/features/coding/CodingSessionView.tsx) — project and coding flow.
+- [ChatPage.tsx](../apps/desktop/src/features/chat/ChatPage.tsx), [CodingPage.tsx](../apps/desktop/src/features/coding/CodingPage.tsx) — conversation-linked project and task flows.
 - [UsagePage.tsx](../apps/desktop/src/features/usage/UsagePage.tsx), [PluginsPage.tsx](../apps/desktop/src/features/catalog/PluginsPage.tsx), [MemoryPage.tsx](../apps/desktop/src/features/memory/MemoryPage.tsx) — usage, integration catalog, and memory behavior.
 
 ### OpenAI primary references
