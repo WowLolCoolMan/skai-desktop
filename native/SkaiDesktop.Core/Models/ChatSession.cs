@@ -20,6 +20,9 @@ public sealed class ChatSession
     public string? ModelProvider { get; set; }
     public long? ModelSizeBytes { get; set; }
     public int? ModelContextLength { get; set; }
+    public string? PersonaId { get; set; }
+    public string? PersonaName { get; set; }
+    public string? PersonaSourceMode { get; set; }
     public bool IncludeProjectFilesInChat { get; set; }
     public string? FolderName { get; set; }
     /// <summary>Whether this chat is pinned above other chats in its list.</summary>

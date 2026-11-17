@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
+import type { ChatAttachment, DesktopConversation, DesktopPersona, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
 import type { Message, Model, Route } from "../../app/types";
 import { Button, Card, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
@@ -52,6 +52,9 @@ type ChatPageProps = {
   workspaceTabId: string;
   capacity: LocalCapacitySnapshot | null;
   recentConversations: DesktopConversation[];
+  personas: DesktopPersona[];
+  activePersonaId: string | null;
+  onPersonaChange: (id: string | null) => void;
   provider: string;
   model: string;
   responseMode: ChatResponseMode;
@@ -99,7 +102,7 @@ type ChatPageProps = {
   workspaceMode?: "conversation" | "project";
 };
 
-export function ChatPage({ workspaceTabId, capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onOpenFile, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onTransitionScheduledTask, workspaceMode = "conversation" }: ChatPageProps) {
+export function ChatPage({ workspaceTabId, capacity, recentConversations, personas, activePersonaId, onPersonaChange, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onOpenFile, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onTransitionScheduledTask, workspaceMode = "conversation" }: ChatPageProps) {
   const capacityEstimate = estimateModelCapacity(models.find((item) => item.model === model), capacity);
   const [draft, setDraft] = useState(() => readChatDraft(workspaceTabId, conversationId));
   const latestDraftRef = useRef(draft);
@@ -243,7 +246,9 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
   const copyMessage = async (content: string, index: number) => {
     if (!navigator.clipboard) return;
     try {
-      await navigator.clipboard.writeText(content);
+      const persona = personas.find((item) => item.id === activePersonaId);
+      const label = persona ? `AI simulation of ${persona.name}, based on ${persona.sourceMode === "public-research" ? "public sources" : "your own material"}. Not the real person.\n\n` : "";
+      await navigator.clipboard.writeText(`${label}${content}`);
       setCopiedMessage(index);
       window.setTimeout(() => setCopiedMessage((current) => current === index ? null : current), 1400);
     } catch {
@@ -265,6 +270,7 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
       <div><p className="section-kicker">{temporaryChat ? "TEMPORARY CHAT" : "CONVERSATION"}</p><strong>{conversationId ? conversationTitle : "New chat"}</strong><span>{temporaryChat ? "This chat stays in memory only and won’t appear in Recents." : `${provider} · saved on this device · keep the thread focused, then turn work into a reviewed task when needed.`}</span></div>
       <div className="chat-header-actions"><div className="chat-response-mode" role="group" aria-label="Conversation response mode"><span>MODE</span><div className="chat-response-mode-options">{([{ id: "think", label: "Chat" }, { id: "coding", label: "Coding" }, { id: "security", label: "Security" }] as Array<{ id: ChatResponseMode; label: string }>).map((item) => <button type="button" key={item.id} className={responseMode === item.id ? "is-active" : ""} aria-pressed={responseMode === item.id} onClick={() => onResponseModeChange(item.id)}>{item.label}</button>)}</div></div><ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><details className="capacity-popover"><summary><StatusBadge tone={capacityEstimate.state === "room" ? "success" : capacityEstimate.state === "tight" ? "warning" : "neutral"}>Device capacity · {capacityEstimate.state === "room" ? "rough fit" : capacityEstimate.state === "tight" ? "tight" : "unknown"}</StatusBadge></summary><div className="capacity-popover-content"><strong>Local device · measurements stay here</strong><span>Selected model: {model || "None selected"}</span><span>Model size: {formatCapacityBytes(capacityEstimate.modelBytes)}</span><span>Rough startup RAM floor: {formatCapacityBytes(capacityEstimate.startupRamBytes)}</span><span>Available RAM after loaded models: {formatCapacityBytes(capacityEstimate.availableRamBytes)}</span><span>Model context: {capacityEstimate.contextLength ? `${capacityEstimate.contextLength.toLocaleString()} tokens` : "Unknown"}</span><span>CPU load: {capacity?.cpuUtilizationPercent == null ? "Unknown" : `${capacity.cpuUtilizationPercent.toFixed(0)}%`}</span><span>GPU: {capacity?.gpu?.name ?? "Not detected"}</span><span>GPU memory: {formatCapacityBytes(capacityEstimate.gpuAvailableBytes)}</span>{capacity?.runtime && <span>Loaded models: {capacity.runtime.loadedModelsKnown ? `${capacity.runtime.loadedModels.length} reported · ${formatCapacityBytes(capacity.runtime.loadedRamBytes)} RAM` : "Not reported by this runtime"}</span>}{capacity?.runtime?.airLlmReady !== null && capacity?.runtime?.airLlmReady !== undefined && <span>AirLLM readiness: {capacity.runtime.airLlmReady ? "Ready" : "Not ready"}</span>}{capacity?.scheduler && <span>Local runs: {capacity.scheduler.activeTaskCount} active · {capacity.scheduler.queuedTaskCount} queued · {capacity.scheduler.executionSlotLimit} slot</span>}{capacity?.scheduler?.queuedTaskCount ? <small>Queued coding tasks start automatically when the current local run finishes.</small> : null}<small>{capacityEstimate.note}</small>{capacity?.runtime?.loadedModelNote && <small>{capacity.runtime.loadedModelNote}</small>}{capacity?.measurementNote && <small>{capacity.measurementNote}</small>}</div></details><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>
     </div>
+    <div className="persona-context-strip"><label className="persona-picker"><span>SMART PERSONA</span><select value={activePersonaId ?? ""} onChange={(event) => onPersonaChange(event.target.value || null)} aria-label="Active smart persona"><option value="">No persona</option>{personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name} · simulation</option>)}</select></label><Button variant="ghost" type="button" onClick={() => onNavigate("personas")}>Build persona</Button>{activePersonaId && <small>AI simulation label is included in chat exports and copied transcripts.</small>}</div>
     <div className={`chat-layout${messages.length === 0 ? " is-start-screen" : ""}`}>
       <main className="chat-column">
         <section className="conversation-surface" aria-label="Conversation">

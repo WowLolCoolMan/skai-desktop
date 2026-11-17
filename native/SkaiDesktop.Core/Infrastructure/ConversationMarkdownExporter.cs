@@ -38,6 +38,7 @@ public static class ConversationMarkdownExporter
             output.Append("- ID: `").Append(session.Id).AppendLine("`");
             output.Append("- Updated: ").AppendLine(session.UpdatedAt.ToString("O"));
             output.Append("- Mode: ").AppendLine(session.Mode);
+            if (!string.IsNullOrWhiteSpace(session.PersonaId)) output.Append("- Persona: AI simulation of ").Append(session.PersonaName ?? "the selected persona").Append(", based on ").Append(session.PersonaSourceMode == "public-research" ? "public sources" : "your own material").AppendLine(". Not the real person.");
             if (!string.IsNullOrWhiteSpace(session.ProjectName)) output.Append("- Project: ").AppendLine(session.ProjectName);
             if (session.Pinned) output.AppendLine("- Pinned: yes");
             if (session.Archived) output.AppendLine("- Archived: yes");

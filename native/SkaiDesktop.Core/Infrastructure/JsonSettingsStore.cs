@@ -111,7 +111,51 @@ public sealed class JsonSettingsStore
         {
             persona.Id = string.IsNullOrWhiteSpace(persona.Id) ? Guid.NewGuid().ToString("N") : persona.Id.Trim();
             persona.Name = (persona.Name ?? string.Empty).Trim();
+            persona.SourceMode = persona.SourceMode?.Equals("public-research", StringComparison.OrdinalIgnoreCase) == true ? "public-research" : "own-material";
+            persona.Roles = Bound(persona.Roles, 4_000);
+            persona.Voice = Bound(persona.Voice, 8_000);
+            persona.Personality = Bound(persona.Personality, 8_000);
+            persona.Timeline = Bound(persona.Timeline, 12_000);
+            persona.SourceMaterial = Bound(persona.SourceMaterial, 200_000);
             persona.Instructions = (persona.Instructions ?? string.Empty).Trim();
+            persona.InteractionCount = Math.Clamp(persona.InteractionCount, 0, 1_000_000);
+            persona.ResearchPassCount = Math.Clamp(persona.ResearchPassCount, 0, 1_000);
+            persona.LastResearchSummary = Bound(persona.LastResearchSummary, 500);
+            persona.VerifiedQuotes ??= [];
+            persona.VerifiedQuotes = persona.VerifiedQuotes.Where(quote => quote is not null).Take(32).ToList();
+            foreach (var quote in persona.VerifiedQuotes)
+            {
+                quote.Text = Bound(quote.Text, 800);
+                quote.SourceId = Bound(quote.SourceId, 128);
+                quote.Attribution = Bound(quote.Attribution, 300);
+            }
+            persona.Sources ??= [];
+            persona.Sources = persona.Sources.Where(source => source is not null).Take(32).ToList();
+            foreach (var source in persona.Sources)
+            {
+                source.Title = Bound(source.Title, 300);
+                source.Url = Bound(source.Url, 2_000);
+                source.AuthorOrPublisher = Bound(source.AuthorOrPublisher, 300);
+                source.PublishedDate = Bound(source.PublishedDate, 80);
+                source.Type = Bound(source.Type, 80);
+                source.ReliabilityNote = Bound(source.ReliabilityNote, 500);
+                source.Excerpt = Bound(source.Excerpt, 1_200);
+            }
+            persona.ResearchHistory ??= [];
+            persona.ResearchHistory = persona.ResearchHistory.Where(pass => pass is not null).Take(12).ToList();
+            foreach (var pass in persona.ResearchHistory)
+            {
+                pass.Focus = Bound(pass.Focus, 120);
+                pass.Summary = Bound(pass.Summary, 500);
+                pass.SourcesAdded = Math.Clamp(pass.SourcesAdded, 0, 32);
+            }
+            persona.Continuity ??= [];
+            persona.Continuity = persona.Continuity.Where(turn => turn is not null).TakeLast(200).ToList();
+            foreach (var turn in persona.Continuity)
+            {
+                turn.Role = turn.Role is "user" or "assistant" ? turn.Role : "user";
+                turn.Content = Bound(turn.Content, 4_000);
+            }
         }
         if (settings.ActivePersonaId is not null && !settings.SavedPersonas.Any(persona => persona.Id == settings.ActivePersonaId))
             settings.ActivePersonaId = null;
@@ -140,6 +184,12 @@ public sealed class JsonSettingsStore
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > maxLength || value.Any(char.IsControl)) return null;
         return value.Trim();
+    }
+
+    private static string Bound(string? value, int maxLength)
+    {
+        var normalized = value?.Trim() ?? string.Empty;
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
     }
 
     public void Save(AppSettings settings)

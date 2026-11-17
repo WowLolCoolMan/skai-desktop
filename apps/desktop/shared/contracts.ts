@@ -100,6 +100,9 @@ export type DesktopConversation = {
   modelProvider?: string | null;
   modelSizeBytes?: number | null;
   modelContextLength?: number | null;
+  personaId?: string | null;
+  personaName?: string | null;
+  personaSourceMode?: string | null;
   airLlmCompatible?: boolean;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string; attachments?: ChatAttachment[] }>;
   projectId?: string | null;
@@ -110,6 +113,45 @@ export type DesktopConversation = {
   archived: boolean;
   tags: string[];
   folderName?: string | null;
+};
+
+export type DesktopPersonaSource = {
+  title: string;
+  url: string;
+  authorOrPublisher: string;
+  publishedDate: string;
+  type: string;
+  reliabilityNote: string;
+  excerpt: string;
+};
+
+export type DesktopPersonaQuote = { text: string; sourceId: string; attribution: string };
+export type DesktopPersonaResearchPass = { completedAtUtc: string; focus: string; sourcesAdded: number; summary: string };
+export type DesktopPersona = {
+  id: string;
+  name: string;
+  sourceMode: "public-research" | "own-material";
+  isPublicFigure: boolean;
+  birthDate?: string | null;
+  deathDate?: string | null;
+  knowledgeCutoffDate?: string | null;
+  eraDate?: string | null;
+  roles: string;
+  voice: string;
+  personality: string;
+  timeline: string;
+  instructions: string;
+  sourceMaterial: string;
+  personalContinuityEnabled: boolean;
+  progressiveResearchEnabled: boolean;
+  interactionCount: number;
+  researchPassCount: number;
+  lastResearchAtUtc?: string | null;
+  lastResearchSummary: string;
+  researchHistory: DesktopPersonaResearchPass[];
+  verifiedQuotes: DesktopPersonaQuote[];
+  sources: DesktopPersonaSource[];
+  updatedAtUtc: string;
 };
 
 export type ChatAttachment = { fileName: string; content: string; mediaType?: string | null };

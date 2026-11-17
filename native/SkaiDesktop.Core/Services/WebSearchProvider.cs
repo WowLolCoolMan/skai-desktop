@@ -10,6 +10,7 @@ using SkaiDesktop.Core.Models;
 namespace SkaiDesktop.Core.Services;
 
 public sealed record WebSearchResult(string Title, string Url, string Snippet);
+public sealed record WebPageText(string Title, string Text);
 
 /// <summary>Small opt-in web search adapter using DuckDuckGo's public HTML search results.</summary>
 public sealed class WebSearchProvider(HttpClient? httpClient = null)
@@ -51,6 +52,24 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
             if (results.Count == 6) break;
         }
         return results;
+    }
+
+    /// <summary>Fetch a small text-only excerpt for an explicitly selected research result.</summary>
+    public async Task<WebPageText?> FetchTextAsync(string url, CancellationToken cancellationToken = default)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+            throw new ArgumentException("Only HTTP and HTTPS research sources are supported.", nameof(url));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(12));
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("persona research"));
+        using var response = await _http.SendAsync(request, timeout.Token);
+        if (!response.IsSuccessStatusCode) return null;
+        var html = await BoundedHttpContent.ReadTextAsync(response.Content, timeout.Token, "Persona research page");
+        var titleMatch = Regex.Match(html, "<title[^>]*>(?<title>.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        var title = Clean(titleMatch.Success ? titleMatch.Groups["title"].Value : uri.Host, 300);
+        var text = Clean(Regex.Replace(html, "<(script|style|noscript)[^>]*>.*?</\\1>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline), 1_800);
+        return text.Length == 0 ? null : new WebPageText(title, text);
     }
 
     private static string Clean(string html, int maxLength)
