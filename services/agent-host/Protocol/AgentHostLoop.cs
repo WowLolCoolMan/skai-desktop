@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
@@ -2302,6 +2303,8 @@ public static class AgentHostLoop
     {
         var query = RequiredBoundedString(request, "query", 240);
         var notes = OptionalString(request, "notes") ?? string.Empty;
+        var cutoffText = OptionalString(request, "cutoffDate");
+        DateTimeOffset? cutoff = DateTimeOffset.TryParse(cutoffText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedCutoff) ? parsedCutoff : null;
         if (notes.Length > 600 || notes.Any(char.IsControl)) throw new InvalidOperationException("Research notes exceed the safety limit.");
         var search = new WebSearchProvider();
         var requestedUrls = OptionalStringList(request, "sourceUrls", 64, 2_000)
@@ -2314,12 +2317,15 @@ public static class AgentHostLoop
             WebPageText? page = null;
             try { page = await search.FetchTextAsync(result.Url).ConfigureAwait(false); }
             catch { /* A source may reject bounded text fetching; retain its search evidence. */ }
+            if (page?.PublishedDate is { } published && cutoff is { } sourceCutoff && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > sourceCutoff)
+                continue;
             sources.Add(new SavedPersonaSource
             {
                 Title = page?.Title ?? result.Title,
                 Url = result.Url,
                 Type = "search result",
                 ReliabilityNote = IsReputablePublicSource(result.Url) ? "Reputable public coverage candidate; review before saving." : "Unverified result; review before relying on it.",
+                PublishedDate = page?.PublishedDate ?? string.Empty,
                 Excerpt = (page?.Text ?? result.Snippet)[..Math.Min((page?.Text ?? result.Snippet).Length, 1_200)],
             });
         }
@@ -2327,8 +2333,10 @@ public static class AgentHostLoop
         {
             WebPageText? page = null;
             try { page = await search.FetchTextAsync(url).ConfigureAwait(false); } catch { }
+            if (page?.PublishedDate is { } published && cutoff is { } sourceCutoff && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > sourceCutoff)
+                continue;
             var excerpt = page?.Text ?? string.Empty;
-            sources.Add(new SavedPersonaSource { Title = page?.Title ?? url, Url = url, Type = "user-tagged public source", ReliabilityNote = "User-selected public source; review identity and date before saving.", Excerpt = excerpt[..Math.Min(excerpt.Length, 1_200)] });
+            sources.Add(new SavedPersonaSource { Title = page?.Title ?? url, Url = url, Type = "user-tagged public source", PublishedDate = page?.PublishedDate ?? string.Empty, ReliabilityNote = "User-selected public source; review identity and date before saving.", Excerpt = excerpt[..Math.Min(excerpt.Length, 1_200)] });
         }
         var reputableCount = sources.Count(source => IsReputablePublicSource(source.Url));
         var qualified = sources.Count >= 2 && reputableCount >= 1;
@@ -2473,7 +2481,10 @@ public static class AgentHostLoop
             foreach (var result in results.Take(2))
             {
                 if (!IsReputablePublicSource(result.Url) || persona.Sources.Any(source => source.Url.Equals(result.Url, StringComparison.OrdinalIgnoreCase))) continue;
-                persona.Sources.Add(new SavedPersonaSource { Title = result.Title, Url = result.Url, Type = "progressive research", ReliabilityNote = "Added by a bounded public-source refinement pass; review before relying on it.", Excerpt = result.Snippet[..Math.Min(result.Snippet.Length, 1_200)] });
+                WebPageText? page = null;
+                try { page = await new WebSearchProvider().FetchTextAsync(result.Url).ConfigureAwait(false); } catch { }
+                if (page?.PublishedDate is { } published && DateTimeOffset.TryParse(persona.KnowledgeCutoffDate, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var cutoff) && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > cutoff) continue;
+                persona.Sources.Add(new SavedPersonaSource { Title = page?.Title ?? result.Title, Url = result.Url, Type = "progressive research", PublishedDate = page?.PublishedDate ?? string.Empty, ReliabilityNote = "Added by a bounded public-source refinement pass; review before relying on it.", Excerpt = (page?.Text ?? result.Snippet)[..Math.Min((page?.Text ?? result.Snippet).Length, 1_200)] });
                 added++;
             }
             persona.Sources = persona.Sources.Take(32).ToList();

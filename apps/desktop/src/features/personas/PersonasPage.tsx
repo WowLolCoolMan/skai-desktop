@@ -46,7 +46,7 @@ export function PersonasPage({ onChanged }: { onChanged?: () => void }) {
     if (!name.trim() || busy) return;
     setBusy(true); setError(null); setResearch(null);
     try {
-      const response = await request("persona.research", { query: name.trim(), notes: notes.trim(), sourceUrls: sourceUrls.split(/\r?\n/).map((url) => url.trim()).filter(Boolean) });
+      const response = await request("persona.research", { query: name.trim(), notes: notes.trim(), cutoffDate: cutoff || today(), sourceUrls: sourceUrls.split(/\r?\n/).map((url) => url.trim()).filter(Boolean) });
       if (!response.ok) throw new Error(response.error?.message ?? "Research could not be completed.");
       const result = response.result as ResearchResult;
       setResearch(result); setSources(result.sources ?? []);

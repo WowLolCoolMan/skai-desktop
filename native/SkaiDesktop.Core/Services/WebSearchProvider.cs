@@ -10,7 +10,10 @@ using SkaiDesktop.Core.Models;
 namespace SkaiDesktop.Core.Services;
 
 public sealed record WebSearchResult(string Title, string Url, string Snippet);
-public sealed record WebPageText(string Title, string Text);
+public sealed record WebPageText(string Title, string Text)
+{
+    public string? PublishedDate { get; init; }
+}
 
 /// <summary>Small opt-in web search adapter using DuckDuckGo's public HTML search results.</summary>
 public sealed class WebSearchProvider(HttpClient? httpClient = null)
@@ -67,9 +70,27 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
         if (!response.IsSuccessStatusCode) return null;
         var html = await BoundedHttpContent.ReadTextAsync(response.Content, timeout.Token, "Persona research page");
         var titleMatch = Regex.Match(html, "<title[^>]*>(?<title>.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        var publishedDate = ExtractPublishedDate(html);
         var title = Clean(titleMatch.Success ? titleMatch.Groups["title"].Value : uri.Host, 300);
         var text = Clean(Regex.Replace(html, "<(script|style|noscript)[^>]*>.*?</\\1>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline), 1_800);
-        return text.Length == 0 ? null : new WebPageText(title, text);
+        return text.Length == 0 ? null : new WebPageText(title, text) { PublishedDate = publishedDate };
+    }
+
+    private static string? ExtractPublishedDate(string html)
+    {
+        var patterns = new[]
+        {
+            "<meta[^>]+(?:property|name)=[\"'](?:article:published_time|datePublished|pubdate|published_time)[\"'][^>]+content=[\"'](?<date>[^\"']+)",
+            "<meta[^>]+content=[\"'](?<date>[^\"']+)[\"'][^>]+(?:property|name)=[\"'](?:article:published_time|datePublished|pubdate|published_time)[\"']",
+        };
+        foreach (var pattern in patterns)
+        {
+            var match = Regex.Match(html, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            if (!match.Success) continue;
+            var value = WebUtility.HtmlDecode(match.Groups["date"].Value).Trim();
+            if (DateTimeOffset.TryParse(value, out var parsed)) return parsed.ToString("yyyy-MM-dd");
+        }
+        return null;
     }
 
     private static string Clean(string html, int maxLength)
