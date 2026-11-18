@@ -173,7 +173,7 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.preflight", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.checks.list", "project.check.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "persona.list", "persona.discover", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove", "image.models.list", "image.generate", "image.generate.start", "image.generate.status", "image.generate.cancel", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
+                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.preflight", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.checks.list", "project.check.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "persona.list", "persona.discover", "persona.research", "persona.research.force", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove", "image.models.list", "image.generate", "image.generate.start", "image.generate.status", "image.generate.cancel", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
             "system.capacity" => GetLocalCapacity(request),
             "airllm.status" => GetAirLlmStatus(request),
             "airllm.install.start" => StartAirLlmInstall(request),
@@ -246,6 +246,7 @@ public static class AgentHostLoop
             "persona.list" => ListPersonas(request),
             "persona.discover" => DiscoverPersonaAsync(request).GetAwaiter().GetResult(),
             "persona.research" => ResearchPersonaAsync(request).GetAwaiter().GetResult(),
+            "persona.research.force" => ForcePersonaResearchAsync(request).GetAwaiter().GetResult(),
             "persona.save" => SavePersona(request),
             "persona.remove" => RemovePersona(request),
             "persona.activate" => ActivatePersona(request),
@@ -1168,16 +1169,12 @@ public static class AgentHostLoop
         var completionMaxTokens = OptionalInt(request, "maxTokens");
         if (activePersona is not null)
         {
-            if (model.StartsWith("qwen3", StringComparison.OrdinalIgnoreCase))
-                completionMaxTokens = Math.Clamp(completionMaxTokens ?? 768, 768, 1_536);
-            else completionMaxTokens = Math.Min(completionMaxTokens ?? 384, 384);
+            var asksForDepth = Regex.IsMatch(personaQuery ?? string.Empty, @"\b(everything|in detail|full story|long answer|deep dive|tell me more|large dump|as much as you can)\b", RegexOptions.IgnoreCase);
+            completionMaxTokens = asksForDepth ? 2_048 : Math.Clamp(completionMaxTokens ?? 768, 512, 1_024);
         }
         var text = new System.Text.StringBuilder();
-        var evidenceGapReply = activePersona is { SourceMode: "public-research" } && RequiresUnsupportedMemoryBoundary(activePersona, personaQuery);
-        if (evidenceGapReply)
-            text.Append($"I can answer in this persona's style, but the selected sources don't establish that personal memory, so I won't invent it. If you add a source that documents it, I can use that evidence.");
         var evidenceSummary = activePersona is { SourceMode: "public-research" } ? TryBuildPersonaEvidenceSummary(activePersona, personaQuery) : null;
-        if (!evidenceGapReply && evidenceSummary is not null) text.Append(evidenceSummary);
+        if (evidenceSummary is not null) text.Append(evidenceSummary);
         var airLlm = new AirLlmProvider();
         var explicitAirLlm = AirLlmProvider.IsAirLlmProvider(settings.ModelProvider);
         var openAiProvider = new OpenAiCompatibleProvider();
@@ -1186,7 +1183,7 @@ public static class AgentHostLoop
         deadline.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
         {
-            if (evidenceGapReply || evidenceSummary is not null) { /* Return the evidence-bounded response without asking the model to improvise. */ }
+            if (evidenceSummary is not null) { /* Return the evidence-bounded response without asking the model to improvise. */ }
             else
             {
             if (!documentsOnly && SemanticConversationCompactor.ShouldCompact(messages))
@@ -1248,7 +1245,7 @@ public static class AgentHostLoop
             throw new TimeoutException($"The local model did not complete within {timeoutSeconds} seconds.");
         }
         var responseText = StripModelReasoningMarkup(text.ToString());
-        if (activePersona is { SourceMode: "public-research" } && evidenceSummary is null && !evidenceGapReply && ContainsUnverifiedQuotation(activePersona, responseText))
+        if (activePersona is { SourceMode: "public-research" } && evidenceSummary is null && ContainsUnverifiedQuotation(activePersona, responseText))
             responseText = "I can't verify that quoted wording in the selected evidence, so I won't present it as a real line. I can summarize what the sources establish instead.";
         if (activePersona?.PersonalContinuityEnabled == true && !OptionalBoolean(request, "suppressPersonaContinuity"))
             SavePersonaContinuity(activePersona.Id, messages, responseText);
@@ -2662,6 +2659,58 @@ public static class AgentHostLoop
             .ToArray();
         var matches = results.Select(result => new { id = result.Url, title = result.Title, snippet = result.Snippet, url = result.Url }).ToArray();
         return new(ProtocolVersion, request.Id, true, new { query, subjectType, matches });
+    }
+
+    private static async Task<AgentResponse> ForcePersonaResearchAsync(AgentRequest request)
+    {
+        var personaId = RequiredBoundedString(request, "personaId", 128);
+        var focus = OptionalString(request, "focus")?.Trim() ?? string.Empty;
+        if (focus.Length > 240 || focus.Any(char.IsControl)) throw new InvalidOperationException("Research focus exceeds the safety limit.");
+        var store = CreateSettingsStore();
+        var settings = store.Load();
+        var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == personaId) ?? throw new KeyNotFoundException("The persona does not exist.");
+        if (persona.SourceMode != "public-research") throw new InvalidOperationException("Force more research is only available for public-research personas.");
+        if (persona.Sources.Count >= 32) throw new InvalidOperationException("This persona has reached its 32-source limit. Remove a source before researching more.");
+
+        var researchRequest = new AgentRequest(ProtocolVersion, request.Id + "-search", "persona.research", JsonSerializer.SerializeToElement(new
+        {
+            query = persona.Name,
+            subjectType = persona.SubjectType,
+            notes = string.IsNullOrWhiteSpace(focus) ? "Find additional independent biography, attributed dialogue or interviews, and useful topic-specific evidence" : focus,
+            cutoffDate = persona.KnowledgeCutoffDate,
+            sourceUrls = Array.Empty<string>(),
+        }, JsonOptions));
+        var researchResponse = await ResearchPersonaAsync(researchRequest).ConfigureAwait(false);
+        if (!researchResponse.Ok || researchResponse.Result is null) throw new InvalidOperationException(researchResponse.Error?.Message ?? "No additional research could be completed.");
+        var researchJson = JsonSerializer.SerializeToElement(researchResponse.Result, JsonOptions);
+        if (!researchJson.TryGetProperty("sources", out var sourceJson)) throw new InvalidOperationException("Research returned no usable source list.");
+        var found = sourceJson.Deserialize<List<SavedPersonaSource>>(JsonOptions) ?? [];
+        var remaining = 32 - persona.Sources.Count;
+        var newSources = found
+            .Where(source => persona.Sources.All(existing => !existing.Url.Equals(source.Url, StringComparison.OrdinalIgnoreCase)))
+            .Where(source => !persona.ExcludedResearchUrls.Contains(source.Url, StringComparer.OrdinalIgnoreCase))
+            .Where(source => source.SpeakerAttribution == "subject-attributed"
+                || source.Type is "Biography" or "Canon reference" or "Official source" or "Character analysis" or "Other reference")
+            .Take(Math.Min(8, remaining))
+            .ToList();
+        persona.Sources.AddRange(newSources);
+        var effectiveFocus = string.IsNullOrWhiteSpace(focus) ? "additional public evidence" : focus;
+        SavedPersonaDistillation? distillation = null;
+        if (newSources.Count > 0)
+        {
+            distillation = await DistillPersonaEvidenceAsync(persona, effectiveFocus).ConfigureAwait(false);
+            if (distillation is not null) persona.LatestDistillation = distillation;
+        }
+        persona.ResearchPassCount++;
+        persona.LastResearchAtUtc = DateTimeOffset.UtcNow;
+        persona.LastResearchSummary = newSources.Count == 0
+            ? "The search found no new sources that passed the persona's relevance and evidence filters."
+            : $"Added {newSources.Count} screened source{(newSources.Count == 1 ? "" : "s")}{(distillation is null ? "; profile synthesis could not be refreshed with the configured model." : " and refreshed the evidence-backed profile synthesis.")}";
+        persona.ResearchHistory.Insert(0, new SavedPersonaResearchPass { Focus = effectiveFocus, SourcesAdded = newSources.Count, Summary = persona.LastResearchSummary });
+        persona.ResearchHistory = persona.ResearchHistory.Take(12).ToList();
+        persona.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        store.Save(settings);
+        return new(ProtocolVersion, request.Id, true, new { persona = PersonaResponse(persona), sourcesAdded = newSources.Count, synthesisUpdated = distillation is not null, summary = persona.LastResearchSummary });
     }
 
     private static async Task<AgentResponse> ResearchPersonaAsync(AgentRequest request)
