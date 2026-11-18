@@ -2650,63 +2650,72 @@ public static class AgentHostLoop
                     .Replace('-', ' ').Replace('_', ' ');
                 return new WebSearchResult(title, uri.AbsoluteUri, "Source URL supplied by you. Open it and confirm that it refers to the intended character.");
             })
-            .Where(result => ContainsPersonaName(query, $"{result.Title} {result.Url}"))
             .ToArray();
-        // When the user already supplied an identity-matching source, let them
-        // verify it immediately. The deeper research step still discovers and
-        // fetches a broader evidence set after they confirm the match.
+        // Include user-supplied URLs alongside public search results; neither
+        // the URL nor the entered name should suppress other candidates.
         IReadOnlyList<WebSearchResult> results = directMatches;
-        var needsIdentityConfirmation = false;
         var discoveryTerms = subjectType == "character" ? "fictional character franchise canon" : "real person biography profile";
-        var subjectName = PersonaNameWithoutHonorifics(query);
-        var queryVariants = new[]
-        {
-            $"\"{subjectName}\" {discoveryTerms}",
-            $"{subjectName} {notes} {discoveryTerms}",
-            subjectName,
-        }.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase);
+        var identityNames = PersonaSearchNames(query);
+        var queryVariants = identityNames.SelectMany(subjectName => new[]
+            {
+                $"\"{subjectName}\" {discoveryTerms}",
+                $"{subjectName} {notes} {discoveryTerms}",
+                subjectName,
+            })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        using var searchLimit = new SemaphoreSlim(3, 3);
         try
         {
-            if (directMatches.Length == 0)
+            var batches = await Task.WhenAll(queryVariants.Select(async variant =>
             {
-                var batches = await Task.WhenAll(queryVariants.Select(async variant =>
+                await searchLimit.WaitAsync(timeout.Token).ConfigureAwait(false);
+                try
                 {
                     try { return await search.SearchAsync(variant, timeout.Token).ConfigureAwait(false); }
                     catch (OperationCanceledException) when (timeout.IsCancellationRequested) { throw; }
                     catch { return Array.Empty<WebSearchResult>(); }
-                })).ConfigureAwait(false);
-                var candidates = batches.SelectMany(batch => batch)
-                    .GroupBy(result => result.Url, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.First())
-                    .ToArray();
-                var exactMatches = candidates.Where(result => ContainsPersonaName(query, $"{result.Title} {result.Snippet}")).ToArray();
-                if (exactMatches.Length > 0) results = exactMatches.Take(8).ToArray();
-                else
-                {
-                    // Do not turn search-engine spelling/alias differences into a dead end.
-                    // These are only suggestions: the UI requires the user to choose one
-                    // before any profile research starts.
-                    results = candidates.Take(8).ToArray();
-                    needsIdentityConfirmation = results.Count > 0;
                 }
-            }
+                finally { searchLimit.Release(); }
+            })).ConfigureAwait(false);
+            var candidates = batches.SelectMany(batch => batch)
+                .GroupBy(result => result.Url, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First());
+            results = directMatches.Concat(candidates)
+                .GroupBy(result => result.Url, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToArray();
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested) { throw new TimeoutException("People search took too long. Try again with a fuller name."); }
         results = results
             .GroupBy(result => result.Url, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
-            .Take(8)
             .ToArray();
-        var matches = results.Select(result => new
-        {
-            id = result.Url,
-            title = result.Title,
-            canonicalName = PersonaCandidateName(query, result.Title),
-            snippet = result.Snippet,
-            url = result.Url,
-            needsIdentityConfirmation,
-        }).ToArray();
-        return new(ProtocolVersion, request.Id, true, new { query, subjectType, matches, needsIdentityConfirmation });
+        var matches = new object[]
+            {
+                new
+                {
+                    id = $"entered-name:{query}",
+                    title = $"Use this name: {query}",
+                    canonicalName = PersonaDisplayNameFromQuery(query),
+                    snippet = "Continue with the name and aliases you entered, even if public search results are missing or unrelated.",
+                    url = string.Empty,
+                    nameMatch = false,
+                    manualQuery = true,
+                },
+            }
+            .Concat(results.Select(result => (object)new
+            {
+                id = result.Url,
+                title = result.Title,
+                canonicalName = PersonaCandidateName(query, result.Title),
+                snippet = result.Snippet,
+                url = result.Url,
+                nameMatch = ContainsPersonaName(query, $"{result.Title} {result.Snippet} {result.Url}"),
+                manualQuery = false,
+            }))
+            .ToArray();
+        return new(ProtocolVersion, request.Id, true, new { query, subjectType, matches });
     }
 
     private static string PersonaCandidateName(string query, string title)
@@ -2716,6 +2725,27 @@ public static class AgentHostLoop
         return candidate.Length is > 0 and <= 120 && candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 8
             ? candidate
             : query;
+    }
+
+    private static string[] PersonaSearchNames(string query)
+    {
+        var aliases = Regex.Match(query, @"\b(?:also\s+known\s+as|a\.k\.a\.|aka)\s+(.+?)(?:\)|;|$)", RegexOptions.IgnoreCase);
+        var primary = aliases.Success ? query[..aliases.Index] : query;
+        var names = new List<string> { PersonaNameWithoutHonorifics(primary) };
+        if (aliases.Success)
+            names.AddRange(Regex.Split(aliases.Groups[1].Value, @"\s+or\s+|[,;/|]+")
+                .Select(PersonaNameWithoutHonorifics));
+        return names.Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(5)
+            .ToArray();
+    }
+
+    private static string PersonaDisplayNameFromQuery(string query)
+    {
+        var aliases = Regex.Match(query, @"\b(?:also\s+known\s+as|a\.k\.a\.|aka)\s+", RegexOptions.IgnoreCase);
+        var displayName = aliases.Success ? query[..aliases.Index] : query;
+        return displayName.Trim().TrimEnd('(', '[', ';', ':', ',').Trim();
     }
 
     private static async Task<AgentResponse> ForcePersonaResearchAsync(AgentRequest request)
