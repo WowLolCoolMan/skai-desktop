@@ -89,7 +89,7 @@ expect(main.includes("setVisibleOnAllWorkspaces(true") && percyTransparent && ma
 expect(main.includes('"tasks.retry": "Retried the local task."'), "Percy must summarize successful task retries");
 expect(main.includes('kind = "success"') && main.includes('kind: "error"'), "Percy completion events must distinguish successful and failed local work");
 expect(main.includes("if (!task) return null"), "Percy completion bubbles must stay scoped to tracked agent work");
-expect(petWindow.includes("BUILTIN_STRIPS") && petWindow.includes("percy-error-frames.png") && petWindow.includes("event.kind"), "The companion must render independent state strips and completion states");
+expect(petWindow.includes("BUILTIN_STRIPS") && petWindow.includes("percy-failed-fallback-frames.png") && petWindow.includes("event.kind"), "The companion must render independent state strips and completion states");
 expect(petWindow.includes("window.addEventListener(\"blur\", cancelDrag)") && petWindow.includes("event.target instanceof Element"), "Percy renderer must cancel lost drags and protect its hide control from drag initiation");
 expect(main.includes("packagedRuntime") && main.includes("process.resourcesPath"), "Electron must resolve packaged runtime paths");
 expect(main.includes("packagedHost") && main.includes("SkaiDesktop.AgentHost"), "Electron must launch a bundled Agent Host when packaged");

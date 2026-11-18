@@ -202,9 +202,11 @@ async function run() {
   if (!evidencePersona.ok || evidencePersona.result?.persona?.subjectType !== "character") throw new Error("Persona subject type did not persist for fictional characters.");
   const sourceUrl = "https://example.org/canon";
   const removedChunk = await request("persona.source.remove", { personaId: evidencePersona.result.persona.id, url: sourceUrl, removeExcerpt: true });
-  if (!removedChunk.ok || removedChunk.result?.sources?.length !== 1 || removedChunk.result.sources[0].excerpt !== "") throw new Error("A saved research excerpt could not be removed independently of its source.");
+  // persona.source.remove returns { persona, profileNeedsRebuild }.
+  const chunkSources = removedChunk.result?.persona?.sources;
+  if (!removedChunk.ok || chunkSources?.length !== 1 || chunkSources[0].excerpt !== "" || removedChunk.result.profileNeedsRebuild !== true) throw new Error("A saved research excerpt could not be removed independently of its source.");
   const removedSource = await request("persona.source.remove", { personaId: evidencePersona.result.persona.id, url: sourceUrl });
-  if (!removedSource.ok || removedSource.result?.sources?.length !== 0) throw new Error("A research source and its remaining chunks could not be removed.");
+  if (!removedSource.ok || removedSource.result?.persona?.sources?.length !== 0) throw new Error("A research source and its remaining chunks could not be removed.");
   await request("persona.remove", { id: evidencePersona.result.persona.id });
   const personaThread = await request("conversation.save", { title: "Persona workshop thread", personaId, messages: [{ role: "user", content: "Keep this inside the workshop." }] });
   const groupThread = await request("conversation.save", { title: "Persona group thread", isPersonaGroup: true, personaIds: [personaId, secondPersona.result.persona.id], messages: [] });
