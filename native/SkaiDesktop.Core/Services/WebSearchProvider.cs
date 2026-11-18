@@ -21,7 +21,7 @@ public sealed record WebPageText(string Title, string Text)
     public string EvidenceQuality { get; init; } = "unreviewed";
 }
 
-/// <summary>Small opt-in web search adapter using DuckDuckGo's public HTML search results.</summary>
+/// <summary>Small opt-in web search adapter using DuckDuckGo HTML results with a bounded Bing fallback.</summary>
 public sealed class WebSearchProvider(HttpClient? httpClient = null)
 {
     private static readonly HttpClient Shared = new() { Timeout = Timeout.InfiniteTimeSpan };
@@ -42,12 +42,21 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
         if (string.IsNullOrWhiteSpace(query)) throw new ArgumentException("Enter a search query.", nameof(query));
         if (query.Length > 500) throw new ArgumentException("Search queries are limited to 500 characters.", nameof(query));
         var uri = new Uri("https://html.duckduckgo.com/html/?q=" + Uri.EscapeDataString(query));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(20));
-        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        request.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("desktop web search"));
-        using var response = await _http.SendAsync(request, timeout.Token);
-        var html = response.IsSuccessStatusCode ? await BoundedHttpContent.ReadTextAsync(response.Content, timeout.Token, "Web search response") : string.Empty;
+        var html = string.Empty;
+        using (var duckDuckGoTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+        {
+            duckDuckGoTimeout.CancelAfter(TimeSpan.FromSeconds(6));
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                request.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("desktop web search"));
+                using var response = await _http.SendAsync(request, duckDuckGoTimeout.Token);
+                if (response.IsSuccessStatusCode)
+                    html = await BoundedHttpContent.ReadTextAsync(response.Content, duckDuckGoTimeout.Token, "Web search response");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+            catch (HttpRequestException) { }
+        }
         var results = new List<WebSearchResult>();
         foreach (Match match in ResultRegex.Matches(html))
         {
@@ -68,38 +77,45 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
         }
         if (results.Count == 0)
         {
-            using var fallbackRequest = new HttpRequestMessage(HttpMethod.Get, "https://www.bing.com/search?q=" + Uri.EscapeDataString(query));
-            fallbackRequest.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("desktop web search fallback"));
-            using var fallbackResponse = await _http.SendAsync(fallbackRequest, timeout.Token);
-            if (fallbackResponse.IsSuccessStatusCode)
+            using var fallbackTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            fallbackTimeout.CancelAfter(TimeSpan.FromSeconds(12));
+            try
             {
-                var fallbackHtml = await BoundedHttpContent.ReadTextAsync(fallbackResponse.Content, timeout.Token, "Fallback web search response");
-                foreach (Match match in BingResultRegex.Matches(fallbackHtml))
+                using var fallbackRequest = new HttpRequestMessage(HttpMethod.Get, "https://www.bing.com/search?q=" + Uri.EscapeDataString(query));
+                fallbackRequest.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("desktop web search fallback"));
+                using var fallbackResponse = await _http.SendAsync(fallbackRequest, fallbackTimeout.Token);
+                if (fallbackResponse.IsSuccessStatusCode)
                 {
-                    var rawUrl = WebUtility.HtmlDecode(match.Groups["url"].Value);
-                    var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
-                    if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https") || IsSearchRedirect(absolute)) continue;
-                    var title = Clean(match.Groups["title"].Value, 200);
-                    var snippet = Clean(match.Groups["snippet"].Value, 700);
-                    if (title.Length == 0) continue;
-                    if (snippet.Length == 0) snippet = "Public search result. Open the source to review identity and details.";
-                    results.Add(new WebSearchResult(title, absolute.AbsoluteUri, snippet));
-                    if (results.Count == 6) break;
-                }
-                if (results.Count == 0)
-                {
-                    foreach (Match match in BingTitleRegex.Matches(fallbackHtml).Take(8))
+                    var fallbackHtml = await BoundedHttpContent.ReadTextAsync(fallbackResponse.Content, fallbackTimeout.Token, "Fallback web search response");
+                    foreach (Match match in BingResultRegex.Matches(fallbackHtml))
                     {
                         var rawUrl = WebUtility.HtmlDecode(match.Groups["url"].Value);
                         var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
                         if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https") || IsSearchRedirect(absolute)) continue;
                         var title = Clean(match.Groups["title"].Value, 200);
+                        var snippet = Clean(match.Groups["snippet"].Value, 700);
                         if (title.Length == 0) continue;
-                        results.Add(new WebSearchResult(title, absolute.AbsoluteUri, "Public search result. Open the source to review identity and details."));
+                        if (snippet.Length == 0) snippet = "Public search result. Open the source to review identity and details.";
+                        results.Add(new WebSearchResult(title, absolute.AbsoluteUri, snippet));
                         if (results.Count == 6) break;
+                    }
+                    if (results.Count == 0)
+                    {
+                        foreach (Match match in BingTitleRegex.Matches(fallbackHtml).Take(8))
+                        {
+                            var rawUrl = WebUtility.HtmlDecode(match.Groups["url"].Value);
+                            var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
+                            if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https") || IsSearchRedirect(absolute)) continue;
+                            var title = Clean(match.Groups["title"].Value, 200);
+                            if (title.Length == 0) continue;
+                            results.Add(new WebSearchResult(title, absolute.AbsoluteUri, "Public search result. Open the source to review identity and details."));
+                            if (results.Count == 6) break;
+                        }
                     }
                 }
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+            catch (HttpRequestException) { }
         }
         return results;
     }

@@ -10,6 +10,8 @@ site](https://wowlolcoolman.github.io/skai-desktop/).
 - [ChatGPT/Codex vs. Skai difference register](CHATGPT_CODEX_VS_SKAI_DIFFERENCES.md) — product, UI-flow, capability, privacy, and platform comparison.
 - [Future features](FUTURE_FEATURES.md) — active product backlog, scoped to the
   local-first product boundary.
+- [To Do Next](TO_DO_NEXT.md) — shared contributor queue with current work,
+  agreed implementation approaches, owners, and acceptance evidence.
 - [Release readiness](RELEASE_READINESS.md) — current packaging and acceptance
   gaps.
 - [Release guide](RELEASING.md) — release targets, required verification, signing

@@ -159,6 +159,7 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
             }).ToArray()
         };
         if (maxTokens is > 0) requestBody["max_tokens"] = Math.Clamp(maxTokens.Value, 1, 4096);
+        if (IsQwen3Model(settings.Model)) requestBody["think"] = false;
         return JsonSerializer.Serialize(requestBody, JsonOptions);
     }
 
@@ -208,8 +209,24 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
     {
         var options = new Dictionary<string, object?> { ["num_ctx"] = settings.OllamaContextWindowTokens, ["temperature"] = settings.Temperature };
         if (maxTokens is > 0) options["num_predict"] = Math.Clamp(maxTokens.Value, 1, 4096);
-        return JsonSerializer.Serialize(new { model = settings.Model, messages = messages.Select(BuildOllamaNativeMessage).ToArray(), stream = true, options }, JsonOptions);
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = settings.Model,
+            ["messages"] = messages.Select(BuildOllamaNativeMessage).ToArray(),
+            ["stream"] = true,
+            ["options"] = options,
+        };
+        // Qwen3 exposes internal reasoning on a separate "thinking" channel and
+        // enables it by default. Skai streams only message.content, so a short
+        // completion budget can be spent entirely on hidden reasoning and look
+        // like an empty or failed chat. Keep responses directly usable here;
+        // users can still choose a dedicated reasoning model when needed.
+        if (IsQwen3Model(settings.Model)) payload["think"] = false;
+        return JsonSerializer.Serialize(payload, JsonOptions);
     }
+
+    private static bool IsQwen3Model(string model) =>
+        model.Trim().StartsWith("qwen3", StringComparison.OrdinalIgnoreCase);
 
     private static object BuildOllamaNativeMessage(ChatMessage message)
     {

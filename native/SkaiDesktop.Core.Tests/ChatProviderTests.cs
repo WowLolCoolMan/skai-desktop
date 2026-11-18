@@ -195,6 +195,42 @@ internal static class ChatProviderTests
         Check(sourceMessage.Content == "Find the rollback checklist" && sourceMessage.Attachments is [{ FileName: "release-notes.pdf" }],
             "provider attachment prompt construction does not mutate the saved conversation message");
 
+        string? qwenPayload = null;
+        var qwenProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
+        {
+            qwenPayload = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"message\":{\"content\":\"A direct reply.\"}}\n", Encoding.UTF8, "application/x-ndjson")
+            };
+        })));
+        await qwenProvider.StreamChatAsync(
+            new AppSettings { Endpoint = "http://localhost:11434", Model = "qwen3:14b", ModelProvider = "Ollama", OllamaContextWindowTokens = 4096 },
+            [new ChatMessage("user", "Reply conversationally")], _ => { }, CancellationToken.None, maxTokens: 100);
+        using (var qwenRequest = JsonDocument.Parse(qwenPayload!))
+        {
+            Check(qwenRequest.RootElement.GetProperty("think").ValueKind == JsonValueKind.False,
+                "Qwen3 native Ollama requests disable hidden reasoning so bounded chats return visible content");
+        }
+
+        string? qwenCompatiblePayload = null;
+        var qwenCompatibleProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
+        {
+            qwenCompatiblePayload = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("data: {\"choices\":[{\"delta\":{\"content\":\"Visible reply.\"}}]}\n\ndata: [DONE]\n\n", Encoding.UTF8, "text/event-stream")
+            };
+        })));
+        await qwenCompatibleProvider.StreamChatAsync(
+            new AppSettings { Endpoint = "http://localhost:11434/v1", Model = "qwen3:14b", ModelProvider = "Ollama" },
+            [new ChatMessage("user", "Reply conversationally")], _ => { }, CancellationToken.None, maxTokens: 100);
+        using (var qwenCompatibleRequest = JsonDocument.Parse(qwenCompatiblePayload!))
+        {
+            Check(qwenCompatibleRequest.RootElement.GetProperty("think").ValueKind == JsonValueKind.False,
+                "Qwen3 OpenAI-compatible Ollama requests disable hidden reasoning under the default response budget");
+        }
+
         string? millionContextPayload = null;
         var millionContextProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
         {

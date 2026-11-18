@@ -136,6 +136,7 @@ Engineering references:
 - [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md) — visual migration ledger and evidence.
 - [`docs/FUTURE_FEATURES.md`](docs/FUTURE_FEATURES.md) — future product backlog.
 - [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — implemented, partial, and planned capabilities.
+- [`docs/TO_DO_NEXT.md`](docs/TO_DO_NEXT.md) — shared contributor handoff for active work and the next agreed tasks.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Electron, Agent Host, and Core architecture boundary.
 - [`docs/GITHUB_INTEGRATION.md`](docs/GITHUB_INTEGRATION.md) — repository project workflows.
 - [`services/agent-host/README.md`](services/agent-host/README.md) — Agent Host protocol notes.

@@ -1166,7 +1166,12 @@ public static class AgentHostLoop
         if (documentsOnly) messages = DocumentsOnlyPrompt.Apply(messages).ToList();
         messages.Insert(0, new ChatMessage("system", ResponseModePrompt(responseMode)));
         var completionMaxTokens = OptionalInt(request, "maxTokens");
-        if (activePersona is not null) completionMaxTokens = Math.Min(completionMaxTokens ?? 384, 384);
+        if (activePersona is not null)
+        {
+            if (model.StartsWith("qwen3", StringComparison.OrdinalIgnoreCase))
+                completionMaxTokens = Math.Clamp(completionMaxTokens ?? 768, 768, 1_536);
+            else completionMaxTokens = Math.Min(completionMaxTokens ?? 384, 384);
+        }
         var text = new System.Text.StringBuilder();
         var evidenceGapReply = activePersona is { SourceMode: "public-research" } && RequiresUnsupportedMemoryBoundary(activePersona, personaQuery);
         if (evidenceGapReply)
@@ -2692,7 +2697,11 @@ public static class AgentHostLoop
                 (Category: "Conversation transcript", Terms: "public speech debate Q&A transcript conversation"),
                 (Category: "Other reference", Terms: "official site public statements career profile"),
             };
-        using var searchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(24));
+        // Persona research fans out across biography, dialogue, transcript, and
+        // canon lanes. Give the paced batches enough time to return transcript
+        // candidates; a short global timeout often left only a user-pinned URL
+        // and made name-only research look complete while missing speech.
+        using var searchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         // Search providers throttle bursts; a request per query variant across all
         // evidence lanes used to fan out twelve simultaneous requests and often
         // return only the explicitly selected URL. Keep research broad, but paced.
@@ -2806,6 +2815,8 @@ public static class AgentHostLoop
             finally { fetchLimit.Release(); }
         })).ConfigureAwait(false);
         var sources = loaded.Where(source => source is not null).Cast<SavedPersonaSource>().ToList();
+        if (sources.Count == 0)
+            fetchWarnings.Add("No usable research sources were found. Public search may be unavailable, or the matching pages may block text extraction; retry or add a known source URL.");
         var reputableCount = sources.Count(source => IsReputablePublicSource(source.Url));
         var qualified = subjectType == "character"
             ? sources.Any(source => source.Type is "Canon reference" or "Official source") || sources.Count >= 2
@@ -2919,11 +2930,7 @@ public static class AgentHostLoop
     }
 
     private static bool ContainsUnverifiedQuotation(SavedPersona persona, string response)
-    {
-        var quotedSpans = Regex.Matches(response, "[\\\"“”‘’][^\\\"“”‘’]{3,180}[\\\"“”‘’]");
-        if (quotedSpans.Count == 0) return false;
-        return quotedSpans.Cast<Match>().Any(span => !persona.VerifiedQuotes.Any(quote => quote.Text.Contains(span.Value.Trim('"', '“', '”', '‘', '’'), StringComparison.Ordinal)));
-    }
+        => PersonaDialogueEvidence.ContainsUnverifiedQuotation(persona, response);
 
     private static bool IsPersonaSourceRelevant(string subject, string title, string excerpt)
     {

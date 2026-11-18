@@ -38,6 +38,16 @@ internal static class WebSearchTests
         var bingResults = await bingSearchProvider.SearchAsync("Rhett McLaughlin");
         Check(bingResults.Count == 1 && bingResults[0].Url == target, "Bing tracking links are unwrapped to the original public source before use");
 
+        var timeoutFallbackProvider = new WebSearchProvider(new HttpClient(new StubHandler((request, _) =>
+        {
+            if (request.RequestUri?.Host == "html.duckduckgo.com") throw new TaskCanceledException("Simulated search timeout.");
+            var html = $"<ol><li class=\"b_algo\"><h2><a href=\"{target}\">Rhett McLaughlin interview transcript</a></h2><p>Long-form conversation transcript.</p></li></ol>";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(html) });
+        })));
+        var fallbackAfterTimeout = await timeoutFallbackProvider.SearchAsync("Rhett McLaughlin transcript");
+        Check(fallbackAfterTimeout.Count == 1 && fallbackAfterTimeout[0].Url == target,
+            "Bing fallback still runs when DuckDuckGo times out");
+
         Check(WebSearchProvider.NormalizePublicResearchUrl("https://www.bing.com/ck/a?u=broken") is null,
             "unresolved Bing redirect URLs are rejected as research sources");
         Check(WebSearchProvider.NormalizePublicResearchUrl("https://example.org/profile") == "https://example.org/profile",
@@ -84,6 +94,10 @@ internal static class WebSearchTests
         var joeAttribution = PersonaDialogueEvidence.DetectSubjectSpeaker("Joe Rogan", labeledTranscript);
         Check(joeAttribution.IsUsable && joeAttribution.TurnCount == 3,
             "speaker-label analysis counts only turns explicitly labeled as the requested person");
+        var shortReplyTranscript = "Joe Rogan: Flat.\nMatt McCusker: That is the other speaker's response to Joe.\nJoe Rogan: Here is a longer, separately labeled response from the host.";
+        Check(PersonaDialogueEvidence.DetectSubjectSpeaker("Joe Rogan", shortReplyTranscript).TurnCount == 1
+            && !PersonaDialogueEvidence.SelectAttributedSpeakerTurns("Joe Rogan", shortReplyTranscript).Contains("Matt McCusker", StringComparison.Ordinal),
+            "a short subject reply cannot absorb the next speaker-labeled turn");
         var mixedAttribution = PersonaDialogueEvidence.DetectSubjectSpeaker("Joe Rogan", archiveTranscript?.Text ?? string.Empty);
         Check(!mixedAttribution.IsUsable,
             "timestamps and mentions of a person do not imply speaker attribution");
@@ -122,6 +136,13 @@ internal static class WebSearchTests
         Check(!PersonaDialogueEvidence.RequiresUnsupportedMemoryBoundary(jackMemoryPersona, "How did you get the compass?")
             && PersonaDialogueEvidence.RequiresUnsupportedMemoryBoundary(jackMemoryPersona, "How did you get the compass, and what did you want from it?"),
             "memory questions requiring multiple claims need evidence for the acquisition and intent together");
+        Check(!PersonaDialogueEvidence.ContainsUnverifiedQuotation(joeMemoryPersona, "I would ask: \"What is the real reason?\" That is a useful question.")
+            && !PersonaDialogueEvidence.ContainsUnverifiedQuotation(joeMemoryPersona, "He might say, \"A sailor with questions deserves an answer before he boards the ship.\"")
+            && PersonaDialogueEvidence.ContainsUnverifiedQuotation(joeMemoryPersona, "He said, \"I competed in my first martial arts tournament in 1995.\""),
+            "quotation checks allow in-character dialogue but catch unsupported attributed speech");
+        joeMemoryPersona.VerifiedQuotes = [new SavedPersonaQuote { Text = "I competed in my first martial arts tournament in 1995.", SourceId = "https://example.org/transcript" }];
+        Check(!PersonaDialogueEvidence.ContainsUnverifiedQuotation(joeMemoryPersona, "He said, \"I competed in my first martial arts tournament in 1995.\""),
+            "a quotation explicitly retained as verified evidence is allowed");
 
         var speakerPageProvider = new WebSearchProvider(new HttpClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -164,7 +185,7 @@ internal static class WebSearchTests
             && !pdfJoeTurns.Contains("This separate speaker", StringComparison.Ordinal),
             "PDF transcript excerpts exclude lines attributed to the other speaker");
 
-        var screenplay = "JACK SPARROW\nWe should make our way to the ship before dawn.\nWILL TURNER\nI have a different plan.\nJACK SPARROW\nThen we'll take the long way around.\nJACK SPARROW\nAnd I have another point to make.";
+        var screenplay = "JACK\nWe should make our way to the ship before dawn.\nWILL TURNER\nI have a different plan.\nJACK\nThen we'll take the long way around.\nJACK\nAnd I have another point to make.";
         var jackAttribution = PersonaDialogueEvidence.DetectSubjectSpeaker("Captain Jack Sparrow", screenplay);
         var jackTurns = PersonaDialogueEvidence.SelectAttributedSpeakerTurns("Captain Jack Sparrow", screenplay);
         Check(PersonaDialogueEvidence.HasTranscriptStructure(screenplay) && jackAttribution.IsUsable && jackAttribution.TurnCount == 3,
@@ -179,5 +200,15 @@ internal static class WebSearchTests
             && !abbreviatedJackTurns.Contains("This line belongs to Elizabeth", StringComparison.Ordinal)
             && !abbreviatedJackTurns.Contains("walks toward the harbor", StringComparison.Ordinal),
             "Captain Jack Sparrow screenplay sources accept the character's JACK cue while excluding other cast members and action descriptions");
+        var screenplayActionBoundary = "Jack\nsloshes through floating net buoys and fish heads, picks up a bucket.\nJACK\nThat is the first spoken response in the script sample.\nJACK\nThat is the second spoken response in the script sample.\nJACK\nThat is the third spoken response in the script sample.";
+        var screenplaySpeechOnly = PersonaDialogueEvidence.SelectAttributedSpeakerTurns("Captain Jack Sparrow", screenplayActionBoundary);
+        Check(PersonaDialogueEvidence.DetectSubjectSpeaker("Captain Jack Sparrow", screenplayActionBoundary).TurnCount == 3
+            && !screenplaySpeechOnly.Contains("sloshes through floating net buoys", StringComparison.Ordinal),
+            "lowercase character mentions in screenplay action prose are never mistaken for uppercase dialogue cues");
+        var screenplayIntroduction = "JACK SPARROW\nLooks across the bay toward the ship.\nJACK\nWhat d'ye say to three shillings?\nJACK\nI have another line to offer.\nJACK\nAnd a third response for the test.";
+        var introductionSpeech = PersonaDialogueEvidence.SelectAttributedSpeakerTurns("Captain Jack Sparrow", screenplayIntroduction);
+        Check(PersonaDialogueEvidence.DetectSubjectSpeaker("Captain Jack Sparrow", screenplayIntroduction).TurnCount == 3
+            && !introductionSpeech.Contains("Looks across the bay", StringComparison.Ordinal),
+            "the uppercase full-name character introduction is not mistaken for a screenplay dialogue cue");
     }
 }

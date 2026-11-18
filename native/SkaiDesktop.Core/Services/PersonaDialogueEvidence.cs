@@ -83,6 +83,7 @@ public static class PersonaDialogueEvidence
             if (speakerPattern.IsMatch(line)) return string.Empty;
             if (Regex.IsMatch(line, @"^\([^)]{1,100}\)$")) continue;
             if (Regex.IsMatch(line, @"^[A-Z][A-Z .'-]{2,35}$")) return string.Empty;
+            if (Regex.IsMatch(line, @"^(?:[A-Z][A-Z .'-]{2,35}|[\p{Lu}][\p{L}'.-]{1,30}(?:\s+[\p{Lu}][\p{L}'.-]{1,30}){1,3})\s*:\s*\S")) return string.Empty;
             return line;
         }
         return string.Empty;
@@ -123,6 +124,32 @@ public static class PersonaDialogueEvidence
         });
     }
 
+    /// <summary>Detects likely fabricated quotations without mistaking quoted terms for attributed speech.</summary>
+    public static bool ContainsUnverifiedQuotation(SavedPersona persona, string response)
+    {
+        var quotedSpans = Regex.Matches(response,
+            "\\\"(?<double>[^\\\"\\r\\n]{8,400})\\\"|“(?<curly>[^”\\r\\n]{8,400})”|‘(?<single>[^’\\r\\n]{8,400})’");
+        foreach (Match span in quotedSpans)
+        {
+            var value = span.Groups["double"].Success ? span.Groups["double"].Value
+                : span.Groups["curly"].Success ? span.Groups["curly"].Value
+                : span.Groups["single"].Value;
+            if (persona.VerifiedQuotes.Any(quote => quote.Text.Contains(value, StringComparison.Ordinal))) continue;
+            if (value.Length >= 12 && persona.Sources.Any(source => source.Excerpt.Contains(value, StringComparison.Ordinal))) return true;
+            var contextStart = Math.Max(0, span.Index - 90);
+            var contextEnd = Math.Min(response.Length, span.Index + span.Length + 90);
+            var context = response[contextStart..contextEnd];
+            var explicitlyAttributed = Regex.IsMatch(context,
+                @"\b(?:said|says|quote|quoted|famous line|you told me|you said|I told|I said|he said|she said)\b",
+                RegexOptions.IgnoreCase);
+            // In a persona chat, generated in-character dialogue may be placed
+            // in quotation marks. Only block wording presented as an actual
+            // quote or wording copied from source evidence.
+            if (explicitlyAttributed && value.Length >= 12) return true;
+        }
+        return false;
+    }
+
     private static List<string> BuildSubjectAliases(string subject)
     {
         var names = Regex.Matches(subject, @"[\p{L}\p{N}]{3,}").Select(match => match.Value)
@@ -143,10 +170,15 @@ public static class PersonaDialogueEvidence
     private static Regex BuildSpeakerLabelPattern(IReadOnlyList<string> aliases)
     {
         var label = string.Join('|', aliases.Distinct(StringComparer.OrdinalIgnoreCase).Select(Regex.Escape));
+        var screenplayAliases = aliases.Where(alias => !alias.Contains(' ')).ToArray();
+        if (screenplayAliases.Length == 0) screenplayAliases = aliases.ToArray();
+        var screenplayLabel = string.Join('|', screenplayAliases.Distinct(StringComparer.OrdinalIgnoreCase).Select(alias => Regex.Escape(alias.ToUpperInvariant())));
         // A speaker cue is an isolated name, a timestamped name, a screenplay
         // continuation cue, or a colon-labeled line. Never accept arbitrary
         // text after a short alias: action such as "Jack walks to the ship"
         // is not dialogue even though it starts with the character's name.
-        return new Regex($@"^\s*(?:\[\s*(?:{label})\s*\]|(?:{label})(?:\s*\(\d{{1,2}}:\d{{2}}(?::\d{{2}})?\)\s*(?<inline>.*)|\s*\(CONT['’]?D\)|\s*:\s*(?<inline>.*))?)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        // Bare screenplay cues must be uppercase; transcript labels can use
+        // normal name casing when they include a timestamp or colon.
+        return new Regex($@"^\s*(?:\[\s*(?i:{label})\s*\]|(?i:{label})\s*\(\d{{1,2}}:\d{{2}}(?::\d{{2}})?\)\s*(?<inline>.*)|(?i:{label})\s*:\s*(?<inline>.*)|(?:{screenplayLabel})(?:\s*\(CONT['’]?D\))?)\s*$", RegexOptions.CultureInvariant);
     }
 }
