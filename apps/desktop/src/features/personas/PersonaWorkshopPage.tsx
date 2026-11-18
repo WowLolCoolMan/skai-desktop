@@ -52,7 +52,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   const activePersonaId = activeThread && !activeThread.isPersonaGroup
     ? activeThread.personaId ?? location.personaId
     : null;
-  const messages: ThreadMessage[] = (activeThread?.messages ?? []).filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role as "user" | "assistant", content: item.content }));
+  const messages: ThreadMessage[] = (activeThread?.messages ?? []).filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role as "user" | "assistant", content: item.content })).filter((item, index, all) => index === 0 || !(item.role === "user" && all[index - 1].role === "user" && item.content.trim() === all[index - 1].content.trim()));
   useEffect(() => {
     setDraft("");
     setFindings([]);
@@ -158,7 +158,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     const personaIds = isGroup ? (activeThread.personaIds ?? []) : activePersonaId ? [activePersonaId] : [];
     const participants = personas.filter((item) => personaIds.includes(item.id));
     if (!participants.length) { setError("This thread no longer has an available persona."); return; }
-    const nextMessages = [...messages, { role: "user" as const, content: text }];
+    const nextMessages = [...messages, { role: "user" as const, content: text }].filter((item, index, all) => index === 0 || !(item.role === "user" && all[index - 1].role === "user" && item.content.trim() === all[index - 1].content.trim()));
     setBusy(true); setError(null); setDraft("");
     try {
       await persistUserMessage(activeThread.id, activeThread.title, nextMessages, personaIds, isGroup);

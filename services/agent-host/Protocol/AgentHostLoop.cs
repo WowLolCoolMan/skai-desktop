@@ -1165,6 +1165,9 @@ public static class AgentHostLoop
             }
             personaQuery = messages.LastOrDefault(message => message.Role.Equals("user", StringComparison.OrdinalIgnoreCase))?.Content;
             messages.Insert(0, new ChatMessage("system", ModelInstructions.PersonaSimulation(persona, personaQuery)));
+            var groupTurnInstruction = OptionalString(request, "groupTurnInstruction");
+            if (!string.IsNullOrWhiteSpace(groupTurnInstruction))
+                messages.Insert(0, new ChatMessage("system", groupTurnInstruction));
         }
         var requestedProvider = OptionalString(request, "provider")?.Trim();
         var settings = new AppSettings
@@ -3192,16 +3195,27 @@ public static class AgentHostLoop
             // outlive the desktop request and left the thread looking empty.
             parameters["timeoutSeconds"] = JsonSerializer.SerializeToElement(90, JsonOptions);
             parameters["maxTokens"] = JsonSerializer.SerializeToElement(512, JsonOptions);
+            parameters["groupTurnInstruction"] = JsonSerializer.SerializeToElement(
+                $"You are the only speaker for {persona.Name} in this turn. Return one natural conversational reply only. Do not write speaker labels, brackets, script directions, actions between asterisks, or dialogue for any other persona. Do not narrate the group or repeat the user's prompt.", JsonOptions);
             parameters["messages"] = JsonSerializer.SerializeToElement(sharedMessages, JsonOptions);
             var child = new AgentRequest(ProtocolVersion, $"{request.Id}-{persona.Id}", "chat.complete", JsonSerializer.SerializeToElement(parameters, JsonOptions));
             var response = await CompleteChatAsync(child).ConfigureAwait(false);
             if (response.Result is null) continue;
             var childResult = JsonSerializer.SerializeToElement(response.Result, JsonOptions);
-            var content = childResult.TryGetProperty("content", out var contentValue) ? contentValue.GetString() ?? string.Empty : string.Empty;
+            var content = childResult.TryGetProperty("content", out var contentValue) ? NormalizeGroupTurn(contentValue.GetString() ?? string.Empty, persona.Name) : string.Empty;
             turns.Add(new { personaId = persona.Id, personaName = persona.Name, content });
             sharedMessages.Add(JsonSerializer.SerializeToElement(new { role = "assistant", content = $"[{persona.Name}]: {content}" }, JsonOptions));
         }
         return new(ProtocolVersion, request.Id, true, new { turns, researchFindings, memoryScope = "group-only" });
+    }
+
+    private static string NormalizeGroupTurn(string content, string personaName)
+    {
+        var value = Regex.Replace(content.Trim(), $"^\\s*\\[{Regex.Escape(personaName)}\\]\\s*:?\\s*", string.Empty, RegexOptions.IgnoreCase);
+        value = Regex.Replace(value, @"^\s*(?:\[[^\]]+\]|[A-Z][^:]{1,80}:)\s*", string.Empty);
+        value = Regex.Replace(value, @"(?:^|\n)\s*\*[^*\r\n]{1,240}\*\s*(?=\n|$)", "\n", RegexOptions.Multiline);
+        value = Regex.Replace(value, @"\n{3,}", "\n\n").Trim();
+        return value.Length > 8_000 ? value[..8_000].TrimEnd() : value;
     }
 
     private static AgentResponse AddPersonaSource(AgentRequest request)
