@@ -37,10 +37,19 @@ export function personaWorkshopLocation(): PersonaWorkshopLocation {
   const scopedParts = baseIndex >= 0 ? parts.slice(baseIndex) : [PERSONA_WORKSHOP_PATH];
   const page = scopedParts[1] as PersonaWorkshopPage;
   const validPages: PersonaWorkshopPage[] = ["library", "threads", "groups", "create", "settings", "memories", "knowledge", "chat"];
+  let personaPart = scopedParts[2] ?? "";
+  let conversationPart = scopedParts[3] ?? "";
+  // Older group-thread URLs dropped the empty persona slot, so their
+  // conversation ID landed in personaId. Recover that unambiguous /chat/:id
+  // shape while new URLs use an explicit placeholder for stable positions.
+  if (page === "chat" && personaPart && !conversationPart) {
+    conversationPart = personaPart;
+    personaPart = "";
+  }
   return {
     page: validPages.includes(page) ? page : "library",
-    personaId: scopedParts[2] ? decodeURIComponent(scopedParts[2]) : null,
-    conversationId: scopedParts[3] ? decodeURIComponent(scopedParts[3]) : null,
+    personaId: personaPart && personaPart !== "-" ? decodeURIComponent(personaPart) : null,
+    conversationId: conversationPart && conversationPart !== "-" ? decodeURIComponent(conversationPart) : null,
   };
 }
 
@@ -52,7 +61,7 @@ export function navigatePersonaWorkshop(page: PersonaWorkshopPage, personaId?: s
     ? { route: "persona-workshop" as Route, index: current.index, length: current.length }
     : { route: "persona-workshop" as Route, index: current.index + 1, length: nextLength };
   if (!replace) window.history.replaceState({ ...(window.history.state ?? {}), [HISTORY_KEY]: { ...current, length: nextLength } }, "", window.location.href);
-  const segments = [PERSONA_WORKSHOP_PATH, page, personaId, conversationId].filter(Boolean).map((segment) => encodeURIComponent(segment!));
+  const segments = [PERSONA_WORKSHOP_PATH, page, personaId ? encodeURIComponent(personaId) : "-", conversationId ? encodeURIComponent(conversationId) : "-"];
   const url = window.location.protocol === "file:" ? `#/${segments.join("/")}` : `/${segments.join("/")}`;
   localStorage.setItem(STORAGE_KEY, "persona-workshop");
   window.history[replace ? "replaceState" : "pushState"]({ ...(window.history.state ?? {}), [HISTORY_KEY]: state }, "", url);
