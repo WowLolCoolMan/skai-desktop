@@ -58,6 +58,7 @@ public sealed class WorkspaceCommandRunner
 
         using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         if (!process.Start()) throw new InvalidOperationException("The command process could not be started.");
+        using var isolation = OsProcessIsolation.Attach(process);
         process.StandardInput.Close();
         var output = new StringBuilder();
         var outputGate = new object();

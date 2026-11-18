@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { DiffEditor, Editor } from "./monacoLazy";
 import { useMonacoTheme } from "../../theme/useMonacoTheme";
-import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreflight, DesktopProjectPreview, DesktopTask } from "../../../shared/contracts";
+import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreflight, DesktopProjectPreview, DesktopTask } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
 import { NavIcon } from "../../components/ui/NavIcon";
@@ -53,6 +53,9 @@ type CodingSessionViewProps = {
   gitCommitBusy: boolean;
   gitPushBusy: boolean;
   gitPullRequestBusy: boolean;
+  projectChecks: DesktopProjectCheck[];
+  projectChecksBusy: boolean;
+  projectCheckBusy: boolean;
   onOpenProject: (project: DesktopProject) => void;
   onOpenFile: (relativePath: string) => void;
   onCloseFile: () => void;
@@ -66,9 +69,11 @@ type CodingSessionViewProps = {
   onCommitGitChanges: (message: string, paths?: string[]) => Promise<boolean>;
   onPushGitChanges: () => Promise<boolean>;
   onCreateGitPullRequest: (title: string, body: string) => Promise<boolean>;
+  onLoadProjectChecks: (projectId?: string) => void;
+  onRunProjectCheck: (projectId: string, taskId: string, checkId: string) => Promise<unknown>;
 };
 
-export function CodingSessionView({ conversation, projects, selectedProject, tasks, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onPushGitChanges, onCreateGitPullRequest, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal, onRunProjectPreflight }: CodingSessionViewProps) {
+export function CodingSessionView({ conversation, projects, selectedProject, tasks, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, onLoadProjectChecks, onRunProjectCheck, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onPushGitChanges, onCreateGitPullRequest, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal, onRunProjectPreflight }: CodingSessionViewProps) {
   // Theme: Monaco colors, syntax and font follow the active theme (src/theme/useMonacoTheme.ts).
   const monacoTheme = useMonacoTheme();
   const [openTabs, setOpenTabs] = useState<string[]>([]);
@@ -96,20 +101,24 @@ export function CodingSessionView({ conversation, projects, selectedProject, tas
   const fileSearchRef = useRef<HTMLInputElement>(null);
   const gitPathKey = gitStatus?.changes.map((change) => change.path).join("\u0000") ?? "";
   useEffect(() => { setSelectedGitPaths(gitStatus?.changes.map((change) => change.path) ?? []); }, [gitPathKey]);
-
-  useEffect(() => { setPanelMode("editor"); }, [selectedFile, fileOriginal]);
   useEffect(() => { setPreflight(null); setPreflightMessage(""); }, [selectedProject.id]);
+
   const runPreflight = async () => {
+    if (preflightBusy) return;
     setPreflightBusy(true);
     setPreflightMessage("");
     try {
       const result = await onRunProjectPreflight(selectedProject.id);
       if (result) setPreflight(result);
       else setPreflightMessage("Preflight could not inspect this project. Check the app status message.");
-    } catch (error) {
-      setPreflightMessage(error instanceof Error ? error.message : "Preflight failed.");
-    } finally { setPreflightBusy(false); }
+    } catch {
+      setPreflightMessage("Preflight could not inspect this project.");
+    } finally {
+      setPreflightBusy(false);
+    }
   };
+
+  useEffect(() => { setPanelMode("editor"); }, [selectedFile, fileOriginal]);
   useEffect(() => {
     let restoredTabs: string[] = [];
     try {
@@ -217,7 +226,7 @@ export function CodingSessionView({ conversation, projects, selectedProject, tas
         </div>
       </div>
       {terminalOpen && <div className="project-dock"><TerminalPanel projects={projects} initialProjectId={selectedProject.id} busy={terminalBusy} output={terminalOutput} exitCode={terminalExitCode} compact onRun={onRunTerminal} /></div>}
-    </Card>{<CodingTaskInspector tasks={tasks} gitStatus={gitStatus} gitDiffReady={Boolean(gitDiff)} gitDiffBusy={gitDiffBusy} onReviewChanges={onLoadGitDiff} />}</div>
+    </Card>{<CodingTaskInspector projectId={selectedProject.id} tasks={tasks} projectChecks={projectChecks} projectChecksBusy={projectChecksBusy} projectCheckBusy={projectCheckBusy} gitStatus={gitStatus} gitDiffReady={Boolean(gitDiff)} gitDiffBusy={gitDiffBusy} onLoadProjectChecks={onLoadProjectChecks} onRunProjectCheck={onRunProjectCheck} onReviewChanges={onLoadGitDiff} />}</div>
     <ModalDialog open={pullRequestOpen} onClose={() => setPullRequestOpen(false)} titleId="create-pull-request-title"><form onSubmit={(event) => { event.preventDefault(); void onCreateGitPullRequest(pullRequestTitle, pullRequestBody).then((created) => { if (created) setPullRequestOpen(false); }); }}><div className="dialog-heading"><div><p className="section-kicker">GITHUB WORKFLOW</p><h3 id="create-pull-request-title">Create pull request</h3><p>Uses the local GitHub CLI session. No token is entered into Skai Desktop.</p></div><button type="button" onClick={() => setPullRequestOpen(false)} aria-label="Close dialog">×</button></div><label>Title<input value={pullRequestTitle} onChange={(event) => setPullRequestTitle(event.target.value)} maxLength={256} /></label><label>Description<textarea value={pullRequestBody} onChange={(event) => setPullRequestBody(event.target.value)} maxLength={16000} rows={6} /></label><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setPullRequestOpen(false)}>Cancel</Button><Button variant="primary" type="submit" disabled={gitPullRequestBusy || !pullRequestTitle.trim()}>{gitPullRequestBusy ? "Creating…" : "Create pull request"}</Button></div></form></ModalDialog>
   </>;
 }

@@ -26,6 +26,8 @@ public static class AgentHostLoop
     private static readonly object AirLlmInstallsGate = new();
     private static readonly Dictionary<string, ImageRuntimeInstallOperation> ImageRuntimeInstalls = new(StringComparer.Ordinal);
     private static readonly object ImageRuntimeInstallsGate = new();
+    private static readonly Dictionary<string, ImageGenerationOperation> ImageGenerations = new(StringComparer.Ordinal);
+    private static readonly object ImageGenerationsGate = new();
     private static readonly Dictionary<string, MarketplaceDownloadOperation> MarketplaceDownloads = new(StringComparer.Ordinal);
     private static readonly object MarketplaceDownloadsGate = new();
     private static readonly McpConnectionRegistry McpConnections = CreateMcpConnectionRegistry();
@@ -171,7 +173,7 @@ public static class AgentHostLoop
                 "agent-host",
                 ProtocolVersion,
                 "ready",
-                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.preflight", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "persona.list", "persona.discover", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove", "image.models.list", "image.generate", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
+                ["runtime.health", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.preflight", "project.files", "project.file.read", "project.preview.read", "project.file.write", "project.file.undo", "project.command.run", "project.checks.list", "project.check.run", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "tasks.list", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "settings.get", "settings.save", "persona.list", "persona.discover", "persona.research", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove", "image.models.list", "image.generate", "image.generate.start", "image.generate.status", "image.generate.cancel", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove"])),
             "system.capacity" => GetLocalCapacity(request),
             "airllm.status" => GetAirLlmStatus(request),
             "airllm.install.start" => StartAirLlmInstall(request),
@@ -194,6 +196,8 @@ public static class AgentHostLoop
             "project.file.write" => WriteProjectFile(request),
             "project.file.undo" => UndoProjectFile(request),
             "project.command.run" => RunProjectCommandAsync(request).GetAwaiter().GetResult(),
+            "project.checks.list" => ListProjectChecks(request),
+            "project.check.run" => RunProjectCheckAsync(request).GetAwaiter().GetResult(),
             "project.terminal.start" => StartProjectTerminalAsync(request).GetAwaiter().GetResult(),
             "project.terminal.read" => ReadProjectTerminal(request),
             "project.terminal.write" => WriteProjectTerminalAsync(request).GetAwaiter().GetResult(),
@@ -251,6 +255,9 @@ public static class AgentHostLoop
             "persona.source.add" => AddPersonaSource(request),
             "persona.source.remove" => RemovePersonaSource(request),
             "image.generate" => GenerateImageAsync(request).GetAwaiter().GetResult(),
+            "image.generate.start" => StartImageGeneration(request),
+            "image.generate.status" => GetImageGenerationStatus(request),
+            "image.generate.cancel" => CancelImageGeneration(request),
             "pet.background.remove" => RemovePetBackgroundAsync(request).GetAwaiter().GetResult(),
             "image.models.list" => ListImageCheckpointsAsync(request).GetAwaiter().GetResult(),
             "chat.complete" => CompleteChatAsync(request).GetAwaiter().GetResult(),
@@ -998,6 +1005,22 @@ public static class AgentHostLoop
         public void Fail(string message) { lock (gate) { State = "failed"; Error = string.IsNullOrWhiteSpace(message) ? "Image runtime setup failed." : message[..Math.Min(message.Length, 400)]; } }
     }
 
+    private sealed class ImageGenerationOperation(string id, CancellationTokenSource cancellation)
+    {
+        private readonly object gate = new();
+        private readonly List<string> progress = [];
+        public string Id { get; } = id;
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+        public string State { get; private set; } = "running";
+        public string? Error { get; private set; }
+        public object? Images { get; private set; }
+        public IReadOnlyList<string> Progress { get { lock (gate) return progress.ToArray(); } }
+        public void AddProgress(string message) { if (string.IsNullOrWhiteSpace(message)) return; lock (gate) { if (progress.Count < 120) progress.Add(message.Length > 400 ? message[..400] : message); } }
+        public void Complete(object? result) { lock (gate) { if (State != "running") return; var element = JsonSerializer.SerializeToElement(result); Images = element.TryGetProperty("images", out var images) ? images : result; State = "completed"; } }
+        public void Cancelled() { lock (gate) { if (State == "running") State = "cancelled"; } }
+        public void Fail(string message) { lock (gate) { if (State != "running") return; State = "failed"; Error = string.IsNullOrWhiteSpace(message) ? "Image generation failed." : message[..Math.Min(message.Length, 400)]; } }
+    }
+
     private sealed class MarketplaceDownloadOperation(string id, string source, string repository, CancellationTokenSource cancellation)
     {
         private readonly object gate = new();
@@ -1426,6 +1449,32 @@ public static class AgentHostLoop
             outputTruncated = result.OutputTruncated,
             workingDirectory = result.WorkingDirectory,
         });
+    }
+
+    private static AgentResponse ListProjectChecks(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 128);
+        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The project does not exist.");
+        var checks = new ProjectCheckDetector().Detect(project.FolderPaths);
+        return new(ProtocolVersion, request.Id, true, new { projectId = id, checks });
+    }
+
+    private static async Task<AgentResponse> RunProjectCheckAsync(AgentRequest request)
+    {
+        var projectId = RequiredBoundedString(request, "projectId", 128);
+        var checkId = RequiredBoundedString(request, "checkId", 128);
+        var taskId = RequiredBoundedString(request, "taskId", 128);
+        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == projectId) ?? throw new KeyNotFoundException("The project does not exist.");
+        var check = new ProjectCheckDetector().Detect(project.FolderPaths).SingleOrDefault(item => item.Id.Equals(checkId, StringComparison.OrdinalIgnoreCase)) ?? throw new KeyNotFoundException("The selected project check is no longer available. Refresh the detected checks.");
+        var task = CreateTaskStore().Get(taskId);
+        if (!string.Equals(task.ProjectId, projectId, StringComparison.Ordinal)) throw new InvalidOperationException("The selected task does not belong to this project.");
+        var root = project.FolderPaths.FirstOrDefault() ?? throw new InvalidOperationException("Select a project folder before running a check.");
+        var started = DateTimeOffset.UtcNow;
+        var result = await new WorkspaceCommandRunner().RunAsync(root, check.RelativeWorkingDirectory, check.Command, TimeSpan.FromMinutes(5)).ConfigureAwait(false);
+        var completed = DateTimeOffset.UtcNow;
+        var evidence = new ProjectCheckEvidence(check.Id, check.Label, check.Command, check.RelativeWorkingDirectory, check.Source, result.ExitCode, result.Output, result.TimedOut, result.OutputTruncated, started, completed);
+        var updated = CreateTaskStore().AttachVerificationEvidence(taskId, evidence);
+        return new(ProtocolVersion, request.Id, true, new { projectId, taskId, check, exitCode = result.ExitCode, output = result.Output, timedOut = result.TimedOut, outputTruncated = result.OutputTruncated, startedAtUtc = started, completedAtUtc = completed, task = updated });
     }
 
     private static async Task<AgentResponse> StartProjectTerminalAsync(AgentRequest request)
@@ -3361,7 +3410,48 @@ public static class AgentHostLoop
         return new(ProtocolVersion, request.Id, true, new { image = result.DataUrl, fileName = result.FileName, progress = "Background removed locally with U2Net." });
     }
 
-    private static async Task<AgentResponse> GenerateImageAsync(AgentRequest request)
+    private static AgentResponse StartImageGeneration(AgentRequest request)
+    {
+        lock (ImageGenerationsGate)
+        {
+            if (ImageGenerations.Values.Any(operation => operation.State == "running")) throw new InvalidOperationException("An image generation is already running. Cancel it or wait for it to finish.");
+            var operation = new ImageGenerationOperation(Guid.NewGuid().ToString("N"), new CancellationTokenSource());
+            ImageGenerations[operation.Id] = operation;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var response = await GenerateImageAsync(request, operation.AddProgress, operation.Cancellation.Token).ConfigureAwait(false);
+                    operation.Complete(response.Result);
+                }
+                catch (OperationCanceledException) { operation.Cancelled(); }
+                catch (Exception error) { operation.Fail(error.Message); }
+            });
+            return ImageGenerationResponse(request, operation);
+        }
+    }
+
+    private static AgentResponse GetImageGenerationStatus(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 80);
+        lock (ImageGenerationsGate) return ImageGenerations.TryGetValue(id, out var operation) ? ImageGenerationResponse(request, operation) : throw new KeyNotFoundException("The image generation session no longer exists.");
+    }
+
+    private static AgentResponse CancelImageGeneration(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 80);
+        lock (ImageGenerationsGate)
+        {
+            if (!ImageGenerations.TryGetValue(id, out var operation)) throw new KeyNotFoundException("The image generation session no longer exists.");
+            operation.Cancellation.Cancel();
+            operation.Cancelled();
+            return ImageGenerationResponse(request, operation);
+        }
+    }
+
+    private static AgentResponse ImageGenerationResponse(AgentRequest request, ImageGenerationOperation operation) => new(ProtocolVersion, request.Id, true, new { id = operation.Id, status = operation.State, progress = operation.Progress.ToArray(), images = operation.Images, error = operation.Error });
+
+    private static async Task<AgentResponse> GenerateImageAsync(AgentRequest request, Action<string>? reportProgress = null, CancellationToken cancellationToken = default)
     {
         var prompt = RequiredBoundedString(request, "prompt", 8_000);
         var provider = OptionalString(request, "provider") ?? "comfyui";
@@ -3375,7 +3465,10 @@ public static class AgentHostLoop
                 diffusersSourceImage = diffusersSource.GetString();
                 diffusersSourceMediaType = RequiredBoundedString(request, "sourceImageMediaType", 32);
             }
+            cancellationToken.ThrowIfCancellationRequested();
+            reportProgress?.Invoke("Running Stable Diffusion Turbo locally…");
             var generated = await new DiffusersImageProvider().GenerateAsync(prompt, diffusersSourceImage, diffusersSourceMediaType).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             return new(ProtocolVersion, request.Id, true, new { prompt, progress = "Generated locally with Stable Diffusion Turbo.", images = new[] { new { url = generated.DataUrl, fileName = generated.FileName } } });
         }
         if (!provider.Equals("comfyui", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Choose a supported local image provider.");
@@ -3394,7 +3487,8 @@ public static class AgentHostLoop
             if (!ChatAttachmentPolicy.IsAllowedImageMediaType(mediaType) || !ChatAttachmentPolicy.HasValidImageSignature(mediaType, sourceImage)) throw new InvalidDataException("The source image must be a valid PNG or JPEG.");
             sourceImageName = mediaType == "image/png" ? "source.png" : "source.jpg";
         }
-        var images = await new ComfyImageProvider().GenerateAsync(endpoint, workflow, prompt, message => progress = message, CancellationToken.None, sourceImageName, sourceImage);
+        cancellationToken.ThrowIfCancellationRequested();
+        var images = await new ComfyImageProvider().GenerateAsync(endpoint, workflow, prompt, message => { progress = message; reportProgress?.Invoke(message); }, cancellationToken, sourceImageName, sourceImage);
         return new(ProtocolVersion, request.Id, true, new
         {
             prompt,

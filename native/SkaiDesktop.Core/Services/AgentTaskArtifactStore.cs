@@ -243,6 +243,20 @@ public sealed class AgentTaskArtifactStore
         return Copy(task);
     }
 
+    public AgentTaskArtifact AttachVerificationEvidence(string id, ProjectCheckEvidence evidence)
+    {
+        ArgumentNullException.ThrowIfNull(evidence);
+        var tasks = Load().ToList();
+        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+        if (task.Status is not (AgentTaskStatuses.Verifying or AgentTaskStatuses.Completed or AgentTaskStatuses.Failed))
+            throw new InvalidOperationException("Verification evidence can only be attached after agent work has produced a reviewable result.");
+        if (evidence.Output.Length > 120_000) throw new ArgumentException("Verification output exceeds the safety limit.", nameof(evidence));
+        task.VerificationEvidence = evidence with { Output = evidence.Output.Trim() };
+        task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        Save(tasks);
+        return Copy(task);
+    }
+
     public AgentTaskArtifact Fail(string id, string resultSummary) => Finish(id, AgentTaskStatuses.Failed, resultSummary, null);
 
     public AgentTaskArtifact Cancel(string id, string resultSummary) => Finish(id, AgentTaskStatuses.Cancelled, resultSummary, null);
@@ -305,6 +319,11 @@ public sealed class AgentTaskArtifactStore
             NormalizeOptional(task.ProjectId, 128, "project ID");
             NormalizeOptional(task.ConversationId, 128, "conversation ID");
             NormalizeIds(task.DependsOn);
+            if (task.VerificationEvidence is { } evidence)
+            {
+                if (evidence.CheckId.Length > 128 || evidence.CheckLabel.Length > 200 || evidence.Command.Length > 2_000 || evidence.RelativeWorkingDirectory.Length > 512 || evidence.Source.Length > 200 || evidence.Output.Length > 120_000 || evidence.Output.Any(char.IsControl) && evidence.Output.Any(character => character is not ('\r' or '\n' or '\t')))
+                    throw new InvalidDataException("The task verification evidence exceeds its safety limit.");
+            }
             if (task.DependsOn.Any(id => !ids.Contains(id)) || task.DependsOn.Contains(task.Id, StringComparer.Ordinal)) throw new InvalidDataException("The agent task store contains an invalid dependency.");
             if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Running or AgentTaskStatuses.Verifying or AgentTaskStatuses.Completed or AgentTaskStatuses.Failed or AgentTaskStatuses.Cancelled or AgentTaskStatuses.Blocked)) throw new InvalidDataException("The agent task store contains an invalid status.");
             if (task.ResultSummary is not null) Normalize(task.ResultSummary, MaxResultCharacters, "task result");
@@ -366,6 +385,7 @@ public sealed class AgentTaskArtifactStore
         ResultSummary = source.ResultSummary,
         ArtifactLabels = source.ArtifactLabels.ToList(),
         ChangedFiles = source.ChangedFiles.ToList(),
+        VerificationEvidence = source.VerificationEvidence,
         WorktreePath = source.WorktreePath,
         WorktreeBranch = source.WorktreeBranch,
         WorktreeRepositoryRoot = source.WorktreeRepositoryRoot,

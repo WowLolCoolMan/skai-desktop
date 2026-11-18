@@ -467,6 +467,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const pullModel = async (modelId: string, onProgress: (message: string) => void): Promise<boolean> => { if (!isLocalEndpoint(endpoint) || provider !== "Ollama") { setError("Model downloads are currently available only through a local Ollama endpoint."); return false; } const started = await request("models.pull.start", { endpoint, model: modelId }); if (!started.ok) { setError(started.error?.message ?? "Local model download could not start."); return false; } const operationId = (started.result as { id?: string }).id; if (!operationId) { setError("Local model download did not return an operation ID."); return false; } activeModelPullId.current = operationId; for (let attempt = 0; attempt < 600; attempt += 1) { await new Promise((resolve) => window.setTimeout(resolve, 500)); const status = await request("models.pull.status", { id: operationId }); if (!status.ok) { setError(status.error?.message ?? "Local model download status was unavailable."); activeModelPullId.current = null; return false; } const result = status.result as { status: string; progress?: string[]; error?: string }; for (const message of result.progress ?? []) onProgress(message); if (result.status === "completed") { setError(null); activeModelPullId.current = null; return true; } if (result.status === "failed" || result.status === "cancelled") { setError(result.error ?? "Local model download did not complete."); activeModelPullId.current = null; return false; } } setError("Local model download timed out; the local operation may still be running."); return false; };
   const cancelModelPull = async (): Promise<boolean> => { const id = activeModelPullId.current; if (!id) return false; const response = await request("models.pull.cancel", { id }); if (!response.ok) { setError(response.error?.message ?? "Local model cancellation failed."); return false; } setError(null); return true; };
   const saveSettings = async () => { const selectedProvider = localProviderOrFallback(provider); if (!isLocalEndpoint(endpoint)) { setError(LOCAL_ENDPOINT_ERROR); return false; } const response = await request("settings.save", { provider: selectedProvider, endpoint, model, ollamaContextWindowTokens, localRamBudgetBytes, localGpuBudgetBytes, themeMode, accentColor, interfaceDensity: density, backdropPreset: backdrop, reduceMotion, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled }); if (!response.ok) { setError(response.error?.message ?? "Workspace settings could not be saved."); return false; } setProvider(selectedProvider); localStorage.setItem("skai.provider", selectedProvider); localStorage.setItem("skai.endpoint", endpoint); localStorage.setItem("skai.model", model); localStorage.setItem("skai.themeMode", themeMode); localStorage.setItem("skai.accentColor", accentColor); localStorage.setItem("skai.density", density); localStorage.setItem("skai.backdrop", backdrop); localStorage.setItem("skai.reduceMotion", String(reduceMotion)); localStorage.setItem("skai.smartPromptRewriting", String(smartPromptRewritingEnabled)); localStorage.setItem("skai.imageEndpoint", imageEndpoint); localStorage.setItem("skai.imageWorkflow", imageWorkflow); localStorage.setItem("skai.imageProvider", imageProvider); setError(null); return true; };
+  const activeImageGenerationId = useRef<string | null>(null);
   const generateImage = async (source?: import("../../shared/contracts").ChatAttachment) => {
     if (imageProvider === "comfyui" && !isLocalEndpoint(imageEndpoint)) { setError(LOCAL_ENDPOINT_ERROR); return; }
     setImageBusy(true);
@@ -475,9 +476,21 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     localStorage.setItem("skai.imageProvider", imageProvider);
     localStorage.setItem("skai.imageWorkflow", imageWorkflow); localStorage.setItem("skai.imageProvider", imageProvider);
     try {
-      const response = await request("image.generate", { provider: imageProvider, ...(imageProvider === "comfyui" ? { endpoint: imageEndpoint, workflow: imageWorkflow } : {}), ...(source ? { sourceImage: source.content, sourceImageMediaType: source.mediaType } : {}), prompt: imagePrompt });
-      if (!response.ok) { setError(response.error?.message ?? "Image generation failed."); return; }
-      const result = response.result as { images?: Array<{ url: string; fileName: string }> };
+      const started = await request("image.generate.start", { provider: imageProvider, ...(imageProvider === "comfyui" ? { endpoint: imageEndpoint, workflow: imageWorkflow } : {}), ...(source ? { sourceImage: source.content, sourceImageMediaType: source.mediaType } : {}), prompt: imagePrompt });
+      if (!started.ok) { setError(started.error?.message ?? "Image generation failed to start."); return; }
+      const operationId = (started.result as { id?: string }).id;
+      if (!operationId) { setError("Image generation did not return an operation ID."); return; }
+      activeImageGenerationId.current = operationId;
+      let result: { status: string; images?: Array<{ url: string; fileName: string }>; error?: string } = { status: "running" };
+      for (let attempt = 0; attempt < 1800 && result.status === "running"; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        const status = await request("image.generate.status", { id: operationId });
+        if (!status.ok) { setError(status.error?.message ?? "Image generation status was unavailable."); return; }
+        result = status.result as typeof result;
+      }
+      if (result.status === "cancelled") { setError("Image generation cancelled."); return; }
+      if (result.status === "failed") { setError(result.error ?? "Image generation failed."); return; }
+      if (result.status !== "completed") { setError("Image generation timed out; the local operation may still be running."); return; }
       const createdAt = new Date().toISOString();
       const imageSource = imageProvider === "comfyui" ? "comfyui" : "diffusers";
       const images: ImageHistoryEntry[] = (result.images ?? []).map((image) => ({ ...image, createdAt, provider: imageSource, prompt: imagePrompt.trim() }));
@@ -486,12 +499,21 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     } catch (error) {
       setError(error instanceof Error ? error.message : "Image generation failed.");
     } finally {
+      activeImageGenerationId.current = null;
       setImageBusy(false);
     }
   };
+  const cancelImageGeneration = async (): Promise<boolean> => {
+    const id = activeImageGenerationId.current;
+    if (!id) return false;
+    const response = await request("image.generate.cancel", { id });
+    if (!response.ok) { setError(response.error?.message ?? "Image generation cancellation failed."); return false; }
+    activeImageGenerationId.current = null;
+    return true;
+  };
   const pickImageSource = async () => { const response = await request("workspace.pickFiles"); if (!response.ok) throw new Error(response.error?.message ?? "Image selection failed."); const attachments = (response.result as { attachments?: import("../../shared/contracts").ChatAttachment[] }).attachments ?? []; const source = attachments.find((item) => item.mediaType === "image/png" || item.mediaType === "image/jpeg"); if (!source) return null; return source; };
   const importImageWorkflow = async () => { const response = await request("workspace.pickFiles"); if (!response.ok) throw new Error(response.error?.message ?? "A local workflow file could not be selected."); const attachments = (response.result as { attachments?: Array<{ fileName: string; content: string }> }).attachments ?? []; const workflowFile = attachments.find((attachment) => /\.(json|json5)$/i.test(attachment.fileName)); if (!workflowFile) throw new Error("Choose a ComfyUI API workflow file (.json or .json5)."); let parsed: unknown; try { parsed = JSON.parse(workflowFile.content); } catch { throw new Error("The selected workflow is not valid JSON."); } if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("The selected workflow must be a JSON object."); return { name: workflowFile.fileName.replace(/\.(json|json5)$/i, ""), workflow: JSON.stringify(parsed, null, 2) }; };
-  const routeState: AppRouteState = { route: route === "settings" ? settingsReturnRoute : route, workspaceTabId: activeWorkspaceTabId, conversations: chat.conversations, provider, model, responseMode: chat.responseMode, capacity, models, ollamaContextWindowTokens, localRamBudgetBytes, localGpuBudgetBytes, endpoint, messages: chat.messages, busy: chat.busy, attachments: chat.attachments, queuedMessages: chat.queuedMessages, conversationId: chat.conversationId, conversationTitle: chat.activeConversation?.title ?? "New chat", pinned: chat.activeConversation?.pinned ?? false, archived: chat.activeConversation?.archived ?? false, projects: coding.projects, selectedProject: coding.selectedProject, projectFiles: coding.projectFiles, selectedFile: coding.selectedFile, filePreview: coding.filePreview, filePreviewError: coding.filePreviewError, fileDraft: coding.fileDraft, fileOriginal: coding.fileOriginal, fileSummary: coding.fileSummary, fileBusy: coding.fileBusy, fileUndoAvailable: coding.fileUndoAvailable, terminalBusy: coding.terminalBusy, terminalOutput: coding.terminalOutput, terminalExitCode: coding.terminalExitCode, gitStatus: coding.gitStatus, gitBusy: coding.gitBusy, gitDiff: coding.gitDiff, gitDiffBusy: coding.gitDiffBusy, gitCommitBusy: coding.gitCommitBusy, gitPullRequestBusy: coding.gitPullRequestBusy, themeMode, accentColor, density, backdrop, reduceMotion, petVisible, petWander, petInteractionDemo, petCharacter, petSpriteDataUrl, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled, imageProvider, imageEndpoint, imagePrompt, imageWorkflow, imageBusy, generatedImages, tasks, scheduledTasks, taskBusy, tasksLoading, tasksError, memoryEntries, memoryBusy, memoryLoading, memoryError, corpusDocuments, corpusLoading, corpusError };
+  const routeState: AppRouteState = { route: route === "settings" ? settingsReturnRoute : route, workspaceTabId: activeWorkspaceTabId, conversations: chat.conversations, provider, model, responseMode: chat.responseMode, capacity, models, ollamaContextWindowTokens, localRamBudgetBytes, localGpuBudgetBytes, endpoint, messages: chat.messages, busy: chat.busy, attachments: chat.attachments, queuedMessages: chat.queuedMessages, conversationId: chat.conversationId, conversationTitle: chat.activeConversation?.title ?? "New chat", pinned: chat.activeConversation?.pinned ?? false, archived: chat.activeConversation?.archived ?? false, projects: coding.projects, selectedProject: coding.selectedProject, projectFiles: coding.projectFiles, selectedFile: coding.selectedFile, filePreview: coding.filePreview, filePreviewError: coding.filePreviewError, fileDraft: coding.fileDraft, fileOriginal: coding.fileOriginal, fileSummary: coding.fileSummary, fileBusy: coding.fileBusy, fileUndoAvailable: coding.fileUndoAvailable, terminalBusy: coding.terminalBusy, terminalOutput: coding.terminalOutput, terminalExitCode: coding.terminalExitCode, gitStatus: coding.gitStatus, gitBusy: coding.gitBusy, gitDiff: coding.gitDiff, gitDiffBusy: coding.gitDiffBusy, gitCommitBusy: coding.gitCommitBusy, gitPullRequestBusy: coding.gitPullRequestBusy, projectChecks: coding.projectChecks, projectChecksBusy: coding.projectChecksBusy, projectCheckBusy: coding.projectCheckBusy, themeMode, accentColor, density, backdrop, reduceMotion, petVisible, petWander, petInteractionDemo, petCharacter, petSpriteDataUrl, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled, imageProvider, imageEndpoint, imagePrompt, imageWorkflow, imageBusy, generatedImages, tasks, scheduledTasks, taskBusy, tasksLoading, tasksError, memoryEntries, memoryBusy, memoryLoading, memoryError, corpusDocuments, corpusLoading, corpusError };
   const selectModel = (nextModel: Model) => {
     const selectedProvider = nextModel.provider === "AirLLM" ? "AirLLM" : nextModel.provider === "LM Studio" ? "LM Studio" : nextModel.provider === "Ollama" ? "Ollama" : "Local API";
     setModel(nextModel.model);
@@ -510,11 +532,14 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   routeActions.onCancelModelPull = cancelModelPull;
   routeActions.onPushGitChanges = coding.pushGitChanges;
   routeActions.onCreateGitPullRequest = coding.createGitPullRequest;
+  routeActions.onLoadProjectChecks = coding.loadProjectChecks;
+  routeActions.onRunProjectCheck = async (projectId, taskId, checkId) => { const result = await coding.runProjectCheck(projectId, taskId, checkId); await loadTaskState(false); return result; };
   routeActions.onStartTerminalSession = coding.startTerminalSession;
   routeActions.onWriteTerminalSession = coding.writeTerminalSession;
   routeActions.onRefreshTerminalSession = coding.refreshTerminalSession;
   routeActions.onCloseTerminalSession = coding.closeTerminalSession;
   routeActions.onDiscoverModels = discoverModels;
   routeActions.onImportWorkflow = importImageWorkflow;
+  routeActions.onCancelImageGeneration = cancelImageGeneration;
   return { routeState, routeActions, route, settingsReturnRoute, workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, selectWorkspaceTab, closeWorkspaceTab, restoreWorkspaceTab, connection, health, error, dismissError, retryConnection, conversations: chat.conversations, agentMode, setAgentMode, conversationQuery, setConversationQuery, sidebarCollapsed, sidebarWidth, toggleSidebar, resizeSidebar, commandOpen, openCommandPalette, closeCommandPalette, startNewChat, selectConversation, updateConversationMetadata: (id, patch) => chat.updateConversationMetadata(patch, id), onNavigate, canGoBack: navigation.index > 0, canGoForward: navigation.index < navigation.length - 1, goBack, goForward, petVisible, petWander, petInteractionDemo, setPetVisible, setPetWander };
 }

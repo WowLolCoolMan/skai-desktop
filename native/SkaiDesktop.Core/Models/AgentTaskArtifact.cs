@@ -35,6 +35,7 @@ public sealed class AgentTaskArtifact
     public string? ResultSummary { get; set; }
     public List<string> ArtifactLabels { get; set; } = [];
     public List<string> ChangedFiles { get; set; } = [];
+    public ProjectCheckEvidence? VerificationEvidence { get; set; }
     public string? WorktreePath { get; set; }
     public string? WorktreeBranch { get; set; }
     public string? WorktreeRepositoryRoot { get; set; }

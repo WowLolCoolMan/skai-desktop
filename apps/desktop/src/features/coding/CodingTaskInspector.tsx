@@ -1,12 +1,19 @@
-import type { DesktopTask, DesktopGitStatus } from "../../../shared/contracts";
+import { useEffect, useState } from "react";
+import type { DesktopProjectCheck, DesktopTask, DesktopGitStatus } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";
 
 type CodingTaskInspectorProps = {
+  projectId: string;
   tasks: DesktopTask[];
+  projectChecks: DesktopProjectCheck[];
+  projectChecksBusy: boolean;
+  projectCheckBusy: boolean;
   gitStatus: DesktopGitStatus | null;
   gitDiffReady: boolean;
   gitDiffBusy: boolean;
   onReviewChanges: (paths?: string[]) => void;
+  onLoadProjectChecks: (projectId?: string) => void;
+  onRunProjectCheck: (projectId: string, taskId: string, checkId: string) => Promise<unknown>;
 };
 
 function statusLabel(status: string) {
@@ -34,11 +41,20 @@ function statusTone(status: string) {
   return "complete";
 }
 
-export function CodingTaskInspector({ tasks, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges }: CodingTaskInspectorProps) {
+export function CodingTaskInspector({ projectId, tasks, projectChecks, projectChecksBusy, projectCheckBusy, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges, onLoadProjectChecks, onRunProjectCheck }: CodingTaskInspectorProps) {
   const recentTasks = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [selectedCheckId, setSelectedCheckId] = useState("");
   const changedPaths = gitStatus?.changes.map((change) => change.path) ?? [];
   const attentionCount = tasks.filter((task) => task.status === "failed" || task.status === "blocked").length;
   const activeCount = tasks.filter((task) => task.status === "running" || task.status === "verifying").length;
+
+  useEffect(() => {
+    if (!selectedTaskId || !tasks.some((task) => task.id === selectedTaskId)) setSelectedTaskId(recentTasks[0]?.id ?? "");
+  }, [recentTasks, selectedTaskId, tasks]);
+  useEffect(() => {
+    if (!selectedCheckId || !projectChecks.some((check) => check.id === selectedCheckId)) setSelectedCheckId(projectChecks[0]?.id ?? "");
+  }, [projectChecks, selectedCheckId]);
 
   return <Card className="coding-task-inspector" aria-label="Project task and changes inspector">
     <div className="coding-task-inspector-heading">
@@ -65,6 +81,16 @@ export function CodingTaskInspector({ tasks, gitStatus, gitDiffReady, gitDiffBus
         {task.requiresApproval && <small className="coding-task-approval">This task required approval before execution.</small>}
         <time dateTime={task.updatedAt}>Updated {Number.isNaN(Date.parse(task.updatedAt)) ? "recently" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(task.updatedAt))}</time>
       </article>)}</div> : <EmptyState title="No task activity" description="Coding runs and their results will remain visible here beside the thread." />}
+    </section>
+    <section className="coding-task-inspector-section" aria-label="Project verification checks">
+      <div className="coding-task-inspector-section-heading"><div><p className="section-kicker">VERIFICATION EVIDENCE</p><strong>Run a detected project check</strong></div><span>{projectChecks.length}</span></div>
+      <p>Checks are discovered from the project files and only run when you explicitly choose one. Preflight never executes them.</p>
+      <div className="coding-verification-controls">
+        <label><span>Task</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)} disabled={!tasks.length}><option value="">Select task</option>{recentTasks.map((task) => <option value={task.id} key={task.id}>{task.title}</option>)}</select></label>
+        <label><span>Check</span><select value={selectedCheckId} onChange={(event) => setSelectedCheckId(event.target.value)} disabled={!projectChecks.length}><option value="">Select check</option>{projectChecks.map((check) => <option value={check.id} key={check.id}>{check.label} · {check.command}</option>)}</select></label>
+      </div>
+      <div className="coding-verification-actions"><Button variant="ghost" disabled={projectChecksBusy} onClick={() => onLoadProjectChecks(projectId)}>{projectChecksBusy ? "Detecting…" : "Refresh checks"}</Button><Button variant="primary" disabled={projectCheckBusy || !selectedTaskId || !selectedCheckId} onClick={() => void onRunProjectCheck(projectId, selectedTaskId, selectedCheckId)}>{projectCheckBusy ? "Running check…" : "Run selected check"}</Button></div>
+      {recentTasks.some((task) => task.verificationEvidence) ? <div className="coding-verification-results">{recentTasks.filter((task) => task.verificationEvidence).map((task) => { const evidence = task.verificationEvidence; if (!evidence) return null; return <article className="coding-verification-result" key={`${task.id}-${evidence.completedAtUtc}`}><div className="coding-task-item-heading"><strong>{task.title}</strong><span className={`coding-task-status-pill is-${evidence.exitCode === 0 && !evidence.timedOut ? "complete" : "attention"}`}>{evidence.timedOut ? "Timed out" : `Exit ${evidence.exitCode}`}</span></div><small>{evidence.checkLabel} · {new Date(evidence.completedAtUtc).toLocaleString()} · {evidence.source}</small><pre tabIndex={0}>{evidence.output || "(no output)"}</pre></article>; })}</div> : <EmptyState title="No verification evidence yet" description="Select a detected check and run it when you are ready to validate the task." />}
     </section>
   </Card>;
 }

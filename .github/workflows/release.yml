@@ -33,6 +33,7 @@ jobs:
       - run: npm run audit:electron-runtime
       - run: npm run audit:electron-tray
       - run: npm run audit:local-only
+      - run: npm run check:release-readiness
       - run: npm test
       - run: npm run agent-host:build
 
@@ -89,6 +90,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: npm run smoke:electron:accessibility
+      - name: Run local voice acceptance contract
+        run: npm run smoke:voice:acceptance
       - name: Smoke-test exact packaged Electron artifact on Linux
         if: runner.os == 'Linux'
         shell: bash

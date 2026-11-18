@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
+import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
 import type { Route } from "../../app/types";
 import type { AgentRequest } from "../../services/agentClient";
 import { loadProjectEditorDraft, removeProjectEditorDraft, saveProjectEditorDraft } from "./projectEditorDraftStore";
@@ -37,6 +37,9 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   const [gitCommitBusy, setGitCommitBusy] = useState(false);
   const [gitPushBusy, setGitPushBusy] = useState(false);
   const [gitPullRequestBusy, setGitPullRequestBusy] = useState(false);
+  const [projectChecks, setProjectChecks] = useState<DesktopProjectCheck[]>([]);
+  const [projectChecksBusy, setProjectChecksBusy] = useState(false);
+  const [projectCheckBusy, setProjectCheckBusy] = useState(false);
   const fileReadRequestId = useRef(0);
   const localFileDrafts = useRef(new Map<string, string>());
   const fileDraftSaveTimer = useRef<number | null>(null);
@@ -118,9 +121,29 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     const result = response.result as { files: DesktopProjectFile[]; protectedFilesSkipped: number; hitEntryLimit: boolean };
     setProjectFiles(result.files ?? []);
     setSelectedProject(project);
+    void loadProjectChecks(project.id);
     setFileSummary(`${result.files.length} readable files · ${result.protectedFilesSkipped} protected names hidden${result.hitEntryLimit ? " · entry limit reached" : ""}`);
     await refreshGitStatus(project.id);
     if (navigateToProject) onNavigate("coding");
+  };
+
+  const loadProjectChecks = async (projectId = selectedProject?.id) => {
+    if (!projectId || projectChecksBusy) return;
+    setProjectChecksBusy(true);
+    const response = await request("project.checks.list", { id: projectId });
+    setProjectChecksBusy(false);
+    if (!response.ok) { setProjectChecks([]); onError(response.error?.message ?? "Project checks could not be detected."); return; }
+    setProjectChecks((response.result as { checks?: DesktopProjectCheck[] }).checks ?? []);
+  };
+
+  const runProjectCheck = async (projectId: string, taskId: string, checkId: string) => {
+    if (projectCheckBusy) return;
+    setProjectCheckBusy(true);
+    const response = await request("project.check.run", { projectId, taskId, checkId });
+    setProjectCheckBusy(false);
+    if (!response.ok) { onError(response.error?.message ?? "The selected project check failed to run."); return null; }
+    onError(null);
+    return response.result;
   };
 
   const refreshGitStatus = async (projectId = selectedProject?.id) => {
@@ -286,5 +309,5 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setTerminalSessionId(null); setTerminalScreen(null); setTerminalExitCode(null); return true;
   };
 
-  return { projects, projectsLoaded, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest };
+  return { projects, projectsLoaded, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest, loadProjectChecks, runProjectCheck };
 }

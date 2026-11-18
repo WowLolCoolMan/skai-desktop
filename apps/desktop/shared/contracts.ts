@@ -176,7 +176,6 @@ export type DesktopPersona = {
   verifiedQuotes: DesktopPersonaQuote[];
   sources: DesktopPersonaSource[];
   profileEvidenceUrls?: string[];
-  excludedResearchUrls?: string[];
   updatedAtUtc: string;
 };
 
@@ -200,8 +199,29 @@ export type DesktopTask = {
   artifactLabels?: string[];
   requiresApproval?: boolean;
   activity?: Array<{ sequence: number; type: string; actor: string; timestamp: string; payload: Record<string, string> }>;
+  verificationEvidence?: {
+    checkId: string;
+    checkLabel: string;
+    command: string;
+    relativeWorkingDirectory: string;
+    source: string;
+    exitCode: number;
+    output: string;
+    timedOut: boolean;
+    outputTruncated: boolean;
+    startedAtUtc: string;
+    completedAtUtc: string;
+  } | null;
   dependsOn: string[];
   updatedAt: string;
+};
+
+export type DesktopProjectCheck = {
+  id: string;
+  label: string;
+  command: string;
+  relativeWorkingDirectory: string;
+  source: string;
 };
 
 export type TaskEnvironment = "local" | "worktree";
