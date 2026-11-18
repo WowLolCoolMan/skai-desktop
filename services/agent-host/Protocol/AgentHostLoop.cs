@@ -3186,6 +3186,12 @@ public static class AgentHostLoop
             parameters["personaId"] = JsonSerializer.SerializeToElement(persona.Id, JsonOptions);
             parameters["suppressProgressiveResearch"] = JsonSerializer.SerializeToElement(true, JsonOptions);
             parameters["suppressPersonaContinuity"] = JsonSerializer.SerializeToElement(true, JsonOptions);
+            // A group turn is a single user action, so each persona gets a
+            // bounded, compact generation budget. The previous default of
+            // 285 seconds per child allowed two sequential generations to
+            // outlive the desktop request and left the thread looking empty.
+            parameters["timeoutSeconds"] = JsonSerializer.SerializeToElement(90, JsonOptions);
+            parameters["maxTokens"] = JsonSerializer.SerializeToElement(512, JsonOptions);
             parameters["messages"] = JsonSerializer.SerializeToElement(sharedMessages, JsonOptions);
             var child = new AgentRequest(ProtocolVersion, $"{request.Id}-{persona.Id}", "chat.complete", JsonSerializer.SerializeToElement(parameters, JsonOptions));
             var response = await CompleteChatAsync(child).ConfigureAwait(false);
