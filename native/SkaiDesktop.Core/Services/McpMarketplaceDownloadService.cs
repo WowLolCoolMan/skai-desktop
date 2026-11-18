@@ -11,7 +11,9 @@ public sealed record McpMarketplaceDownload(string Id, string Name, string Versi
 public sealed class McpMarketplaceDownloadService
 {
     private const string Package = "rea-agents";
-    private const string Version = "6.9.0";
+    // REA 6.7 supports the Node 24.20 runtime shipped on current Skai machines.
+    // Later releases require Node 24.22.1+ and exit before starting MCP.
+    private const string Version = "6.7.0";
     private const int MaxPackageBytes = 128 * 1024 * 1024;
     private static readonly HttpClient Http = CreateHttp();
 

@@ -8,9 +8,23 @@ internal static class McpStdioClientTests
 {
     public static async Task RunAsync()
     {
+        var largeToolCatalog = JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 2,
+            result = new
+            {
+                tools = new object[]
+                {
+                    new { name = "list-files", description = "Lists files.", inputSchema = new { type = "object" }, annotations = new { readOnlyHint = true } },
+                    new { name = "delete-file", description = "Deletes a file.", inputSchema = new { type = "object" } },
+                    new { name = "large-schema-tool", description = new string('x', 300_000), inputSchema = new { type = "object" }, annotations = new { readOnlyHint = true } },
+                },
+            },
+        });
         var responses = string.Join("\n", [
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\"}}",
-            "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"list-files\",\"description\":\"Lists files.\",\"inputSchema\":{\"type\":\"object\"},\"annotations\":{\"readOnlyHint\":true}},{\"name\":\"delete-file\",\"description\":\"Deletes a file.\",\"inputSchema\":{\"type\":\"object\"}}]}}",
+            largeToolCatalog,
             "{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"safe result\"}]}}"
         ]) + "\n";
         await using var input = new MemoryStream(Encoding.UTF8.GetBytes(responses));
@@ -21,7 +35,7 @@ internal static class McpStdioClientTests
         await using var client = new McpStdioClient("test-server", input, output, null, registry);
         await client.InitializeAsync();
         var tools = await client.ListToolsAsync();
-        Check(tools.Count == 2 && !tools[0].IsMutating && tools[1].IsMutating, "MCP stdio client classifies bounded tool annotations conservatively");
+        Check(tools.Count == 3 && !tools[0].IsMutating && tools[1].IsMutating && !tools[2].IsMutating, "MCP stdio client accepts large catalogs and classifies tool annotations conservatively");
         using var arguments = JsonDocument.Parse("{}");
         var result = await client.CallToolAsync(tools[0], new McpToolGrant
         {

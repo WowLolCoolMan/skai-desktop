@@ -8,7 +8,7 @@ namespace SkaiDesktop.Core.Services;
 /// <summary>Supervises REA's pinned npm MCP process over the existing bounded stdio protocol.</summary>
 public sealed class McpReaProcessClient : IMcpClient
 {
-    public const string PackageVersion = "6.9.0";
+    public const string PackageVersion = "6.7.0";
     private readonly Process _process;
     private readonly McpStdioClient _client;
     private readonly StringBuilder _diagnostics = new();
@@ -61,9 +61,13 @@ public sealed class McpReaProcessClient : IMcpClient
         return new McpReaProcessClient(process, registry);
     }
 
-    public Task InitializeAsync(CancellationToken cancellationToken = default) => _client.InitializeAsync(cancellationToken);
-    public Task<IReadOnlyList<McpToolDescriptor>> ListToolsAsync(CancellationToken cancellationToken = default) => _client.ListToolsAsync(cancellationToken);
-    public Task<McpToolCallResult> CallToolAsync(McpToolDescriptor descriptor, McpToolGrant grant, JsonElement arguments, CancellationToken cancellationToken = default) => _client.CallToolAsync(descriptor, grant, arguments, cancellationToken);
+    public Task InitializeAsync(CancellationToken cancellationToken = default) => RunWithDiagnosticsAsync(() => _client.InitializeAsync(cancellationToken));
+
+    public Task<IReadOnlyList<McpToolDescriptor>> ListToolsAsync(CancellationToken cancellationToken = default) =>
+        RunWithDiagnosticsAsync(() => _client.ListToolsAsync(cancellationToken));
+
+    public Task<McpToolCallResult> CallToolAsync(McpToolDescriptor descriptor, McpToolGrant grant, JsonElement arguments, CancellationToken cancellationToken = default) =>
+        RunWithDiagnosticsAsync(() => _client.CallToolAsync(descriptor, grant, arguments, cancellationToken));
 
     public async ValueTask DisposeAsync()
     {
@@ -95,5 +99,26 @@ public sealed class McpReaProcessClient : IMcpClient
             }
             _diagnostics.AppendLine(line);
         }
+    }
+
+    private async Task RunWithDiagnosticsAsync(Func<Task> operation)
+    {
+        try { await operation().ConfigureAwait(false); }
+        catch (Exception error) { throw WithDiagnostics(error); }
+    }
+
+    private async Task<T> RunWithDiagnosticsAsync<T>(Func<Task<T>> operation)
+    {
+        try { return await operation().ConfigureAwait(false); }
+        catch (Exception error) { throw WithDiagnostics(error); }
+    }
+
+    private Exception WithDiagnostics(Exception error)
+    {
+        string diagnostics;
+        lock (_diagnosticsGate) diagnostics = _diagnostics.ToString().Trim();
+        if (string.IsNullOrWhiteSpace(diagnostics)) return error;
+        var state = _process.HasExited ? $" (process exited with code {_process.ExitCode})" : string.Empty;
+        return new InvalidOperationException($"REA MCP failed{state}: {diagnostics}", error);
     }
 }
