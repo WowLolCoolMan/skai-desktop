@@ -2656,6 +2656,7 @@ public static class AgentHostLoop
         // verify it immediately. The deeper research step still discovers and
         // fetches a broader evidence set after they confirm the match.
         IReadOnlyList<WebSearchResult> results = directMatches;
+        var needsIdentityConfirmation = false;
         var discoveryTerms = subjectType == "character" ? "fictional character franchise canon" : "real person biography profile";
         var subjectName = PersonaNameWithoutHonorifics(query);
         var queryVariants = new[]
@@ -2674,12 +2675,20 @@ public static class AgentHostLoop
                     catch (OperationCanceledException) when (timeout.IsCancellationRequested) { throw; }
                     catch { return Array.Empty<WebSearchResult>(); }
                 })).ConfigureAwait(false);
-                results = batches.SelectMany(batch => batch)
-                    .Where(result => ContainsPersonaName(query, $"{result.Title} {result.Snippet}"))
+                var candidates = batches.SelectMany(batch => batch)
                     .GroupBy(result => result.Url, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group.First())
-                    .Take(8)
                     .ToArray();
+                var exactMatches = candidates.Where(result => ContainsPersonaName(query, $"{result.Title} {result.Snippet}")).ToArray();
+                if (exactMatches.Length > 0) results = exactMatches.Take(8).ToArray();
+                else
+                {
+                    // Do not turn search-engine spelling/alias differences into a dead end.
+                    // These are only suggestions: the UI requires the user to choose one
+                    // before any profile research starts.
+                    results = candidates.Take(8).ToArray();
+                    needsIdentityConfirmation = results.Count > 0;
+                }
             }
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested) { throw new TimeoutException("People search took too long. Try again with a fuller name."); }
@@ -2688,8 +2697,25 @@ public static class AgentHostLoop
             .Select(group => group.First())
             .Take(8)
             .ToArray();
-        var matches = results.Select(result => new { id = result.Url, title = result.Title, snippet = result.Snippet, url = result.Url }).ToArray();
-        return new(ProtocolVersion, request.Id, true, new { query, subjectType, matches });
+        var matches = results.Select(result => new
+        {
+            id = result.Url,
+            title = result.Title,
+            canonicalName = PersonaCandidateName(query, result.Title),
+            snippet = result.Snippet,
+            url = result.Url,
+            needsIdentityConfirmation,
+        }).ToArray();
+        return new(ProtocolVersion, request.Id, true, new { query, subjectType, matches, needsIdentityConfirmation });
+    }
+
+    private static string PersonaCandidateName(string query, string title)
+    {
+        var separator = Regex.Match(title, @"\s+(?:\||—|–|-)\s+");
+        var candidate = (separator.Success ? title[..separator.Index] : title).Trim();
+        return candidate.Length is > 0 and <= 120 && candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 8
+            ? candidate
+            : query;
     }
 
     private static async Task<AgentResponse> ForcePersonaResearchAsync(AgentRequest request)
