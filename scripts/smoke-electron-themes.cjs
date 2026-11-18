@@ -142,8 +142,9 @@ async function main() {
         const name = '"' + (option.label || option.textContent || '').trim() + '"';
         if (background.length === 4 && background[3] < 1) { problems.push('transparent ' + option.tagName.toLowerCase() + ' ' + name); continue; }
         const ratio = contrast(channels(styles.color), background);
-        if (ratio < 4.5) problems.push(name + ' contrast ' + ratio.toFixed(2));
+        if (ratio < 4.5) problems.push(name + ' contrast ' + ratio.toFixed(2) + (problems.length ? '' : ' (color ' + styles.color + ' on ' + styles.backgroundColor + ', select ' + getComputedStyle(option.parentElement).color + ' on ' + getComputedStyle(option.parentElement).backgroundColor + ', scheme ' + styles.colorScheme + ')'));
       }
+      if (problems.length) problems.unshift('forced-colors ' + matchMedia('(forced-colors: active)').matches + ', prefers-contrast ' + matchMedia('(prefers-contrast: more)').matches + ', text token ' + getComputedStyle(document.documentElement).getPropertyValue('--skai-color-text').trim() + ', surface token ' + getComputedStyle(document.documentElement).getPropertyValue('--skai-color-surface').trim());
       return { options: document.querySelectorAll('select option').length, nativeDark: matchMedia('(prefers-color-scheme: dark)').matches, problems };
     })())`, (value) => { try { const probe = JSON.parse(value); return theme === "system" || probe.nativeDark === (theme === "dark"); } catch { return false; } }, `${theme} native color scheme`).catch(() => null);
     if (!popups) throw new Error(`The native color scheme did not follow the ${theme} theme (nativeTheme.themeSource is out of sync).`);
