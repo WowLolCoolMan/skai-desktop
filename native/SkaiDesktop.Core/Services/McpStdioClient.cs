@@ -8,7 +8,10 @@ namespace SkaiDesktop.Core.Services;
 /// <summary>Small bounded MCP JSON-RPC client for a supervised stdio transport.</summary>
 public sealed class McpStdioClient : IMcpClient
 {
-    private const int MaxMessageCharacters = 256 * 1024;
+    // REA publishes complete JSON Schemas for its tools. Its initial tools/list
+    // response is several megabytes even though the actual tool arguments stay
+    // small. Keep a bounded line limit, but do not reject a valid catalog.
+    private const int MaxMessageCharacters = 8 * 1024 * 1024;
     private const int MaxArgumentsCharacters = 32 * 1024;
     private const int MaxResultCharacters = 1 * 1024 * 1024;
     private readonly string _serverId;

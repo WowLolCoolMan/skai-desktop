@@ -911,11 +911,11 @@ export function PluginsPage({
                       {selected.id === "tool:rea" ? (
                         <div className="plugins-detail-note">
                           <strong>
-                            Verified local MCP package · version 6.9.0
+                            Verified local MCP package · version 6.7.0
                           </strong>
                           <span>
-                            Published by morluto. Requires Node.js 22.23.4+,
-                            24.22.1+, or 26.12.1+. Download verifies the pinned
+                            Published by morluto. Requires Node.js 22.19.0+,
+                            24.11.0+, or 26.0.0+. Download verifies the pinned
                             npm SHA-512 digest. Connecting runs the reviewed REA
                             stdio profile; tool calls remain governed by Skai
                             approval.
