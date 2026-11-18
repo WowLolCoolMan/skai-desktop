@@ -677,7 +677,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .workbench-recovery-actions .ui-button { padding: 7px 9px; font-size: var(--skai-text-xs); }
 .ui-empty-icon .nav-icon { width: 18px; height: 18px; }
 .coding-page .page-header-coding-session h1 { font-size: calc(var(--skai-text-4xl) * var(--skai-heading-scale)); letter-spacing: -.035em; }
-.coding-session-grid { grid-template-columns: minmax(280px, .8fr) minmax(390px, 1.15fr) minmax(240px, .55fr); }
+.coding-session-grid { grid-template-columns: minmax(360px, .9fr) minmax(420px, 1.4fr) minmax(260px, .55fr); }
 .project-thread-panel { display: flex; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-surface); }
 .project-thread-panel > .chat-page { width: 100%; min-width: 0; min-height: 0; flex: 1; border: 0; border-radius: inherit; }
 .project-thread-panel .chat-header { display: none; }
@@ -751,6 +751,32 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .chat-start-recent button { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 9px 11px; }
 .chat-start-recent button > span { overflow: hidden; font-size: var(--skai-text-sm); text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 540px) { .chat-start-actions { grid-template-columns: 1fr; } .chat-start-recent button { grid-template-columns: 1fr; } }
+
+/* Keep the embedded coding thread's transcript, task planner, and composer in
+   separate rows. The regular chat layout rules assume a taller standalone
+   page, which lets the empty-state content slide underneath the planner here. */
+.project-thread-panel > .chat-page { overflow: hidden; }
+.project-thread-panel .chat-context-bar { flex: 0 0 auto; }
+.project-thread-panel .chat-layout { display: flex; min-height: 0; flex: 1 1 0; overflow: hidden; }
+.project-thread-panel .chat-column { display: flex; min-width: 0; min-height: 0; height: 100%; flex: 1 1 0; flex-direction: column; gap: 8px; overflow: hidden; padding-bottom: 0; }
+.project-thread-panel .conversation-surface { display: flex; width: 100%; height: auto; min-height: 0; flex: 1 1 0; flex-direction: column; overflow: hidden; }
+.project-thread-panel .conversation-surface .chat-empty-surface { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
+.project-thread-panel .chat-task-composer { flex: 0 0 auto; }
+.project-thread-panel .composer-card { position: static; z-index: auto; width: 100%; flex: 0 0 auto; margin: 0; }
+.project-thread-panel .chat-empty-surface { display: flex; align-items: center; justify-content: center; }
+.project-thread-panel .chat-start-screen { justify-items: start; width: 100%; gap: 6px; margin: 0; padding: 16px; text-align: left; }
+.project-thread-panel .chat-start-screen > img, .project-thread-panel .chat-start-screen > .section-kicker, .project-thread-panel .chat-start-actions, .project-thread-panel .chat-start-recent { display: none; }
+.project-thread-panel .chat-start-screen h2 { font-size: calc(var(--skai-text-xl) * var(--skai-heading-scale)); letter-spacing: -.02em; }
+.project-thread-panel .chat-start-screen > p:not(.section-kicker) { font-size: var(--skai-text-sm); }
+.coding-session-grid { container-type: inline-size; }
+@container (max-width: 1280px) {
+  .coding-session-grid { grid-template-columns: minmax(290px, .82fr) minmax(0, 1.18fr); }
+  .coding-session-grid > .coding-task-inspector { grid-column: 1 / -1; max-height: 280px; }
+}
+@container (max-width: 720px) {
+  .coding-session-grid { grid-template-columns: minmax(0, 1fr); }
+  .coding-session-grid > .coding-task-inspector { grid-column: auto; max-height: 340px; }
+}
 .coding-page .page-header-coding-session .page-description { max-width: 620px; font-size: var(--skai-text-sm); }
 .app-content-coding { display: flex; min-height: 0; flex-direction: column; padding-bottom: 24px; overflow: hidden; }
 .app-content-coding .coding-page { display: flex; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
