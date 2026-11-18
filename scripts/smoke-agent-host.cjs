@@ -290,7 +290,8 @@ async function run() {
   if (!approved.ok || approved.result?.status !== "queued") throw new Error("tasks.approve did not release the task to the local queue.");
   const tasks = await request("tasks.list");
   const plannedTask = tasks.result?.find(task => task.id === planned.result.id);
-  if (!tasks.ok || plannedTask?.title !== "Protocol smoke task" || plannedTask.instruction !== "Review the local task workflow." || plannedTask.responseMode !== "security" || !Array.isArray(plannedTask.artifactLabels)) throw new Error("tasks.plan response mode persistence round-trip failed.");
+  const approvalListed = tasks.result?.find(task => task.id === approvalTask.result.id);
+  if (!tasks.ok || plannedTask?.title !== "Protocol smoke task" || plannedTask.instruction !== "Review the local task workflow." || plannedTask.responseMode !== "security" || !Array.isArray(plannedTask.artifactLabels) || approvalListed?.requiresApproval !== true) throw new Error("tasks.list did not preserve the task review metadata.");
   const queued = await request("tasks.queue", { id: planned.result.id });
   if (!queued.ok || queued.result?.status !== "queued") throw new Error("tasks.queue did not queue the local task.");
   const isolatedModelSettings = await request("settings.save", { endpoint: "http://127.0.0.1:1/v1", model: "protocol-smoke-model", provider: "Ollama" });

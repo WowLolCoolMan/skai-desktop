@@ -49,6 +49,16 @@ export type DesktopProject = {
   updatedAt: string;
 };
 
+export type DesktopProjectPreflight = {
+  projectId: string;
+  projectName: string;
+  inspectedAt: string;
+  manifests: string[];
+  runtimes: Array<{ name: string; required: boolean; available: boolean }>;
+  suggestedChecks: string[];
+  executionNote: string;
+};
+
 export type DesktopProjectFile = {
   relativePath: string;
   bytes: number;
@@ -123,12 +133,16 @@ export type DesktopPersonaSource = {
   authorOrPublisher: string;
   publishedDate: string;
   type: string;
+  speakerAttribution?: string;
+  attributedTurnCount?: number;
+  evidenceQuality?: string;
   reliabilityNote: string;
   excerpt: string;
 };
 
 export type DesktopPersonaQuote = { text: string; sourceId: string; attribution: string };
 export type DesktopPersonaResearchPass = { completedAtUtc: string; focus: string; sourcesAdded: number; summary: string };
+export type DesktopPersonaDistillation = { updatedAtUtc: string; focus: string; sourceUrls: string[]; roles: string; speechPatterns: string; personality: string; thinkingStyle: string; interactionStyle: string; values: string; knowledge: string; evidenceBoundaries: string; timeline: string };
 export type DesktopPersona = {
   id: string;
   name: string;
@@ -143,6 +157,11 @@ export type DesktopPersona = {
   voiceProfileId: string;
   voice: string;
   personality: string;
+  thinkingStyle: string;
+  interactionStyle: string;
+  values: string;
+  knowledge: string;
+  evidenceBoundaries: string;
   timeline: string;
   instructions: string;
   sourceMaterial: string;
@@ -152,9 +171,12 @@ export type DesktopPersona = {
   researchPassCount: number;
   lastResearchAtUtc?: string | null;
   lastResearchSummary: string;
+  latestDistillation?: DesktopPersonaDistillation | null;
   researchHistory: DesktopPersonaResearchPass[];
   verifiedQuotes: DesktopPersonaQuote[];
   sources: DesktopPersonaSource[];
+  profileEvidenceUrls?: string[];
+  excludedResearchUrls?: string[];
   updatedAtUtc: string;
 };
 
@@ -176,6 +198,8 @@ export type DesktopTask = {
   status: string;
   resultSummary?: string | null;
   artifactLabels?: string[];
+  requiresApproval?: boolean;
+  activity?: Array<{ sequence: number; type: string; actor: string; timestamp: string; payload: Record<string, string> }>;
   dependsOn: string[];
   updatedAt: string;
 };

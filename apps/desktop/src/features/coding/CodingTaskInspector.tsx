@@ -59,8 +59,11 @@ export function CodingTaskInspector({ tasks, gitStatus, gitDiffReady, gitDiffBus
       <div className="coding-task-inspector-section-heading"><div><p className="section-kicker">THREAD TASKS</p><strong>{tasks.length ? "Recent work" : "No task activity"}</strong></div>{tasks.length > 8 && <span>8+</span>}</div>
       {recentTasks.length ? <div className="coding-task-list">{recentTasks.map((task) => <article className="coding-task-item" key={task.id}>
         <div className="coding-task-item-heading"><strong>{task.title}</strong><span className={`coding-task-status-pill is-${statusTone(task.status)}`}>{statusLabel(task.status)}</span></div>
-        {task.resultSummary && <p>{task.resultSummary}</p>}
-        {task.changedFiles?.length ? <small>{task.changedFiles.length} changed file{task.changedFiles.length === 1 ? "" : "s"}</small> : null}
+        <p className="coding-task-instruction">{task.instruction}</p>
+        {task.resultSummary && <p className="coding-task-result"><strong>Result</strong> {task.resultSummary}</p>}
+        {task.changedFiles?.length ? <details className="coding-task-files"><summary>{task.changedFiles.length} changed file{task.changedFiles.length === 1 ? "" : "s"}</summary><ul>{task.changedFiles.slice(0, 12).map((path) => <li key={path}><code>{path}</code></li>)}</ul>{task.changedFiles.length > 12 && <small>And {task.changedFiles.length - 12} more</small>}</details> : <small>No changed files recorded</small>}
+        {task.requiresApproval && <small className="coding-task-approval">This task required approval before execution.</small>}
+        <time dateTime={task.updatedAt}>Updated {Number.isNaN(Date.parse(task.updatedAt)) ? "recently" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(task.updatedAt))}</time>
       </article>)}</div> : <EmptyState title="No task activity" description="Coding runs and their results will remain visible here beside the thread." />}
     </section>
   </Card>;

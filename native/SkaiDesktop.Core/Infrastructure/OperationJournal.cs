@@ -63,18 +63,23 @@ public sealed class OperationJournal
     }
 
     public OperationRun Create(string workspaceId, string userInstruction, string actor = "user",
-        string modelProvider = "unknown", string model = "unknown", string endpointPrivacy = "unknown")
+        string modelProvider = "unknown", string model = "unknown", string endpointPrivacy = "unknown", string? runId = null)
     {
         if (string.IsNullOrWhiteSpace(workspaceId) || workspaceId.Length > 128 || workspaceId.Any(char.IsControl))
             throw new ArgumentException("Workspace identity is invalid.", nameof(workspaceId));
         if (string.IsNullOrWhiteSpace(userInstruction) || userInstruction.Length > MaxInstructionCharacters)
             throw new ArgumentException($"An operation instruction must contain 1-{MaxInstructionCharacters} characters.", nameof(userInstruction));
         ValidateProvenance(modelProvider, model, endpointPrivacy);
+        var normalizedRunId = string.IsNullOrWhiteSpace(runId) ? Guid.NewGuid().ToString("N") : runId.Trim();
+        ValidateEventText(normalizedRunId, 128, nameof(runId));
 
         var snapshot = Load();
+        if (snapshot.Runs.Any(item => item.RunId == normalizedRunId))
+            throw new InvalidOperationException("The operation run identity already exists.");
         var now = DateTimeOffset.UtcNow;
         var run = new OperationRun
         {
+            RunId = normalizedRunId,
             WorkspaceId = workspaceId,
             UserInstruction = userInstruction,
             ModelProvider = modelProvider.Trim(),
@@ -213,11 +218,40 @@ public sealed class OperationJournal
         return changed;
     }
 
+    /// <summary>Reconciles one interrupted run without changing unrelated queued or approval-waiting work.</summary>
+    public OperationRun? ReconcileRunAfterRestart(string runId, string actor = "recovery")
+    {
+        ValidateEventText(runId, 128, nameof(runId));
+        var snapshot = Load();
+        var run = snapshot.Runs.SingleOrDefault(item => item.RunId == runId);
+        if (run is null || run.Status is not (OperationRunStatuses.Validating or OperationRunStatuses.Running or OperationRunStatuses.Verifying or OperationRunStatuses.Cancelling)) return null;
+        var previousStatus = run.Status;
+        run.Status = OperationRunStatuses.NeedsReconciliation;
+        run.LastEventSequence++;
+        run.UpdatedAt = DateTimeOffset.UtcNow;
+        snapshot.Events.Add(new OperationEvent
+        {
+            RunId = run.RunId,
+            Sequence = run.LastEventSequence,
+            TimestampUtc = run.UpdatedAt,
+            Type = "run.needs_reconciliation",
+            Actor = actor,
+            CorrelationId = runId,
+            Payload = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["previousStatus"] = previousStatus,
+                ["reason"] = "The process restarted while the operation was in flight. Inspect effects before resuming."
+            }
+        });
+        Save(snapshot);
+        return run;
+    }
+
     public static bool CanTransition(string current, string next) => current switch
     {
         OperationRunStatuses.Draft => next is OperationRunStatuses.Validating or OperationRunStatuses.Cancelling,
         OperationRunStatuses.Validating => next is OperationRunStatuses.Queued or OperationRunStatuses.Failed or OperationRunStatuses.Cancelling,
-        OperationRunStatuses.Queued => next is OperationRunStatuses.Running or OperationRunStatuses.Failed or OperationRunStatuses.Cancelling,
+        OperationRunStatuses.Queued => next is OperationRunStatuses.Running or OperationRunStatuses.AwaitingApproval or OperationRunStatuses.Failed or OperationRunStatuses.Cancelling,
         OperationRunStatuses.Running => next is OperationRunStatuses.AwaitingApproval or OperationRunStatuses.Verifying or OperationRunStatuses.Failed or OperationRunStatuses.Cancelling,
         OperationRunStatuses.AwaitingApproval => next is OperationRunStatuses.Running or OperationRunStatuses.Failed or OperationRunStatuses.Cancelling,
         OperationRunStatuses.Verifying => next is OperationRunStatuses.ReviewReady or OperationRunStatuses.Completed or OperationRunStatuses.Failed or OperationRunStatuses.Cancelling,

@@ -17,6 +17,23 @@ and acceptance evidence.
 - Move completed items to the implemented state only after the user-facing
   workflow and failure states are verified.
 
+## Priority order
+
+The near-term roadmap is maintained in [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
+The append-only Coding Agent task timeline, no-replay crash reconciliation,
+and read-only project preflight are implemented and verified. The next
+highest-value sequence is: (1) add user-selected verification command execution
+and evidence beside the diff, (2) complete installed-pack voice acceptance,
+(3) add stronger OS isolation before expanding unattended or parallel
+execution, and (4) finish image generation/edit progress and cancellation.
+Other proposals below remain future work.
+
+Remote device control, cloud model execution/sync, team administration, and
+unattended computer use need separate product, privacy, and security decisions;
+they are not assumed commitments. Full 1M-token context execution requires a
+compatible model and sufficient runtime hardware; a request-size contract is
+not evidence of full-context execution.
+
 ## Current product boundary
 
 Skai Desktop is local-only. The application does not use hosted model
@@ -265,8 +282,11 @@ source of truth when a proposal overlaps a broader planned capability.
   changed lines.
 - [ ] A consolidated approval inbox for pending file writes, commands, and
   integrations, showing the scope and reason for each request.
-- [ ] A task change timeline linking what the agent read, proposed, changed,
-  and verified.
+- [x] A task change timeline linking what the agent read, proposed, changed,
+  and verified. (Coding tasks now append local approval, file action, command
+  outcome, verification, and restart reconciliation events; the thread shows a
+  chronological activity disclosure. File contents and raw shell commands are
+  excluded.)
 - [ ] Worktree review and recovery to inspect isolated changes, apply selected
   files, or recover work after an interrupted run.
 - [ ] Repository map showing key folders, entry points, and dependencies.
@@ -307,8 +327,10 @@ source of truth when a proposal overlaps a broader planned capability.
   respects visible exclusions and local storage limits.
 - [ ] Background verification queue for explicitly approved checks, with
   pause and cancel controls.
-- [ ] Task restart recovery to resume or safely mark interrupted tasks after
-  an app or Agent Host restart.
+- [x] Task restart recovery to resume or safely mark interrupted tasks after
+  an app or Agent Host restart. (Interrupted Coding Agent tasks are marked for
+  review in task state and the operation journal; restart never replays a
+  model/tool request.)
 - [ ] Resource-aware task scheduling that limits simultaneous model requests
   based on available local memory and compute.
 - [ ] Idle model management to offer unloading unused models or keeping

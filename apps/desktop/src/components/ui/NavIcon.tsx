@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type NavIconName = "chat" | "code" | "activity" | "model" | "image" | "marketplace" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "search" | "plus" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
+export type NavIconName = "chat" | "code" | "activity" | "model" | "image" | "marketplace" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "search" | "plus" | "document" | "audio" | "microphone" | "headset" | "stop" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
 
 export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVGSVGElement>) {
   const common = { fill: "none", stroke: "currentColor", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, strokeWidth: 1.65 };
@@ -19,6 +19,11 @@ export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVG
     case "project": content = <><path {...common} d="M3.5 7.5h6l1.8 2h9.2v9.2a1.8 1.8 0 0 1-1.8 1.8H5.3a1.8 1.8 0 0 1-1.8-1.8z" /><path {...common} d="M3.5 7.5V5.8A1.8 1.8 0 0 1 5.3 4h4l1.8 2h7.6a1.8 1.8 0 0 1 1.8 1.8v1.7" /></> ; break;
     case "search": content = <><circle {...common} cx="10.8" cy="10.8" r="6.8" /><path {...common} d="m16 16 4.5 4.5" /></> ; break;
     case "plus": content = <path {...common} d="M12 5v14M5 12h14" />; break;
+    case "document": content = <><path {...common} d="M7 3.8h7l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20V5.3A1.5 1.5 0 0 1 7.5 3.8Z" /><path {...common} d="M14 4v4h4M9 12h6M9 15.5h6" /></>; break;
+    case "audio": content = <><path {...common} d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></>; break;
+    case "microphone": content = <><rect {...common} x="9" y="3" width="6" height="12" rx="3" /><path {...common} d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" /></>; break;
+    case "headset": content = <><path {...common} d="M4 13v-1a8 8 0 0 1 16 0v1" /><rect {...common} x="3.5" y="12" width="4" height="7" rx="1.6" /><rect {...common} x="16.5" y="12" width="4" height="7" rx="1.6" /><path {...common} d="M20.5 18a4 4 0 0 1-4 3H14" /></>; break;
+    case "stop": content = <rect fill="currentColor" x="6" y="6" width="12" height="12" rx="2" />; break;
     case "arrow-right": content = <><path {...common} d="M4 12h15" /><path {...common} d="m13 6 6 6-6 6" /></> ; break;
     case "arrow-up-right": content = <><path {...common} d="M6 18 18 6" /><path {...common} d="M9 6h9v9" /></> ; break;
     case "chevron-left": content = <path {...common} d="m15 5-7 7 7 7" />; break;

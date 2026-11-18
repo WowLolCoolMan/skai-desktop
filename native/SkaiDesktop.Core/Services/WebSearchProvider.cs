@@ -16,6 +16,9 @@ public sealed record WebPageText(string Title, string Text)
 {
     public string? PublishedDate { get; init; }
     public string? SourceType { get; init; }
+    public string SpeakerAttribution { get; init; } = "unknown";
+    public int AttributedTurnCount { get; init; }
+    public string EvidenceQuality { get; init; } = "unreviewed";
 }
 
 /// <summary>Small opt-in web search adapter using DuckDuckGo's public HTML search results.</summary>
@@ -55,7 +58,8 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                     .FirstOrDefault(part => part.StartsWith("uddg=", StringComparison.OrdinalIgnoreCase));
                 if (queryPart is not null) href = Uri.UnescapeDataString(queryPart[5..]);
             }
-            if (!Uri.TryCreate(href, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https")) continue;
+            href = UnwrapBingResultUrl(href) ?? string.Empty;
+            if (!Uri.TryCreate(href, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https") || IsSearchRedirect(absolute)) continue;
             var title = Clean(match.Groups["title"].Value, 200);
             var snippet = Clean(match.Groups["snippet"].Value, 700);
             if (title.Length == 0 || snippet.Length == 0) continue;
@@ -74,7 +78,7 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                 {
                     var rawUrl = WebUtility.HtmlDecode(match.Groups["url"].Value);
                     var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
-                    if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https")) continue;
+                    if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https") || IsSearchRedirect(absolute)) continue;
                     var title = Clean(match.Groups["title"].Value, 200);
                     var snippet = Clean(match.Groups["snippet"].Value, 700);
                     if (title.Length == 0) continue;
@@ -88,7 +92,7 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                     {
                         var rawUrl = WebUtility.HtmlDecode(match.Groups["url"].Value);
                         var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
-                        if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https")) continue;
+                        if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https") || IsSearchRedirect(absolute)) continue;
                         var title = Clean(match.Groups["title"].Value, 200);
                         if (title.Length == 0) continue;
                         results.Add(new WebSearchResult(title, absolute.AbsoluteUri, "Public search result. Open the source to review identity and details."));
@@ -120,6 +124,19 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
         catch (FormatException) { return null; }
     }
 
+    public static string? NormalizePublicResearchUrl(string? href)
+    {
+        if (string.IsNullOrWhiteSpace(href) || !Uri.TryCreate(href, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return null;
+        var unwrapped = UnwrapBingResultUrl(uri.AbsoluteUri);
+        if (unwrapped is null || !Uri.TryCreate(unwrapped, UriKind.Absolute, out var normalized) || IsSearchRedirect(normalized)) return null;
+        return normalized.AbsoluteUri;
+    }
+
+    private static bool IsSearchRedirect(Uri uri) =>
+        uri.Host.Equals("bing.com", StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.Equals("/ck/a", StringComparison.OrdinalIgnoreCase)
+        || uri.Host.Equals("google.com", StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.Equals("/url", StringComparison.OrdinalIgnoreCase)
+        || uri.Host.Equals("duckduckgo.com", StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.Equals("/l/", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Fetch a small text-only excerpt for an explicitly selected research result.</summary>
     public async Task<WebPageText?> FetchTextAsync(string url, CancellationToken cancellationToken = default)
     {
@@ -130,20 +147,103 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
             var transcript = await FetchYouTubeTranscriptAsync(uri, cancellationToken).ConfigureAwait(false);
             if (transcript is not null) return transcript;
         }
+        if (uri.Host.Equals("joeroganpodcast.org", StringComparison.OrdinalIgnoreCase))
+        {
+            var archiveTranscript = await FetchJreArchiveTranscriptAsync(uri, cancellationToken).ConfigureAwait(false);
+            if (archiveTranscript is not null) return archiveTranscript;
+        }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(12));
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
         request.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("persona research"));
         using var response = await _http.SendAsync(request, timeout.Token);
         if (!response.IsSuccessStatusCode) return null;
+        if (response.Content.Headers.ContentType?.MediaType?.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) == true
+            || uri.AbsolutePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            var pdfBytes = await BoundedHttpContent.ReadBytesAsync(response.Content, 8 * 1024 * 1024, timeout.Token, "Persona research PDF").ConfigureAwait(false);
+            if (!PdfAttachmentTextExtractor.HasPdfSignature(pdfBytes)) return null;
+            string pdfText;
+            try { pdfText = PdfAttachmentTextExtractor.Extract(pdfBytes, 20_000); }
+            catch (InvalidDataException) { return null; }
+            var filename = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName
+                ?? Uri.UnescapeDataString(uri.Segments.LastOrDefault() ?? uri.Host);
+            var pdfTitle = Clean(filename.Trim('"'), 300);
+            if (string.IsNullOrWhiteSpace(pdfTitle)) pdfTitle = uri.Host;
+            var speakerLabelCount = Regex.Matches(pdfText, @"(?:^|\r?\n)\s*(?:\*\*)?[\p{Lu}][\p{L}'.-]{1,30}(?:\s+[\p{Lu}][\p{L}'.-]{1,30}){0,3}(?:\*\*)?:\s*\S", RegexOptions.Multiline).Count;
+            var sourceType = speakerLabelCount >= 3 ? "Conversation transcript" : null;
+            return new WebPageText(pdfTitle, pdfText)
+            {
+                SourceType = sourceType,
+                EvidenceQuality = sourceType is null ? "reference-text" : "speaker-labeled-pdf-transcript",
+            };
+        }
         var html = await BoundedHttpContent.ReadTextAsync(response.Content, timeout.Token, "Persona research page");
         var titleMatch = Regex.Match(html, "<title[^>]*>(?<title>.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
         var publishedDate = ExtractPublishedDate(html);
         var title = Clean(titleMatch.Success ? titleMatch.Groups["title"].Value : uri.Host, 300);
         var visibleHtml = Regex.Replace(html, "<(script|style|noscript|nav|footer|header|svg|form)[^>]*>.*?</\\1>", " ", RegexOptions.IgnoreCase | RegexOptions.Singleline);
         visibleHtml = Regex.Replace(visibleHtml, "</?(?:p|div|li|br|h[1-6]|section|article)[^>]*>", "\n", RegexOptions.IgnoreCase);
-        var text = RemoveAdCopy(Clean(visibleHtml, 20_000));
+        var text = RemoveAdCopy(CleanPageText(visibleHtml, 20_000));
         return text.Length == 0 ? null : new WebPageText(title, text) { PublishedDate = publishedDate };
+    }
+
+    private async Task<WebPageText?> FetchJreArchiveTranscriptAsync(Uri transcriptPage, CancellationToken cancellationToken)
+    {
+        if (!transcriptPage.AbsolutePath.Contains("/transcript", StringComparison.OrdinalIgnoreCase)) return null;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        using var homeRequest = new HttpRequestMessage(HttpMethod.Get, "https://joeroganpodcast.org/");
+        homeRequest.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("persona transcript research"));
+        using var homeResponse = await _http.SendAsync(homeRequest, timeout.Token).ConfigureAwait(false);
+        if (!homeResponse.IsSuccessStatusCode) return null;
+        var home = await BoundedHttpContent.ReadTextAsync(homeResponse.Content, timeout.Token, "Transcript archive page").ConfigureAwait(false);
+        var bundlePath = Regex.Match(home, "src=\\\"(?<src>/assets/index-[^\\\"]+\\.js)\\\"", RegexOptions.IgnoreCase).Groups["src"].Value;
+        if (string.IsNullOrWhiteSpace(bundlePath)) return null;
+        using var bundleRequest = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri("https://joeroganpodcast.org"), bundlePath));
+        bundleRequest.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("persona transcript research"));
+        using var bundleResponse = await _http.SendAsync(bundleRequest, timeout.Token).ConfigureAwait(false);
+        if (!bundleResponse.IsSuccessStatusCode) return null;
+        var bundle = await BoundedHttpContent.ReadTextAsync(bundleResponse.Content, timeout.Token, "Transcript archive app data").ConfigureAwait(false);
+        var api = Regex.Match(bundle, "(?<url>https://[a-z0-9]+\\.supabase\\.co)").Groups["url"].Value;
+        var key = Regex.Match(bundle, "(?<key>eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)").Groups["key"].Value;
+        if (string.IsNullOrWhiteSpace(api) || string.IsNullOrWhiteSpace(key)) return null;
+        var segments = transcriptPage.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var slug = segments.Length > 1 && segments[^1].Equals("transcript", StringComparison.OrdinalIgnoreCase)
+            ? segments[^2]
+            : segments.LastOrDefault() ?? string.Empty;
+        var words = Regex.Matches(slug.Replace('-', ' '), @"[\p{L}\p{N}]{3,}").Select(match => match.Value)
+            .Where(word => !Regex.IsMatch(word, @"^\d+$"))
+            .TakeLast(4).ToArray();
+        if (words.Length == 0) return null;
+        var guestPattern = string.Join("%20", words.Select(Uri.EscapeDataString));
+        var endpoint = $"{api}/rest/v1/episodes?select=title,guest,date,transcript&published=eq.true&archived=eq.false&guest=ilike.*{guestPattern}*&limit=8";
+        using var dataRequest = new HttpRequestMessage(HttpMethod.Get, endpoint);
+        dataRequest.Headers.TryAddWithoutValidation("apikey", key);
+        dataRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+        using var dataResponse = await _http.SendAsync(dataRequest, timeout.Token).ConfigureAwait(false);
+        if (!dataResponse.IsSuccessStatusCode) return null;
+        var payload = await BoundedHttpContent.ReadTextAsync(dataResponse.Content, timeout.Token, "Podcast transcript data").ConfigureAwait(false);
+        using var document = JsonDocument.Parse(payload);
+        var episode = document.RootElement.EnumerateArray()
+            .Where(item => item.TryGetProperty("transcript", out var transcript) && transcript.ValueKind == JsonValueKind.String && transcript.GetString()?.Length >= 800)
+            .OrderByDescending(item => item.GetProperty("transcript").GetString()!.Length)
+            .FirstOrDefault();
+        if (episode.ValueKind != JsonValueKind.Object) return null;
+        var body = episode.GetProperty("transcript").GetString() ?? string.Empty;
+        var title = episode.TryGetProperty("title", out var titleValue) ? titleValue.GetString() ?? "" : "";
+        var guest = episode.TryGetProperty("guest", out var guestValue) ? guestValue.GetString() ?? "" : "";
+        var date = episode.TryGetProperty("date", out var dateValue) ? dateValue.GetString() ?? "" : "";
+        // This archive provides timed speech text but does not label the speakers.
+        // Keep it useful for topic coverage while refusing to use it as Joe's voice evidence.
+        return new WebPageText($"Joe Rogan Experience transcript — {title} ({guest})", body[..Math.Min(body.Length, 20_000)])
+        {
+            PublishedDate = date,
+            SourceType = "Unattributed conversation transcript",
+            SpeakerAttribution = "unattributed-mixed-speakers",
+            EvidenceQuality = "dialogue-present-speaker-unverified",
+        };
     }
 
     private async Task<WebPageText?> FetchYouTubeTranscriptAsync(Uri videoUri, CancellationToken cancellationToken)
@@ -186,7 +286,7 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                 .Where(line => !string.IsNullOrWhiteSpace(line));
             var transcript = RemoveAdCopy(string.Join(" ", lines));
             if (transcript.Length == 0) return null;
-            return new WebPageText(Clean(titleMatch.Success ? titleMatch.Groups["title"].Value : "YouTube video", 300), transcript[..Math.Min(transcript.Length, 20_000)]) { SourceType = "Video captions" };
+            return new WebPageText(Clean(titleMatch.Success ? titleMatch.Groups["title"].Value : "YouTube video", 300), transcript[..Math.Min(transcript.Length, 20_000)]) { SourceType = "Unattributed video captions", SpeakerAttribution = "unattributed-mixed-speakers", EvidenceQuality = "dialogue-present-speaker-unverified" };
         }
     }
 
@@ -206,7 +306,7 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
             if (adSentencesRemaining > 0) { adSentencesRemaining--; continue; }
             cleaned.Add(sentence);
         }
-        return string.Join(" ", cleaned).Trim();
+        return string.Join("\n", cleaned).Trim();
     }
 
     private static string? ExtractPublishedDate(string html)
@@ -230,6 +330,16 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
     {
         var text = WebUtility.HtmlDecode(Tags.Replace(html, ""));
         text = Regex.Replace(text, "\\s+", " ").Trim();
+        return text.Length <= maxLength ? text : text[..maxLength] + "…";
+    }
+
+    private static string CleanPageText(string html, int maxLength)
+    {
+        var text = WebUtility.HtmlDecode(Tags.Replace(html, ""));
+        text = Regex.Replace(text, @"\r\n?", "\n");
+        text = Regex.Replace(text, @"[^\S\n]+", " ");
+        text = Regex.Replace(text, @" *\n *", "\n");
+        text = Regex.Replace(text, @"\n{3,}", "\n\n").Trim();
         return text.Length <= maxLength ? text : text[..maxLength] + "…";
     }
 }

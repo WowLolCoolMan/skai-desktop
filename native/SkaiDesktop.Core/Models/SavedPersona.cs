@@ -19,6 +19,16 @@ public sealed class SavedPersona
     public string VoiceProfileId { get; set; } = string.Empty;
     public string Voice { get; set; } = string.Empty;
     public string Personality { get; set; } = string.Empty;
+    /// <summary>Evidence-backed reasoning and decision patterns distilled from source material.</summary>
+    public string ThinkingStyle { get; set; } = string.Empty;
+    /// <summary>Observed interaction behavior, including conversational modes and response habits.</summary>
+    public string InteractionStyle { get; set; } = string.Empty;
+    /// <summary>Beliefs and values, with uncertainty or change over time stated explicitly.</summary>
+    public string Values { get; set; } = string.Empty;
+    /// <summary>Topics and knowledge supported by the selected source corpus.</summary>
+    public string Knowledge { get; set; } = string.Empty;
+    /// <summary>Limits, disputed evidence, and unsupported areas the persona must not guess about.</summary>
+    public string EvidenceBoundaries { get; set; } = string.Empty;
     public string Timeline { get; set; } = string.Empty;
     public string SourceMaterial { get; set; } = string.Empty;
     public string Instructions { get; set; } = string.Empty;
@@ -29,10 +39,15 @@ public sealed class SavedPersona
     public int ResearchPassCount { get; set; }
     public DateTimeOffset? LastResearchAtUtc { get; set; }
     public string LastResearchSummary { get; set; } = string.Empty;
+    public SavedPersonaDistillation? LatestDistillation { get; set; }
     public List<SavedPersonaResearchPass> ResearchHistory { get; set; } = [];
     public List<SavedPersonaContinuityTurn> Continuity { get; set; } = [];
     public List<SavedPersonaQuote> VerifiedQuotes { get; set; } = [];
     public List<SavedPersonaSource> Sources { get; set; } = [];
+    /// <summary>Sources used to draft the current public-research profile fields.</summary>
+    public List<string> ProfileEvidenceUrls { get; set; } = [];
+    /// <summary>Sources explicitly removed by the user; progressive research must not re-add them.</summary>
+    public List<string> ExcludedResearchUrls { get; set; } = [];
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -43,6 +58,12 @@ public sealed class SavedPersonaSource
     public string AuthorOrPublisher { get; set; } = string.Empty;
     public string PublishedDate { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
+    /// <summary>Whether dialogue in this source is explicitly linked to the persona by speaker labels.</summary>
+    public string SpeakerAttribution { get; set; } = "not-applicable";
+    /// <summary>Number of transcript turns explicitly attributed to the persona, when available.</summary>
+    public int AttributedTurnCount { get; set; }
+    /// <summary>Evidence quality gate result; only verified-attributed dialogue can inform voice.</summary>
+    public string EvidenceQuality { get; set; } = "unreviewed";
     public string ReliabilityNote { get; set; } = string.Empty;
     public string Excerpt { get; set; } = string.Empty;
 }
@@ -60,6 +81,23 @@ public sealed class SavedPersonaResearchPass
     public string Focus { get; set; } = string.Empty;
     public int SourcesAdded { get; set; }
     public string Summary { get; set; } = string.Empty;
+}
+
+/// <summary>Latest research-derived persona synthesis. Kept separate from user-edited profile fields.</summary>
+public sealed class SavedPersonaDistillation
+{
+    public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public string Focus { get; set; } = string.Empty;
+    public List<string> SourceUrls { get; set; } = [];
+    public string Roles { get; set; } = string.Empty;
+    public string SpeechPatterns { get; set; } = string.Empty;
+    public string Personality { get; set; } = string.Empty;
+    public string ThinkingStyle { get; set; } = string.Empty;
+    public string InteractionStyle { get; set; } = string.Empty;
+    public string Values { get; set; } = string.Empty;
+    public string Knowledge { get; set; } = string.Empty;
+    public string EvidenceBoundaries { get; set; } = string.Empty;
+    public string Timeline { get; set; } = string.Empty;
 }
 
 public sealed class SavedPersonaContinuityTurn

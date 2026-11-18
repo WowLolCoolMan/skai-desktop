@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { DiffEditor, Editor } from "./monacoLazy";
 import { useMonacoTheme } from "../../theme/useMonacoTheme";
-import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreview, DesktopTask } from "../../../shared/contracts";
+import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectFile, DesktopProjectPreflight, DesktopProjectPreview, DesktopTask } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
 import { NavIcon } from "../../components/ui/NavIcon";
@@ -60,6 +60,7 @@ type CodingSessionViewProps = {
   onSaveFile: () => void;
   onUndoFile: () => void;
   onRunTerminal: (projectId: string, command: string, cwd: string) => void;
+  onRunProjectPreflight: (projectId: string) => Promise<DesktopProjectPreflight | null>;
   onRefreshGitStatus: () => void;
   onLoadGitDiff: (paths?: string[]) => void;
   onCommitGitChanges: (message: string, paths?: string[]) => Promise<boolean>;
@@ -67,7 +68,7 @@ type CodingSessionViewProps = {
   onCreateGitPullRequest: (title: string, body: string) => Promise<boolean>;
 };
 
-export function CodingSessionView({ conversation, projects, selectedProject, tasks, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onPushGitChanges, onCreateGitPullRequest, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal }: CodingSessionViewProps) {
+export function CodingSessionView({ conversation, projects, selectedProject, tasks, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onPushGitChanges, onCreateGitPullRequest, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal, onRunProjectPreflight }: CodingSessionViewProps) {
   // Theme: Monaco colors, syntax and font follow the active theme (src/theme/useMonacoTheme.ts).
   const monacoTheme = useMonacoTheme();
   const [openTabs, setOpenTabs] = useState<string[]>([]);
@@ -80,6 +81,9 @@ export function CodingSessionView({ conversation, projects, selectedProject, tas
   const [pullRequestTitle, setPullRequestTitle] = useState("Review local project changes");
   const [pullRequestBody, setPullRequestBody] = useState("Please review the local changes and validation evidence.");
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
+  const [preflight, setPreflight] = useState<DesktopProjectPreflight | null>(null);
+  const [preflightBusy, setPreflightBusy] = useState(false);
+  const [preflightMessage, setPreflightMessage] = useState("");
   const loadedTabsProjectRef = useRef<string | null>(null);
   const activeFileRestoreRef = useRef<string | null>(null);
   const skipTabPersistenceRef = useRef(false);
@@ -94,6 +98,18 @@ export function CodingSessionView({ conversation, projects, selectedProject, tas
   useEffect(() => { setSelectedGitPaths(gitStatus?.changes.map((change) => change.path) ?? []); }, [gitPathKey]);
 
   useEffect(() => { setPanelMode("editor"); }, [selectedFile, fileOriginal]);
+  useEffect(() => { setPreflight(null); setPreflightMessage(""); }, [selectedProject.id]);
+  const runPreflight = async () => {
+    setPreflightBusy(true);
+    setPreflightMessage("");
+    try {
+      const result = await onRunProjectPreflight(selectedProject.id);
+      if (result) setPreflight(result);
+      else setPreflightMessage("Preflight could not inspect this project. Check the app status message.");
+    } catch (error) {
+      setPreflightMessage(error instanceof Error ? error.message : "Preflight failed.");
+    } finally { setPreflightBusy(false); }
+  };
   useEffect(() => {
     let restoredTabs: string[] = [];
     try {
@@ -186,7 +202,8 @@ export function CodingSessionView({ conversation, projects, selectedProject, tas
   };
 
   return <>
-    <div className="coding-project-context" aria-label="Project and Git status"><div className={`git-summary${gitStatus?.hasConflicts ? " has-conflicts" : ""}`} aria-live="polite"><strong>{gitStatus ? gitStatus.branch : "Git status unavailable"}</strong><span>{gitStatus ? `${gitStatus.changes.length} change${gitStatus.changes.length === 1 ? "" : "s"}${gitStatus.hasConflicts ? " · conflicts" : ""}` : "Select a Git repository to inspect changes"}</span></div><div className="coding-project-context-actions"><Button variant="ghost" disabled={gitBusy} onClick={onRefreshGitStatus}>{gitBusy ? "Checking…" : "Refresh Git"}</Button><label><span className="sr-only">Switch coding project</span><select value={selectedProject.id} onChange={(event) => { const project = projects.find((item) => item.id === event.target.value); if (project) onOpenProject(project); }} aria-label="Switch coding project">{projects.map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label></div></div>
+    <div className="coding-project-context" aria-label="Project and Git status"><div className={`git-summary${gitStatus?.hasConflicts ? " has-conflicts" : ""}`} aria-live="polite"><strong>{gitStatus ? gitStatus.branch : "Git status unavailable"}</strong><span>{gitStatus ? `${gitStatus.changes.length} change${gitStatus.changes.length === 1 ? "" : "s"}${gitStatus.hasConflicts ? " · conflicts" : ""}` : "Select a Git repository to inspect changes"}</span></div><div className="coding-project-context-actions"><Button variant="secondary" disabled={preflightBusy} onClick={() => void runPreflight()}>{preflightBusy ? "Scanning…" : "Run preflight"}</Button><Button variant="ghost" disabled={gitBusy} onClick={onRefreshGitStatus}>{gitBusy ? "Checking…" : "Refresh Git"}</Button><label><span className="sr-only">Switch coding project</span><select value={selectedProject.id} onChange={(event) => { const project = projects.find((item) => item.id === event.target.value); if (project) onOpenProject(project); }} aria-label="Switch coding project">{projects.map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label></div></div>
+    {(preflight || preflightMessage) && <Card className="project-preflight" aria-label="Project preflight results"><div className="panel-heading"><div><p className="section-kicker">LOCAL PREFLIGHT</p><h3>{preflight ? "Project setup" : "Preflight status"}</h3></div><Button variant="ghost" onClick={() => { setPreflight(null); setPreflightMessage(""); }}>Dismiss</Button></div>{preflightMessage && <p role="status">{preflightMessage}</p>}{preflight && <><p>{preflight.manifests.length ? `Detected ${preflight.manifests.join(", ")}.` : "No supported dependency manifest was detected at the selected folder roots."}</p>{preflight.runtimes.length > 0 && <ul className="project-preflight-runtimes">{preflight.runtimes.map((runtime) => <li key={runtime.name}><strong>{runtime.name}</strong><span>{runtime.available ? "Available" : "Required runtime not found on PATH"}</span></li>)}</ul>}{preflight.suggestedChecks.length > 0 && <><strong>Suggested checks (not run)</strong><ul className="project-preflight-checks">{preflight.suggestedChecks.map((command) => <li key={command}><code>{command}</code></li>)}</ul></>}<small>{preflight.executionNote}</small></>}</Card>}
     <div className="coding-session-grid">{conversation && <div className="project-thread-panel">{conversation}</div>}<Card className="project-browser-card coding-project-browser">
       <div className="panel-heading"><div><p className="section-kicker">PROJECT FILES</p><h3>Files &amp; changes</h3></div><div className="project-browser-actions"><span className="panel-count">{projectFiles.length}</span><Button variant={terminalOpen ? "secondary" : "ghost"} aria-pressed={terminalOpen} onClick={() => setTerminalOpen((open) => !open)}>{terminalOpen ? "Hide terminal" : "Show terminal"}</Button></div></div>
       {fileSummary && <p className="file-summary">{fileSummary}</p>}

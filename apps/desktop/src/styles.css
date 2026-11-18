@@ -512,8 +512,8 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-chat .chat-page { display: flex; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
 .app-content-chat .chat-context-bar { flex: 0 0 auto; }
 .app-content-chat .chat-layout { min-height: 0; flex: 1 1 0; overflow: hidden; }
-.app-content-chat .chat-column { display: flex; min-height: 0; height: 100%; flex-direction: column; gap: 14px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
-.app-content-chat .chat-column .conversation-surface { flex: 1 0 180px; }
+.app-content-chat .chat-column { display: flex; min-height: 0; height: 100%; flex-direction: column; gap: 14px; overflow: hidden; }
+.app-content-chat .chat-column .conversation-surface { height: auto; min-height: 0; flex: 1 1 0; }
 .app-content-chat .chat-column .composer-card { flex: 0 0 auto; }
 .app-content-chat .conversation-surface { position: relative; display: flex; height: clamp(300px, calc(100vh - 560px), 450px); min-height: 0; flex-direction: column; overflow: hidden; }
 .app-content-chat .message-list { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
@@ -530,6 +530,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-chat .conversation-surface { width: min(920px, 100%); border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .app-content-chat .conversation-surface .conversation-header { padding: 0 0 12px; border-bottom-color: color-mix(in srgb, var(--skai-color-border) 82%, transparent); }
 .app-content-chat .conversation-surface .message-list { width: 100%; margin: 0; padding: 24px 0 30px; }
+.app-content-chat .conversation-surface .message-list { min-height: 0; flex: 1 1 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .app-content-chat .conversation-surface .chat-empty-surface { display: grid; min-height: 0; flex: 1 1 auto; place-items: center; overflow-y: auto; }
 .app-content-chat .conversation-surface .ui-empty { width: min(420px, 100%); min-height: 0; padding: 44px 20px; border: 0; background: transparent; }
 .app-content-chat .conversation-surface .chat-message { max-width: 100%; padding: 5px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -541,6 +542,19 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-chat .conversation-surface .chat-message.user .message-content { color: var(--skai-color-text); }
 @media (max-width: 1100px) { .app-content-chat .conversation-surface { width: min(920px, 100%); } }
 @media (max-width: 640px) { .chat-page .composer-card { bottom: auto; width: 100%; }.app-content-chat .conversation-surface .chat-empty-surface { min-height: 280px; }.app-content-chat .conversation-surface .chat-message.user { max-width: 94%; } }
+
+/* Keep the transcript as the single scroll surface in both full-page chat and
+   the embedded coding conversation. This prevents the composer from slipping
+   below a second nested scrollbar on shorter windows. */
+.project-task-chat .chat-column { display: flex; height: 100%; flex-direction: column; overflow: hidden; }
+.project-task-chat .conversation-surface { height: auto; min-height: 0; flex: 1 1 0; }
+.project-task-chat .conversation-surface .message-list { min-height: 0; flex: 1 1 0; overflow-y: auto; overscroll-behavior: contain; }
+.chat-task-composer:not(.is-open) { gap: 6px; padding: 9px 12px; }
+.chat-task-composer:not(.is-open) .task-composer-heading { gap: 12px; }
+.chat-task-composer:not(.is-open) .task-composer-heading > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.chat-task-composer:not(.is-open) .task-composer-heading .section-kicker { flex: 0 0 auto; margin: 0; }
+.chat-task-composer:not(.is-open) .task-composer-heading h3 { margin: 0; font-size: var(--skai-text-sm); font-weight: 550; }
+.chat-task-composer:not(.is-open) .task-composer-heading p:not(.section-kicker) { display: none; }
 
 /* Reference-style composer: one calm surface, generous writing area, quiet tool row. */
 .chat-page .composer-card {
@@ -604,14 +618,15 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
   border-top: 1px solid color-mix(in srgb, var(--skai-color-border) 45%, transparent);
 }
 .chat-page .composer-card .composer-actions > .ui-button {
-  min-width: 0;
-  justify-content: flex-start;
-  padding: 7px 8px;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  justify-content: center;
+  padding: 7px;
   border-radius: var(--skai-radius-md);
   color: var(--skai-color-text-muted);
-  font-size: var(--skai-text-xs);
-  white-space: nowrap;
 }
+.chat-page .composer-card .composer-actions > .ui-button .nav-icon { width: 17px; height: 17px; }
 .chat-page .composer-card .composer-actions > .ui-button:hover,
 .chat-page .composer-card .composer-actions > .ui-button[aria-pressed="true"] { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
 .chat-page .composer-card .composer-actions > div { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
@@ -681,6 +696,27 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .coding-task-item { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
 .coding-task-item-heading strong { min-width: 0; color: var(--skai-color-text); font-size: var(--skai-text-xs); line-height: 1.35; }
 .coding-task-item p { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-size: var(--skai-text-2xs); }
+.coding-task-item .coding-task-instruction { color: var(--skai-color-text-muted); }
+.coding-task-item .coding-task-result { -webkit-line-clamp: 5; color: var(--skai-color-text); }
+.coding-task-files { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.coding-task-files summary { cursor: pointer; }
+.coding-task-files ul { display: grid; gap: 4px; margin: 7px 0; padding-left: 18px; }
+.coding-task-files code { overflow-wrap: anywhere; color: var(--skai-color-text); font-family: var(--skai-font-mono); }
+.coding-task-item time { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.coding-task-approval { color: var(--skai-color-warning-text, var(--skai-color-warning)) !important; }
+.thread-run-activity { flex-basis: 100%; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.thread-run-activity summary { cursor: pointer; }
+.thread-run-activity ol { display: grid; gap: 6px; margin: 8px 0; padding-left: 18px; }
+.thread-run-activity li { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 8px; }
+.thread-run-activity li code, .thread-run-activity li strong { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.thread-run-activity li time, .thread-run-activity li small { justify-self: end; }
+.project-preflight { display: grid; gap: 10px; padding: 14px; }
+.project-preflight > p { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
+.project-preflight > small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.project-preflight-runtimes, .project-preflight-checks { display: grid; gap: 5px; margin: 0; padding-left: 18px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.project-preflight-runtimes li { display: flex; justify-content: space-between; gap: 12px; }
+.project-preflight-runtimes strong, .project-preflight-checks code { color: var(--skai-color-text); }
+.project-preflight-checks code { font-family: var(--skai-font-mono); }
 .coding-task-item small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
 .coding-task-status-pill { flex: 0 0 auto; padding: 3px 5px; border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: var(--skai-color-surface); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); text-transform: uppercase; }
 .coding-task-status-pill.is-active { color: var(--skai-color-accent-text); }
@@ -1042,9 +1078,16 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .marketplace-model-copy { display: grid; min-width: 0; gap: 4px; }
 .marketplace-model-copy small { overflow-wrap: anywhere; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .marketplace-model-inspector { border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-surface); }
-.marketplace-model-inspector .marketplace-model-actions { justify-content: flex-start; margin-top: auto; }
+.marketplace-model-inspector .marketplace-model-actions { justify-content: flex-start; margin-top: 0; }
 .marketplace-model-controls { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 .marketplace-model-controls .settings-toggle { grid-column: 1 / -1; min-width: 0; }
+.marketplace-model-filter-disclosure { margin: 0 0 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-surface-soft) 62%, transparent); }
+.marketplace-model-filter-disclosure > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 12px; color: var(--skai-color-text); font-size: var(--skai-text-sm); font-weight: 550; cursor: pointer; list-style: none; }
+.marketplace-model-filter-disclosure > summary::-webkit-details-marker { display: none; }
+.marketplace-model-filter-disclosure > summary::after { content: "⌄"; color: var(--skai-color-text-muted); transition: transform var(--skai-duration-fast) var(--skai-ease-standard); }
+.marketplace-model-filter-disclosure[open] > summary::after { transform: rotate(180deg); }
+.marketplace-model-filter-disclosure > summary small { margin-left: auto; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 400; }
+.marketplace-model-filter-disclosure .marketplace-model-controls { margin: 0; border: 0; border-top: 1px solid var(--skai-color-border); border-radius: 0 0 var(--skai-radius-lg) var(--skai-radius-lg); background: transparent; }
 .marketplace-model-row { flex-wrap: wrap; }
 .marketplace-model-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .app-content-marketplace .marketplace-model-layout { min-height: min(620px, calc(100vh - 340px)); }
@@ -1746,3 +1789,5 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .persona-group-findings article { display:grid; gap:.3rem; }
 .persona-group-findings small { color:var(--muted-text); }
 .persona-group-findings div { display:flex; flex-wrap:wrap; gap:.35rem; }
+.task-require-approval { display: flex; align-items: flex-start; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
+.task-require-approval input { margin-top: 2px; accent-color: var(--skai-color-accent); }

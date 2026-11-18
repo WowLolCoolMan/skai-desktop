@@ -37,6 +37,12 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   }, [request]);
   const persona = personas.find((item) => item.id === location.personaId) ?? null;
   const activeThread = threads.find((item) => item.id === location.conversationId) ?? null;
+  // The Workshop route is explicitly scoped to a persona. Keep that identity as
+  // a recovery path for older or partially migrated conversation records that
+  // have lost their PersonaId metadata; group threads remain metadata-only.
+  const activePersonaId = activeThread && !activeThread.isPersonaGroup
+    ? activeThread.personaId ?? location.personaId
+    : null;
   const messages: ThreadMessage[] = (activeThread?.messages ?? []).filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role as "user" | "assistant", content: item.content }));
   useEffect(() => {
     setDraft("");
@@ -99,7 +105,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     const text = draft.trim();
     if (!text || busy || !activeThread) return;
     const isGroup = Boolean(activeThread.isPersonaGroup);
-    const personaIds = isGroup ? (activeThread.personaIds ?? []) : activeThread.personaId ? [activeThread.personaId] : [];
+    const personaIds = isGroup ? (activeThread.personaIds ?? []) : activePersonaId ? [activePersonaId] : [];
     const participants = personas.filter((item) => personaIds.includes(item.id));
     if (!participants.length) { setError("This thread no longer has an available persona."); return; }
     const nextMessages = [...messages, { role: "user" as const, content: text }];
@@ -159,10 +165,16 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   };
   const removePersonaResearch = async (source: DesktopPersonaSource, removeExcerpt: boolean) => {
     if (!persona) return;
-    const action = removeExcerpt ? "Remove this saved research excerpt? The source link will stay." : "Remove this source and its saved research excerpt from the persona?";
+    const affectsProfile = !persona.profileEvidenceUrls?.length || persona.profileEvidenceUrls.includes(source.url);
+    const resetNotice = affectsProfile ? " The generated profile fields will also be cleared so this evidence cannot keep influencing replies; rebuild them from the remaining sources." : "";
+    const action = (removeExcerpt ? "Remove this saved research excerpt? The source link will stay." : "Remove this source and its saved research excerpt from the persona?") + resetNotice;
     if (!window.confirm(action)) return;
     const response = await request("persona.source.remove", { personaId: persona.id, url: source.url, removeExcerpt });
-    if (response.ok) await refreshPersonas();
+    if (response.ok) {
+      const result = response.result as { profileNeedsRebuild?: boolean };
+      if (result.profileNeedsRebuild) setError("The evidence changed, so generated profile fields were cleared. Rebuild the profile before starting another persona conversation.");
+      await refreshPersonas();
+    }
     else setError(response.error?.message ?? "The research source could not be changed.");
   };
   const deletePersona = async () => {
@@ -212,7 +224,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   } else if (location.page === "chat" && activeThread) {
     const isGroup = Boolean(activeThread.isPersonaGroup);
     const participants = personas.filter((item) => isGroup ? activeThread.personaIds?.includes(item.id) : item.id === activeThread.personaId);
-    content = <section className="persona-workshop-content persona-chat-content"><PageHeader eyebrow={isGroup ? "PERSONA GROUP THREAD" : `PERSONA THREAD · ${persona?.name ?? participants[0]?.name ?? "Persona"}`} title={activeThread.title} description={participants.map((item) => item.name).join(" · ")} actions={<Button variant="ghost" type="button" onClick={() => open("threads")}>All conversations</Button>} />
+    content = <section className="persona-workshop-content persona-chat-content"><PageHeader eyebrow={isGroup ? "PERSONA GROUP THREAD" : `PERSONA THREAD · ${persona?.name ?? participants[0]?.name ?? "Persona"}`} title={activeThread.title} description={participants.map((item) => item.name).join(" · ")} actions={<>{!isGroup && activePersonaId && <Button type="button" onClick={() => void beginThread([activePersonaId], false)}>New thread</Button>}<Button variant="ghost" type="button" onClick={() => open("threads")}>All conversations</Button></>} />
       {isGroup && <div className="persona-thread-controls"><label><input type="checkbox" checked={research} onChange={(event) => setResearch(event.target.checked)} /> Research shared context</label><label><input type="checkbox" checked={speakGroup} onChange={(event) => setSpeakGroup(event.target.checked)} /> Read replies aloud</label></div>}
       <Card className="persona-chat-transcript">{messages.length ? messages.map((item, index) => <article className={`persona-chat-message is-${item.role}`} key={`${index}-${item.role}`}><strong>{item.role === "user" ? "You" : isGroup ? item.content.match(/^\[([^\]]+)\]:/)?.[1] ?? "Persona" : participants[0]?.name ?? "Persona"}</strong><p>{item.role === "assistant" && isGroup ? item.content.replace(/^\[[^\]]+\]:\s*/, "") : item.content}</p></article>) : <EmptyState title="Start the conversation" description="This thread is saved in Persona Workshop and stays separate from normal chats." />}{busy && <p className="settings-help">{isGroup ? "The group is replying…" : `${participants[0]?.name ?? "Your persona"} is thinking…`}</p>}{isGroup && findings?.length ? <div className="persona-group-findings"><h3>Shared research</h3>{findings.map((finding) => <article key={finding.url}><a href={finding.url} target="_blank" rel="noreferrer">{finding.title}</a><p>{finding.excerpt}</p></article>)}</div> : null}</Card>
       {error && <p className="form-error" role="alert">{error}</p>}<form className="persona-chat-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Message ${isGroup ? "the group" : participants[0]?.name ?? "your persona"}…`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} /><Button type="submit" disabled={busy || !draft.trim()}>{busy ? "Replying…" : "Send"}</Button></form>

@@ -27,12 +27,13 @@ function consumeTaskPrefill(): TaskPrefill | null {
 
 export function ChatTaskComposer({ busy, onPlanTask }: {
   busy: boolean;
-  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment) => Promise<boolean>;
+  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, requiresApproval: boolean) => Promise<boolean>;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [instruction, setInstruction] = useState("");
   const [environment, setEnvironment] = useState<TaskEnvironment>("local");
+  const [requiresApproval, setRequiresApproval] = useState(true);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export function ChatTaskComposer({ busy, onPlanTask }: {
     const safeTitle = title.trim().slice(0, 200);
     const safeInstruction = instruction.trim().slice(0, 6000);
     if (!safeTitle || !safeInstruction || busy) return;
-    const saved = await onPlanTask(safeTitle, safeInstruction, environment);
+    const saved = await onPlanTask(safeTitle, safeInstruction, environment, requiresApproval);
     setStatus(saved ? "Plan saved to this conversation for review." : "The plan could not be saved. Check the status message and retry.");
   };
 
@@ -74,6 +75,7 @@ export function ChatTaskComposer({ busy, onPlanTask }: {
     {open && <form id="chat-task-composer-fields" onSubmit={(event) => void submit(event)}>
       <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={5} onChange={(event) => setInstruction(event.target.value)} required /></label></div>
       <EnvironmentPicker value={environment} onChange={setEnvironment} />
+      <label className="task-require-approval"><input type="checkbox" checked={requiresApproval} onChange={(event) => setRequiresApproval(event.target.checked)} /> Require approval before starting the local agent run</label>
       <div className="task-composer-footer"><span role="status">{status || "Review the brief before saving the plan."}</span><Button variant="primary" type="submit" disabled={busy || !title.trim() || !instruction.trim()}>{busy ? "Saving plan…" : "Save plan in thread"}</Button></div>
     </form>}
   </section>;

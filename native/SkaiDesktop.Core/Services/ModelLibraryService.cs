@@ -351,14 +351,26 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
                         .Select(bytes => (long?)bytes)
                         .Sum()
                     : null;
+                var contextLength = ReadContextLength(item);
                 return new HubModel(id,
                     item.TryGetProperty("downloads", out var downloads) && downloads.TryGetInt64(out var count) ? count : 0,
                     item.TryGetProperty("likes", out var likes) && likes.TryGetInt32(out var likeCount) ? likeCount : 0,
-                    label, tags, sizeBytes);
+                    label, tags, sizeBytes, contextLength);
             }));
         }
         var filtered = (uncensored ? allModels.Where(model => model.IsUncensored) : allModels.Where(model => !model.IsUncensored));
         return filtered.DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase).OrderByDescending(model => model.Downloads).ToArray();
+    }
+
+    private static int? ReadContextLength(JsonElement item)
+    {
+        if (!item.TryGetProperty("config", out var config) || config.ValueKind != JsonValueKind.Object) return null;
+        foreach (var name in new[] { "max_position_embeddings", "model_max_length", "max_sequence_length", "seq_length" })
+            if (config.TryGetProperty(name, out var value) && value.TryGetInt32(out var length) && length is > 0 and < 10_000_000) return length;
+        if (config.TryGetProperty("text_config", out var textConfig) && textConfig.ValueKind == JsonValueKind.Object)
+            foreach (var name in new[] { "max_position_embeddings", "model_max_length", "max_sequence_length", "seq_length" })
+                if (textConfig.TryGetProperty(name, out var value) && value.TryGetInt32(out var length) && length is > 0 and < 10_000_000) return length;
+        return null;
     }
 
     /// <summary>Finds text-generation repositories with full Transformers weights for the optional AirLLM route.</summary>
@@ -743,7 +755,7 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
     }
 }
 
-public sealed record HubModel(string Id, long Downloads, int Likes, bool IsUncensored = false, string[]? Tags = null, long? SizeBytes = null);
+public sealed record HubModel(string Id, long Downloads, int Likes, bool IsUncensored = false, string[]? Tags = null, long? SizeBytes = null, int? ContextLength = null);
 public sealed record ModelScopeGgufFile(string Path, long SizeBytes, string? Sha256);
 public sealed record ModelScopeGgufPackage(string Repository, string Name, IReadOnlyList<ModelScopeGgufFile> Files, long Downloads, bool IsUncensored = false)
 {

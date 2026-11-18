@@ -116,12 +116,32 @@ public sealed class JsonSettingsStore
             persona.VoiceProfileId = Bound(persona.VoiceProfileId, 120);
             persona.Voice = Bound(persona.Voice, 8_000);
             persona.Personality = Bound(persona.Personality, 8_000);
+            persona.ThinkingStyle = Bound(persona.ThinkingStyle, 8_000);
+            persona.InteractionStyle = Bound(persona.InteractionStyle, 8_000);
+            persona.Values = Bound(persona.Values, 8_000);
+            persona.Knowledge = Bound(persona.Knowledge, 12_000);
+            persona.EvidenceBoundaries = Bound(persona.EvidenceBoundaries, 6_000);
             persona.Timeline = Bound(persona.Timeline, 12_000);
             persona.SourceMaterial = Bound(persona.SourceMaterial, 200_000);
             persona.Instructions = (persona.Instructions ?? string.Empty).Trim();
             persona.InteractionCount = Math.Clamp(persona.InteractionCount, 0, 1_000_000);
             persona.ResearchPassCount = Math.Clamp(persona.ResearchPassCount, 0, 1_000);
             persona.LastResearchSummary = Bound(persona.LastResearchSummary, 500);
+            if (persona.LatestDistillation is { } distillation)
+            {
+                distillation.Focus = Bound(distillation.Focus, 120);
+                distillation.SourceUrls ??= [];
+                distillation.SourceUrls = distillation.SourceUrls.Where(url => !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https").Distinct(StringComparer.OrdinalIgnoreCase).Take(12).Select(url => Bound(url, 2_000)).ToList();
+                distillation.Roles = Bound(distillation.Roles, 4_000);
+                distillation.SpeechPatterns = Bound(distillation.SpeechPatterns, 6_000);
+                distillation.Personality = Bound(distillation.Personality, 6_000);
+                distillation.ThinkingStyle = Bound(distillation.ThinkingStyle, 6_000);
+                distillation.InteractionStyle = Bound(distillation.InteractionStyle, 6_000);
+                distillation.Values = Bound(distillation.Values, 6_000);
+                distillation.Knowledge = Bound(distillation.Knowledge, 8_000);
+                distillation.EvidenceBoundaries = Bound(distillation.EvidenceBoundaries, 5_000);
+                distillation.Timeline = Bound(distillation.Timeline, 8_000);
+            }
             persona.VerifiedQuotes ??= [];
             persona.VerifiedQuotes = persona.VerifiedQuotes.Where(quote => quote is not null).Take(32).ToList();
             foreach (var quote in persona.VerifiedQuotes)

@@ -40,6 +40,14 @@ internal static class OperationJournalTests
             var export = journal.ExportJson();
             Check(export.Contains("skai-operations-v1", StringComparison.Ordinal) && export.Contains(run.RunId, StringComparison.Ordinal) && export.Contains("run.needs_reconciliation", StringComparison.Ordinal), "operation export is a validated local evidence bundle");
             Check(journal.Search("workspace-1").Single().RunId == run.RunId && journal.Search("missing-operation").Count == 0, "operation search is bounded and matches local provenance");
+
+            var taskRun = journal.Create("workspace-2", "Read a bounded local source.", runId: "task-run-1");
+            journal.Transition(taskRun.RunId, OperationRunStatuses.Validating);
+            journal.Transition(taskRun.RunId, OperationRunStatuses.Queued);
+            Check(journal.ReconcileRunAfterRestart(taskRun.RunId) is null, "restart reconciliation leaves queued and approval-waiting work untouched");
+            journal.Transition(taskRun.RunId, OperationRunStatuses.Running);
+            var taskRecovery = journal.ReconcileRunAfterRestart(taskRun.RunId);
+            Check(taskRecovery?.Status == OperationRunStatuses.NeedsReconciliation && journal.Load().Events.Last().CorrelationId == taskRun.RunId, "single-run recovery records the interrupted task correlation without replay");
         }
         finally
         {
