@@ -80,6 +80,8 @@ public sealed class AppSettings
     public string? ActivePersonaId { get; set; }
     /// <summary>Bounded local reusable bundles of instructions, knowledge, and tool guidance.</summary>
     public List<SavedPreset> SavedPresets { get; set; } = [];
+    /// <summary>Inactivity retention for individual and group Persona Workshop threads, in minutes. One hour by default.</summary>
+    public int PersonaConversationRetentionMinutes { get; set; } = 60;
     public string? ActivePresetId { get; set; }
     /// <summary>Bounded local web bookmarks; links open only after explicit user action.</summary>
     public List<Quicklink> Quicklinks { get; set; } = [];

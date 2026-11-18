@@ -26,6 +26,7 @@ public static class AgentHostLoop
     private static readonly object AirLlmInstallsGate = new();
     private static readonly Dictionary<string, ImageRuntimeInstallOperation> ImageRuntimeInstalls = new(StringComparer.Ordinal);
     private static readonly object ImageRuntimeInstallsGate = new();
+    private static readonly object PersonaConversationRetentionGate = new();
     private static readonly Dictionary<string, ImageGenerationOperation> ImageGenerations = new(StringComparer.Ordinal);
     private static readonly object ImageGenerationsGate = new();
     private static readonly Dictionary<string, MarketplaceDownloadOperation> MarketplaceDownloads = new(StringComparer.Ordinal);
@@ -52,6 +53,8 @@ public static class AgentHostLoop
         lock (TaskJournalGate)
             foreach (var task in interruptedTasks) TaskJournal.Value.ReconcileRunAfterRestart(task.Id);
         var scheduledDispatcher = Task.Run(() => RunScheduledDispatcherAsync(hostCancellation.Token), hostCancellation.Token);
+        CleanupExpiredPersonaConversations();
+        var personaConversationCleanup = Task.Run(() => RunPersonaConversationCleanupAsync(hostCancellation.Token), hostCancellation.Token);
 
         try
         {
@@ -91,9 +94,34 @@ public static class AgentHostLoop
             hostCancellation.Cancel();
             try { await scheduledDispatcher.ConfigureAwait(false); }
             catch (OperationCanceledException) when (hostCancellation.IsCancellationRequested) { }
+            try { await personaConversationCleanup.ConfigureAwait(false); }
+            catch (OperationCanceledException) when (hostCancellation.IsCancellationRequested) { }
         }
         await DisposeTerminalSessionsAsync().ConfigureAwait(false);
         await DisposeMcpClientsAsync().ConfigureAwait(false);
+    }
+
+    private static async Task RunPersonaConversationCleanupAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            CleanupExpiredPersonaConversations();
+    }
+
+    private static void CleanupExpiredPersonaConversations()
+    {
+        lock (PersonaConversationRetentionGate)
+        {
+            var settings = CreateSettingsStore().Load();
+            var retentionMinutes = Math.Clamp(settings.PersonaConversationRetentionMinutes, 15, 10_080);
+            var expiresBefore = DateTimeOffset.UtcNow.AddMinutes(-retentionMinutes);
+            var store = CreateConversationStore();
+            var sessions = store.Load();
+            var remaining = sessions.Where(session =>
+                !(session.PersonaId is not null || session.IsPersonaGroup)
+                || session.UpdatedAt > expiresBefore).ToList();
+            if (remaining.Count != sessions.Count) store.Save(remaining);
+        }
     }
 
     private static async Task RunScheduledDispatcherAsync(CancellationToken cancellationToken)
@@ -2122,6 +2150,7 @@ public static class AgentHostLoop
 
     private static AgentResponse ListConversations(AgentRequest request)
     {
+        CleanupExpiredPersonaConversations();
         var scope = OptionalString(request, "scope") ?? "standard";
         var personaId = OptionalString(request, "personaId");
         var includeArchived = request.Params?.TryGetProperty("includeArchived", out var archivedValue) == true
@@ -2163,6 +2192,7 @@ public static class AgentHostLoop
 
     private static AgentResponse SearchConversations(AgentRequest request)
     {
+        CleanupExpiredPersonaConversations();
         var query = OptionalString(request, "query") ?? string.Empty;
         var scope = OptionalString(request, "scope") ?? "standard";
         var personaId = OptionalString(request, "personaId");
@@ -2511,6 +2541,7 @@ public static class AgentHostLoop
             developerMode = settings.DeveloperMode,
             memoryInjectionEnabled = settings.MemoryInjectionEnabled,
             smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled,
+            personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes,
         });
     }
 
@@ -3453,9 +3484,15 @@ public static class AgentHostLoop
                 settings.SmartPromptRewritingEnabled = smartPromptRewriting.GetBoolean();
             if (parameters.TryGetProperty("reduceMotion", out var reduceMotion) && reduceMotion.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 settings.ReduceMotion = reduceMotion.GetBoolean();
+            if (parameters.TryGetProperty("personaConversationRetentionMinutes", out var personaRetention) && personaRetention.TryGetInt32(out var retentionMinutes))
+            {
+                if (retentionMinutes is not (15 or 60 or 240 or 1_440 or 10_080))
+                    throw new InvalidOperationException("Persona conversation retention must be 15 minutes, 1 hour, 4 hours, 1 day, or 7 days.");
+                settings.PersonaConversationRetentionMinutes = retentionMinutes;
+            }
         }
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled });
+        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled, personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes });
     }
 
     private static async Task<AgentResponse> RemovePetBackgroundAsync(AgentRequest request)

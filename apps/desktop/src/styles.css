@@ -1791,5 +1791,18 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .persona-group-findings article { display:grid; gap:.3rem; }
 .persona-group-findings small { color:var(--muted-text); }
 .persona-group-findings div { display:flex; flex-wrap:wrap; gap:.35rem; }
+.persona-group-picker { grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; margin: 8px 0; }
+.persona-group-choice { display: grid; grid-template-columns: 18px 36px minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); color: var(--skai-color-text); background: var(--skai-color-surface); cursor: pointer; transition: border-color 140ms ease, background 140ms ease; }
+.persona-group-choice:hover, .persona-group-choice:focus-within { border-color: color-mix(in srgb, var(--skai-color-accent) 55%, var(--skai-color-border)); }
+.persona-group-choice.is-selected { border-color: color-mix(in srgb, var(--skai-color-accent) 65%, var(--skai-color-border)); background: color-mix(in srgb, var(--skai-color-accent) 8%, var(--skai-color-surface)); }
+.persona-group-choice input { accent-color: var(--skai-color-accent); }
+.persona-group-choice-avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--skai-color-accent); background: color-mix(in srgb, var(--skai-color-accent) 14%, var(--skai-color-surface)); font-weight: 700; }
+.persona-group-choice > span:last-child { display: grid; min-width: 0; gap: 3px; }
+.persona-group-choice strong { overflow: hidden; color: var(--skai-color-text); text-overflow: ellipsis; white-space: nowrap; }
+.persona-group-choice small { overflow: hidden; color: var(--skai-color-text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.persona-advanced-research { display: grid; gap: 12px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); }
+.persona-advanced-research summary { color: var(--skai-color-text-muted); cursor: pointer; font-size: var(--skai-text-sm); }
+.persona-advanced-research[open] summary { margin-bottom: 4px; color: var(--skai-color-text); }
+.persona-advanced-research .settings-field { grid-template-columns: minmax(0, 1fr); }
 .task-require-approval { display: flex; align-items: flex-start; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
 .task-require-approval input { margin-top: 2px; accent-color: var(--skai-color-accent); }
