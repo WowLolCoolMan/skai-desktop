@@ -805,6 +805,53 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 @media (max-height: 760px) and (min-width: 641px) { .app-content-coding .coding-page-active .coding-session-grid .coding-project-browser { grid-template-rows: auto auto auto minmax(260px, 1fr) auto; }.app-content-coding .coding-page-active .project-dock { max-height: 190px; } }
 @media (max-width: 1200px) { .coding-session-grid { grid-template-columns: minmax(280px, .8fr) minmax(390px, 1.2fr); }.coding-task-inspector { grid-column: 1 / -1; max-height: 320px; } }
 @media (max-width: 900px) { .coding-session-grid { grid-template-columns: minmax(0, 1fr); flex: none; }.coding-activity-panel { max-height: 340px; }.coding-task-inspector { grid-column: auto; max-height: none; } }
+
+/* Coding workspace: keep the conversation and file workbench together, while
+   giving the review inspector a stable, readable rail.  The previous three
+   equal-ish columns forced the composer and file controls into narrow cards. */
+.app-content-coding .coding-session-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(276px, 320px);
+  grid-template-areas:
+    "conversation inspector"
+    "files inspector";
+  align-items: stretch;
+  gap: 16px;
+}
+.app-content-coding .coding-session-grid > .project-thread-panel {
+  grid-area: conversation;
+  min-height: 320px;
+}
+.app-content-coding .coding-session-grid > .coding-project-browser {
+  grid-area: files;
+  min-height: 480px;
+}
+.app-content-coding .coding-session-grid > .coding-task-inspector {
+  grid-area: inspector;
+  position: sticky;
+  top: 12px;
+  align-self: start;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+}
+.app-content-coding .coding-project-browser .project-file-layout {
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1100px) {
+  .app-content-coding .coding-session-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "conversation" "files" "inspector";
+  }
+  .app-content-coding .coding-session-grid > .coding-task-inspector {
+    position: static;
+    max-height: 360px;
+  }
+}
+@media (max-width: 640px) {
+  .app-content-coding .coding-session-grid { gap: 12px; }
+  .app-content-coding .coding-session-grid > .project-thread-panel,
+  .app-content-coding .coding-session-grid > .coding-project-browser { min-height: 360px; }
+}
 .app-content-workbench { display: flex; min-height: 0; flex-direction: column; padding-bottom: 24px; overflow: hidden; }
 .app-content-workbench .workbench-page { display: flex; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
 .app-content-workbench .workbench-page > .page-header, .app-content-workbench .workbench-page > .workbench-overview, .app-content-workbench .workbench-page > .workbench-filter-bar { flex: 0 0 auto; }
