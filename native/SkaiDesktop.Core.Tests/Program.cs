@@ -21,6 +21,7 @@ ConversationForkTests.Run();
 ConversationMessageSearchTests.Run();
 PetWanderPlannerTests.Run();
 await WebSearchTests.RunAsync();
+await PersonaKnowledgeTests.RunAsync();
 await GitHubTests.RunAsync();
 ChatMessageTests.Run();
 PromptVariableTests.Run();

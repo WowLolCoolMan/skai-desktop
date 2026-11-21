@@ -52,6 +52,19 @@ const standardRequestTimeoutMs = 30_000;
 // CPU inference. Keep the Agent Host alive long enough for that operation.
 const imageGenerationRequestTimeoutMs = 60 * 60_000;
 const chatRequestTimeoutMs = 5 * 60_000;
+// Persona research fans out across public sources; drafting runs two model passes, each up to the
+// chat deadline. Both used to hit the 30-second default, which restarted the host mid-work.
+const personaResearchRequestTimeoutMs = 4 * 60_000;
+const personaDraftRequestTimeoutMs = 12 * 60_000;
+const longRequestTimeouts = {
+  "chat.complete": chatRequestTimeoutMs,
+  "persona.group.complete": 15 * 60_000,
+  "persona.discover": 2 * 60_000,
+  "persona.research": personaResearchRequestTimeoutMs,
+  "persona.research.force": 10 * 60_000,
+  "persona.draft": personaDraftRequestTimeoutMs,
+  "marketplace.models.search": 2 * 60_000,
+};
 const chatHostDeadlineSeconds = 285;
 const globalLauncherAccelerator = "CommandOrControl+Alt+Space";
 let isQuitting = false;
@@ -1163,8 +1176,8 @@ function scheduleUpdateCheck() {
 
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "tasks.list",
-  "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "image.generate.start", "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.research.force", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove",
-  "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
+  "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "image.generate.start", "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.research.force", "persona.draft", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove",
+  "settings.save", "profile.get", "profile.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
@@ -1280,11 +1293,9 @@ function requestAgent(method, params) {
     ? { ...params, timeoutSeconds: chatHostDeadlineSeconds }
     : params;
   return new Promise((resolve) => {
-    const timeoutMs = method === "chat.complete"
-      ? chatRequestTimeoutMs
-      : method === "image.generate" || method === "pet.background.remove"
-        ? imageGenerationRequestTimeoutMs
-        : standardRequestTimeoutMs;
+    const timeoutMs = method === "image.generate" || method === "pet.background.remove"
+      ? imageGenerationRequestTimeoutMs
+      : longRequestTimeouts[method] ?? standardRequestTimeoutMs;
     const timer = setTimeout(() => {
       if (!pending.has(id)) return;
       pending.delete(id);

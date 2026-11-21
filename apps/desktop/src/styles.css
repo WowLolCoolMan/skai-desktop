@@ -1844,3 +1844,13 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .persona-advanced-research .settings-field { grid-template-columns: minmax(0, 1fr); }
 .task-require-approval { display: flex; align-items: flex-start; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
 .task-require-approval input { margin-top: 2px; accent-color: var(--skai-color-accent); }
+/* Settings → General → About you: optional name, gender, and age shared with chats and personas. */
+.settings-about-you { display: grid; gap: 10px; margin-bottom: 18px; padding: 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
+.settings-about-you h3 { margin: 0; color: var(--skai-color-text); font-size: var(--skai-text-md, 14px); }
+.settings-about-you-note { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs, 12px); line-height: 1.45; }
+.settings-about-you-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 10px; }
+.settings-about-you-fields .settings-field { margin: 0; min-width: 0; }
+.settings-about-you-fields input { width: 100%; min-width: 0; }
+.settings-about-you-error { margin: 0; color: var(--skai-color-danger); font-size: var(--skai-text-xs, 12px); }
+.settings-about-you-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs, 12px); }
+@media (max-width: 720px) { .settings-about-you-fields { grid-template-columns: minmax(0, 1fr); } }
