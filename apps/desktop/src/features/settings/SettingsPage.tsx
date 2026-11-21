@@ -189,7 +189,7 @@ export function SettingsPage(props: SettingsProps) {
       <main className="settings-content">
         <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h3>{activeCategory}</h3><p>{categoryDescription(activeCategory)}</p></div></div>
 
-        {activeCategory === "General" && <><CloseBehaviorSetting /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
+        {activeCategory === "General" && <><AboutYouSetting /><CloseBehaviorSetting /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
 
         {activeCategory === "Appearance" && <><AppearancePreview /><div className="settings-field"><label>Color theme<select value={props.themeMode} onChange={(event) => change("themeMode", event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label>{/* Theme: the old Accent select (Cyan/Violet/Amber/Rose) was removed at the user's request: nothing read it. Appearance → Layout and motion → Accent sets the accent now. */}</div><ThemeSettings /><div className="settings-field"><label>Interface density<select value={props.density} onChange={(event) => change("density", event.target.value)}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label><label>Backdrop<select value={props.backdrop} onChange={(event) => change("backdrop", event.target.value)}><option value="none">None</option><option value="deep-sea">Deep sea</option><option value="deep-space">Deep space</option></select></label></div><Toggle label="Reduced motion" detail="Minimize interface animations and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /></>}
 
@@ -226,6 +226,45 @@ function categoryDescription(category: Category) {
 }
 
 // Linux only: what closing the main window does (see electron/main.cjs). Saved immediately in the shell.
+type UserProfile = { name: string; gender: string; age: string };
+
+/** Optional details the user shares with every chat and persona, so the AI knows who it's talking to. */
+function AboutYouSetting() {
+  const bridge = window.skaiAgent as typeof window.skaiAgent | undefined;
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!bridge) return;
+    void bridge.request("profile.get").then((response: AgentResponse) => {
+      const result = response.ok ? response.result as { name?: string; gender?: string; age?: number | null } : {};
+      setProfile({ name: result.name ?? "", gender: result.gender ?? "", age: result.age ? String(result.age) : "" });
+    });
+  }, [bridge]);
+  if (!bridge || !profile) return null;
+  const update = (key: keyof UserProfile) => (event: ChangeEvent<HTMLInputElement>) => { setProfile({ ...profile, [key]: event.target.value }); setStatus(null); };
+  const ageValue = profile.age.trim();
+  const ageInvalid = ageValue !== "" && !(/^\d{1,3}$/.test(ageValue) && Number(ageValue) >= 1 && Number(ageValue) <= 120);
+  const save = async () => {
+    if (ageInvalid) return;
+    setSaving(true);
+    const response = await bridge.request("profile.save", { name: profile.name.trim(), gender: profile.gender.trim(), age: ageValue ? Number(ageValue) : 0 });
+    setSaving(false);
+    setStatus(response.ok ? "Saved. Chats and personas will use these details." : response.error?.message ?? "Could not save your details.");
+  };
+  return <section className="settings-about-you" aria-labelledby="settings-about-you-heading">
+    <h3 id="settings-about-you-heading">About you</h3>
+    <p className="settings-about-you-note">Optional. Tell Skai and your personas who you are, so they can call you by name instead of “user”. Leave any field blank to keep it private. Stored only on this computer.</p>
+    <div className="settings-about-you-fields">
+      <label className="settings-field">Name<input value={profile.name} maxLength={60} autoComplete="given-name" placeholder="What should the AI call you?" onChange={update("name")} /></label>
+      <label className="settings-field">Gender<input value={profile.gender} maxLength={40} placeholder="Optional" onChange={update("gender")} /></label>
+      <label className="settings-field">Age<input value={profile.age} inputMode="numeric" maxLength={3} placeholder="Optional" aria-invalid={ageInvalid} onChange={update("age")} /></label>
+    </div>
+    {ageInvalid && <p className="settings-about-you-error" role="alert">Enter an age from 1 to 120, or leave it blank.</p>}
+    <div className="settings-about-you-actions"><Button variant="secondary" disabled={saving || ageInvalid} onClick={() => void save()}>{saving ? "Saving…" : "Save details"}</Button>{status && <span role="status">{status}</span>}</div>
+  </section>;
+}
+
 function CloseBehaviorSetting() {
   const bridge = window.skaiAgent?.window;
   const [behavior, setBehavior] = useState<CloseBehavior | null>(null);

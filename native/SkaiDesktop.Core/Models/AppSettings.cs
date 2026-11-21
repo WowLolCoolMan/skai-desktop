@@ -29,6 +29,13 @@ public sealed class AppSettings
     public string VisionApiFormat { get; set; } = "auto";
     public string VisionCapabilityOverride { get; set; } = "auto";
     public double Temperature { get; set; } = 0.7;
+
+    /// <summary>
+    /// Per-request JSON schema that constrains the model's reply (Ollama "format", OpenAI-compatible
+    /// "response_format"). Set for structured tasks such as persona drafting; never persisted.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ResponseJsonSchema { get; set; }
     /// <summary>Bounded response-budget preference: adaptive, light, standard, high, or ultra.</summary>
     public string EffortMode { get; set; } = "standard";
     /// <summary>Optional Ollama context window override. Zero leaves the runtime default unchanged.</summary>
@@ -82,6 +89,12 @@ public sealed class AppSettings
     public List<SavedPreset> SavedPresets { get; set; } = [];
     /// <summary>Inactivity retention for individual and group Persona Workshop threads, in minutes. One hour by default.</summary>
     public int PersonaConversationRetentionMinutes { get; set; } = 60;
+
+    // Optional "About you" details the user chooses to share with every chat and persona. Empty
+    // means not shared; the model is never told a value the user left blank.
+    public string UserName { get; set; } = string.Empty;
+    public string UserGender { get; set; } = string.Empty;
+    public int UserAge { get; set; }
     public string? ActivePresetId { get; set; }
     /// <summary>Bounded local web bookmarks; links open only after explicit user action.</summary>
     public List<Quicklink> Quicklinks { get; set; } = [];

@@ -160,6 +160,8 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         };
         if (maxTokens is > 0) requestBody["max_tokens"] = Math.Clamp(maxTokens.Value, 1, 4096);
         if (IsQwen3Model(settings.Model)) requestBody["think"] = false;
+        if (ParseResponseSchema(settings) is { } schema)
+            requestBody["response_format"] = new Dictionary<string, object?> { ["type"] = "json_schema", ["json_schema"] = new Dictionary<string, object?> { ["name"] = "structured_reply", ["strict"] = true, ["schema"] = schema } };
         return JsonSerializer.Serialize(requestBody, JsonOptions);
     }
 
@@ -222,7 +224,16 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         // like an empty or failed chat. Keep responses directly usable here;
         // users can still choose a dedicated reasoning model when needed.
         if (IsQwen3Model(settings.Model)) payload["think"] = false;
+        // Ollama's structured outputs: constrained decoding makes even small models return valid JSON.
+        if (ParseResponseSchema(settings) is { } schema) payload["format"] = schema;
         return JsonSerializer.Serialize(payload, JsonOptions);
+    }
+
+    private static JsonElement? ParseResponseSchema(AppSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ResponseJsonSchema)) return null;
+        using var document = JsonDocument.Parse(settings.ResponseJsonSchema);
+        return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : null;
     }
 
     private static bool IsQwen3Model(string model) =>

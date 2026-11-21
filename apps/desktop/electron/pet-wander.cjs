@@ -32,20 +32,31 @@ function finite(value, fallback = 0) {
 }
 
 function rectCoveredByDisplays(rect, displays) {
+  // Keep this geometry check deliberately iterative. Display/work-area data is
+  // native input; a malformed or self-referential value must never be able to
+  // re-enter the layout calculation and overflow the Electron main process.
+  if (!rect || !Array.isArray(displays) || !Number.isFinite(rect.x) || !Number.isFinite(rect.y) || !Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) return false;
   const right = rect.x + rect.width;
   const bottom = rect.y + rect.height;
-  const yBands = [...new Set([
-    rect.y,
-    bottom,
-    ...displays.flatMap((display) => [display.y, display.y + display.height]).filter((edge) => edge > rect.y && edge < bottom),
-  ])].sort((left, rightEdge) => left - rightEdge);
+  const yBands = [rect.y, bottom];
+  for (const display of displays.slice(0, 32)) {
+    if (!display || !Number.isFinite(display.y) || !Number.isFinite(display.height) || display.height <= 0) continue;
+    const top = display.y;
+    const edge = display.y + display.height;
+    if (top > rect.y && top < bottom) yBands.push(top);
+    if (edge > rect.y && edge < bottom) yBands.push(edge);
+  }
+  yBands.sort((left, rightEdge) => left - rightEdge);
+  const uniqueBands = yBands.filter((value, index) => index === 0 || value !== yBands[index - 1]);
 
-  for (let band = 1; band < yBands.length; band += 1) {
-    const y = (yBands[band - 1] + yBands[band]) / 2;
-    const intervals = displays
-      .filter((display) => y >= display.y && y < display.y + display.height)
-      .map((display) => ({ left: display.x, right: display.x + display.width }))
-      .sort((left, rightEdge) => left.left - rightEdge.left);
+  for (let band = 1; band < uniqueBands.length; band += 1) {
+    const y = (uniqueBands[band - 1] + uniqueBands[band]) / 2;
+    const intervals = [];
+    for (const display of displays.slice(0, 32)) {
+      if (!display || !Number.isFinite(display.x) || !Number.isFinite(display.y) || !Number.isFinite(display.width) || !Number.isFinite(display.height) || display.width <= 0 || display.height <= 0) continue;
+      if (y >= display.y && y < display.y + display.height) intervals.push({ left: display.x, right: display.x + display.width });
+    }
+    intervals.sort((left, rightEdge) => left.left - rightEdge.left);
     let coveredTo = rect.x;
     for (const interval of intervals) {
       if (interval.left > coveredTo) break;
@@ -54,7 +65,7 @@ function rectCoveredByDisplays(rect, displays) {
     }
     if (coveredTo < right) return false;
   }
-  return yBands.length > 1;
+  return uniqueBands.length > 1;
 }
 
 class PetWanderGrid {

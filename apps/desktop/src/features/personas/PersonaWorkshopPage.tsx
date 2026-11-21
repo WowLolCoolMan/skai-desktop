@@ -10,6 +10,7 @@ type GroupResult = { turns?: Array<{ personaId: string; personaName: string; con
 
 export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model, provider }: { personas: DesktopPersona[]; endpoint: string; model: string; provider: string }) {
   const [personas, setPersonas] = useState(initialPersonas);
+  const [personasLoading, setPersonasLoading] = useState(true);
   const [location, setLocation] = useState(personaWorkshopLocation);
   const [threads, setThreads] = useState<DesktopConversation[]>([]);
   const [threadLoading, setThreadLoading] = useState(true);
@@ -34,9 +35,14 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   const [error, setError] = useState<string | null>(null);
   const request = useCallback((method: string, params?: Record<string, unknown>) => window.skaiAgent.request(method, params), []);
   const refreshPersonas = useCallback(async () => {
-    const response = await request("persona.list");
-    if (response.ok) setPersonas((response.result as { personas?: DesktopPersona[] }).personas ?? []);
-    else setError(response.error?.message ?? "Personas could not be refreshed.");
+    setPersonasLoading(true);
+    try {
+      const response = await request("persona.list");
+      if (response.ok) setPersonas((response.result as { personas?: DesktopPersona[] }).personas ?? []);
+      else setError(response.error?.message ?? "Personas could not be refreshed.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Personas could not be refreshed.");
+    } finally { setPersonasLoading(false); }
   }, [request]);
   const persona = personas.find((item) => item.id === location.personaId) ?? null;
   const activeThread = threads.find((item) => item.id === location.conversationId) ?? null;
@@ -46,7 +52,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   const activePersonaId = activeThread && !activeThread.isPersonaGroup
     ? activeThread.personaId ?? location.personaId
     : null;
-  const messages: ThreadMessage[] = (activeThread?.messages ?? []).filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role as "user" | "assistant", content: item.content }));
+  const messages: ThreadMessage[] = (activeThread?.messages ?? []).filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role as "user" | "assistant", content: item.content })).filter((item, index, all) => index === 0 || !(item.role === "user" && all[index - 1].role === "user" && item.content.trim() === all[index - 1].content.trim()));
   useEffect(() => {
     setDraft("");
     setFindings([]);
@@ -62,10 +68,13 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
 
   const loadThreads = useCallback(async (includeArchived = true) => {
     setThreadLoading(true);
-    const response = await request("conversations.list", { scope: "persona", includeArchived });
-    if (response.ok) { setThreads((response.result as DesktopConversation[]) ?? []); setThreadError(null); }
-    else setThreadError(response.error?.message ?? "Persona conversations could not be loaded.");
-    setThreadLoading(false);
+    try {
+      const response = await request("conversations.list", { scope: "persona", includeArchived });
+      if (response.ok) { setThreads((response.result as DesktopConversation[]) ?? []); setThreadError(null); }
+      else setThreadError(response.error?.message ?? "Persona conversations could not be loaded.");
+    } catch (reason) {
+      setThreadError(reason instanceof Error ? reason.message : "Persona conversations could not be loaded.");
+    } finally { setThreadLoading(false); }
   }, [request]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);
   useEffect(() => { void refreshPersonas(); }, [refreshPersonas]);
@@ -111,13 +120,26 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   const open = (page: WorkshopPage, personaId: string | null = null, conversationId: string | null = null) => navigatePersonaWorkshop(page, personaId, conversationId);
   const beginThread = async (personaIds: string[], group: boolean) => {
     const selected = personas.filter((item) => personaIds.includes(item.id));
-    if ((!group && selected.length !== 1) || (group && selected.length < 2)) return;
+    if ((!group && selected.length !== 1) || (group && selected.length < 2)) {
+      setError(group ? "One or more selected personas are no longer available. Refresh the library and choose them again." : "That persona is no longer available. Refresh the library and try again.");
+      await refreshPersonas();
+      return;
+    }
     const title = group ? (groupName.trim() || selected.map((item) => item.name).join(" + ")) : `Chat with ${selected[0].name}`;
     const response = await request("conversation.save", { title, mode: "ChatBot", responseMode: "think", model, modelProvider: provider, messages: [], ...(group ? { isPersonaGroup: true, personaIds } : { personaId: personaIds[0] }) });
     if (!response.ok) { setError(response.error?.message ?? "A persona thread could not be created."); return; }
-    const id = (response.result as { id: string }).id;
-    await loadThreads(false);
+    const saved = response.result as { id: string; updatedAt?: string };
+    const id = saved.id;
+    const createdThread: DesktopConversation = {
+      id, title, mode: "ChatBot", responseMode: "think", model, modelProvider: provider,
+      personaId: group ? null : personaIds[0], personaName: group ? "Persona group" : selected[0].name,
+      personaIds: group ? [...personaIds] : [], isPersonaGroup: group, messages: [],
+      updatedAt: saved.updatedAt ?? new Date().toISOString(), pinned: false, archived: false, tags: [],
+    };
+    setThreads((current) => [createdThread, ...current.filter((thread) => thread.id !== id)]);
+    setError(null);
     open("chat", group ? null : personaIds[0], id);
+    void loadThreads(false);
   };
   const openExistingThread = (thread: DesktopConversation) => open("chat", thread.personaId ?? null, thread.id);
   const saveMessages = async (id: string, title: string, next: ThreadMessage[], personaIds: string[], group: boolean) => {
@@ -136,7 +158,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     const personaIds = isGroup ? (activeThread.personaIds ?? []) : activePersonaId ? [activePersonaId] : [];
     const participants = personas.filter((item) => personaIds.includes(item.id));
     if (!participants.length) { setError("This thread no longer has an available persona."); return; }
-    const nextMessages = [...messages, { role: "user" as const, content: text }];
+    const nextMessages = [...messages, { role: "user" as const, content: text }].filter((item, index, all) => index === 0 || !(item.role === "user" && all[index - 1].role === "user" && item.content.trim() === all[index - 1].content.trim()));
     setBusy(true); setError(null); setDraft("");
     try {
       await persistUserMessage(activeThread.id, activeThread.title, nextMessages, personaIds, isGroup);
@@ -255,12 +277,19 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     const participants = personas.filter((item) => isGroup ? activeThread.personaIds?.includes(item.id) : item.id === activeThread.personaId);
     content = <section className="persona-workshop-content persona-chat-content"><PageHeader eyebrow={isGroup ? "PERSONA GROUP THREAD" : `PERSONA THREAD · ${persona?.name ?? participants[0]?.name ?? "Persona"}`} title={activeThread.title} description={participants.map((item) => item.name).join(" · ")} actions={<>{!isGroup && activePersonaId && <Button type="button" onClick={() => void beginThread([activePersonaId], false)}>New thread</Button>}<Button variant="ghost" type="button" onClick={() => open("threads")}>All conversations</Button></>} />
       {isGroup && <div className="persona-thread-controls"><label><input type="checkbox" checked={research} onChange={(event) => setResearch(event.target.checked)} /> Research shared context</label><label><input type="checkbox" checked={speakGroup} onChange={(event) => setSpeakGroup(event.target.checked)} /> Read replies aloud</label></div>}
-      <Card className="persona-chat-transcript">{messages.length ? messages.map((item, index) => <article className={`persona-chat-message is-${item.role}`} key={`${index}-${item.role}`}><strong>{item.role === "user" ? "You" : isGroup ? item.content.match(/^\[([^\]]+)\]:/)?.[1] ?? "Persona" : participants[0]?.name ?? "Persona"}</strong><p>{item.role === "assistant" && isGroup ? item.content.replace(/^\[[^\]]+\]:\s*/, "") : item.content}</p></article>) : <EmptyState title="Start the conversation" description="This thread is saved in Persona Workshop and stays separate from normal chats." />}{busy && <p className="settings-help">{isGroup ? "The group is replying…" : `${participants[0]?.name ?? "Your persona"} is thinking…`}</p>}{isGroup && findings?.length ? <div className="persona-group-findings"><h3>Shared research</h3>{findings.map((finding) => <article key={finding.url}><a href={finding.url} target="_blank" rel="noreferrer">{finding.title}</a><p>{finding.excerpt}</p></article>)}</div> : null}</Card>
+      <Card className="persona-chat-transcript">{messages.length ? messages.map((item, index) => <article className={`persona-chat-message is-${item.role}`} key={`${index}-${item.role}`}><strong>{item.role === "user" ? "You" : isGroup ? item.content.match(/^\[([^\]]+)\]:/)?.[1] ?? "Persona" : participants[0]?.name ?? "Persona"}</strong><p>{item.role === "assistant" && isGroup ? item.content.replace(/^\[[^\]]+\]:\s*/, "") : item.content}</p></article>) : <EmptyState title="Start the conversation" description="This thread is saved in Persona Workshop and stays separate from normal chats." />}{busy && <p className="settings-help">{isGroup ? "The group is replying…" : `${participants[0]?.name ?? "Your persona"} is thinking…`}</p>}</Card>
+      {isGroup && findings?.length ? <section className="persona-group-findings" aria-label="Shared research"><div className="persona-group-findings-header"><div><p className="section-kicker">CONTEXT</p><h3>Shared research</h3></div><span>{findings.length} sources</span></div><div className="persona-group-findings-grid">{findings.map((finding) => <article key={finding.url}><a href={finding.url} target="_blank" rel="noreferrer">{finding.title}</a><p>{finding.excerpt || "Public source selected for group context."}</p><small>{finding.url}</small></article>)}</div></section> : null}
       {error && <p className="form-error" role="alert">{error}</p>}<form className="persona-chat-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Message ${isGroup ? "the group" : participants[0]?.name ?? "your persona"}…`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} /><Button type="submit" disabled={busy || !draft.trim()}>{busy ? "Replying…" : "Send"}</Button></form>
       {!isGroup && persona && <div className="persona-chat-subnav"><Button variant="ghost" type="button" onClick={() => open("settings", persona.id)}>Settings</Button><Button variant="ghost" type="button" onClick={() => open("memories", persona.id)}>Memories</Button><Button variant="ghost" type="button" onClick={() => open("knowledge", persona.id)}>Knowledge base</Button></div>}
     </section>;
+  } else if ((location.page === "chat" && threadLoading) || (location.personaId && personasLoading)) {
+    content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Loading your workshop" description="Checking your saved personas and conversations on this device." /><Card><p className="settings-help">Your local workshop data is loading…</p></Card></section>;
+  } else if (location.page === "chat") {
+    content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Conversation unavailable" description={threadError || "This persona conversation may have expired or been removed."} actions={<><Button variant="secondary" type="button" onClick={() => open("groups")}>Persona groups</Button><Button type="button" onClick={() => open("threads")}>All conversations</Button></>} /><Card><p className="settings-help">Your personas are still in the library. You can start a new group conversation there.</p></Card></section>;
+  } else if (location.personaId) {
+    content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Persona unavailable" description={personasLoading ? "Checking your saved personas…" : "This persona may have been removed. Your other personas and group conversations are unchanged."} actions={<><Button variant="secondary" type="button" onClick={() => open("groups")}>Persona groups</Button><Button type="button" onClick={() => open("library")}>Back to library</Button></>} /></section>;
   } else {
-    content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Persona not found" description="This persona or conversation may have been removed." actions={<Button type="button" onClick={() => open("library")}>Back to library</Button>} /></section>;
+    content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Page unavailable" description="This Persona Workshop page is unavailable." actions={<Button type="button" onClick={() => open("library")}>Back to library</Button>} /></section>;
   }
 
   return <main className="app-content feature-page persona-workshop-page"><header className="persona-workshop-header"><div><p className="section-kicker">SKAI PERSONAS</p><h1>Skai Personas</h1><span>Profiles, group stories, memories, and knowledge — together in one place.</span></div>{location.page !== "create" && <Button variant="ghost" type="button" onClick={() => open("create")}>＋ Create persona</Button>}</header><div className="persona-workshop-layout">{sidebar}<div className="persona-workshop-main">{content}</div></div>{error && location.page !== "chat" && <div className="persona-workshop-error" role="alert">{error}<button type="button" onClick={() => setError(null)} aria-label="Dismiss">×</button></div>}</main>;
