@@ -886,6 +886,14 @@ public static class AgentHostLoop
         var text = RequiredSpeechText(request, "text", 4_000);
         var rate = OptionalDouble(request, "rate") ?? 1;
         if (rate is < 0.5 or > 2) throw new InvalidOperationException("rate must be between 0.5 and 2.");
+        if (OptionalString(request, "provider")?.Equals("elevenlabs", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var apiKey = RequiredBoundedString(request, "apiKey", 512);
+            var voiceId = RequiredBoundedString(request, "voiceId", 128);
+            var endpoint = RequiredBoundedString(request, "endpoint", 2_000);
+            var audio = CloudVoiceService.SynthesizeAsync(endpoint, voiceId, apiKey, text, rate).GetAwaiter().GetResult();
+            return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "elevenlabs-cloud", interruptible = true, audioDataUrl = audio });
+        }
         var engine = voice.Speak(text, rate);
         return new(ProtocolVersion, request.Id, true, new { spoken = true, engine, interruptible = true });
     }

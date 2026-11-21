@@ -10,8 +10,11 @@
 - Marketplace distinguishes `Available locally`, `Ready to install`, and
   `Catalog only`. A source URL alone never makes an engine installable.
 - Marketplace advertises an optional ElevenLabs connector as a user-key
-  cloud voice option. This does not add a hosted model route or weaken the
-  local model boundary.
+  cloud voice option. Voice & Audio now lets the user choose local/system or
+  ElevenLabs cloud speech, enter a voice ID, and test it from the same
+  settings surface. The key is session-only and is sent only to the explicit
+  ElevenLabs speech request; it is not written to workspace settings or sent
+  to the local language model.
 - Persona cards can persist an assigned local voice profile. Chat and Coding
   continue to use the shared Settings default when no persona override is
   present.
@@ -32,7 +35,8 @@ upstream project is already bundled. The next vertical slices must add:
    typed prosody/effect cues.
 3. Voice Workbench clip storage, one-time rights notice, incremental rebuild
    state, and profile assignment UI.
-4. Secure user-key storage and an explicit optional cloud voice adapter.
+4. Secure persistent keyring storage for cloud voice keys; the current slice
+   intentionally keeps keys in memory until Skai closes.
 5. Full-duplex Voice Mode with streaming audio, interruption, barge-in, and
    device acceptance tests.
 
