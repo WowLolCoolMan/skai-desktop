@@ -1854,3 +1854,43 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .settings-about-you-error { margin: 0; color: var(--skai-color-danger); font-size: var(--skai-text-xs, 12px); }
 .settings-about-you-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs, 12px); }
 @media (max-width: 720px) { .settings-about-you-fields { grid-template-columns: minmax(0, 1fr); } }
+/* Pet attacks: wind-up, pounce lunge with impact, and fire breath with embers and scorch. Only the
+   cursor-attacking companion (Blaze) receives these states. Colors come from the pet art tokens. */
+.pet-window-rage { position: absolute; left: 50%; bottom: 6px; z-index: 0; width: 190px; height: 130px; border-radius: 50%; background: radial-gradient(closest-side, var(--skai-art-pet-anger-4), transparent); transform: translateX(-50%); pointer-events: none; animation: pet-attack-rage 420ms ease-in-out infinite alternate; }
+.is-pounce-attack .pet-window-rage, .is-fire-breath-attack .pet-window-rage { background: radial-gradient(closest-side, var(--skai-art-pet-target-2), transparent); animation-duration: 260ms; }
+.is-angry-attack .pet-window-art { animation: pet-attack-bristle 95ms steps(2, end) infinite; }
+.pet-window-target-lock.is-acquiring { animation: pet-attack-acquire 700ms cubic-bezier(.2,.8,.2,1) both; }
+.pet-window-target-lock.is-fire-target { border-style: dotted; animation: pet-window-lock 240ms ease-in-out infinite alternate; }
+.is-pounce-attack .pet-window-art { animation: pet-attack-pounce 1300ms cubic-bezier(.22,.8,.26,1) both; }
+.pet-window-root.is-pounce-attack { animation: pet-attack-shake 300ms 640ms linear both; }
+.pet-window-impact { position: absolute; z-index: 5; width: 0; height: 0; pointer-events: none; }
+.pet-window-impact::before { position: absolute; left: -48px; top: -48px; width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle, var(--skai-art-pet-anger-2), var(--skai-art-pet-target-3) 38%, transparent 70%); content: ""; opacity: 0; animation: pet-attack-flash 320ms 630ms ease-out both; }
+.pet-window-shockwave { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; border: 3px solid var(--skai-art-pet-target-1); border-radius: 50%; opacity: 0; animation: pet-attack-shockwave 560ms 640ms ease-out both; }
+.pet-window-shockwave.is-second { border-color: var(--skai-art-pet-anger-5); animation-delay: 760ms; }
+.pet-window-impact i { position: absolute; left: -2px; top: -7px; width: 4px; height: 14px; border-radius: var(--skai-radius-xs); background: var(--skai-art-pet-anger-6); box-shadow: 0 0 8px var(--skai-art-pet-anger-7); opacity: 0; transform: rotate(var(--spark-angle)); animation: pet-attack-spark 520ms 650ms ease-out both; }
+.is-fire-breath-attack .pet-window-art { animation: pet-attack-recoil 2600ms ease-out both; }
+.pet-window-root.is-fire-breath-attack { animation: pet-attack-shake 380ms 260ms linear both; }
+.pet-window-embers { position: absolute; left: 50%; top: 96px; z-index: 3; width: 0; height: 0; pointer-events: none; }
+.pet-window-embers i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--skai-art-pet-anger-2); box-shadow: 0 0 10px var(--skai-art-pet-fire-1), 0 0 18px var(--skai-art-pet-fire-2); opacity: 0; animation: pet-attack-ember 760ms var(--ember-delay) ease-in infinite; }
+.pet-window-scorch { position: absolute; z-index: 2; width: 70px; height: 70px; border-radius: 50%; background: radial-gradient(circle, var(--skai-art-pet-anger-6), var(--skai-art-pet-fire-1) 35%, var(--skai-art-pet-anger-4) 62%, transparent 72%); opacity: 0; transform: translate(-50%, -50%) scale(.2); pointer-events: none; animation: pet-attack-scorch 2200ms 420ms ease-out both; }
+.pet-window-root.is-paused .pet-window-rage, .pet-window-root.is-paused .pet-window-impact, .pet-window-root.is-paused .pet-window-embers, .pet-window-root.is-paused .pet-window-scorch { display: none; }
+.pet-window-root.is-paused.is-attacking, .pet-window-root.is-paused.is-attacking .pet-window-art { animation: none; }
+@keyframes pet-attack-rage { from { opacity: .55; transform: translateX(-50%) scale(.92); } to { opacity: 1; transform: translateX(-50%) scale(1.08); } }
+@keyframes pet-attack-bristle { from { transform: translate(-1.5px, 0); } to { transform: translate(1.5px, -1px); } }
+@keyframes pet-attack-acquire { from { opacity: 0; transform: translate(-50%, -50%) scale(2.4) rotate(-90deg); } to { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); } }
+@keyframes pet-attack-pounce {
+  0% { transform: translate(0, 0) scale(1, 1); }
+  24% { transform: translate(calc(var(--pet-lunge-x) * -0.12), 7px) scale(1.1, .82); }
+  44% { transform: translate(calc(var(--pet-lunge-x) * .72), -30px) scale(.92, 1.14); }
+  52% { transform: translate(var(--pet-lunge-x), 2px) scale(1.18, .84); }
+  60% { transform: translate(calc(var(--pet-lunge-x) * .97), 0) scale(1, 1); }
+  82% { transform: translate(calc(var(--pet-lunge-x) * .9), 0) scale(1, 1); }
+  100% { transform: translate(0, 0) scale(1, 1); }
+}
+@keyframes pet-attack-shake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-5px, 2px); } 40% { transform: translate(4px, -3px); } 60% { transform: translate(-3px, 1px); } 80% { transform: translate(2px, -1px); } }
+@keyframes pet-attack-flash { 0% { opacity: 0; transform: scale(.3); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes pet-attack-shockwave { 0% { opacity: .95; transform: scale(.4); } 100% { opacity: 0; transform: scale(5.2); } }
+@keyframes pet-attack-spark { 0% { opacity: 1; transform: rotate(var(--spark-angle)) translateY(-6px) scaleY(1.2); } 100% { opacity: 0; transform: rotate(var(--spark-angle)) translateY(-58px) scaleY(.3); } }
+@keyframes pet-attack-recoil { 0% { transform: translateX(0); } 10% { transform: translateX(calc(var(--pet-lunge-x) * -0.08)) scale(1.04, .96); } 22%, 86% { transform: translateX(calc(var(--pet-lunge-x) * -0.04)) scale(1.02, .98); } 100% { transform: translateX(0) scale(1, 1); } }
+@keyframes pet-attack-ember { 0% { opacity: 0; transform: translate(0, 0) scale(.6); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--pet-aim-dx), calc(var(--pet-aim-dy) + var(--ember-lift))) scale(1.4); } }
+@keyframes pet-attack-scorch { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.2); } 25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); } 70% { opacity: .9; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); } }

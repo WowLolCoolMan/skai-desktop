@@ -242,7 +242,9 @@ export function PetWindow() {
 
   const activePose = pose === "success" || pose === "error" || pose === "needs-attention" ? pose : COMPOSITOR_DRAG ? "idle" : activity.state;
   const motionAnimationId = activePose === "walk" ? (activity.facing === -1 ? "running-left" : "running-right") : ({ idle: "idle", thinking: "review", coding: "running", coding_malicious: "malicious", stuck: "waiting", success: "jumping", error: "failed", "needs-attention": "failed", angry: "idle", pounce: "pounce", "fire-breath": "fire-breath", celebrate: "jumping", "curious-scan": "review", "ember-curl": "idle", "star-orbit": "idle", "rock-roll": "running", "sprout-stretch": "idle" } as Record<PetPose, string>)[activePose];
-  const motionClip = motionManifest ? motionAnimationClip(motionManifest, motionAnimationId) : null;
+  // A companion with its own animation for a signature move (Ember's "ember-curl" and "curious-scan")
+  // plays it instead of the generic stand-in.
+  const motionClip = motionManifest ? (activePose !== "walk" && motionManifest.animations[activePose] ? motionAnimationClip(motionManifest, activePose) : null) ?? motionAnimationClip(motionManifest, motionAnimationId) : null;
   const animationId = animationByPose[activePose];
   const customStrip = customProfile?.strips[animationId];
   const builtinPose = BUILTIN_POSE_BY_ACTIVITY[activePose];
@@ -274,8 +276,13 @@ export function PetWindow() {
   const blinkFrameCount = blinkStrip?.frameCount ?? (blinkSheet ? 11 : 0);
   const blinkStyle = blinkSheet ? { backgroundImage: `url(${blinkSheet})`, backgroundSize: `${frameWidth * blinkFrameCount}px ${frameHeight}px`, width: `${frameWidth}px`, height: `${frameHeight}px`, "--pet-blink-end": `${-frameWidth * (blinkFrameCount - 1)}px`, "--pet-blink-steps": blinkFrameCount - 1, "--pet-blink-duration": `${blinkDuration}ms` } as CSSProperties : undefined;
   const target = activity.target ?? { x: activity.facing === -1 ? 8 : 212, y: 104 };
-  const fightScene = !COMPOSITOR_DRAG && activePose === "pounce";
+  // The main process widens the window for both attacks, so both lay out on the wide scene.
+  const fightScene = !COMPOSITOR_DRAG && (activePose === "pounce" || activePose === "fire-breath");
   const sceneWidth = fightScene ? 460 : 220;
+  const attacking = !COMPOSITOR_DRAG && (activePose === "angry" || activePose === "pounce" || activePose === "fire-breath");
+  // How far the pounce carries the pet toward the cursor across the scene (bounded to stay on-scene).
+  const lungeX = Math.max(-170, Math.min(170, Math.round((target.x - sceneWidth / 2) * 0.72)));
+  const attackStyle = { "--pet-lunge-x": `${lungeX}px`, "--pet-aim-dx": `${target.x - sceneWidth / 2}px`, "--pet-aim-dy": `${target.y - 96}px` } as CSSProperties;
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.target instanceof Element && event.target.closest("button")) return;
     event.preventDefault();
@@ -328,9 +335,15 @@ export function PetWindow() {
       setBlinking(false);
     };
   }, [activePose, animationPaused, blinkDuration, blinkSheet, companionName, draggingState, genericBlinkFallback, pageVisible, stillPose]);
-  return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}${fightScene ? " is-fight-scene" : ""}${animationPaused ? " is-paused" : ""}${entering && !animationPaused ? " is-entering" : ""}${stillPose ? " is-still" : ""}`} style={{ width: `${sceneWidth}px` }} aria-label={`${companionName} desktop companion. Drag to move.`} data-pose={activePose} data-character={character}>
+  return <main className={`pet-window-root${COMPOSITOR_DRAG ? " is-compositor-drag" : ""}${fightScene ? " is-fight-scene" : ""}${animationPaused ? " is-paused" : ""}${entering && !animationPaused ? " is-entering" : ""}${stillPose ? " is-still" : ""}${attacking ? ` is-attacking is-${activePose}-attack` : ""}`} style={{ width: `${sceneWidth}px`, ...(attacking ? attackStyle : {}) }} aria-label={`${companionName} desktop companion. Drag to move.`} data-pose={activePose} data-character={character}>
     {bubble && <div className={`pet-window-bubble pet-window-bubble-${bubbleKind}`} role="status" aria-live="polite">{bubble}</div>}
     {activePose === "angry" && <span className={`pet-window-anger${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true"><i /><i /><i /></span>}
+    {attacking && <span className="pet-window-rage" aria-hidden="true" />}
+    {activePose === "angry" && activity.target && <span className="pet-window-target-lock is-acquiring" style={{ left: `${target.x}px`, top: `${target.y}px` }} aria-hidden="true" />}
+    {activePose === "pounce" && <span className="pet-window-impact" style={{ left: `${target.x}px`, top: `${target.y}px` }} aria-hidden="true"><b className="pet-window-shockwave" /><b className="pet-window-shockwave is-second" />{Array.from({ length: 10 }, (_, index) => <i key={index} style={{ "--spark-angle": `${index * 36 + 8}deg` } as CSSProperties} />)}</span>}
+    {activePose === "fire-breath" && <span className={`pet-window-embers${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true">{Array.from({ length: 9 }, (_, index) => <i key={index} style={{ "--ember-delay": `${index * 90}ms`, "--ember-lift": `${(index % 3) * 9 - 9}px` } as CSSProperties} />)}</span>}
+    {activePose === "fire-breath" && <span className="pet-window-scorch" style={{ left: `${target.x}px`, top: `${target.y}px` }} aria-hidden="true" />}
+    {activePose === "fire-breath" && <span className="pet-window-target-lock is-fire-target" style={{ left: `${target.x}px`, top: `${target.y}px` }} aria-hidden="true" />}
     {activePose === "pounce" && <span className={`pet-window-pounce-trail${activity.facing === -1 ? " is-facing-left" : ""}`} aria-hidden="true"><i /><i /><i /></span>}
     {activePose === "pounce" && <span className="pet-window-target-lock is-pounce-target" style={{ left: `${target.x}px`, top: `${target.y}px` }} aria-hidden="true" />}
     {activePose === "curious-scan" && <span className="pet-window-scanner" aria-hidden="true"><i /></span>}
