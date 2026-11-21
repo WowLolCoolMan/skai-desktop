@@ -26,6 +26,11 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
 {
     private static readonly HttpClient Shared = new() { Timeout = Timeout.InfiniteTimeSpan };
     private readonly HttpClient _http = httpClient ?? Shared;
+    private static readonly TimeSpan DuckDuckGoCooldown = TimeSpan.FromMinutes(10);
+    // Keyed by HttpClient so the app's shared client remembers failures across provider instances
+    // while each injected (test) client starts fresh.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<HttpClient, System.Runtime.CompilerServices.StrongBox<DateTimeOffset>> DuckDuckGoCooldowns = new();
+    private System.Runtime.CompilerServices.StrongBox<DateTimeOffset> DuckDuckGoRetryAfter => DuckDuckGoCooldowns.GetValue(_http, _ => new(DateTimeOffset.MinValue));
     private static readonly Regex ResultRegex = new(
         "<a[^>]*class=\"result__a\"[^>]*href=\"(?<url>[^\"]+)\"[^>]*>(?<title>.*?)</a>.*?<a[^>]*class=\"result__snippet\"[^>]*>(?<snippet>.*?)</a>",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
@@ -43,6 +48,9 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
         if (query.Length > 500) throw new ArgumentException("Search queries are limited to 500 characters.", nameof(query));
         var uri = new Uri("https://html.duckduckgo.com/html/?q=" + Uri.EscapeDataString(query));
         var html = string.Empty;
+        // DuckDuckGo blocks or times out on some networks. After a failure, skip it for a while
+        // instead of spending six seconds per query before every Bing fallback.
+        if (DateTimeOffset.UtcNow >= DuckDuckGoRetryAfter.Value)
         using (var duckDuckGoTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
         {
             duckDuckGoTimeout.CancelAfter(TimeSpan.FromSeconds(6));
@@ -53,9 +61,10 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                 using var response = await _http.SendAsync(request, duckDuckGoTimeout.Token);
                 if (response.IsSuccessStatusCode)
                     html = await BoundedHttpContent.ReadTextAsync(response.Content, duckDuckGoTimeout.Token, "Web search response");
+                else DuckDuckGoRetryAfter.Value = DateTimeOffset.UtcNow.Add(DuckDuckGoCooldown);
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
-            catch (HttpRequestException) { }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { DuckDuckGoRetryAfter.Value = DateTimeOffset.UtcNow.Add(DuckDuckGoCooldown); }
+            catch (HttpRequestException) { DuckDuckGoRetryAfter.Value = DateTimeOffset.UtcNow.Add(DuckDuckGoCooldown); }
         }
         var results = new List<WebSearchResult>();
         foreach (Match match in ResultRegex.Matches(html))
@@ -93,7 +102,12 @@ public sealed class WebSearchProvider(HttpClient? httpClient = null)
                         var unwrappedUrl = UnwrapBingResultUrl(rawUrl);
                         if (unwrappedUrl is null || !Uri.TryCreate(unwrappedUrl, UriKind.Absolute, out var absolute) || absolute.Scheme is not ("http" or "https") || IsSearchRedirect(absolute)) continue;
                         var title = Clean(match.Groups["title"].Value, 200);
-                        var snippet = Clean(match.Groups["snippet"].Value, 700);
+                        // The snippet is a later <p> inside the same result block; the result regex's
+                        // optional lazy group never captures it, so read it from the block itself.
+                        var blockEnd = fallbackHtml.IndexOf("<li class=\"b_algo\"", match.Index + match.Length, StringComparison.OrdinalIgnoreCase);
+                        var block = fallbackHtml[match.Index..(blockEnd < 0 ? Math.Min(fallbackHtml.Length, match.Index + 6_000) : blockEnd)];
+                        var paragraph = Regex.Match(block, "<p[^>]*>(?<snippet>.*?)</p>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                        var snippet = Clean(paragraph.Success ? paragraph.Groups["snippet"].Value : match.Groups["snippet"].Value, 700);
                         if (title.Length == 0) continue;
                         if (snippet.Length == 0) snippet = "Public search result. Open the source to review identity and details.";
                         results.Add(new WebSearchResult(title, absolute.AbsoluteUri, snippet));

@@ -11,6 +11,7 @@ const { pathToFileURL } = require("node:url");
 const { PetWanderGrid, PetWanderPlanner, PetWalk } = require("./pet-wander.cjs");
 const { listVisibleWindows } = require("./pet-surfaces.cjs");
 const { normalizePetBehaviorSettings, randomAttackSequence } = require("./pet-attack.cjs");
+const { CHASE_LIMITS, chaseDecision, strikeDecision, facingToward } = require("./pet-chase.cjs");
 const { createPetMotionEngine } = require("./pet-motion-engine.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
 const { augmentUserPath } = require("./user-path.cjs");
@@ -52,6 +53,19 @@ const standardRequestTimeoutMs = 30_000;
 // CPU inference. Keep the Agent Host alive long enough for that operation.
 const imageGenerationRequestTimeoutMs = 60 * 60_000;
 const chatRequestTimeoutMs = 5 * 60_000;
+// Persona research fans out across public sources; drafting runs two model passes, each up to the
+// chat deadline. Both used to hit the 30-second default, which restarted the host mid-work.
+const personaResearchRequestTimeoutMs = 4 * 60_000;
+const personaDraftRequestTimeoutMs = 12 * 60_000;
+const longRequestTimeouts = {
+  "chat.complete": chatRequestTimeoutMs,
+  "persona.group.complete": 15 * 60_000,
+  "persona.discover": 2 * 60_000,
+  "persona.research": personaResearchRequestTimeoutMs,
+  "persona.research.force": 10 * 60_000,
+  "persona.draft": personaDraftRequestTimeoutMs,
+  "marketplace.models.search": 2 * 60_000,
+};
 const chatHostDeadlineSeconds = 285;
 const globalLauncherAccelerator = "CommandOrControl+Alt+Space";
 let isQuitting = false;
@@ -85,6 +99,8 @@ let petBehaviorSequence = [];
 let petBehaviorOrigin = null;
 let petBehaviorTarget = null;
 let petBehaviorCursorTarget = null;
+let petBehaviorChaseStartedAt = 0;
+let petBehaviorLastRetargetAt = 0;
 let petAttackSceneBounds = null;
 let petBehaviorWalk = null;
 let petBehaviorWalkMode = null;
@@ -356,6 +372,27 @@ function petCursorIsInScene(cursor) {
   return petDisplay.id === cursorDisplay.id;
 }
 
+function petCenterPoint() {
+  const bounds = petWindow.getBounds();
+  return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+}
+
+/** Aim the attack at the cursor where it is now (it may have moved since the chase began). */
+function retargetPetBehavior(cursor) {
+  petBehaviorCursorTarget = { x: cursor.x, y: cursor.y };
+  petBehaviorTarget = petBehaviorTargetPosition(cursor);
+  petBehaviorLastRetargetAt = Date.now();
+}
+
+/** Stop chasing and walk home (the remaining sequence is dropped). */
+function abandonPetChase() {
+  petMotionEngine.unregister("behavior-walk");
+  petBehaviorWalk = null;
+  petBehaviorStepTimer = undefined;
+  petBehaviorSequence = [];
+  performNextPetBehaviorAction();
+}
+
 function makePetBehaviorWalk(fromBounds, toBounds, speed = 380) {
   if (!windowPositioningAvailable) return null;
   const { area, grid, blocked } = petWanderLayout();
@@ -387,6 +424,18 @@ function movePetForBehavior(mode, targetBounds) {
   // obstacle; using it throughout the walk can make Blaze visibly walk
   // backwards on a detour.
   const movementFacing = petBehaviorWalk.facingAt(elapsed) || petActivity.facing;
+  if (mode === "approach" && petBehaviorCursorTarget) {
+    const cursor = screen.getCursorScreenPoint();
+    const decision = chaseDecision({ now: Date.now(), chaseStartedAt: petBehaviorChaseStartedAt, lastRetargetAt: petBehaviorLastRetargetAt, cursor, target: petBehaviorCursorTarget, cursorOnPetDisplay: petCursorIsInScene(cursor) });
+    if (decision === "abort") { stopPetBehavior(true); return; }
+    if (decision === "give-up") { abandonPetChase(); return; }
+    if (decision === "retarget") {
+      // Follow the moving cursor: re-plan from where the pet is now toward where the cursor is now.
+      retargetPetBehavior(cursor);
+      const replanned = makePetBehaviorWalk(petWindow.getBounds(), petBehaviorTarget.position, CHASE_LIMITS.chargeSpeed);
+      if (replanned) { petBehaviorWalk = replanned; petBehaviorWalkStartedAt = performance.now(); return; }
+    }
+  }
   try {
     petWindow.setPosition(x, y);
     setPetActivity("walk", movementFacing);
@@ -403,9 +452,11 @@ function movePetForBehavior(mode, targetBounds) {
     petBehaviorWalk = null;
     petBehaviorStepTimer = undefined;
     if (mode === "approach") {
-      petWindow.setPosition(Math.trunc(targetBounds.x), Math.trunc(targetBounds.y));
-      setPetActivity("angry", petBehaviorTarget?.facing ?? 1, petBehaviorAimPoint());
-      petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 460);
+      const arrival = petBehaviorTarget?.position ?? targetBounds;
+      petWindow.setPosition(Math.trunc(arrival.x), Math.trunc(arrival.y));
+      // A beat of eye contact before striking reads as intent rather than a random twitch.
+      setPetActivity("angry", petBehaviorTarget?.facing ?? 1, petBehaviorAimPoint(), true);
+      petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 380);
     } else finishPetBehavior();
     return;
   }
@@ -418,7 +469,7 @@ function startPetBehaviorWalk(mode, targetBounds) {
     return;
   }
   const bounds = petWindow.getBounds();
-  petBehaviorWalk = makePetBehaviorWalk(bounds, targetBounds);
+  petBehaviorWalk = makePetBehaviorWalk(bounds, targetBounds, mode === "approach" ? CHASE_LIMITS.chargeSpeed : 380);
   if (!petBehaviorWalk) {
     if (mode === "approach") {
       setPetActivity("angry", petBehaviorTarget?.facing ?? 1, petBehaviorAimPoint());
@@ -466,14 +517,19 @@ function performNextPetBehaviorAction() {
     return;
   }
   if ((action === "pounce" || action === "fire-breath") && petBehaviorCursorTarget) {
+    // Strike at the cursor where it is now. If it got away, chase it again (within the chase
+    // budget); if it left the pet's display or the budget is spent, walk home.
     const cursor = screen.getCursorScreenPoint();
-    if (!petCursorIsInScene(cursor) || Math.hypot(cursor.x - petBehaviorCursorTarget.x, cursor.y - petBehaviorCursorTarget.y) > 22) {
-      // A composed routine may have non-cursor steps before its attack. Recheck
-      // the target at the point of impact so those steps never turn into a
-      // surprise chase when the user moves the pointer.
-      stopPetBehavior(true);
+    const decision = strikeDecision({ now: Date.now(), chaseStartedAt: petBehaviorChaseStartedAt, cursor, petCenter: petCenterPoint(), cursorOnPetDisplay: petCursorIsInScene(cursor) });
+    if (decision === "abort") { stopPetBehavior(true); return; }
+    if (decision === "give-up") { abandonPetChase(); return; }
+    retargetPetBehavior(cursor);
+    if (decision === "chase") {
+      petBehaviorSequence.unshift(action);
+      startPetBehaviorWalk("approach", petBehaviorTarget.position);
       return;
     }
+    petBehaviorTarget = { ...petBehaviorTarget, facing: facingToward(petCenterPoint(), cursor, petBehaviorTarget?.facing ?? 1) };
   }
   if (action === "approach-cursor") {
     if (petBehaviorTarget && petBehaviorCursorTarget) startPetBehaviorWalk("approach", petBehaviorTarget.position);
@@ -486,7 +542,8 @@ function performNextPetBehaviorAction() {
     setPetActivity("pounce", petBehaviorTarget?.facing ?? 1, aim, true);
     // Keep the attack state alive long enough for the anticipation, lunge,
     // contact effect, and recovery frames to read as one deliberate action.
-    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1150);
+    // Crouch, leap, impact (~650 ms), and recovery; matches the pet window's pounce keyframes.
+    petBehaviorStepTimer = setTimeout(performNextPetBehaviorAction, 1400);
     return;
   }
   if (action === "fire-breath") {
@@ -528,18 +585,18 @@ function startPetBehaviorAttack() {
   }
   const cursor = screen.getCursorScreenPoint();
   if (!petCursorIsInScene(cursor)) { stopPetBehavior(false); return; }
-  petBehaviorCursorTarget = cursor;
-  petBehaviorTarget = petBehaviorTargetPosition(cursor);
+  retargetPetBehavior(cursor);
+  petBehaviorChaseStartedAt = Date.now();
+  // Wind-up: the pet locks on and bristles before charging. Moving the cursor no longer cancels
+  // the attack; the chase follows it.
   setPetActivity("angry", petBehaviorTarget.facing, petBehaviorAimPoint(cursor));
   petBehaviorStepTimer = setTimeout(() => {
     if (!petBehaviorRunning || !petBehaviorCanRun()) { stopPetBehavior(false); return; }
     const current = screen.getCursorScreenPoint();
-    if (!petCursorIsInScene(current) || Math.hypot(current.x - cursor.x, current.y - cursor.y) > 22) {
-      stopPetBehavior(false);
-      return;
-    }
+    if (!petCursorIsInScene(current)) { stopPetBehavior(false); return; }
+    retargetPetBehavior(current);
     performNextPetBehaviorAction();
-  }, 420);
+  }, 700);
 }
 
 function schedulePetWander() {
@@ -1163,8 +1220,8 @@ function scheduleUpdateCheck() {
 
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "tasks.list",
-  "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "image.generate.start", "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.research.force", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove",
-  "settings.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
+  "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "image.generate.start", "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.research.force", "persona.draft", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove",
+  "settings.save", "profile.get", "profile.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start", "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list", "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect", "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "voice.models", "voice.speak", "voice.stop", "voice.status", "marketplace.catalog", "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "system.capacity", "airllm.status", "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.upsert", "corpus.remove",
   "workspace.pickFolder",
 ]);
 
@@ -1280,11 +1337,9 @@ function requestAgent(method, params) {
     ? { ...params, timeoutSeconds: chatHostDeadlineSeconds }
     : params;
   return new Promise((resolve) => {
-    const timeoutMs = method === "chat.complete"
-      ? chatRequestTimeoutMs
-      : method === "image.generate" || method === "pet.background.remove"
-        ? imageGenerationRequestTimeoutMs
-        : standardRequestTimeoutMs;
+    const timeoutMs = method === "image.generate" || method === "pet.background.remove"
+      ? imageGenerationRequestTimeoutMs
+      : longRequestTimeouts[method] ?? standardRequestTimeoutMs;
     const timer = setTimeout(() => {
       if (!pending.has(id)) return;
       pending.delete(id);

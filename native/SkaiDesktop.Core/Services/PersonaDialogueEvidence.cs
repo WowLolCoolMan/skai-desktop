@@ -32,10 +32,17 @@ public static class PersonaDialogueEvidence
     }
 
     public static SpeakerAttribution DetectSubjectSpeaker(string subject, string text)
+        => DetectSpeaker(BuildSubjectAliases(subject), text);
+
+    /// <summary>
+    /// Counts dialogue turns labelled with any of <paramref name="speakerLabels"/>. The first label is
+    /// the display name. Callers that know a subject's canonical aliases (for example a resolved
+    /// character whose transcripts label it "SpongeBob" rather than "SpongeBob SquarePants") pass them here.
+    /// </summary>
+    public static SpeakerAttribution DetectSpeaker(IReadOnlyList<string> speakerLabels, string text)
     {
-        var aliases = BuildSubjectAliases(subject);
+        var aliases = NormalizeLabels(speakerLabels);
         if (aliases.Count == 0) return new(0, string.Empty);
-        var fullName = aliases[0];
         var labelPattern = BuildSpeakerLabelPattern(aliases);
         var lines = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
         var count = 0;
@@ -47,12 +54,16 @@ public static class PersonaDialogueEvidence
             var following = FindFollowingDialogueLine(lines, index, labelPattern);
             if (inline.Length >= 12 || following.Length >= 12) count++;
         }
-        return new(count, fullName);
+        return new(count, aliases[0]);
     }
 
     public static string SelectAttributedSpeakerTurns(string subject, string text, int maxCharacters = 6_000)
+        => SelectSpeakerTurns(BuildSubjectAliases(subject), text, maxCharacters);
+
+    /// <summary>Selects turns labelled with any of <paramref name="speakerLabels"/>, relabelled with the first (display) label.</summary>
+    public static string SelectSpeakerTurns(IReadOnlyList<string> speakerLabels, string text, int maxCharacters = 6_000)
     {
-        var aliases = BuildSubjectAliases(subject);
+        var aliases = NormalizeLabels(speakerLabels);
         if (aliases.Count == 0) return string.Empty;
         var labelPattern = BuildSpeakerLabelPattern(aliases);
         var lines = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(line => line.Trim()).ToArray();
@@ -75,6 +86,17 @@ public static class PersonaDialogueEvidence
         return sample.ToString();
     }
 
+    private static List<string> NormalizeLabels(IReadOnlyList<string> labels)
+    {
+        var cleaned = labels.Select(label => Regex.Replace(label ?? string.Empty, @"\s+", " ").Trim())
+            .Where(label => label.Length >= 2)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        // Screenplays use uppercase cues; keep an uppercase copy of each label for that form.
+        foreach (var label in cleaned.ToArray()) if (!cleaned.Contains(label.ToUpperInvariant(), StringComparer.Ordinal)) cleaned.Add(label.ToUpperInvariant());
+        return cleaned;
+    }
+
     private static string FindFollowingDialogueLine(string[] lines, int speakerLine, Regex speakerPattern)
     {
         for (var index = speakerLine + 1; index < lines.Length; index++)
@@ -83,7 +105,8 @@ public static class PersonaDialogueEvidence
             if (speakerPattern.IsMatch(line)) return string.Empty;
             if (Regex.IsMatch(line, @"^\([^)]{1,100}\)$")) continue;
             if (Regex.IsMatch(line, @"^[A-Z][A-Z .'-]{2,35}$")) return string.Empty;
-            if (Regex.IsMatch(line, @"^(?:[A-Z][A-Z .'-]{2,35}|[\p{Lu}][\p{L}'.-]{1,30}(?:\s+[\p{Lu}][\p{L}'.-]{1,30}){1,3})\s*:\s*\S")) return string.Empty;
+            // Any other speaker label, including a single name ("Beth: [roaring]"), starts someone else's turn.
+            if (Regex.IsMatch(line, @"^(?:[A-Z][A-Z .'-]{2,35}|[\p{Lu}][\p{L}'.-]{1,30}(?:\s+[\p{Lu}][\p{L}'.-]{1,30}){0,3})\s*:\s*\S")) return string.Empty;
             return line;
         }
         return string.Empty;
