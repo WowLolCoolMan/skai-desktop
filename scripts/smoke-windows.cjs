@@ -19,6 +19,7 @@ const steps = [
   // (package:electron only publishes the Release host into dist/).
   "agent-host:build:smoke",
   "smoke:agent-host",
+  "smoke:airllm",
   "smoke:marketplace-host",
   "test",
   "test:update-policy",
