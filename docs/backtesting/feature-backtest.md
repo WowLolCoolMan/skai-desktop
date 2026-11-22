@@ -30,6 +30,7 @@ worktree.
 | Pets, Linux windowing, update policy, bridge/runtime/tray/local-only audits | Corresponding `test:*` and `audit:*` scripts |
 | Repository hygiene and release configuration | `check:hygiene`, `check:release-config`, `audit:future-features` |
 | Windows 0.1.4 unsigned installer packaging and update metadata | `SKAI_ALLOW_UNSIGNED_INSTALLER=true node scripts/package-windows-installer.cjs` — NSIS artifact and `latest.yml` verified locally |
+| Windows 0.1.4 clean install and uninstall | Unsigned installer installed into a disposable profile, launched the packaged app, passed the packaged smoke, then silently uninstalled; completed 2026-11-22. This does not cover upgrade/data retention or rollback. |
 | Real local Diffusers generation progress | Installed SD-Turbo runtime generated a 512×512 CPU image; worker reported actual 1/4 through 4/4 inference steps. Agent Host now forwards step progress and cancellation to the image operation. |
 
 ## Conditional or incomplete coverage
@@ -42,7 +43,7 @@ worktree.
 | Persona model quality | Research succeeds with installed `qwen3:14b`; one character draft returned a partial card. Core deterministic voice-card and source-boundary tests pass, but more model-specific quality evaluation is needed. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |
 | Release signing and lifecycle | Release audit confirms the gates exist. Cryptographic signing and clean-machine upgrade/rollback still require configured CI secrets and Windows/Ubuntu runners. |
-| Local Windows upgrade lifecycle | A current 0.1.4 installer can be built and metadata-verified locally, but the disposable 0.1.3 → 0.1.4 upgrade smoke needs a real 0.1.3 installer artifact. The unsigned local artifact is not release evidence. |
+| Local Windows upgrade lifecycle | Disposable clean install/launch/uninstall passed for unsigned 0.1.4. The 0.1.3 → 0.1.4 upgrade smoke still needs a real 0.1.3 installer artifact; upgrade data retention and rollback remain unverified. |
 | WebM video sampling | H.264 MP4 sampling passes. The smoke harness's data-URL WebM probe is rejected by Chromium's URL safety policy on this host, so the run reports this and leaves actual packaged WebM decoding unverified. |
 | Linux AppImage packaging | The packager correctly refuses to run on Windows; build and acceptance require an Ubuntu/Linux runner. |
 

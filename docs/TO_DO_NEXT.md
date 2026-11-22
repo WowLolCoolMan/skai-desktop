@@ -169,13 +169,16 @@ and to any detailed plan rather than copying their full contents here.
 - **Owner:** Unclaimed
 - **Context:** The 0.1.4 Windows NSIS installer and `latest.yml` were built and
   metadata-verified unsigned on 2026-11-22. The owner has chosen to defer
-  certificates; local unsigned validation can proceed. A published 0.1.3
-  installer is unavailable, so the documented upgrade smoke has not run.
-  Linux acceptance still requires a Linux runner.
+  certificates; local unsigned validation can proceed. On 2026-11-22, the
+  unsigned 0.1.4 installer installed into a disposable profile, launched the
+  packaged app, passed its smoke checks, and silently uninstalled. A published
+  0.1.3 installer is unavailable, so upgrade/data-retention/rollback remain
+  unverified. Linux acceptance still requires a Linux runner.
 - **Agreed approach:** Use the release checklist against exact packaged
-  artifacts. Verify signatures, checksums, clean install, upgrade with data
-  retention, uninstall, and rollback on each supported target. Do not mark a
-  platform ready based on development builds alone.
+  artifacts. Verify checksums, clean install and uninstall (now accepted for
+  unsigned Windows 0.1.4), then upgrade with data retention and rollback on
+  each supported target. Signing is intentionally deferred by the owner. Do not
+  mark a platform ready based on development builds alone.
 - **Acceptance:** Attach artifact identifiers and test evidence for each target;
   signing and update verification fail closed; upgrade and rollback preserve
   user data; all release blockers in the readiness doc are resolved or clearly
