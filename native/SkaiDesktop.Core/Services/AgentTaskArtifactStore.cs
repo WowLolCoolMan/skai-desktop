@@ -337,7 +337,7 @@ public sealed class AgentTaskArtifactStore
             NormalizeIds(task.DependsOn);
             if (task.VerificationEvidence is { } evidence)
             {
-                if (evidence.CheckId.Length > 128 || evidence.CheckLabel.Length > 200 || evidence.Command.Length > 2_000 || evidence.RelativeWorkingDirectory.Length > 512 || evidence.Source.Length > 200 || evidence.Output.Length > 120_000 || evidence.Output.Any(char.IsControl) && evidence.Output.Any(character => character is not ('\r' or '\n' or '\t')))
+                if (evidence.CheckId.Length > 128 || evidence.CheckLabel.Length > 200 || evidence.Command.Length > 2_000 || evidence.RelativeWorkingDirectory.Length > 512 || evidence.Source.Length > 200 || evidence.Output.Length > 120_000 || evidence.Output.Any(character => char.IsControl(character) && character is not ('\r' or '\n' or '\t')))
                     throw new InvalidDataException("The task verification evidence exceeds its safety limit.");
             }
             if (task.DependsOn.Any(id => !ids.Contains(id)) || task.DependsOn.Contains(task.Id, StringComparer.Ordinal)) throw new InvalidDataException("The agent task store contains an invalid dependency.");

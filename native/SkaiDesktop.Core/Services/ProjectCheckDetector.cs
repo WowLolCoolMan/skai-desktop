@@ -28,10 +28,11 @@ public sealed class ProjectCheckDetector
         {
             using var document = JsonDocument.Parse(File.ReadAllText(package));
             if (!document.RootElement.TryGetProperty("scripts", out var scripts) || scripts.ValueKind != JsonValueKind.Object) return;
+            var npm = OperatingSystem.IsWindows() ? "npm.cmd" : "npm";
             foreach (var name in new[] { "test", "check", "typecheck", "lint", "build", "verify" })
             {
                 if (!scripts.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String) continue;
-                var command = $"npm run {name}";
+                var command = $"{npm} run {name}";
                 checks.Add(new($"npm:{name}", $"npm · {name}", command, ".", "package.json scripts"));
             }
         }

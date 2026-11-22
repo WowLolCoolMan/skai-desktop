@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SkaiDesktop.Core.Infrastructure;
 
@@ -13,6 +14,7 @@ public sealed class WorkspaceCommandRunner
     public const int MaxCommandCharacters = 4_000;
     public const int MaxOutputCharacters = 30_000;
     public static readonly TimeSpan MaxTimeout = TimeSpan.FromMinutes(2);
+    private static readonly Regex TerminalControlSequence = new("\\x1b(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\x07]*(?:\\x07|\\x1b\\\\))", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public async Task<WorkspaceCommandResult> RunAsync(
         string selectedRoot,
@@ -89,9 +91,11 @@ public sealed class WorkspaceCommandRunner
             throw;
         }
         await Task.WhenAll(standardOutput, standardError).ConfigureAwait(false);
+        var capturedOutput = TerminalControlSequence.Replace(output.ToString(), string.Empty);
+        capturedOutput = new string(capturedOutput.Where(character => !char.IsControl(character) || character is '\r' or '\n' or '\t').ToArray());
         return new WorkspaceCommandResult(
             process.ExitCode,
-            output.ToString(),
+            capturedOutput,
             timedOut,
             truncated != 0,
             workingDirectory,

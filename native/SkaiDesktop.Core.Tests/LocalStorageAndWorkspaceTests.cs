@@ -354,6 +354,11 @@ internal static class LocalStorageAndWorkspaceTests
             {
                 Environment.SetEnvironmentVariable(secretEnvironmentName, previousSecretEnvironment);
             }
+            var coloredCommand = await commandRunner.RunAsync(workspacePath, ".",
+                OperatingSystem.IsWindows() ? "Write-Output ([char]27 + '[31mcheck-output[0m')" : "printf '\\033[31mcheck-output\\033[0m'",
+                TimeSpan.FromSeconds(10));
+            Check(coloredCommand.Output.Contains("check-output", StringComparison.Ordinal) && !coloredCommand.Output.Contains('\u001b'),
+                "project command output strips terminal control sequences before it is saved as verification evidence");
             var commandResult = await commandRunner.RunAsync(workspacePath, "src",
                 OperatingSystem.IsWindows() ? "Write-Output skai-command-ok" : "printf skai-command-ok",
                 TimeSpan.FromSeconds(10));

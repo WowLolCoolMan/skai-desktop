@@ -167,7 +167,7 @@ public static partial class AgentHostLoop
         if (!string.Equals(task.ProjectId, projectId, StringComparison.Ordinal)) throw new InvalidOperationException("The selected task does not belong to this project.");
         var root = project.FolderPaths.FirstOrDefault() ?? throw new InvalidOperationException("Select a project folder before running a check.");
         var started = DateTimeOffset.UtcNow;
-        var result = await new WorkspaceCommandRunner().RunAsync(root, check.RelativeWorkingDirectory, check.Command, TimeSpan.FromMinutes(5)).ConfigureAwait(false);
+        var result = await new WorkspaceCommandRunner().RunAsync(root, check.RelativeWorkingDirectory, check.Command, WorkspaceCommandRunner.MaxTimeout).ConfigureAwait(false);
         var completed = DateTimeOffset.UtcNow;
         var evidence = new ProjectCheckEvidence(check.Id, check.Label, check.Command, check.RelativeWorkingDirectory, check.Source, result.ExitCode, result.Output, result.TimedOut, result.OutputTruncated, started, completed);
         var updated = CreateTaskStore().AttachVerificationEvidence(taskId, evidence);

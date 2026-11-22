@@ -348,6 +348,16 @@ Move finished entries here with their commit/PR and verification evidence.
   cap but not under 256 MiB. The full native Core suite and Agent Host build
   pass. Filesystem/network sandboxing and Linux containment remain outstanding.
 
+- **2026-11-22 — Explicit project-check acceptance and Windows command fixes.**
+  The task workflow smoke now proves preflight does not execute a detected test,
+  then explicitly runs that test and verifies its nonzero exit status and output
+  persist beside the completed task. This exposed and fixed a five-minute
+  verification timeout that exceeded the runner's two-minute limit, Windows
+  PowerShell selecting the blocked `npm.ps1` shim, and multiline output being
+  rejected by an overly broad control-character check. Project command output
+  now strips terminal control sequences before persistence. Native Core checks
+  and `node scripts/smoke-task-journal.cjs` pass.
+
 - **2026-11-22 — Persona profile drafting recovery.** Empty structured draft
   passes now receive one bounded retry with compact evidence and concise
   instructions. Core tests and Agent Host build pass; the live Sam Hyde

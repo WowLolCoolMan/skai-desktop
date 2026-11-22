@@ -18,6 +18,7 @@ fs.mkdirSync(profile, { recursive: true });
 fs.mkdirSync(workspace, { recursive: true });
 fs.writeFileSync(path.join(workspace, "README.md"), "journal read fixture\n");
 fs.writeFileSync(path.join(workspace, "package.json"), JSON.stringify({ scripts: { build: "node build.js", test: "node test.js" } }, null, 2));
+fs.writeFileSync(path.join(workspace, "test.js"), "require('node:fs').writeFileSync('preflight-executed.marker', 'unexpected'); console.log('explicit-project-check-output'); process.exit(7);\n");
 const env = {
   ...process.env,
   SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
@@ -103,8 +104,13 @@ async function run() {
   const project = await call("project.save", { name: "Journal smoke project", folderPaths: [workspace] });
   if (!project.ok) throw new Error(`Could not create the disposable project: ${JSON.stringify(project)}`);
   const preflight = await call("project.preflight", { id: project.result.id });
-  if (!preflight.ok || !preflight.result?.manifests?.includes("package.json") || !preflight.result?.runtimes?.some(item => item.name === "Node.js") || !preflight.result?.suggestedChecks?.includes("npm run build") || !preflight.result?.executionNote?.includes("not been run"))
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  if (!preflight.ok || !preflight.result?.manifests?.includes("package.json") || !preflight.result?.runtimes?.some(item => item.name === "Node.js") || !preflight.result?.suggestedChecks?.includes(`${npm} run build`) || !preflight.result?.executionNote?.includes("not been run"))
     throw new Error(`Project preflight did not report a local, review-first setup check: ${JSON.stringify(preflight)}`);
+  if (fs.existsSync(path.join(workspace, "preflight-executed.marker"))) throw new Error("Read-only project preflight executed the package test script.");
+  const detectedChecks = await call("project.checks.list", { id: project.result.id });
+  if (!detectedChecks.ok || !detectedChecks.result?.checks?.some(item => item.id === "npm:test" && item.command === `${npm} run test`))
+    throw new Error(`The project did not expose its test script as an explicit selectable check: ${JSON.stringify(detectedChecks)}`);
   const task = await call("tasks.plan", { title: "Read-file journal smoke", instruction: "Read README.md, then report a short summary.", projectId: project.result.id, model: "journal-smoke-model", modelProvider: "Local API", modelSizeBytes: 1, modelContextLength: 4096 });
   if (!task.ok) throw new Error(`Could not create the coding task: ${JSON.stringify(task)}`);
   const taskQueued = await call("tasks.queue", { id: task.result.id });
@@ -122,6 +128,12 @@ async function run() {
   const events = finalTask.activity?.map(item => item.type) ?? [];
   if (!events.includes("tool.read_file.started") || !events.includes("tool.read_file.completed") || !events.includes("task.verification.completed"))
     throw new Error(`Task timeline did not preserve the read and verification events: ${events.join(", ")}`);
+  const projectCheck = await call("project.check.run", { projectId: project.result.id, taskId: task.result.id, checkId: "npm:test" });
+  if (!projectCheck.ok || projectCheck.result?.exitCode !== 1 || !projectCheck.result?.output?.includes("explicit-project-check-output"))
+    throw new Error(`The explicitly selected project check did not preserve its failing exit status and output: ${JSON.stringify(projectCheck)}`);
+  if (!fs.existsSync(path.join(workspace, "preflight-executed.marker"))) throw new Error("The explicitly selected project check did not execute its fixture script.");
+  if (projectCheck.result?.task?.verificationEvidence?.exitCode !== 1 || !projectCheck.result?.task?.verificationEvidence?.output?.includes("explicit-project-check-output"))
+    throw new Error("The selected check result was not persisted with the task's reviewable artifact.");
   const journalText = fs.readFileSync(env.SRAI_OPERATIONS_PATH, "utf8");
   if (journalText.includes("journal read fixture")) throw new Error("The operation journal recorded file contents instead of metadata.");
 
@@ -146,7 +158,7 @@ async function run() {
   if (recoveredTask?.status !== "blocked" || !recoveredTask.activity?.some(item => item.type === "run.needs_reconciliation"))
     throw new Error(`Restart did not mark the in-flight task for review: ${JSON.stringify(recoveredTask)}`);
   if (modelCalls !== callsAtShutdown) throw new Error(`Restart recovery replayed the local model request: ${callsAtShutdown} -> ${modelCalls}.`);
-  console.log("Task workflow smoke passed: read-only preflight, approval review, safe file events, verification, redaction, and no-replay recovery.");
+  console.log("Task workflow smoke passed: read-only preflight, explicit selected-check failure evidence, approval review, safe file events, redaction, and no-replay recovery.");
 }
 
 run().catch(error => {

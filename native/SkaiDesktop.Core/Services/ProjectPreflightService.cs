@@ -58,7 +58,7 @@ public sealed class ProjectPreflightService
             using var document = JsonDocument.Parse(File.ReadAllText(path));
             if (!document.RootElement.TryGetProperty("scripts", out var scripts) || scripts.ValueKind != JsonValueKind.Object) return;
             foreach (var script in scripts.EnumerateObject())
-                if (script.Name is "build" or "test" or "check" or "lint" or "typecheck") checks.Add($"npm run {script.Name}");
+                if (script.Name is "build" or "test" or "check" or "lint" or "typecheck") checks.Add($"{(OperatingSystem.IsWindows() ? "npm.cmd" : "npm")} run {script.Name}");
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException) { }
     }

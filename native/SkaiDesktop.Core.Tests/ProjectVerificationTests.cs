@@ -12,9 +12,14 @@ internal static class ProjectVerificationTests
         {
             File.WriteAllText(Path.Combine(root, "package.json"), "{\"scripts\":{\"test\":\"vitest run\",\"dev\":\"vite\",\"build\":\"vite build\"}}");
             var checks = new ProjectCheckDetector().Detect([root]);
-            Check(checks.Any(check => check.Id == "npm:test" && check.Command == "npm run test"), "project check detector finds explicit package test scripts");
+            var npm = OperatingSystem.IsWindows() ? "npm.cmd" : "npm";
+            Check(checks.Any(check => check.Id == "npm:test" && check.Command == $"{npm} run test"), "project check detector finds explicit package test scripts using the Windows command shim when needed");
             Check(checks.Any(check => check.Id == "npm:build"), "project check detector finds build scripts");
             Check(checks.All(check => check.Id != "npm:dev"), "project check detector excludes non-verification package scripts");
+            var marker = Path.Combine(root, "preflight-ran.marker");
+            File.WriteAllText(Path.Combine(root, "test.js"), "require('node:fs').writeFileSync('preflight-ran.marker', 'unexpected');\n");
+            var preflight = new ProjectPreflightService().Inspect([root]);
+            Check(preflight.SuggestedChecks.Contains($"{npm} run test") && !File.Exists(marker), "preflight can list a package check without executing its fixture script");
 
             var store = new AgentTaskArtifactStore(Path.Combine(root, "tasks.json"));
             var task = store.Create("Verify project", "Run a selected project check.");
@@ -22,9 +27,9 @@ internal static class ProjectVerificationTests
             Check(store.TryClaimReady()?.Status == AgentTaskStatuses.Running, "verification fixture claims a task before evidence is attached");
             store.Complete(task.Id, "Task changes are ready for review.");
             var started = DateTimeOffset.UtcNow.AddSeconds(-1);
-            store.AttachVerificationEvidence(task.Id, new ProjectCheckEvidence("package:test", "Test", "npm run test", ".", "package.json", 0, "passed", false, false, started, DateTimeOffset.UtcNow));
+            store.AttachVerificationEvidence(task.Id, new ProjectCheckEvidence("package:test", "Test", "npm run test", ".", "package.json", 0, "passed\nwith a second line", false, false, started, DateTimeOffset.UtcNow));
             var reloaded = new AgentTaskArtifactStore(Path.Combine(root, "tasks.json")).Get(task.Id);
-            Check(reloaded.VerificationEvidence?.ExitCode == 0 && reloaded.VerificationEvidence.Output == "passed", "verification evidence persists beside the task artifact");
+            Check(reloaded.VerificationEvidence?.ExitCode == 0 && reloaded.VerificationEvidence.Output == "passed\nwith a second line", "multiline verification evidence persists beside the task artifact");
         }
         finally { DeleteDirectoryTree(root); }
     }
