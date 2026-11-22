@@ -139,7 +139,8 @@ export function SettingsPage(props: SettingsProps) {
     let current = true;
     if (voiceSettings.source !== "cloud") return () => { current = false; };
     void window.skaiAgent?.request("voice.credentials.status", { provider: voiceSettings.cloudProvider }).then((response) => {
-      if (!current || !response?.ok) return;
+      if (!current) return;
+      if (!response?.ok) { setCloudCredentialAvailable(false); setCloudCredentialConfigured(false); return; }
       const result = response.result as { available?: boolean; configured?: boolean };
       setCloudCredentialAvailable(Boolean(result.available));
       setCloudCredentialConfigured(Boolean(result.configured));

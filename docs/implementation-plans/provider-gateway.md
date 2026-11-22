@@ -69,8 +69,13 @@ complete, enforceable operating mode.
 - **Progress:** Cloud voice keys now use per-provider OS-protected storage on
   Windows and the Linux Secret Service. The renderer can save, check, replace,
   and remove keys; speech requests identify a provider but do not carry its
-  credential. The generic provider-connection contract and macOS credential
-  support remain open.
+  credential. Core now exposes an `ISecretStore` contract with a shared Windows
+  DPAPI/Linux Secret Service implementation. The voice-specific store delegates
+  through it while retaining its previous Windows file path, DPAPI entropy, and
+  Linux keyring attributes. Windows tests cover generic key round-trip,
+  connection isolation, ciphertext at rest, removal, and unsafe IDs. macOS
+  storage plus Linux live-keyring and corrupted/unavailable-store acceptance
+  remain open.
 - Define typed provider-connection metadata, provider capabilities, and
   per-request route identity.
 - Add provider-neutral OS credential storage and tests for unavailable,

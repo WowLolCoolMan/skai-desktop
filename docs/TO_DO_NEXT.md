@@ -264,9 +264,11 @@ and to any detailed plan rather than copying their full contents here.
   offline-only mode. Never silently change provider or send data to a remote
   endpoint without the user's selected connection.
 - **Progress:** Cloud voice keys now use per-provider OS-protected storage on
-  Windows and the Linux desktop keyring. Speech requests no longer carry keys.
-  This is a voice-specific credential slice; generic model-provider connection
-  metadata, routing, and macOS secure storage remain unfinished.
+  Windows and the Linux desktop keyring. Core now has a shared `ISecretStore`
+  contract; voice credentials use it without changing existing storage IDs.
+  Speech requests no longer carry keys. Generic model-provider connection
+  metadata/routing, macOS support, and live Linux keyring acceptance remain
+  unfinished.
 - **Acceptance:** Users can add, verify, select, and remove supported local and
   remote connections; secrets are stored by the OS and do not appear in
   renderer state, logs, settings files, or diagnostics; chat streams and

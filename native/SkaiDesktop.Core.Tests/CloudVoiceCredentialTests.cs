@@ -26,6 +26,30 @@ internal static class CloudVoiceCredentialTests
             catch (ArgumentException) { Check(true, "voice credential storage rejects unknown providers"); }
             await store.DeleteAsync("elevenlabs");
             Check(!await store.HasAsync("elevenlabs"), "voice credential removal clears the provider key");
+
+            var providerDirectory = Path.Combine(directory, "generic-provider");
+            var providerStore = new PlatformSecretStore("skaidesktop-provider", "model provider", providerDirectory);
+            const string providerKey = "generic-provider-key-0987654321";
+            Check(await providerStore.GetAsync("connection-01") is null, "generic secret store reports a missing connection credential");
+            await providerStore.SetAsync("connection-01", providerKey);
+            Check(await providerStore.GetAsync("connection-01") == providerKey, "generic secret store round-trips a credential by stable key");
+            Check(!Encoding.UTF8.GetString(await File.ReadAllBytesAsync(Path.Combine(providerDirectory, "connection-01.bin"))).Contains(providerKey, StringComparison.Ordinal), "generic secret store encrypts credentials at rest");
+            Check(await providerStore.GetAsync("connection-02") is null, "generic secret store isolates credentials by connection");
+            var otherProviderStore = new PlatformSecretStore("skaidesktop-other-provider", "model provider", providerDirectory);
+            try
+            {
+                _ = await otherProviderStore.GetAsync("connection-01");
+                throw new Exception("Expected credentials from separate services to remain cryptographically isolated.");
+            }
+            catch (System.Security.Cryptography.CryptographicException) { Check(true, "generic secret store isolates credentials by service namespace"); }
+            await providerStore.RemoveAsync("connection-01");
+            Check(await providerStore.GetAsync("connection-01") is null, "generic secret store removes credentials by stable key");
+            try
+            {
+                await providerStore.SetAsync("../outside", providerKey);
+                throw new Exception("Expected unsafe secret-store identifiers to be rejected.");
+            }
+            catch (ArgumentException) { Check(true, "generic secret store rejects path-shaped identifiers"); }
         }
         finally
         {
