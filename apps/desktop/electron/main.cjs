@@ -23,6 +23,7 @@ const { createThemeService } = require("./theme-service.cjs");
 const { createAgentHostClient } = require("./agent-host-client.cjs");
 const { createPetStateStore } = require("./pet-state-store.cjs");
 const { createTrayController } = require("./tray-controller.cjs");
+const { createPetWindowController } = require("./pet-window.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -912,81 +913,34 @@ function petCompletionText(method, response) {
   return text ? { text, kind: "success" } : null;
 }
 
-// X11 sessions without a compositor (plain i3/bspwm/Openbox) cannot show transparent
-// windows; Percy would be a black box there, so it gets an opaque card instead.
 let petOpaque = false;
-async function resolvePetSurface() {
-  if (process.platform !== "linux" || displayBackend.backend !== "x11" || isWaylandSession(process.env)) return;
-  const composited = await x11HasCompositor();
-  petOpaque = composited === false;
-  if (petOpaque) console.log("[windowing] no X11 compositor detected; Percy uses an opaque window.");
-}
-
-function createPetWindow() {
-  if (petWindow && !petWindow.isDestroyed()) return petWindow;
-  const savedState = petStateStore.read();
-  petReady = false;
-  petWindow = new BrowserWindow({
-    // Native Wayland ignores client-chosen positions; let the compositor place it.
-    ...(windowPositioningAvailable ? petBounds() : { width: PET_WINDOW_WIDTH, height: PET_WINDOW_HEIGHT }),
-    // _NET_WM_WINDOW_TYPE_TOOLBAR makes tiling X11 window managers (i3, bspwm,
-    // awesome, and Hyprland/Sway for XWayland clients) float Percy instead of
-    // tiling it into the layout.
-    ...(process.platform === "linux" ? { type: "toolbar" } : {}),
-    title: "Skai Desktop · Pets",
-    transparent: !petOpaque,
-    frame: false,
-    resizable: false,
-    movable: true,
-    minimizable: false,
-    maximizable: false,
-    closable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    hasShadow: false,
-    backgroundColor: petOpaque ? "#10141d" : "#00000000",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      // Percy is an unfocused companion; without this Chromium throttles or pauses its sprite
-      // animation whenever another window has focus or the OS reports it occluded (Windows).
-      backgroundThrottling: false,
-      preload: path.join(__dirname, "preload.cjs"),
-    },
-  });
-  petWindow.setAlwaysOnTop(true, "floating");
-  petWindow.on("moved", () => { if (!petWanderMoving && !petEntranceMoving) persistPetState(); });
-  petWindow.webContents.on("did-finish-load", () => {
+// X11 without a compositor cannot render a transparent companion window. Keep
+// native window setup here as a small lifecycle boundary, separate from startup.
+const petWindowController = createPetWindowController({
+  BrowserWindow,
+  process,
+  displayBackend,
+  isWaylandSession,
+  x11HasCompositor,
+  canPositionWindows: windowPositioningAvailable,
+  getPetWindow: () => petWindow,
+  setPetWindow: (window) => { petWindow = window; },
+  getSavedState: () => petStateStore.read(),
+  getPetBounds: petBounds,
+  getIsQuitting: () => isQuitting,
+  getPetOpaque: () => petOpaque,
+  setPetOpaque: (opaque) => { petOpaque = opaque; },
+  setPetReady: (ready) => { petReady = ready; },
+  onMoved: () => { if (!petWanderMoving && !petEntranceMoving) persistPetState(); },
+  onLoaded: () => {
     petReady = true;
-    petWindow.webContents.send("pet:activity", petActivity);
+    petWindow?.webContents.send("pet:activity", petActivity);
     flushPetMessages();
     schedulePetBehaviorAttack();
-  });
-  // Window managers can close Percy directly (Hyprland/i3 close-window keybinds
-  // ignore `closable: false`). Treat that as "hide Percy" so the tray and
-  // Settings can bring it back, instead of destroying the window for the session.
-  petWindow.on("close", (event) => {
-    if (isQuitting) return;
-    event.preventDefault();
-    setPetVisible(false);
-  });
-  petWindow.on("closed", () => { petReady = false; stopPetDrag(); petWindow = undefined; });
-  if (typeof petWindow.setVisibleOnAllWorkspaces === "function") {
-    petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  }
-  // On native Wayland, dragging is handed to the compositor (app-region drag →
-  // xdg_toplevel.move) because the app can neither read nor set its position.
-  const petQuery = { pet: "1", ...(process.env.SKAI_RIG_PET === "1" ? { rig: "1" } : {}), ...(windowPositioningAvailable ? {} : { drag: "compositor" }), ...(petOpaque ? { surface: "opaque" } : {}) };
-  const devUrl = process.env.SKAI_DESKTOP_RENDERER_URL;
-  if (devUrl) {
-    const url = new URL(devUrl);
-    for (const [key, value] of Object.entries(petQuery)) url.searchParams.set(key, value);
-    void petWindow.loadURL(url.toString());
-  } else {
-    void petWindow.loadFile(path.join(rendererRoot, "dist", "index.html"), { query: petQuery });
-  }
-  petWindow.once("ready-to-show", () => {
+  },
+  onClose: () => setPetVisible(false),
+  onClosed: () => { petReady = false; stopPetDrag(); petWindow = undefined; },
+  onReadyToShow: (savedState) => {
     if (savedState.visible !== false) {
       const entering = startPetEntrance();
       if (!entering) {
@@ -996,9 +950,14 @@ function createPetWindow() {
         persistPetState();
       }
     } else persistPetState();
-  });
-  return petWindow;
-}
+  },
+  getRendererUrl: () => process.env.SKAI_DESKTOP_RENDERER_URL,
+  getRigPetEnabled: () => process.env.SKAI_RIG_PET === "1",
+  preloadPath: path.join(__dirname, "preload.cjs"),
+  rendererIndexPath: path.join(rendererRoot, "dist", "index.html"),
+});
+const resolvePetSurface = () => petWindowController.resolveSurface();
+const createPetWindow = () => petWindowController.create();
 
 function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) {

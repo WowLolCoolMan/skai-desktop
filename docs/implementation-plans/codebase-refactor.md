@@ -208,6 +208,10 @@ checked per slice.
 - Moved workspace tab schema validation, local persistence, recovery limits,
   and ID creation into `workspaceTabStore.ts`. Existing storage keys and the
   16-open/10-closed tab limits remain unchanged.
+- Moved Percy’s Electron window construction, display-surface fallback, load
+  setup, and native window event wiring into `pet-window.cjs`. App startup still
+  owns pet behavior and callbacks; Wayland positioning, X11 transparency,
+  saved visibility, tray close behavior, and renderer query flags are preserved.
 - Re-ran renderer typecheck/build, Agent Host/Core Release build, Electron
   syntax checks and packaging, bridge-method audit, and local-only audit after
   the final slices. The packaged renderer still reports the existing large
@@ -228,11 +232,12 @@ checked per slice.
 ## Follow-on maintenance and product acceptance
 
 - Continue with small, independently reviewable slices when these areas are
-  next touched: Electron pet-window orchestration in `main.cjs`, remaining
-  persona research orchestration in Agent Host, workspace coordination in
-  `useDesktopWorkspace.ts`, Marketplace/Plugins page composition, and model or
-  workflow Core services. Their size alone is not a reason for mechanical
-  splitting; extract only cohesive behavior with a clear owner.
+  next touched: remaining pet movement/behavior orchestration in `main.cjs`,
+  remaining persona research orchestration in Agent Host, workspace
+  coordination in `useDesktopWorkspace.ts`, Marketplace/Plugins page
+  composition, and other model or workflow Core services. Their size alone is
+  not a reason for mechanical splitting; extract only cohesive behavior with a
+  clear owner.
 - Keep the protocol entry point responsible for process I/O and lifecycle,
   Electron `main.cjs` responsible for app startup/orchestration, and feature
   pages responsible for composition. Continue moving domain behavior behind

@@ -80,10 +80,11 @@ and to any detailed plan rather than copying their full contents here.
 - **Context:** The first all-layer pass is pushed, and follow-on slices are
   underway. Persona evidence and progressive research, GitHub workspace
   status/process boundaries, Agent Host Marketplace model handlers and task
-  journal, Electron tray behavior, and workspace tab persistence have now been
-  extracted. Remaining high-value candidates include Electron pet orchestration,
-  Agent Host research sequencing, workspace state coordination, Marketplace/
-  Plugins composition, and model/workflow services.
+  journal, Electron tray behavior and Percy window construction, and workspace
+  tab persistence have now been extracted. Remaining high-value candidates
+  include pet movement/behavior orchestration, Agent Host research sequencing,
+  workspace state coordination, Marketplace/Plugins composition, and
+  model/workflow services.
 - **Agreed approach:** Refactor incrementally by cohesive responsibility,
   preserve bridge/storage/runtime behavior, sync with `main` before each
   commit, and verify the layer being changed. Do not split files mechanically
