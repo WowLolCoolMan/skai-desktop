@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a user-facing improvement or new capability.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues and the capability matrix / To Do Next docs first. Skai keeps model execution local; requests for hosted inference or cloud sync are outside the current product boundary.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What task or user need is currently difficult?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the behavior you want, without prescribing an implementation unless you have a reason.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance examples
+      description: Give concrete examples of how someone would know this is done.
+    validations:
+      required: false
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Product boundary
+      options:
+        - label: I have considered the local-first model and data boundary.
+          required: true

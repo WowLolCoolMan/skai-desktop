@@ -48,3 +48,12 @@ override the current capability matrix or local-only model boundary.
 
 - [Super-app research](SUPER_APP_RESEARCH.md)
 - [Open WebUI research](OPEN_WEBUI_RESEARCH.md)
+
+## Community and licensing
+
+- [Contributor guide](../CONTRIBUTING.md)
+- [Code of Conduct](../CODE_OF_CONDUCT.md)
+- [Security policy](../SECURITY.md)
+- [Accessibility statement](../ACCESSIBILITY.md)
+- [Source Reference License](../LICENSE)
+- [Third-party notices](../THIRD_PARTY_NOTICES.md)
