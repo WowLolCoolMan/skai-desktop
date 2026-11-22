@@ -61,6 +61,8 @@
     "package:linux:appimage": "node scripts/package-linux-appimage.cjs",
     "check:syntax:linux-packager": "node --check scripts/package-linux-appimage.cjs",
     "check:release-readiness": "node scripts/validate-release-readiness.cjs",
-    "smoke:personas": "node scripts/smoke-personas.cjs"
+    "smoke:personas": "node scripts/smoke-personas.cjs",
+    "smoke:image:workflow": "node scripts/smoke-image-workflow.cjs",
+    "check:syntax:image-workflow": "node --check scripts/smoke-image-workflow.cjs"
   }
 }

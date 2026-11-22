@@ -22,10 +22,19 @@ limited to 24 records and 32 MiB of URL data. Runtime dependency installation,
 the first model download, and local CPU generation were exercised in Skai on
 2026-11-15. On 2026-11-22, direct worker acceptance returned 512×512 JPEGs for
 text-to-image and image-to-image; progress reported four actual text steps and
-two effective edit steps. The persistent IndexedDB database and image blob were
-present after closing and relaunching the app; visually reopening the gallery
-entry after that restart still needs acceptance. Live cancellation during
-inference and the packaged hardware matrix also remain unverified.
+two effective edit steps. Packaged-app history restoration and live cancellation
+are now covered by the acceptance run below. The packaged hardware matrix and
+live ComfyUI behavior remain unverified.
+
+On 2026-11-22, the packaged Windows app was exercised end to end with the local
+runtime and cached SD-Turbo weights. The Images page cancelled active inference,
+then generated a valid 512×512 JPEG, reopened it from history for image-to-image
+editing, generated a second valid 512×512 JPEG, and restored both images after
+reloading the packaged app. `npm run smoke:image:workflow` automates this path
+against a packaged artifact using a disposable app profile. It requires the
+local runtime and cached weights and sets Hugging Face offline mode so it never
+downloads a model as part of the smoke. Live generation was CPU-backed on this
+machine; this does not validate GPU or ComfyUI behavior.
 
 ## ComfyUI integration
 
@@ -51,7 +60,8 @@ built-in Diffusers path.
 - Runtime setup and model download need clear disk/network requirements. Model
   weights and Python packages are separate downloads.
 - Prompts and model execution remain local. Model downloads contact Hugging Face
-  and follow that repository's license and access requirements.
+  and follow that repository's license and access requirements. The packaged
+  workflow smoke uses only cached model weights.
 
 ## Acceptance criteria
 

@@ -157,20 +157,20 @@ and to any detailed plan rather than copying their full contents here.
   cannot overlap the cancellation unwind. The Images page now displays the
   most recent runtime-reported progress and a stopping state. Automated
   provider tests cover ComfyUI queue polling, scoped cancellation, and local
-  endpoint enforcement. A packaged renderer-to-host edit/history run and live
-  cancellation during Diffusers inference remain open.
+  endpoint enforcement. The packaged Windows renderer-to-host path now cancels
+  live inference, generates and edits images, and restores both outputs from
+  local history after reload. An offline-only packaged smoke automates this.
 - **Agreed approach:** Exercise the supported local runtimes and expose real
   stage/progress state when the runtime provides it. Cancellation must stop the
   active operation, preserve completed outputs, and return the UI to a usable
   state. Clearly label unknown progress instead of inventing a percentage.
 - **Acceptance:** Local generation and edit return valid output in the worker;
   ComfyUI queue polling/cancellation and local-only endpoint checks pass in
-  automated tests. Still open: verify generation and edit from the packaged
-  renderer through Agent Host into persistent history, and cancel a live
-  Diffusers inference from the UI while confirming it has fully stopped before
-  another job can start. Runtime errors and missing dependencies must remain
-  actionable, completed images must remain available, and progress must reflect
-  runtime evidence.
+  automated tests. Packaged Windows generation, edit, persistent history after
+  reload, live cancellation, and starting another generation after cancellation
+  now pass. Still open: confirm actionable missing-dependency and failure states
+  in the packaged UI, exercise a live ComfyUI instance, and validate additional
+  hardware. Progress must continue to reflect runtime evidence.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [local image generation](LOCAL_IMAGE_GENERATION.md).
 
