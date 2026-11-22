@@ -21,6 +21,7 @@ worktree.
 | Memory workflows | `smoke-memory` |
 | PDF attachment policy | `smoke-pdf-attachment` |
 | Local voice output and cancellation contract | `smoke:voice:acceptance -- --require-installed-pack` |
+| Installed AirLLM sidecar preflight | `npm run smoke:airllm` |
 | Packaged Electron routes, Marketplace, Percy, video sampling, local audio fail-closed behavior | `smoke:electron:artifact` |
 | Accessibility | 14 routes, 0 WCAG violations in `smoke:electron:accessibility` |
 | Responsive overflow | 11 routes × 5 viewport widths |
