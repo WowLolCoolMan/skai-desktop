@@ -208,6 +208,7 @@ Move finished entries here with their commit/PR and verification evidence.
   Electron syntax checks and packaging, bridge-method audit, and local-only
   audit pass. Follow-on candidates and unfinished product acceptance are
   listed separately in the [refactor plan](implementation-plans/codebase-refactor.md).
+  Implementation commit: `b4b46cf1`.
 
 - **2026-11-22 — Selected project checks with durable task evidence.** The
   Coding Agent already supports explicit detected-check selection, bounded
