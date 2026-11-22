@@ -17,7 +17,7 @@ if (!fs.existsSync(path.join(prepackaged, "Skai Desktop")) || !fs.existsSync(pat
 fs.mkdirSync(output, { recursive: true });
 const version = JSON.parse(fs.readFileSync(path.join(prepackaged, "resources", "app", "package.json"), "utf8")).version;
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error(`Invalid packaged app version: ${version}`);
-const result = spawnSync(process.execPath, [cli, "--linux", "AppImage", "--x64", "--prepackaged", prepackaged, "--config", config, `--config.directories.output=${output}`, `--config.extraMetadata.version=${version}`], { cwd: desktopRoot, stdio: "inherit", env: process.env, shell: false });
+const result = spawnSync(process.execPath, [cli, "--linux", "AppImage", "--x64", "--publish", "never", "--prepackaged", prepackaged, "--config", config, `--config.directories.output=${output}`, `--config.extraMetadata.version=${version}`], { cwd: desktopRoot, stdio: "inherit", env: process.env, shell: false });
 if (result.error) throw result.error;
 if (result.status !== 0) throw new Error(`electron-builder exited with status ${result.status}.`);
 const image = path.join(output, `Skai-Desktop-${version}-x64.AppImage`);
