@@ -81,7 +81,8 @@ and to any detailed plan rather than copying their full contents here.
   Agent Host handlers and the Voice Workbench have been separated, while
   Marketplace, persona research, model library, and workspace orchestration
   remain large. Persona matching and HTML parsing are now in focused Core
-  helpers; source fetching and research orchestration remain to be separated.
+  helpers, and bounded public-source requests are isolated in an injectable
+  client; research orchestration and evidence selection remain to be separated.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
   bridge and storage contracts, keep current behavior, and integrate one
   reviewable slice at a time after syncing with main.
@@ -232,7 +233,9 @@ Move finished entries here with their commit/PR and verification evidence.
 - **2026-11-22 — Persona research Core boundaries.** Moved deterministic
   identity matching and MediaWiki HTML parsing into focused helpers while
   preserving the existing public research facade. Core and Agent Host Release
-  builds pass with zero warnings. Commits `a2a6d4e5` and `d2c0222f`.
+  builds pass with zero warnings. Bounded Wikipedia/Fandom fetching is now an
+  injectable client with the same `HttpClient` test seam. Commits `a2a6d4e5`,
+  `d2c0222f`, and `afe7cb07`.
 
 - **2026-11-18 — Coding Agent task journal, approval controls, and read-only
   project preflight.** Added task activity and restart reconciliation, approval

@@ -94,6 +94,9 @@ that users touch as each slice is moved.
 - Extracted persona identity matching into a deterministic helper and moved
   MediaWiki HTML-to-text parsing behind its own parser, while retaining the
   existing `PersonaKnowledgeSources` public facade.
+- Extracted bounded Wikipedia/Fandom requests, timeouts, host pacing, and
+  retry handling into an injectable `PersonaWikiClient`; the coordinator still
+  owns the existing research decisions and evidence selection.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent
@@ -117,7 +120,7 @@ that users touch as each slice is moved.
 - Continue the renderer extraction; `PluginsPage.tsx`, `AgentHostLoop.cs`,
   `PersonaKnowledgeSources.cs`, and `ModelLibraryService.cs` are among the
   largest current mixed-responsibility files. Persona matching and HTML parsing
-  are now separate, but research orchestration, source fetching, and evidence
+  and HTTP fetching are now separate, but research orchestration and evidence
   selection remain in `PersonaKnowledgeSources.cs`.
 - Complete installed speech-pack and real audio acceptance for local voice.
 - Keep OS isolation, image-runtime acceptance, and release/platform gaps in
