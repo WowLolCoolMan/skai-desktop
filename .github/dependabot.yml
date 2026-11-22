@@ -1,0 +1,107 @@
+version: 2
+
+updates:
+  # Root tooling and repository scripts.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Electron renderer, main process, and packaging dependencies.
+  - package-ecosystem: npm
+    directory: "/apps/desktop"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      desktop-npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Central package versions and projects under native/.
+  - package-ecosystem: nuget
+    directory: "/native"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 4
+    groups:
+      native-nuget-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Agent Host project and its direct NuGet dependencies.
+  - package-ecosystem: nuget
+    directory: "/services/agent-host"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 4
+    groups:
+      agent-host-nuget-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Managed local image-generation runtime.
+  - package-ecosystem: pip
+    directory: "/services/diffusers"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    groups:
+      diffusers-pip-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Optional AirLLM runtime.
+  - package-ecosystem: pip
+    directory: "/services/airllm"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    groups:
+      airllm-pip-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Keep actions in CI and release workflows up to date.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    groups:
+      github-actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
