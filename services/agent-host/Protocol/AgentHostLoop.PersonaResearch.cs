@@ -291,7 +291,10 @@ public static partial class AgentHostLoop
                     if (requestedUrls.Contains(item.Result.Url, StringComparer.OrdinalIgnoreCase)) fetchWarnings.Add($"{new Uri(item.Result.Url).Host}: the page was only a transcript-app shell, with no extractable transcript.");
                     return null;
                 }
-                var detectedAttribution = identity is null ? PersonaDialogueEvidence.DetectSubjectSpeaker(query, pageText) : PersonaDialogueEvidence.DetectSpeaker(subjectNames, pageText);
+                IReadOnlyList<string> researchSpeakerLabels = identity is null ? new[] { query } : subjectNames;
+                if (subjectType == "person")
+                    researchSpeakerLabels = PersonaDialogueEvidence.AddConfirmedFirstNameAlias(identity?.CanonicalName ?? subjectName, researchSpeakerLabels, pageText);
+                var detectedAttribution = PersonaDialogueEvidence.DetectSpeaker(researchSpeakerLabels, pageText);
                 var speakerAttribution = page?.SpeakerAttribution is { } knownAttribution and not "unknown"
                     ? knownAttribution
                     : detectedAttribution.IsUsable ? "subject-attributed" : "unattributed-or-unknown";
@@ -308,7 +311,7 @@ public static partial class AgentHostLoop
                     || category.Contains("caption", StringComparison.OrdinalIgnoreCase);
                 if (!containsDialogue) { speakerAttribution = "not-applicable"; attributedTurns = 0; }
                 var excerpt = speakerAttribution == "subject-attributed"
-                    ? identity is null ? PersonaDialogueEvidence.SelectAttributedSpeakerTurns(query, pageText) : PersonaDialogueEvidence.SelectSpeakerTurns(subjectNames, pageText)
+                    ? PersonaDialogueEvidence.SelectSpeakerTurns(researchSpeakerLabels, pageText)
                     : SelectPersonaEvidenceExcerpt(subjectName, notes, title, pageText);
                 if (excerpt.Length < 120 && page?.SpeakerAttribution == "unattributed-mixed-speakers")
                     excerpt = SelectMixedTranscriptSample(pageText);

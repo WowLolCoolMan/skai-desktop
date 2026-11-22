@@ -32,6 +32,12 @@ keep this queue focused on unfinished work.
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 
+- **2026-11-22:** Name-only Persona research now accepts a confirmed first-name
+  speaker label when a page also contains the full public-person name and clear
+  transcript structure. The live Joe Rogan workflow passed with no supplied URLs:
+  identity resolved, 13 sources, 59 attributed lines, and all nine profile fields
+  drafted. The added alias path rejects prose-only mentions and transcripts that
+  do not identify the full subject.
 - **2026-11-22:** Persona chats and progressive research now filter dated evidence
   by the earlier knowledge/era cutoff; mixed-era syntheses and unsupported
   generated profile fields are withheld. Core regression coverage, Agent Host

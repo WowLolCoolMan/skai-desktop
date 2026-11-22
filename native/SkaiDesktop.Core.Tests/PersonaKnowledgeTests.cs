@@ -129,6 +129,14 @@ internal static class PersonaKnowledgeTests
         var labels = new[] { "SpongeBob SquarePants", "SpongeBob" };
         Check(PersonaDialogueEvidence.DetectSubjectSpeaker("SpongeBob SquarePants", transcript).TurnCount == 0, "full-name matching alone misses first-name speaker labels");
         Check(PersonaDialogueEvidence.DetectSpeaker(labels, transcript).TurnCount == 3, "alias-aware speaker detection counts first-name labels");
+        var publicTranscript = "Joe Rogan Experience — episode transcript\nJoe (0:00): That is a substantial opening statement from the host.\nJamie (0:12): This line belongs to the other speaker instead.\nJoe (0:25): Here is another separately labeled response from Joe.\nJoe (0:42): A third labeled response is included for validation.";
+        var confirmedPublicLabels = PersonaDialogueEvidence.AddConfirmedFirstNameAlias("Joe Rogan", ["Joe Rogan"], publicTranscript);
+        Check(PersonaDialogueEvidence.DetectSpeaker(confirmedPublicLabels, publicTranscript).TurnCount == 3
+              && PersonaDialogueEvidence.SelectSpeakerTurns(confirmedPublicLabels, publicTranscript).Contains("third labeled response", StringComparison.Ordinal),
+            "a full-name-confirmed public-person transcript can attribute first-name host labels");
+        Check(!PersonaDialogueEvidence.AddConfirmedFirstNameAlias("Joe Rogan", ["Joe Rogan"], "Joe: This is just an unstructured paragraph mentioning Joe Rogan." ).Contains("Joe", StringComparer.OrdinalIgnoreCase)
+              && !PersonaDialogueEvidence.AddConfirmedFirstNameAlias("Joe Rogan", ["Joe Rogan"], "Joe (0:00): This is a structured transcript but the page does not identify the full subject.\nJoe (0:25): Nor here.\nJoe (0:42): Neither here.").Contains("Joe", StringComparer.OrdinalIgnoreCase),
+            "first-name speaker aliases require transcript structure and the full subject name on the page");
         var turns = PersonaDialogueEvidence.SelectSpeakerTurns(labels, transcript);
         Check(turns.StartsWith("SpongeBob SquarePants: ", StringComparison.Ordinal) && !turns.Contains("mayonnaise", StringComparison.Ordinal), "selected turns are relabelled with the display name and exclude other speakers");
         Check(PersonaDialogueEvidence.SelectSpeakerTurns(["Boog"], "Boog:\nBeth: [roaring]\nBoog: Whew, no denyin' it at all.").Split('\n').Length == 1,

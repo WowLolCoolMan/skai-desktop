@@ -35,6 +35,26 @@ public static class PersonaDialogueEvidence
         => DetectSpeaker(BuildSubjectAliases(subject), text);
 
     /// <summary>
+    /// Public-person transcripts sometimes shorten a confirmed full name to a first-name
+    /// speaker tag. Only allow that expansion when the page itself names the full subject and
+    /// has transcript structure; a name mention in ordinary prose is not enough.
+    /// </summary>
+    public static IReadOnlyList<string> AddConfirmedFirstNameAlias(string canonicalName, IReadOnlyList<string> speakerLabels, string text)
+    {
+        if (!HasTranscriptStructure(text)) return speakerLabels;
+        var nameParts = Regex.Matches(canonicalName ?? string.Empty, @"[\p{L}\p{N}]{3,}")
+            .Select(match => match.Value)
+            .Where(part => !new[] { "captain", "the", "sir", "mr", "mrs", "ms", "dr", "professor", "king", "queen" }.Contains(part, StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        if (nameParts.Length < 2 || nameParts[0].Length < 3) return speakerLabels;
+        var normalizedText = $" {Regex.Replace(text.ToLowerInvariant(), @"[^\p{L}\p{N}]+", " ")} ";
+        if (nameParts.Any(part => !normalizedText.Contains($" {part.ToLowerInvariant()} ", StringComparison.Ordinal))) return speakerLabels;
+        return speakerLabels.Contains(nameParts[0], StringComparer.OrdinalIgnoreCase)
+            ? speakerLabels
+            : speakerLabels.Append(nameParts[0]).ToArray();
+    }
+
+    /// <summary>
     /// Counts dialogue turns labelled with any of <paramref name="speakerLabels"/>. The first label is
     /// the display name. Callers that know a subject's canonical aliases (for example a resolved
     /// character whose transcripts label it "SpongeBob" rather than "SpongeBob SquarePants") pass them here.

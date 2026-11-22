@@ -37,6 +37,7 @@ const subjects = [
   { input: "Trevor Phillips", subjectType: "character", expect: { name: /^Trevor Philips$/i, host: /gta\.fandom\.com/, chat: /michael|franklin|sandy shores|meth|trevor|los santos|blaine/i } },
   { input: "Spongebob", subjectType: "character", expect: { name: /^SpongeBob SquarePants$/i, host: /wikipedia\.org|spongebob\.fandom\.com/, chat: /krusty|patrick|bikini bottom|krabs|squidward|jelly|pineapple/i } },
   { input: "David Lynch", subjectType: "person", expect: { name: /^David Lynch$/i, host: /wikipedia\.org/, deathDate: /^2025-01-16$/, chat: /film|twin peaks|eraserhead|coffee|meditat|dream|mulholland|blue velvet/i } },
+  { input: "Joe Rogan", subjectType: "person", expect: { name: /^Joe Rogan$/i, host: /wikipedia\.org/, chat: /podcast|comedy|ufc|interview|rogan|jre/i } },
   { input: "Boog from Open Season", subjectType: "character", expect: { name: /^Boog$/i, host: /openseason\.fandom\.com/, chat: /elliot|beth|bear|timberline|forest|hunt/i } },
 ].filter((subject) => !only || subject.input.toLowerCase() === only.toLowerCase());
 
