@@ -106,6 +106,12 @@ that users touch as each slice is moved.
 - Moved update IPC registration and its sender/URL checks into
   `update-ipc.cjs`; the existing updater manager remains responsible for update
   lifecycle and download state.
+- Moved Marketplace catalog normalization, section filtering, and category
+  grouping into `marketplaceEntries.ts`, keeping the React page focused on UI
+  state and MCP operations.
+- Moved local media URL IPC registration, ownership checks, validation, and
+  revocation into `local-media-ipc.cjs`; the renderer-visible channel names and
+  local media behavior are unchanged.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent

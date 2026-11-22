@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -10,26 +10,16 @@ import "./pluginsMcpHealth.css";
 import type { Model, Route } from "../../app/types";
 import { MarketplacePage } from "./MarketplacePage";
 import { request } from "./marketplaceRequest";
+import {
+  createMarketplaceEntries,
+  filterMarketplaceEntries,
+  groupMarketplaceEntries,
+  type MarketplaceCatalogSection,
+  type Skill,
+  type Tool,
+} from "./marketplaceEntries";
 export { VoiceWorkbench } from "./VoiceWorkbench";
 
-type Skill = {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  permissions: string[];
-  source: string;
-  enabled: boolean;
-};
-type Tool = {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  access: string;
-  builtIn: boolean;
-  status: string;
-};
 type McpConnection = {
   connectionId: string;
   serverId: string;
@@ -47,7 +37,7 @@ type McpTool = {
   requiredCapabilities: string[];
 };
 
-type MarketplaceHubSection = "Discover" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed";
+type MarketplaceHubSection = MarketplaceCatalogSection;
 type StaffPickKind = "Model" | "MCP server" | "Skill" | "Plugin" | "Voice pack" | "Persona" | "Highlight";
 type StaffPickAction =
   | { label: string; type: "external"; url: string }
@@ -174,101 +164,10 @@ export function PluginsPage({
       );
   }, [catalogSection, query, view]);
 
-  const entries = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    const skillEntries = skills.map((skill) => ({
-      id: `skill:${skill.id}`,
-      kind: "Skills" as const,
-      name: skill.name,
-      description: skill.description,
-      category: "Compatible plugins",
-      access: skill.permissions.join(" · ") || "No extra permissions",
-      status: skill.enabled ? "Enabled" : "Disabled",
-      availability:
-        skill.source === "built-in" ? "Built into Skai" : "Installed locally",
-      installed: skill.source !== "built-in",
-      tone: skill.enabled ? ("success" as const) : ("neutral" as const),
-      source: skill.source,
-    }));
-    const toolEntries = [
-      ...tools,
-      {
-        id: "rea",
-        name: "REA · Reverse Engineering Agent",
-        description:
-          "Downloadable local MCP server for reverse engineering software and application behavior.",
-        category: "Developer Tools",
-        access: "Local stdio MCP · explicit tool approval",
-        builtIn: false,
-        status: "Downloadable MCP",
-      },
-    ].map((tool) => ({
-      id: `tool:${tool.id}`,
-      kind: "Tools" as const,
-      name: tool.name,
-      description: tool.description,
-      category:
-        tool.id === "rea"
-          ? "MCP servers"
-          : tool.builtIn
-            ? "Skai built-ins"
-            : "Compatible plugins",
-      access: tool.access,
-      status: tool.builtIn ? "Built in" : tool.status,
-      availability:
-        tool.id === "rea"
-          ? "Downloadable MCP · morluto"
-          : tool.builtIn
-            ? "Available in Skai"
-            : "Installed locally",
-      installed:
-        tool.id === "rea"
-          ? connections.some(
-              (connection) =>
-                connection.serverId === "rea" && connection.state === "healthy",
-            )
-          : tool.builtIn || tool.status.toLowerCase().includes("installed"),
-      tone:
-        tool.builtIn || tool.id === "rea"
-          ? ("success" as const)
-          : ("neutral" as const),
-      source:
-        tool.id === "rea"
-          ? "morluto · github.com/morluto/rea"
-          : "Marketplace catalog",
-    }));
-    return [...skillEntries, ...toolEntries].filter((entry) => {
-      return (
-        (!term ||
-          `${entry.name} ${entry.description} ${entry.category} ${entry.access} ${entry.source}`
-            .toLowerCase()
-            .includes(term))
-      );
-    });
-  }, [query, skills, tools]);
-  const sectionEntries = useMemo(() => entries.filter((entry) => {
-    if (catalogSection === "Skills") return entry.kind === "Skills";
-    if (catalogSection === "MCP Servers") return entry.kind === "Tools" && (entry.id === "tool:rea" || /mcp/i.test(entry.category));
-    if (catalogSection === "Plugins") return entry.kind === "Tools" && entry.id !== "tool:rea" && !/mcp/i.test(entry.category);
-    return true;
-  }), [catalogSection, entries]);
+  const entries = createMarketplaceEntries(skills, tools, connections, query);
+  const sectionEntries = filterMarketplaceEntries(entries, catalogSection);
   const selected = sectionEntries.find((entry) => entry.id === selectedId) ?? null;
-  const groupedEntries = useMemo(() => {
-    const groups = new Map<string, typeof sectionEntries>();
-    for (const entry of sectionEntries)
-      groups.set(
-        entry.category || (entry.kind === "Skills" ? "Skills" : "Tools"),
-        [
-          ...(groups.get(
-            entry.category || (entry.kind === "Skills" ? "Skills" : "Tools"),
-          ) ?? []),
-          entry,
-        ],
-      );
-    return [...groups.entries()].sort(([left], [right]) =>
-      left.localeCompare(right),
-    );
-  }, [sectionEntries]);
+  const groupedEntries = groupMarketplaceEntries(sectionEntries);
   const connectMcp = async () => {
     if (!serverId.trim() || !endpoint.trim()) return;
     setMcpBusy(true);
