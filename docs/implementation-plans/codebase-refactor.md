@@ -162,6 +162,9 @@ checked per slice.
   same state and callbacks without changing the in-app review flow.
 - Moved developer-curated Marketplace staff picks and their action routing into
   `StaffPicksPanel`, keeping curated navigation separate from catalog state.
+- Moved Marketplace model tag facets, combined filtering, active-filter counts,
+  and runtime compatibility checks into `marketplaceModelFilters.ts`; model
+  results, install prompts, and Marketplace navigation keep the same behavior.
 - Moved local media URL IPC registration, ownership checks, validation, and
   revocation into `local-media-ipc.cjs`; the renderer-visible channel names and
   local media behavior are unchanged.

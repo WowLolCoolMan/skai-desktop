@@ -4,12 +4,12 @@ import type { AgentResponse, DesktopPersona, UpdateCheckResult } from "../../../
 import { Button, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
+import { countActiveMarketplaceModelFilters, filterMarketplaceModels, isMarketplaceModelInstallRouteAvailable, marketplaceModelFilterOptions, type MarketplaceModel } from "./marketplaceModelFilters";
 
 export type MarketplaceSection = Section;
 type Section = "Discover" | "Models" | "Image models" | "Voices" | "Image workflows" | "Skills" | "Tools" | "Installed" | "Updates";
 type Filter = "All" | "Local models" | "Voices" | "Image workflows" | "Skills" | "Tools";
 type CatalogItem = { id: string; title: string; filter: Filter; description: string; detail: string; icon: NavIconName; status: string; tone: "neutral" | "success" | "warning"; publisher: string; version: string; compatibility: string; nextStep: string; installable: boolean };
-type MarketplaceModel = { id: string; repository: string; name?: string; source: string; kind: string; downloads: number; likes: number; uncensored: boolean; tags: string[]; sizeBytes?: number | null; contextLength?: number | null; installRoute: string; installable: boolean; requiresAirLlm?: boolean; files?: Array<{ path: string; sizeBytes: number; sha256?: string | null }> };
 type MarketplaceCatalog = { providers: Array<{ id: string; name: string; kinds: string[]; remote: boolean }>; voiceProviders?: Array<{ id: string; name: string; kind: string; requiresUserKey: boolean; status: string }>; voices: Array<{ id: string; name: string; description: string; runtime: string; license: string; size: string; installed: boolean; lowResource: boolean; sourceUrl: string; adapterAvailable: boolean; supportsStreaming: boolean; supportsVoiceCloning: boolean; supportsEmotion: boolean; supportsAudioEffects: boolean; availabilityNote: string; installable: boolean }>; skills: Array<{ id: string; name: string; description: string; category: string; permissions: string[]; source: string; installed: boolean; enabled: boolean; installable: boolean }>; tools: Array<{ id: string; name: string; description: string; category: string; access: string; builtIn: boolean; status: string; source?: string | null; installable: boolean }> };
 
 const items: CatalogItem[] = [
@@ -222,32 +222,14 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   // Live provider search gets the full width under Models; Discover stays a capability overview.
   const showModels = section === "Models";
-  const modelTags = useMemo(() => [...new Set(models.flatMap((model) => model.tags))].sort((a, b) => a.localeCompare(b)), [models]);
-  const taskOptions = useMemo(() => ["All tasks", ...new Set(modelTags.filter((tag) => /text|chat|code|image|audio|video|vision|speech|embed/i.test(tag)).map((tag) => tag.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())))], [modelTags]);
-  const libraryOptions = useMemo(() => ["All libraries", ...new Set(modelTags.filter((tag) => /transformers|gguf|mlx|pytorch|tensorflow|diffusers|safetensors|jax/i.test(tag)).map((tag) => tag.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())))], [modelTags]);
-  const appOptions = useMemo(() => ["All apps", ...new Set(modelTags.filter((tag) => /ollama|llama\.cpp|lm studio|vllm|jan|localai|airllm/i.test(tag)).map((tag) => tag.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())))], [modelTags]);
-  const filteredModels = useMemo(() => models.filter((model) => {
-    const matchesProvider = provider === "All providers" || (provider === "AirLLM" ? model.requiresAirLlm === true : model.source === provider && !model.requiresAirLlm);
-    const sizeLimit = size === "Any size" ? Number.POSITIVE_INFINITY : Number(size);
-    const matchesSize = size === "Any size" || (model.sizeBytes != null && model.sizeBytes <= sizeLimit * 1024 ** 3);
-    const tags = model.tags.map((tag) => tag.toLowerCase());
-    const normalizedTask = taskFilter === "All tasks" ? "" : taskFilter.toLowerCase();
-    const normalizedLibrary = libraryFilter === "All libraries" ? "" : libraryFilter.toLowerCase();
-    const normalizedApp = appFilter === "All apps" ? "" : appFilter.toLowerCase();
-    const matchesTask = !normalizedTask || tags.some((tag) => tag.includes(normalizedTask));
-    const matchesLibrary = !normalizedLibrary || tags.some((tag) => tag.includes(normalizedLibrary));
-    const matchesApp = !normalizedApp || tags.some((tag) => tag.includes(normalizedApp));
-    const matchesContext = contextFilter === "Any context" || (contextFilter === "1M-class window" && (model.contextLength ?? 0) >= 900_000);
-    return matchesProvider && matchesSize && matchesTask && matchesLibrary && matchesApp && matchesContext;
-  }), [appFilter, contextFilter, libraryFilter, models, provider, size, taskFilter]);
+  const { tasks: taskOptions, libraries: libraryOptions, apps: appOptions } = useMemo(() => marketplaceModelFilterOptions(models), [models]);
+  const filteredModels = useMemo(() => filterMarketplaceModels(models, {
+    provider, size, task: taskFilter, library: libraryFilter, app: appFilter, context: contextFilter, uncensored,
+  }), [appFilter, contextFilter, libraryFilter, models, provider, size, taskFilter, uncensored]);
   const selectedRemoteModel = filteredModels.find((model) => model.id === selectedRemoteModelId) ?? filteredModels[0] ?? null;
-  const activeModelFilterCount = [provider !== "All providers", taskFilter !== "All tasks", libraryFilter !== "All libraries", appFilter !== "All apps", size !== "Any size", contextFilter !== "Any context", uncensored].filter(Boolean).length;
+  const activeModelFilterCount = countActiveMarketplaceModelFilters({ provider, size, task: taskFilter, library: libraryFilter, app: appFilter, context: contextFilter, uncensored });
   const activeLocalRuntime = localStorage.getItem("skai.provider") ?? "Ollama";
-  const installRouteAvailable = (model: MarketplaceModel) => model.requiresAirLlm || (model.installRoute === "ollama-pull"
-    ? activeLocalRuntime.toLowerCase().includes("ollama")
-    : model.installRoute === "ollama-gguf"
-    ? activeLocalRuntime.toLowerCase().includes("ollama")
-    : model.installRoute === "lm-studio" && activeLocalRuntime.toLowerCase().replaceAll("-", " ").includes("lm studio"));
+  const installRouteAvailable = (model: MarketplaceModel) => isMarketplaceModelInstallRouteAvailable(model, activeLocalRuntime);
 
   async function searchModels(nextQuery = query, nextUncensored = uncensored) {
     const requestId = ++modelSearchRequestRef.current;
