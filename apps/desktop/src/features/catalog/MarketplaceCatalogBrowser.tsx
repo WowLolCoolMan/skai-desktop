@@ -122,8 +122,11 @@ export function MarketplaceCatalogBrowser({
                           <dt>Publisher</dt>
                           <dd>{selected.source}</dd>
                         </div>
+                        {selected.license && <div><dt>License</dt><dd>{selected.license}</dd></div>}
                       </dl>
-                      {selected.id === "tool:rea" ? (
+                      {selected.kind === "Catalog" ? (
+                        <div className="plugins-detail-note"><strong>Local setup review</strong><span>{selected.installReview} No hosted route is configured for this catalog entry.</span></div>
+                      ) : selected.id === "tool:rea" ? (
                         <div className="plugins-detail-note">
                           <strong>
                             Verified local MCP package · version 6.7.0

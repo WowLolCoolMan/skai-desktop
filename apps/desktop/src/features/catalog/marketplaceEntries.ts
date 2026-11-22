@@ -18,11 +18,11 @@ export type Tool = {
   status: string;
 };
 
-export type MarketplaceCatalogSection = "Discover" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed";
+export type MarketplaceCatalogSection = "Discover" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed" | "Updates";
 
 export type MarketplaceEntry = {
   id: string;
-  kind: "Skills" | "Tools";
+  kind: "Skills" | "Tools" | "Catalog";
   name: string;
   description: string;
   category: string;
@@ -32,7 +32,11 @@ export type MarketplaceEntry = {
   installed: boolean;
   tone: "success" | "neutral";
   source: string;
+  license?: string;
+  installReview?: string;
 };
+
+export type CuratedCatalogEntry = { id: string; name: string; provider: string; category: string; license: string; description: string; runtime: string; capabilities: string[]; source: string; localOnly: boolean; installable: boolean; installReview: string };
 
 export type McpConnectionStatus = {
   serverId: string;
@@ -44,6 +48,7 @@ export function createMarketplaceEntries(
   tools: Tool[],
   connections: McpConnectionStatus[],
   query: string,
+  curated: CuratedCatalogEntry[] = [],
 ): MarketplaceEntry[] {
   const term = query.trim().toLowerCase();
   const skillEntries: MarketplaceEntry[] = skills.map((skill) => ({
@@ -90,7 +95,13 @@ export function createMarketplaceEntries(
     };
   });
 
-  return [...skillEntries, ...toolEntries].filter((entry) =>
+  const curatedEntries: MarketplaceEntry[] = curated.map((item) => ({
+    id: `catalog:${item.id}`, kind: "Catalog", name: item.name, description: item.description,
+    category: item.category, access: item.capabilities.join(" · "), status: item.license.toLowerCase().includes("non-commercial") || item.license.toLowerCase().includes("research") || item.license.toLowerCase().includes("llama") || item.license.toLowerCase().includes("custom") ? `License review · ${item.license}` : item.license,
+    availability: `${item.runtime} · Local only`, installed: false, tone: "neutral", source: `${item.provider} · ${item.source}`,
+    license: item.license, installReview: item.installReview,
+  }));
+  return [...skillEntries, ...toolEntries, ...curatedEntries].filter((entry) =>
     !term || `${entry.name} ${entry.description} ${entry.category} ${entry.access} ${entry.source}`.toLowerCase().includes(term),
   );
 }
@@ -101,7 +112,7 @@ export function filterMarketplaceEntries(
 ): MarketplaceEntry[] {
   return entries.filter((entry) => {
     if (section === "Skills") return entry.kind === "Skills";
-    if (section === "MCP Servers") return entry.kind === "Tools" && (entry.id === "tool:rea" || /mcp/i.test(entry.category));
+    if (section === "MCP Servers") return (entry.kind === "Tools" && (entry.id === "tool:rea" || /mcp/i.test(entry.category))) || (entry.kind === "Catalog" && entry.category === "MCP Servers");
     if (section === "Plugins") return entry.kind === "Tools" && entry.id !== "tool:rea" && !/mcp/i.test(entry.category);
     return true;
   });

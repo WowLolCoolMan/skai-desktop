@@ -9,6 +9,58 @@ namespace SkaiDesktop.Core.Services;
 /// </summary>
 public static class MarketplaceCatalogService
 {
+    private sealed record CuratedEntry(string Id, string Name, string Provider, string Category, string License, string Description, string Runtime, string[] Capabilities, string Source);
+
+    private static readonly CuratedEntry[] CuratedEntries = BuildCuratedEntries();
+
+    private static CuratedEntry[] BuildCuratedEntries()
+    {
+        var entries = new List<CuratedEntry>();
+        void Add(string category, string provider, string license, string runtime, string capabilities, params (string id, string name, string description, string source)[] items)
+        {
+            foreach (var item in items)
+                entries.Add(new(item.id, item.name, provider, category, license, item.description, runtime, capabilities.Split('|'), item.source));
+        }
+
+        Add("Voice (TTS/STT)", "Replit", "MIT", "Local Python runtime; install path not yet connected", "text-to-speech|voice-cloning", ("chatterbox", "Chatterbox / Chatterbox-Turbo", "Local expressive speech synthesis with optional reference voice input.", "https://github.com/resemble-ai/chatterbox"));
+        Add("Voice (TTS/STT)", "hexgrad", "Apache-2.0", "ONNX local runtime; installer not connected", "text-to-speech|multivoice", ("kokoro-82m", "Kokoro-82M", "Compact local neural speech synthesis.", "https://huggingface.co/hexgrad/Kokoro-82M"));
+        Add("Voice (TTS/STT)", "Alibaba", "Apache-2.0", "Local Python/PyTorch; installer not connected", "text-to-speech|voice-design|voice-cloning|streaming", ("qwen3-tts", "Qwen3-TTS", "Multilingual local speech with voice design and cloning.", "https://github.com/QwenLM/Qwen3-TTS"));
+        Add("Voice (TTS/STT)", "Fish Audio", "Research NC", "Local runtime; verify model terms", "text-to-speech|voice-cloning|emotion", ("fish-audio-s2-pro", "Fish Audio S2 Pro", "Expressive speech generation; research non-commercial terms apply.", "https://github.com/fishaudio/fish-speech"));
+        Add("Voice (TTS/STT)", "BreezeBlue", "Research NC", "Local runtime; verify model terms", "text-to-speech", ("breeze-tts-2", "Breeze TTS 2", "Local speech synthesis; research non-commercial terms apply.", "https://huggingface.co/BreezeBlue"));
+        Add("Voice (TTS/STT)", "StepFun", "Apache-2.0", "Local runtime; setup not connected", "speech-editing|audio", ("step-audio-editx", "Step Audio EditX", "Local speech and audio editing model.", "https://huggingface.co/stepfun-ai"));
+        Add("Voice (TTS/STT)", "Mistral", "CC-BY-NC", "Local runtime; non-commercial", "text-to-speech", ("voxtral-tts", "Voxtral TTS", "Local speech model with non-commercial license restrictions.", "https://huggingface.co/mistralai"));
+        Add("Voice (TTS/STT)", "NVIDIA", "Open", "Local runtime; setup not connected", "text-to-speech|multilingual", ("magpie-multilingual-357m", "Magpie-Multilingual 357M", "Multilingual local speech model.", "https://huggingface.co/nvidia"));
+        Add("Voice (TTS/STT)", "SWivid", "CC-BY-NC", "Local Python/PyTorch; non-commercial", "text-to-speech|voice-cloning", ("f5-tts", "F5-TTS", "Local flow-matching speech and reference voice cloning.", "https://github.com/SWivid/F5-TTS"));
+        Add("Voice (TTS/STT)", "Coqui", "CPML NC", "Local Python/PyTorch; non-commercial", "text-to-speech|multilingual|voice-cloning", ("xtts-v2", "XTTS v2", "Multilingual local speech and reference voice cloning.", "https://github.com/coqui-ai/TTS"));
+        Add("Voice (TTS/STT)", "Piper", "MIT / GPL-3.0", "Local ONNX; voice-specific terms", "text-to-speech|offline", ("piper", "Piper", "Compact offline neural speech; individual voice licenses vary.", "https://github.com/rhasspy/piper"));
+        Add("Voice (TTS/STT)", "Kitten AI", "Apache-2.0", "Local runtime; setup not connected", "text-to-speech|small-model", ("kitten-tts-08", "Kitten TTS 0.8", "Small local text-to-speech model.", "https://github.com/KittenML/KittenTTS"));
+        Add("Voice (TTS/STT)", "Alibaba", "Apache-2.0", "Local Python/PyTorch; setup not connected", "text-to-speech|multilingual|voice-cloning", ("cosyvoice2", "CosyVoice2", "Multilingual local speech with zero-shot voice support.", "https://github.com/FunAudioLLM/CosyVoice"));
+        Add("Voice (TTS/STT)", "NVIDIA", "Apache-2.0", "Local runtime; setup not connected", "text-to-speech|multispeaker", ("dia-2", "Dia 2", "Local multi-speaker speech generation.", "https://huggingface.co/nvidia"));
+        Add("Voice (TTS/STT)", "Supertone", "Open", "Local runtime; verify model terms", "text-to-speech", ("supertonic-3", "Supertonic 3", "Local speech synthesis model.", "https://github.com/supertone-inc"));
+        Add("Voice (TTS/STT)", "Maya Research", "Apache-2.0", "Local runtime; setup not connected", "text-to-speech", ("maya1", "Maya1", "Local expressive speech model.", "https://huggingface.co"));
+        Add("Voice (TTS/STT)", "Kyutai", "MIT", "Local Python runtime; setup not connected", "speech-to-speech|streaming", ("moshi", "Moshi", "Local realtime speech conversation model.", "https://github.com/kyutai-labs/moshi"));
+        Add("Voice (TTS/STT)", "Meta", "Llama License", "Local runtime; license gated", "speech|multimodal", ("llama-omni", "Llama-Omni", "Local multimodal model with speech output; Meta license applies.", "https://github.com/ictnlp/LLaMA-Omni"));
+        Add("Voice (TTS/STT)", "OpenAI", "MIT", "Local Whisper runtime; setup not connected", "speech-to-text|transcription", ("whisper-large-v3", "Whisper large-v3", "Local speech recognition and transcription.", "https://github.com/openai/whisper"));
+        Add("Voice (TTS/STT)", "NVIDIA", "CC-BY-NC", "Local NeMo runtime; non-commercial", "speech-to-text|transcription", ("parakeet-tdt-11b", "Parakeet TDT 1.1B", "Local speech recognition; non-commercial license applies.", "https://huggingface.co/nvidia"));
+
+        var coding = new (string id, string name, string provider, string license, string source)[] {
+            ("deepseek-v4-1-flash","DeepSeek V4.1 Flash","DeepSeek","MIT","https://huggingface.co/deepseek-ai"),("kimi-k3","Kimi K3","Moonshot","Modified MIT","https://huggingface.co/moonshotai"),("glm-5-3","GLM-5.3","Z.ai","License not confirmed","https://huggingface.co/zai-org"),("glm-5-2","GLM-5.2","Z.ai","MIT","https://huggingface.co/zai-org"),("glm-5-3-flash","GLM-5.3-Flash","Z.ai","MIT","https://huggingface.co/zai-org"),("qwen3-coder-480b-a35b","Qwen3 Coder 480B-A35B","Alibaba","Apache-2.0","https://huggingface.co/Qwen"),("qwen3-8-27b","Qwen3.8-27B","Alibaba","Apache-2.0","https://huggingface.co/Qwen"),("qwen3-8-max","Qwen3.8-Max","Alibaba","License not confirmed","https://huggingface.co/Qwen"),("mistral-large-4","Mistral Large 4","Mistral","Open-Weight","https://huggingface.co/mistralai"),("devstral-small-2505","Devstral Small 2505","Mistral","Apache-2.0","https://huggingface.co/mistralai"),("mimo-v2-6-pro","MiMo-V2.6-Pro","Xiaomi","MIT","https://huggingface.co/XiaomiMiMo"),("deepseek-v4-pro","DeepSeek V4 Pro","DeepSeek","MIT","https://huggingface.co/deepseek-ai"),("gemma-4-31b","Gemma 4 31B","Google","Apache-2.0","https://huggingface.co/google"),("gpt-oss-120b","gpt-oss-120b","OpenAI","Apache-2.0","https://huggingface.co/openai"),("hunyuan-hy3","Hunyuan Hy3","Tencent","Apache-2.0","https://huggingface.co/tencent"),("command-a-plus","Command A+","Cohere","Apache-2.0","https://huggingface.co/CohereForAI")};
+        foreach (var item in coding) Add("Coding", item.provider, item.license, "Ollama / LM Studio if compatible weights exist; verify package", "code-generation|local-inference", (item.id, item.name, $"Self-hostable coding model entry. License: {item.license}.", item.source));
+
+        var chat = new (string id, string name, string provider, string license, string source)[] {
+            ("glm-5-2-general","GLM-5.2","Z.ai","MIT","https://huggingface.co/zai-org"),("qwen3-6-27b","Qwen3.6-27B","Alibaba","Apache-2.0","https://huggingface.co/Qwen"),("deepseek-v4-flash","DeepSeek V4-Flash","DeepSeek","MIT","https://huggingface.co/deepseek-ai"),("kimi-k3-general","Kimi K3","Moonshot","Modified MIT","https://huggingface.co/moonshotai"),("gemma-4-2-31b","Gemma 4 2B–31B","Google","Apache-2.0","https://huggingface.co/google"),("gpt-oss-120b-general","gpt-oss-120b","OpenAI","Apache-2.0","https://huggingface.co/openai"),("gpt-oss-20b","gpt-oss-20b","OpenAI","Apache-2.0","https://huggingface.co/openai"),("hunyuan-hy3-general","Hunyuan Hy3","Tencent","Apache-2.0","https://huggingface.co/tencent"),("command-a-plus-general","Command A+","Cohere","Apache-2.0","https://huggingface.co/CohereForAI"),("phi-4-mini","Phi-4-mini","Microsoft","MIT","https://huggingface.co/microsoft"),("mistral-small-3-2-24b","Mistral Small 3.2 24B","Mistral","Apache-2.0","https://huggingface.co/mistralai"),("llama-3-3-70b","Llama 3.3 70B","Meta","Llama License","https://huggingface.co/meta-llama"),("qwen3-14b","Qwen3 14B","Alibaba","Apache-2.0","https://huggingface.co/Qwen"),("minimax-m2-5","MiniMax M2.5","MiniMax","Custom","https://huggingface.co/MiniMaxAI"),("deepseek-v3-2","DeepSeek V3.2","DeepSeek","MIT","https://huggingface.co/deepseek-ai"),("mistral-large-4-general","Mistral Large 4","Mistral","Open-Weight","https://huggingface.co/mistralai")};
+        foreach (var item in chat) Add("Chat / General LLM", item.provider, item.license, "Ollama / LM Studio if compatible weights exist; verify package", "chat|text-generation|local-inference", (item.id, item.name, $"Self-hostable general language model entry. License: {item.license}.", item.source));
+
+        var images = new (string id, string name, string provider, string license, string source)[] {
+            ("flux-2-dev","FLUX.2 [dev]","BFL","Non-commercial","https://huggingface.co/black-forest-labs"),("qwen-image-2-1","Qwen-Image-2.1","Alibaba","Non-commercial","https://huggingface.co/Qwen"),("qwen-image-2512","Qwen-Image-2512","Alibaba","Apache-2.0","https://huggingface.co/Qwen"),("flux-2-klein-4b","FLUX.2 klein 4B","BFL","Apache-2.0","https://huggingface.co/black-forest-labs"),("hidream-o1-image","HiDream-O1-Image","HiDream","MIT","https://huggingface.co/HiDream-ai"),("hunyuanimage-3","HunyuanImage 3.0","Tencent","Community","https://huggingface.co/tencent"),("z-image-turbo","Z-Image Turbo","Alibaba","Apache-2.0","https://huggingface.co/Tongyi-MAI"),("flux-1-schnell","FLUX.1 [schnell]","BFL","Apache-2.0","https://huggingface.co/black-forest-labs"),("sd-3-5-large","SD 3.5 Large","Stability","Community License <$1M","https://huggingface.co/stabilityai"),("sdxl-1-0","SDXL 1.0","Stability","OpenRAIL++","https://huggingface.co/stabilityai"),("sd-3-5-medium","SD 3.5 Medium","Stability","Community License <$1M","https://huggingface.co/stabilityai"),("nvidia-sana","NVIDIA Sana","NVIDIA","Apache-2.0","https://huggingface.co/nvidia"),("deepseek-janus-pro","DeepSeek Janus-Pro","DeepSeek","MIT","https://huggingface.co/deepseek-ai"),("ideogram-4","Ideogram 4.0","Ideogram","Non-commercial","https://huggingface.co"),("ming-image-01-design","Ming-Image-0.1-Design","InclusionAI","MIT","https://huggingface.co/inclusionAI"),("flux-3-image-klein","FLUX 3 Image Klein","BFL","Kommunity","https://huggingface.co/black-forest-labs"),("glm-image","GLM-Image","Z.ai","MIT","https://huggingface.co/zai-org")};
+        foreach (var item in images) Add("Image Generation", item.provider, item.license, "ComfyUI or local Diffusers only when a compatible package is verified", "text-to-image|local-inference", (item.id, item.name, $"Self-hostable image generation entry. License: {item.license}.", item.source));
+
+        var mcps = new (string id, string name, string provider, string access)[] {
+            ("playwright-mcp","Playwright MCP","Microsoft","stdio MCP"),("github-mcp","GitHub MCP","GitHub","stdio MCP; local credentials required"),("context7-mcp","Context7","Upstash","stdio MCP"),("filesystem-mcp","Filesystem MCP","Model Context Protocol","stdio MCP; explicit folder permissions"),("supabase-mcp","Supabase MCP","Supabase","stdio or HTTP MCP; local setup"),("postgres-mcp-pro","Postgres MCP Pro","Postgres MCP","stdio MCP; database credentials required"),("figma-mcp","Figma MCP","Figma","stdio or HTTP MCP; provider auth may be required"),("linear-mcp","Linear MCP","Linear","stdio or HTTP MCP; provider auth may be required"),("notion-mcp","Notion MCP","Notion","stdio or HTTP MCP; provider auth may be required"),("atlassian-rovo-mcp","Atlassian Rovo MCP","Atlassian","stdio or HTTP MCP; provider auth may be required"),("sentry-mcp","Sentry MCP","Sentry","stdio or HTTP MCP; provider auth may be required"),("stripe-mcp","Stripe MCP","Stripe","stdio or HTTP MCP; provider auth may be required"),("cloudflare-mcp","Cloudflare MCP","Cloudflare","stdio or HTTP MCP; provider auth may be required"),("slack-mcp","Slack MCP","Slack","stdio or HTTP MCP; provider auth may be required"),("exa-mcp","Exa MCP","Exa","stdio or HTTP MCP; provider auth may be required"),("firecrawl-mcp","Firecrawl MCP","Firecrawl","stdio MCP; local server and key may be required"),("brave-search-mcp","Brave Search MCP","Brave","stdio MCP; local server and key may be required"),("tavily-mcp","Tavily MCP","Tavily","stdio MCP; local server and key may be required"),("terraform-mcp","Terraform MCP","HashiCorp","stdio MCP"),("aws-mcp-server","AWS MCP Server","AWS","stdio MCP; local AWS credentials required")};
+        foreach (var item in mcps) Add("MCP Servers", item.provider, "See upstream repository", item.access, "tools|explicit-approval", (item.id, item.name, $"MCP server integration. Setup requires reviewing the upstream server and its local configuration. {item.access}.", "https://github.com"));
+        return entries.ToArray();
+    }
+
     public static object Snapshot() => new
     {
         providers = new[]
@@ -86,6 +138,13 @@ public static class MarketplaceCatalogService
             status = tool.StatusLabel,
             source = tool.WhereToFind,
             installable = false,
+        }).ToArray(),
+        catalogEntries = CuratedEntries.Select(entry => new
+        {
+            id = entry.Id, name = entry.Name, provider = entry.Provider, category = entry.Category,
+            license = entry.License, description = entry.Description, runtime = entry.Runtime,
+            capabilities = entry.Capabilities, source = entry.Source, localOnly = true,
+            installable = false, installReview = "No verified installer is connected. Review upstream source and license before local setup.",
         }).ToArray(),
     };
 }
