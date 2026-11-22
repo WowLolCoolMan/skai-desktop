@@ -19,9 +19,17 @@ def main(request):
         from airllm import AutoModel
         import torch
 
+        if not torch.cuda.is_available():
+            raise RuntimeError("AirLLM requires a CUDA-capable PyTorch installation and NVIDIA GPU; this machine has no available CUDA device.")
+
         # Custom repository code is a separate trust decision in Skai. The
         # host keeps this disabled unless the user explicitly approves it.
-        kwargs = {"trust_remote_code": bool(request.get("allow_remote_code", False))}
+        # Older AirLLM releases reject the keyword when it is false. Omitting it
+        # keeps the default safe behavior while remaining compatible with those
+        # releases; only an explicit user approval adds the opt-in override.
+        kwargs = {}
+        if request.get("allow_remote_code", False):
+            kwargs["trust_remote_code"] = True
         if request.get("compression") in ("4bit", "8bit"):
             kwargs["compression"] = request["compression"]
         if request.get("cache_path"):
