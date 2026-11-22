@@ -3,6 +3,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const workflowPath = path.join(root, ".github", "workflows", "release.yml");
+const electronWorkflowPath = path.join(root, ".github", "workflows", "electron-ci.yml");
 const installerSmokePath = path.join(root, "scripts", "smoke-windows-installer.cjs");
 const errors = [];
 
@@ -11,6 +12,18 @@ try {
   workflow = fs.readFileSync(workflowPath, "utf8");
 } catch (error) {
   errors.push(`Unable to read .github/workflows/release.yml: ${error.message}`);
+}
+
+for (const [label, workflowFile] of [["release", workflowPath], ["Electron CI", electronWorkflowPath]]) {
+  try {
+    const source = fs.readFileSync(workflowFile, "utf8");
+    const setupNodeSteps = [...source.matchAll(/uses:\s*actions\/setup-node@v4[\s\S]{0,160}?node-version:\s*(\d+)/g)];
+    if (!setupNodeSteps.length || setupNodeSteps.some((step) => step[1] !== "24")) {
+      errors.push(`${label} workflow must use Node.js 24 for all setup-node steps (local MCP runtime requirement).`);
+    }
+  } catch (error) {
+    errors.push(`Unable to read ${path.relative(root, workflowFile)}: ${error.message}`);
+  }
 }
 
 const requireContract = (label, pattern) => {
