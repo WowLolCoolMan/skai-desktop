@@ -5,7 +5,6 @@
 // Depends on: HttpClient, BoundedHttpContent, PersonaDialogueEvidence. Used by the Agent Host's
 // persona.discover and persona.research.
 
-using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -61,156 +60,13 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     private static readonly HttpClient Shared = new() { Timeout = Timeout.InfiniteTimeSpan };
     private readonly HttpClient _http = httpClient ?? Shared;
 
-    private static readonly HashSet<string> Honorifics = new(StringComparer.Ordinal)
-    {
-        "captain", "capt", "sir", "dame", "madam", "mr", "mrs", "ms", "miss", "dr", "doctor", "professor", "prof",
-        "king", "queen", "prince", "princess", "lord", "lady", "the", "general", "agent", "detective", "officer",
-    };
-
-    // Character and "battle stats" aggregators, fan-fiction and dubbing wikis. They often host a
-    // page for every character, but the franchise's own wiki is the better canon source.
-    private static readonly string[] AggregatorWikis =
-    [
-        "vsbattles", "villains", "hero", "heroes", "near-pure-good-hero", "pure-good-hero", "heroes-and-villain", "villainsfanon",
-        "inconsistently-admirable", "deathbattle", "deathbattlefanon", "characterprofile", "powerlisting", "fanon", "dubdb",
-        "dubbing-fanon", "historica", "althistory", "listofdeaths", "evil", "antagonists", "protagonists", "joke-battles",
-        "ultimate-pop-culture", "fictionalcrossover", "crossoverfanon", "ideas", "community", "allthetropes", "tropedia",
-        "logos", "fictionalcharacters", "muc", "international-dubbing", "dubbing", "voice-actors", "behindthevoiceactors", "aesthetics",
-        "inconsistently-heinous", "pure-evil", "monster", "loathsome-characters", "awesome-characters", "near-pure-evil",
-    ];
-
-    // ---------------------------------------------------------------- query parsing and matching
-
-    /// <summary>Splits "Boog from Open Season", "Boog (Open Season)" or "Boog - Open Season" into name and franchise.</summary>
-    public static PersonaQuery ParseQuery(string input)
-    {
-        var text = Regex.Replace(input ?? string.Empty, @"\s+", " ").Trim();
-        if (text.Length == 0) return new(string.Empty, null);
-        var parenthetical = Regex.Match(text, @"^(?<name>[^()]+?)\s*\((?<franchise>[^()]{2,80})\)$");
-        if (parenthetical.Success) return Split(parenthetical);
-        var from = Regex.Match(text, @"^(?<name>.+?)\s+from\s+(?:the\s+)?(?<franchise>.{2,80})$", RegexOptions.IgnoreCase);
-        if (from.Success && Tokens(from.Groups["name"].Value).Count is >= 1 and <= 5) return Split(from);
-        var dash = Regex.Match(text, @"^(?<name>[^,–—-]+?)\s+[–—-]\s+(?<franchise>.{2,80})$");
-        if (dash.Success) return Split(dash);
-        return new(text, null);
-
-        static PersonaQuery Split(Match match) => new(match.Groups["name"].Value.Trim(), match.Groups["franchise"].Value.Trim().TrimEnd('.', ')'));
-    }
-
-    /// <summary>Lowercase, accent-free, punctuation-free form used for comparisons.</summary>
-    public static string Normalize(string value)
-    {
-        var decomposed = (value ?? string.Empty).Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(decomposed.Length);
-        foreach (var character in decomposed)
-        {
-            var category = CharUnicodeInfo.GetUnicodeCategory(character);
-            if (category == UnicodeCategory.NonSpacingMark) continue;
-            builder.Append(char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : ' ');
-        }
-        return Regex.Replace(builder.ToString(), @"\s+", " ").Trim();
-    }
-
-    private static List<string> Tokens(string value) =>
-        Normalize(Regex.Replace(value ?? string.Empty, @"\([^)]*\)", " ")).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
-
-    private static List<string> NameTokens(string value)
-    {
-        var tokens = Tokens(value);
-        var meaningful = tokens.Where(token => !Honorifics.Contains(token)).ToList();
-        return meaningful.Count > 0 ? meaningful : tokens;
-    }
-
-    /// <summary>
-    /// How well <paramref name="candidate"/> matches the name a user typed, from 0 to 1. Tolerates
-    /// typos ("Phillips"/"Philips"), honorifics ("Captain"), missing surnames ("Spongebob" for
-    /// "SpongeBob SquarePants"), and spacing ("Sponge Bob").
-    /// </summary>
-    public static double NameSimilarity(string query, string candidate)
-    {
-        var queryTokens = NameTokens(query);
-        var candidateTokens = NameTokens(candidate);
-        if (queryTokens.Count == 0 || candidateTokens.Count == 0) return 0;
-        double Best(string token, List<string> others) => others.Max(other => TokenSimilarity(token, other));
-        var queryCoverage = queryTokens.Average(token => Best(token, candidateTokens));
-        var candidateCoverage = candidateTokens.Average(token => Best(token, queryTokens));
-        var combined = 0.75 * queryCoverage + 0.25 * candidateCoverage;
-        var joined = TokenSimilarity(string.Concat(queryTokens), string.Concat(candidateTokens));
-        // A single-token query that equals one candidate token ("Boog" vs "Boog") is a strong match
-        // even when the candidate has more tokens.
-        return Math.Round(Math.Max(combined, joined), 3);
-    }
-
-    private static double TokenSimilarity(string left, string right)
-    {
-        if (left == right) return 1;
-        if (left.Length == 0 || right.Length == 0) return 0;
-        var distance = Levenshtein(left, right);
-        var similarity = 1.0 - (double)distance / Math.Max(left.Length, right.Length);
-        // Short tokens need to match exactly; one edit in a three-letter name is a different name.
-        if (Math.Min(left.Length, right.Length) <= 3 && distance > 0) similarity *= 0.5;
-        // Below this, two tokens are different words ("hyde"/"home"), not a typo ("phillips"/"philips").
-        return similarity >= 0.7 ? similarity : 0;
-    }
-
-    private static int Levenshtein(string left, string right)
-    {
-        var previous = new int[right.Length + 1];
-        var current = new int[right.Length + 1];
-        for (var j = 0; j <= right.Length; j++) previous[j] = j;
-        for (var i = 1; i <= left.Length; i++)
-        {
-            current[0] = i;
-            for (var j = 1; j <= right.Length; j++)
-            {
-                var cost = left[i - 1] == right[j - 1] ? 0 : 1;
-                current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
-            }
-            (previous, current) = (current, previous);
-        }
-        return previous[right.Length];
-    }
-
-    /// <summary>Classifies a Wikipedia short description as a person, character, creative work, or unknown.</summary>
-    public static string ClassifyDescription(string description)
-    {
-        var text = (description ?? string.Empty).ToLowerInvariant();
-        if (text.Length == 0) return "unknown";
-        if (Regex.IsMatch(text, @"\b(?:fictional|character|mascot|protagonist|antagonist|anthropomorphic)\b")) return "character";
-        if (Regex.IsMatch(text, @"\b(?:born|died|\(\d{4}|\d{4}\s*[–-]\s*\d{4})\b|\(born|\b(?:actor|actress|comedian|politician|singer|rapper|writer|author|journalist|broadcaster|presenter|footballer|athlete|player|youtuber|streamer|podcaster|businessman|businesswoman|entrepreneur|musician|director|producer|activist|scientist|philosopher|chef|artist|model|internet personality)\b")) return "person";
-        if (Regex.IsMatch(text, @"\b(?:film|movie|series|sitcom|video game|game|franchise|novel|album|single|song|episode|book|attraction|ride|theme park|restaurant|toy|brand|comic|manga|anime|show|programme|program|company|organization|organisation|band|website|software)\b")) return "work";
-        return "unknown";
-    }
-
-    /// <summary>Pulls the franchise out of descriptions such as "Fictional character in the Pirates of the Caribbean film series".</summary>
-    public static string? ExtractFranchise(string description)
-    {
-        var match = Regex.Match(description ?? string.Empty, @"\b(?:in|from|of)\s+(?:the\s+)?(?<franchise>[A-Z0-9][^,;]+)$");
-        if (!match.Success) return null;
-        var franchise = Regex.Replace(match.Groups["franchise"].Value,
-            @"\s+(?:(?:animated|live-action|media|film|movie|video game|game|book|novel|comic|television|tv|web|anime|manga)\s+)*(?:series|franchise|films?|games?|universe|saga|trilogy|show|sitcom)\s*$",
-            string.Empty, RegexOptions.IgnoreCase).Trim();
-        return franchise.Length is >= 2 and <= 80 && !Regex.IsMatch(franchise, @"^(?:the\s+)?same name$", RegexOptions.IgnoreCase) ? franchise : null;
-    }
-
-    private static bool IsAggregatorWiki(string host)
-    {
-        var subdomain = host.Split('.')[0].ToLowerInvariant();
-        return AggregatorWikis.Any(name => subdomain.Equals(name, StringComparison.Ordinal) || subdomain.Contains("fanon", StringComparison.Ordinal) || subdomain.EndsWith("-fanon", StringComparison.Ordinal));
-    }
-
-    private static double FranchiseAffinity(string? franchise, params string?[] evidence)
-    {
-        if (string.IsNullOrWhiteSpace(franchise)) return 0.5;
-        var wanted = NameTokens(franchise).Where(token => token.Length > 2).ToArray();
-        if (wanted.Length == 0) return 0.5;
-        var haystack = " " + Normalize(string.Join(' ', evidence.Where(item => item is not null))) + " ";
-        var joinedHaystack = haystack.Replace(" ", string.Empty);
-        var hits = wanted.Count(token => haystack.Contains($" {token} ", StringComparison.Ordinal) || joinedHaystack.Contains(token, StringComparison.Ordinal));
-        return (double)hits / wanted.Length;
-    }
-
-    public static string WikiUrl(string host, string title) => $"https://{host}/wiki/{Uri.EscapeDataString(title.Replace(' ', '_')).Replace("%2F", "/").Replace("%3A", ":")}";
+    // Public compatibility surface retained while matching rules live in their own focused helper.
+    public static PersonaQuery ParseQuery(string input) => PersonaIdentityMatcher.ParseQuery(input);
+    public static string Normalize(string value) => PersonaIdentityMatcher.Normalize(value);
+    public static double NameSimilarity(string query, string candidate) => PersonaIdentityMatcher.NameSimilarity(query, candidate);
+    public static string ClassifyDescription(string description) => PersonaIdentityMatcher.ClassifyDescription(description);
+    public static string? ExtractFranchise(string description) => PersonaIdentityMatcher.ExtractFranchise(description);
+    public static string WikiUrl(string host, string title) => PersonaIdentityMatcher.WikiUrl(host, title);
 
     // ---------------------------------------------------------------- identity resolution
 
@@ -220,7 +76,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     /// </summary>
     public async Task<IReadOnlyList<PersonaIdentity>> ResolveAsync(string input, string? subjectHint, CancellationToken cancellationToken = default)
     {
-        var query = ParseQuery(input);
+        var query = PersonaIdentityMatcher.ParseQuery(input);
         if (query.Name.Length == 0) return [];
         var hint = subjectHint is "person" or "character" ? subjectHint : null;
         var franchiseSuffix = query.Franchise is null ? string.Empty : " " + query.Franchise;
@@ -242,17 +98,17 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         // A character request whose Wikipedia hits are only works ("Grand Theft Auto V" for
         // "Trevor Phillips") still tells us the franchise.
         var inferredFranchise = query.Franchise
-            ?? wikipediaHits.Where(hit => ClassifyDescription(hit.Description) == "work").Select(hit => hit.Title).FirstOrDefault();
+            ?? wikipediaHits.Where(hit => PersonaIdentityMatcher.ClassifyDescription(hit.Description) == "work").Select(hit => hit.Title).FirstOrDefault();
 
         // Ask Fandom which wiki is dedicated to the franchise (gta, openseason, spongebob, pirates) and
         // search for the character there directly. Cross-wiki search tends to surface company, logo,
         // or "every character" wikis first, which hold far thinner canon and no transcripts.
         var franchiseCandidates = new[] { query.Franchise, inferredFranchise }
-            .Concat(wikipediaHits.Where(hit => ClassifyDescription(hit.Description) == "character").Select(hit => ExtractFranchise(hit.Description)))
+            .Concat(wikipediaHits.Where(hit => PersonaIdentityMatcher.ClassifyDescription(hit.Description) == "character").Select(hit => PersonaIdentityMatcher.ExtractFranchise(hit.Description)))
             .Where(item => !string.IsNullOrWhiteSpace(item)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToArray();
         // No franchise anywhere ("Trevor Phillips"): let the wikis that host a matching page vote.
         if (franchiseCandidates.Length == 0)
-            franchiseCandidates = fandomHits.Where(hit => !IsAggregatorWiki(hit.Host) && NameSimilarity(query.Name, hit.Title) >= 0.75 && hit.Franchise is not null)
+            franchiseCandidates = fandomHits.Where(hit => !PersonaIdentityMatcher.IsAggregatorWiki(hit.Host) && PersonaIdentityMatcher.NameSimilarity(query.Name, hit.Title) >= 0.75 && hit.Franchise is not null)
                 .Select(hit => hit.Franchise!).Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToArray();
         var dedicatedHosts = new List<string>();
         if (hint != "person")
@@ -260,7 +116,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             foreach (var franchise in franchiseCandidates)
             {
                 var communities = await Quietly(() => CommunitySearchAsync(franchise, 4, cancellationToken)).ConfigureAwait(false);
-                foreach (var community in communities.Where(community => !IsAggregatorWiki(community.Host)).Take(2))
+                foreach (var community in communities.Where(community => !PersonaIdentityMatcher.IsAggregatorWiki(community.Host)).Take(2))
                 {
                     if (dedicatedHosts.Contains(community.Host)) continue;
                     dedicatedHosts.Add(community.Host);
@@ -268,13 +124,13 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
                     // SquarePants"), and "<name> character" — a wiki's search often ranks the
                     // series or film page above its character page for a bare name.
                     var searchNames = new[] { query.Name, $"{query.Name} character" }
-                        .Concat(fandomHits.Where(hit => NameSimilarity(query.Name, hit.Title) >= 0.75).Select(hit => Regex.Replace(hit.Title, @"\s*\([^)]*\)\s*$", string.Empty)))
+                        .Concat(fandomHits.Where(hit => PersonaIdentityMatcher.NameSimilarity(query.Name, hit.Title) >= 0.75).Select(hit => Regex.Replace(hit.Title, @"\s*\([^)]*\)\s*$", string.Empty)))
                         .Distinct(StringComparer.OrdinalIgnoreCase).Take(3).ToArray();
                     var titleBatches = await Task.WhenAll(searchNames.Select(name => Quietly(() => WikiSearchTitlesAsync(community.Host, name, 6, cancellationToken)))).ConfigureAwait(false);
                     var titles = titleBatches.SelectMany(batch => batch).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                    var best = titles.Select(title => (title, score: NameSimilarity(query.Name, title) + TitleShapeBonus(title)))
+                    var best = titles.Select(title => (title, score: PersonaIdentityMatcher.NameSimilarity(query.Name, title) + TitleShapeBonus(title)))
                         .OrderByDescending(item => item.score).FirstOrDefault();
-                    if (best.title is not null && NameSimilarity(query.Name, best.title) >= 0.6)
+                    if (best.title is not null && PersonaIdentityMatcher.NameSimilarity(query.Name, best.title) >= 0.6)
                         fandomHits.Insert(0, new FandomHit(best.title, community.Host, community.Name, $"Page on {community.Name}, the dedicated wiki for {franchise}.", franchise));
                 }
             }
@@ -283,11 +139,11 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         var identities = new List<PersonaIdentity>();
         foreach (var hit in wikipediaHits)
         {
-            var type = ClassifyDescription(hit.Description);
+            var type = PersonaIdentityMatcher.ClassifyDescription(hit.Description);
             if (type == "work") continue;
-            var nameScore = NameSimilarity(query.Name, hit.Title);
+            var nameScore = PersonaIdentityMatcher.NameSimilarity(query.Name, hit.Title);
             if (nameScore < 0.6) continue;
-            var franchise = type == "character" ? ExtractFranchise(hit.Description) ?? query.Franchise : null;
+            var franchise = type == "character" ? PersonaIdentityMatcher.ExtractFranchise(hit.Description) ?? query.Franchise : null;
             var fandom = type == "person" ? null : BestFandomMatch(fandomHits, hit.Title, franchise ?? query.Franchise, dedicatedHosts);
             identities.Add(Build(hit.Title, hit.Description, type, franchise ?? fandom?.Franchise, hit.Title, type == "character" ? fandom : null, nameScore));
         }
@@ -295,7 +151,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         foreach (var fandom in fandomHits)
         {
             if (identities.Any(identity => identity.FandomHost == fandom.Host && identity.FandomTitle == fandom.Title)) continue;
-            var nameScore = NameSimilarity(query.Name, fandom.Title);
+            var nameScore = PersonaIdentityMatcher.NameSimilarity(query.Name, fandom.Title);
             if (nameScore < 0.6) continue;
             identities.Add(Build(fandom.Title, fandom.Snippet, hint ?? "character", fandom.Franchise, null, fandom, nameScore));
         }
@@ -314,7 +170,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             scored[position] = scored[position] with { Score = Math.Round(scored[position].Score + bonus, 3) };
         }
         return scored
-            .GroupBy(identity => Normalize(identity.CanonicalName) + "|" + Normalize(identity.Franchise ?? identity.FandomHost ?? string.Empty))
+            .GroupBy(identity => PersonaIdentityMatcher.Normalize(identity.CanonicalName) + "|" + PersonaIdentityMatcher.Normalize(identity.Franchise ?? identity.FandomHost ?? string.Empty))
             .Select(MergeGroup)
             .OrderByDescending(identity => identity.Score)
             .Take(8)
@@ -325,12 +181,12 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             var canonical = Regex.Replace(name.Split('/')[0], @"\s*\((?:character|fictional character|[^)]*\bcharacter)\)\s*$", string.Empty, RegexOptions.IgnoreCase).Trim();
             var aliases = new List<string> { canonical };
             if (fandom is not null) aliases.Add(Regex.Replace(fandom.Title, @"\s*\([^)]*\)\s*$", string.Empty).Trim());
-            if (NameSimilarity(query.Name, canonical) >= 0.75) aliases.Add(query.Name);
-            var meaningful = NameTokens(canonical);
+            if (PersonaIdentityMatcher.NameSimilarity(query.Name, canonical) >= 0.75) aliases.Add(query.Name);
+            var meaningful = PersonaIdentityMatcher.TokenizeName(canonical);
             // Scripts and transcripts label characters by first name ("Jack", "Trevor", "SpongeBob").
             if (type == "character" && meaningful.Count >= 2)
             {
-                var first = Regex.Matches(canonical, @"[\p{L}\p{N}'’.-]+").Select(match => match.Value).FirstOrDefault(token => !Honorifics.Contains(Normalize(token)));
+                var first = Regex.Matches(canonical, @"[\p{L}\p{N}'’.-]+").Select(match => match.Value).FirstOrDefault(token => !PersonaIdentityMatcher.IsHonorific(PersonaIdentityMatcher.Normalize(token)));
                 if (first is { Length: >= 3 }) aliases.Add(first);
             }
             return new PersonaIdentity
@@ -354,20 +210,20 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         || Regex.IsMatch(hit.Description, @"^(?:topics referred to by the same term|disambiguation|wikimedia disambiguation page|index of)", RegexOptions.IgnoreCase);
 
     private static FandomHit? BestFandomMatch(IEnumerable<FandomHit> hits, string name, string? franchise, IReadOnlyList<string> dedicatedHosts) =>
-        hits.Where(hit => NameSimilarity(name, hit.Title) >= 0.8 || NameSimilarity(hit.Title, name) >= 0.8)
+        hits.Where(hit => PersonaIdentityMatcher.NameSimilarity(name, hit.Title) >= 0.8 || PersonaIdentityMatcher.NameSimilarity(hit.Title, name) >= 0.8)
             .OrderByDescending(hit => dedicatedHosts.Contains(hit.Host))
             .ThenByDescending(hit => TitleShapeBonus(hit.Title))
-            .ThenByDescending(hit => FranchiseAffinity(franchise, hit.SiteName, hit.Host))
-            .ThenBy(hit => IsAggregatorWiki(hit.Host))
-            .FirstOrDefault(hit => !IsAggregatorWiki(hit.Host));
+            .ThenByDescending(hit => PersonaIdentityMatcher.FranchiseAffinity(franchise, hit.SiteName, hit.Host))
+            .ThenBy(hit => PersonaIdentityMatcher.IsAggregatorWiki(hit.Host))
+            .FirstOrDefault(hit => !PersonaIdentityMatcher.IsAggregatorWiki(hit.Host));
 
     private static double ScoreIdentity(PersonaIdentity identity, PersonaQuery query, string? hint, string? inferredFranchise, IReadOnlyList<string> dedicatedHosts)
     {
         var typeScore = hint is null || identity.SubjectType == "unknown" ? 0.5 : identity.SubjectType == hint ? 1 : 0;
         var franchise = query.Franchise ?? inferredFranchise;
-        var franchiseScore = franchise is null ? 0.5 : FranchiseAffinity(franchise, identity.Franchise, identity.FandomSiteName, identity.FandomHost, identity.Description);
+        var franchiseScore = franchise is null ? 0.5 : PersonaIdentityMatcher.FranchiseAffinity(franchise, identity.Franchise, identity.FandomSiteName, identity.FandomHost, identity.Description);
         var dedicated = identity.FandomHost is not null && dedicatedHosts.Contains(identity.FandomHost);
-        var sourceScore = (identity.WikipediaTitle is not null ? 0.6 : 0) + (identity.FandomHost is null ? 0 : dedicated ? 0.6 : IsAggregatorWiki(identity.FandomHost) ? 0.05 : 0.3);
+        var sourceScore = (identity.WikipediaTitle is not null ? 0.6 : 0) + (identity.FandomHost is null ? 0 : dedicated ? 0.6 : PersonaIdentityMatcher.IsAggregatorWiki(identity.FandomHost) ? 0.05 : 0.3);
         if (dedicated) franchiseScore = Math.Max(franchiseScore, 0.9);
         var shape = TitleShapeBonus(identity.FandomTitle ?? identity.WikipediaTitle ?? identity.CanonicalName);
         return Math.Round(0.45 * identity.NameScore + 0.2 * typeScore + 0.2 * franchiseScore + 0.15 * Math.Min(1, sourceScore) + shape, 3);
@@ -416,20 +272,20 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         if (!isWikipedia && !isFandom) return null;
         var canonical = Regex.Replace(title.Split('/')[0], @"\s*\((?:character|fictional character|[^)]*\bcharacter)\)\s*$", string.Empty, RegexOptions.IgnoreCase).Trim();
         var aliases = new List<string> { canonical };
-        if (NameSimilarity(typedName, canonical) >= 0.75) aliases.Add(ParseQuery(typedName).Name);
-        var first = Regex.Matches(canonical, @"[\p{L}\p{N}'’.-]+").Select(match => match.Value).FirstOrDefault(token => !Honorifics.Contains(Normalize(token)));
-        if (subjectType == "character" && NameTokens(canonical).Count >= 2 && first is { Length: >= 3 }) aliases.Add(first);
+        if (PersonaIdentityMatcher.NameSimilarity(typedName, canonical) >= 0.75) aliases.Add(PersonaIdentityMatcher.ParseQuery(typedName).Name);
+        var first = Regex.Matches(canonical, @"[\p{L}\p{N}'’.-]+").Select(match => match.Value).FirstOrDefault(token => !PersonaIdentityMatcher.IsHonorific(PersonaIdentityMatcher.Normalize(token)));
+        if (subjectType == "character" && PersonaIdentityMatcher.TokenizeName(canonical).Count >= 2 && first is { Length: >= 3 }) aliases.Add(first);
         return new PersonaIdentity
         {
             CanonicalName = canonical,
             SubjectType = subjectType is "person" or "character" ? subjectType : "unknown",
-            Franchise = ParseQuery(typedName).Franchise,
+            Franchise = PersonaIdentityMatcher.ParseQuery(typedName).Franchise,
             Aliases = aliases.Where(alias => alias.Length >= 2).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             WikipediaTitle = isWikipedia ? title : null,
             FandomHost = isFandom ? host : null,
             FandomTitle = isFandom ? title : null,
             FandomSiteName = isFandom ? host : null,
-            NameScore = NameSimilarity(typedName, canonical),
+            NameScore = PersonaIdentityMatcher.NameSimilarity(typedName, canonical),
         };
     }
 
@@ -496,11 +352,11 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     {
         if (string.IsNullOrWhiteSpace(identity.Franchise)) return identity;
         var wikis = await CommunitySearchAsync(identity.Franchise, 4, cancellationToken).ConfigureAwait(false);
-        foreach (var wiki in wikis.Where(wiki => !IsAggregatorWiki(wiki.Host)))
+        foreach (var wiki in wikis.Where(wiki => !PersonaIdentityMatcher.IsAggregatorWiki(wiki.Host)))
         {
             var titles = await WikiSearchTitlesAsync(wiki.Host, identity.CanonicalName, 5, cancellationToken).ConfigureAwait(false);
-            var title = titles.OrderByDescending(candidate => NameSimilarity(identity.CanonicalName, candidate)).FirstOrDefault();
-            if (title is not null && NameSimilarity(identity.CanonicalName, title) >= 0.75)
+            var title = titles.OrderByDescending(candidate => PersonaIdentityMatcher.NameSimilarity(identity.CanonicalName, candidate)).FirstOrDefault();
+            if (title is not null && PersonaIdentityMatcher.NameSimilarity(identity.CanonicalName, title) >= 0.75)
                 return identity with { FandomHost = wiki.Host, FandomTitle = title, FandomSiteName = wiki.Name };
         }
         return identity;
@@ -533,7 +389,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         var sections = HtmlToSections(html);
         var site = identity.FandomSiteName ?? identity.FandomHost;
         var url = identity.FandomUrl!;
-        var note = IsAggregatorWiki(identity.FandomHost)
+        var note = PersonaIdentityMatcher.IsAggregatorWiki(identity.FandomHost)
             ? "Fan-maintained aggregator wiki; prefer franchise wiki or official canon where they disagree."
             : "Fan-maintained franchise wiki; usually detailed and canon-focused, but check disputed details.";
         var documents = new List<PersonaKnowledgeDocument>();
@@ -566,7 +422,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             if (!attribution.IsUsable) continue;
             var turns = CleanTurns(PersonaDialogueEvidence.SelectSpeakerTurns(SpeakerLabels(identity), text, 6_000));
             if (turns.Count < 3) continue;
-            documents.Add(new($"{title} — {identity.FandomSiteName ?? identity.FandomHost}", WikiUrl(identity.FandomHost, title), identity.FandomHost, "Story transcript", string.Join('\n', turns),
+            documents.Add(new($"{title} — {identity.FandomSiteName ?? identity.FandomHost}", PersonaIdentityMatcher.WikiUrl(identity.FandomHost, title), identity.FandomHost, "Story transcript", string.Join('\n', turns),
                 "subject-attributed", Math.Max(turns.Count, attribution.TurnCount), "explicit-speaker-labels", "Fan transcript with explicit speaker labels; compare with the episode or film for transcription errors."));
             if (documents.Sum(document => document.AttributedTurnCount) >= 80) break;
         }
@@ -585,11 +441,11 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         var documents = new List<PersonaKnowledgeDocument>();
         // Person pages ("Sam Hyde") hold quotes by the subject; work pages ("Open Season (2006 film)")
         // hold labelled dialogue from which the subject's lines are selected.
-        var personPage = titles.FirstOrDefault(title => NameSimilarity(identity.CanonicalName, title) >= 0.85);
+        var personPage = titles.FirstOrDefault(title => PersonaIdentityMatcher.NameSimilarity(identity.CanonicalName, title) >= 0.85);
         // Pages found by the character's name mention the character, so try them first; then the
         // franchise's pages by affinity. Each is kept only if it holds the character's labelled lines.
         var workPages = identity.SubjectType == "person" ? [] : nameTitles
-            .Concat(titles.OrderByDescending(title => FranchiseAffinity(identity.Franchise ?? identity.CanonicalName, title)))
+            .Concat(titles.OrderByDescending(title => PersonaIdentityMatcher.FranchiseAffinity(identity.Franchise ?? identity.CanonicalName, title)))
             .Where(title => title != personPage).Distinct(StringComparer.OrdinalIgnoreCase).Take(4).ToArray();
         if (personPage is not null)
         {
@@ -599,7 +455,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
                 var sections = HtmlToSections(html);
                 var quotes = QuoteLines(sections.Where(section => section.Heading.Length > 0 && !IsBoilerplateSection(section.Heading) && !Regex.IsMatch(section.Heading, @"^(?:quotes about|about|misattributed|disputed)", RegexOptions.IgnoreCase)).SelectMany(section => section.Lines), identity);
                 if (quotes.Count >= 3)
-                    documents.Add(new($"{personPage} — Wikiquote", WikiUrl("en.wikiquote.org", personPage), "en.wikiquote.org", identity.SubjectType == "person" ? "Interview" : "Character dialogue",
+                    documents.Add(new($"{personPage} — Wikiquote", PersonaIdentityMatcher.WikiUrl("en.wikiquote.org", personPage), "en.wikiquote.org", identity.SubjectType == "person" ? "Interview" : "Character dialogue",
                         string.Join('\n', quotes.Select(line => $"{identity.CanonicalName}: {line}")), "subject-attributed", quotes.Count, "sourced-quote-collection",
                         "Wikiquote collects sourced quotes attributed to this subject; check each quote's listed source."));
             }
@@ -613,7 +469,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             if (!attribution.IsUsable) continue;
             var turns = CleanTurns(PersonaDialogueEvidence.SelectSpeakerTurns(SpeakerLabels(identity), text, 5_000));
             if (turns.Count < 3) continue;
-            documents.Add(new($"{title} — Wikiquote", WikiUrl("en.wikiquote.org", title), "en.wikiquote.org", "Character dialogue",
+            documents.Add(new($"{title} — Wikiquote", PersonaIdentityMatcher.WikiUrl("en.wikiquote.org", title), "en.wikiquote.org", "Character dialogue",
                 string.Join('\n', turns), "subject-attributed", turns.Count, "explicit-speaker-labels",
                 "Wikiquote dialogue with speaker labels; lines are from the listed work."));
         }
@@ -646,7 +502,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             if (speaker.Success)
             {
                 // A labelled line belongs to the subject only when the label is one of its names.
-                if (!labels.Contains(Normalize(speaker.Groups["speaker"].Value))) continue;
+                if (!labels.Contains(PersonaIdentityMatcher.Normalize(speaker.Groups["speaker"].Value))) continue;
                 line = line[(line.IndexOf(':') + 1)..].Trim();
             }
             // Source citations under a quote ("Interview with X, 2016") are not quotes.
