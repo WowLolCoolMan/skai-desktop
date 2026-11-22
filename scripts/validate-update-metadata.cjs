@@ -1,7 +1,9 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
-const yaml = require("js-yaml");
+const yaml = require(require.resolve("js-yaml", {
+  paths: [path.join(__dirname, "..", "apps", "desktop")],
+}));
 
 const [metadataPath, artifactDirectory] = process.argv.slice(2);
 if (!metadataPath || !artifactDirectory) throw new Error("Usage: node validate-update-metadata.cjs <latest.yml> <artifact-directory>");

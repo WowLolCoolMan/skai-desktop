@@ -29,6 +29,7 @@ worktree.
 | Themes and live reload | `smoke:electron:themes` |
 | Pets, Linux windowing, update policy, bridge/runtime/tray/local-only audits | Corresponding `test:*` and `audit:*` scripts |
 | Repository hygiene and release configuration | `check:hygiene`, `check:release-config`, `audit:future-features` |
+| Windows 0.1.4 unsigned installer packaging and update metadata | `SKAI_ALLOW_UNSIGNED_INSTALLER=true node scripts/package-windows-installer.cjs` — NSIS artifact and `latest.yml` verified locally |
 
 ## Conditional or incomplete coverage
 
@@ -39,6 +40,8 @@ worktree.
 | Persona model quality | Research succeeds with installed `qwen3:14b`; one character draft returned a partial card. Core deterministic voice-card and source-boundary tests pass, but more model-specific quality evaluation is needed. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |
 | Release signing and lifecycle | Release audit confirms the gates exist. Cryptographic signing and clean-machine upgrade/rollback still require configured CI secrets and Windows/Ubuntu runners. |
+| Local Windows upgrade lifecycle | A current 0.1.4 installer can be built and metadata-verified locally, but the disposable 0.1.3 → 0.1.4 upgrade smoke needs a real 0.1.3 installer artifact. The unsigned local artifact is not release evidence. |
+| Linux AppImage packaging | The packager correctly refuses to run on Windows; build and acceptance require an Ubuntu/Linux runner. |
 
 ## Test-harness notes
 
@@ -47,3 +50,7 @@ is now measured dynamically, and the cancellation fixture uses an oversized
 model estimate to deterministically exercise the single-slot path. Tasks also
 inherit the saved provider when no task-specific provider is supplied, keeping
 AirLLM-aware admission consistent with `system.capacity`.
+
+The update-metadata verifier resolves `js-yaml` from the desktop dependency
+tree, matching the repository's install layout and allowing the local Windows
+installer packaging check to run after `npm --prefix apps/desktop install`.
