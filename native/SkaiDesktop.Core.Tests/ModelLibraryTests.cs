@@ -61,7 +61,7 @@ internal static class ModelLibraryTests
             };
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(models) });
         })));
-        var discoveredLocalModels = await localInventory.DiscoverLocalModelsAsync("http://localhost:1234/v1");
+        var discoveredLocalModels = await localInventory.DiscoverLocalModelsAsync("http://localhost:1234/v1", includeHuggingFaceCache: false);
         Check(discoveredLocalModels.Count == 3, "model library finds installed models across multiple local runtimes");
         Check(discoveredLocalModels.Count(model => model.Model == "qwen3:8b") == 2 && discoveredLocalModels.Select(model => model.Endpoint).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 2, "same model ID remains distinguishable when installed in separate runtimes");
         Check(discoveredLocalModels.Any(model => model.Provider == "LM Studio" && model.IsLoaded == false && model.DisplayName == "Qwen 3 8B") && discoveredLocalModels.Any(model => model.Provider == "Ollama" && model.SizeBytes == 123456789), "runtime-native inventories include installed state and model metadata");
@@ -79,7 +79,7 @@ internal static class ModelLibraryTests
             oversized.Headers.ContentLength = BoundedHttpContent.MaxJsonBytes + 1L;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = oversized });
         })));
-        var resilientModels = await resilientInventory.DiscoverLocalModelsAsync("http://localhost:1234/v1");
+        var resilientModels = await resilientInventory.DiscoverLocalModelsAsync("http://localhost:1234/v1", includeHuggingFaceCache: false);
         Check(resilientModels.Count == 1 && resilientModels[0].Model == "healthy-local-model" && resilientModels[0].Provider == "LM Studio",
             "one malformed local runtime response does not block Model Library inventory from healthy runtimes");
 

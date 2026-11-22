@@ -278,7 +278,10 @@ internal static class LocalStorageAndWorkspaceTests
             RunGit(gitReviewPath, "add", "--all");
             RunGit(gitReviewPath, "commit", "-m", "initial");
             File.WriteAllText(Path.Combine(gitReviewPath, "README.md"), "Changed README\n");
-            var renamedNotesName = new string('r', 96) + ".md";
+            // Keep the component long enough to exercise rename provenance while
+            // leaving room for Windows sandbox temp roots that already exceed
+            // the legacy MAX_PATH boundary.
+            var renamedNotesName = new string('r', OperatingSystem.IsWindows() ? 64 : 96) + ".md";
             File.Move(Path.Combine(gitReviewPath, "notes.md"), Path.Combine(gitReviewPath, renamedNotesName));
             RunGit(gitReviewPath, "add", "-A", "--", "notes.md", renamedNotesName);
             Directory.CreateDirectory(Path.Combine(gitReviewPath, ".github", "workflows"));

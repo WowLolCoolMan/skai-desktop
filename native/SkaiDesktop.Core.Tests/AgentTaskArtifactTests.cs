@@ -6,7 +6,9 @@ internal static class AgentTaskArtifactTests
 {
     public static async Task RunAsync()
     {
-        var root = Path.Combine(Path.GetTempPath(), "skai-agent-tests-" + Guid.NewGuid().ToString("N"));
+        // Keep the Git fixture path short enough for Git for Windows' internal
+        // GIT_DIR budget even when the test runner's sandbox temp root is long.
+        var root = Path.Combine(Path.GetTempPath(), "s-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -50,6 +52,10 @@ internal static class AgentTaskArtifactTests
             store.Queue(failedPlan.Id);
             var failed = await executor.ExecuteNextAsync((_, _) => throw new InvalidOperationException("handler failure"));
             Check(failed?.Status == AgentTaskStatuses.Failed && failed.ResultSummary == "handler failure", "agent task executor durably records handler failure");
+            var noisyFailurePlan = store.Create("Fail with noisy detail", "Persist a safe one-line handler failure.");
+            store.Queue(noisyFailurePlan.Id);
+            var noisyFailure = await executor.ExecuteNextAsync((_, _) => throw new InvalidOperationException("handler line 1\nhandler line 2"));
+            Check(noisyFailure?.Status == AgentTaskStatuses.Failed && noisyFailure.ResultSummary == "handler line 1 handler line 2", "agent task executor normalizes multiline handler failures before persistence");
             var cancelledExecutionPlan = store.Create("Cancel bounded review", "Run a cancelled injected handler.");
             store.Queue(cancelledExecutionPlan.Id);
             using var cancellation = new CancellationTokenSource();
@@ -73,7 +79,7 @@ internal static class AgentTaskArtifactTests
             store.Queue(isolatedPlan.Id);
             var worktreeExecutor = new AgentTaskExecutor(store);
             var coordinator = new GitWorktreeCoordinator();
-            var worktreeParent = Path.Combine(root, "worktrees");
+            var worktreeParent = Path.Combine(root, "w");
             var isolatedResult = await worktreeExecutor.ExecuteNextInWorktreeAsync(coordinator, isolatedRepository, worktreeParent, async (task, lease, _) =>
             {
                 Check(task.WorktreePath == lease.WorktreePath && File.Exists(Path.Combine(lease.WorktreePath, "README.md")), "agent executor injects a real isolated worktree into the handler");
@@ -81,7 +87,7 @@ internal static class AgentTaskArtifactTests
                 await Task.CompletedTask;
                 return new AgentTaskExecutionResult("Isolated review completed.", ["isolated-review"]);
             });
-            Check(isolatedResult?.Status == AgentTaskStatuses.Completed && isolatedResult.WorktreePath is not null && isolatedResult.WorktreeRepositoryRoot == isolatedRepository, "agent executor durably retains the worktree lease after handler completion");
+            Check(isolatedResult?.Status == AgentTaskStatuses.Completed && isolatedResult.WorktreePath is not null && string.Equals(isolatedResult.WorktreeRepositoryRoot, isolatedRepository, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal), "agent executor durably retains the worktree lease after handler completion");
             var releasedResult = await worktreeExecutor.ReleaseTaskWorktreeAsync(isolatedResult!.Id, coordinator);
             Check(releasedResult.WorktreePath is null && !Directory.Exists(Path.Combine(worktreeParent, $"agent-task-{isolatedResult.Id}")), "agent executor releases a retained clean worktree explicitly");
             try

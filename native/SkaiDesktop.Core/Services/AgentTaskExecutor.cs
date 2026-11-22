@@ -51,7 +51,7 @@ public sealed class AgentTaskExecutor
         }
         catch (Exception error)
         {
-            var summary = string.IsNullOrWhiteSpace(error.Message) ? "The task handler failed." : error.Message;
+            var summary = NormalizeFailureSummary(error, "The task handler failed.");
             return _store.Fail(task.Id, summary);
         }
     }
@@ -92,9 +92,19 @@ public sealed class AgentTaskExecutor
         }
         catch (Exception error)
         {
-            var summary = string.IsNullOrWhiteSpace(error.Message) ? "The isolated task handler failed; the worktree was retained for review." : error.Message;
+            var summary = NormalizeFailureSummary(error, "The isolated task handler failed; the worktree was retained for review.");
             return _store.Fail(task.Id, summary);
         }
+    }
+
+    private static string NormalizeFailureSummary(Exception error, string fallback)
+    {
+        var raw = string.IsNullOrWhiteSpace(error.Message) ? fallback : error.Message;
+        var normalized = string.Concat(raw.Select(character => char.IsControl(character) ? ' ' : character)).Trim();
+        if (normalized.Length == 0) normalized = fallback;
+        return normalized.Length <= AgentTaskArtifactStore.MaxResultCharacters
+            ? normalized
+            : normalized[..AgentTaskArtifactStore.MaxResultCharacters];
     }
 
     public async Task<AgentTaskArtifact> ReleaseTaskWorktreeAsync(

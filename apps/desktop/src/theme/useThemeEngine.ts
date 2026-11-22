@@ -15,6 +15,33 @@ export function useThemeEngine(request: Request, themeMode: ThemeMode) {
   // Theme: load built-in and user themes and keep them live-reloading.
   useEffect(() => { themeEngine.start(request); }, [request]);
 
+  // Windows owns the title-bar controls when titleBarOverlay is enabled. Keep
+  // their native hit targets and window actions, while syncing the button area
+  // and glyph color to the currently applied Skai palette.
+  useEffect(() => {
+    if (!window.skaiAgent?.window || window.skaiAgent.window.platform !== "win32") return;
+    const root = document.documentElement;
+    let queued = false;
+    const sync = () => {
+      queued = false;
+      const style = getComputedStyle(root);
+      const background = style.getPropertyValue("--skai-color-canvas").trim();
+      const foreground = style.getPropertyValue("--skai-color-text").trim();
+      if (/^#[0-9a-f]{6}$/i.test(background) && /^#[0-9a-f]{6}$/i.test(foreground)) {
+        void window.skaiAgent?.window?.setTitleBarTheme(background, foreground);
+      }
+    };
+    const scheduleSync = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(sync);
+    };
+    const observer = new MutationObserver(scheduleSync);
+    observer.observe(root, { attributes: true, attributeFilter: ["style", "data-scheme"] });
+    sync();
+    return () => observer.disconnect();
+  }, []);
+
   // Theme: keep Electron's nativeTheme in step with the app's Light/Dark/System pick
   // (otherwise select popups, scrollbars, dialogs and the window frame follow the OS),
   // and publish the resolved scheme as <html data-scheme="light|dark"> so tokens.css

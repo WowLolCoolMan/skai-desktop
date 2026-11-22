@@ -1,0 +1,27 @@
+.settings-achievements-empty { display: grid; justify-items: center; align-content: center; min-height: 280px; padding: 24px; text-align: center; }
+.settings-achievements-empty > span { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 35%, var(--skai-color-border)); border-radius: var(--skai-radius-2xl); color: var(--skai-color-accent-text); background: color-mix(in srgb, var(--skai-color-accent) 10%, var(--skai-color-surface-soft)); font-size: var(--skai-text-4xl); }
+.settings-achievements-empty h2 { margin: 14px 0 5px; color: var(--skai-color-text); font-size: var(--skai-text-xl); }
+.settings-achievements-empty p { max-width: 380px; margin: 0; color: var(--skai-color-text-muted); line-height: 1.5; }
+.settings-achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.settings-achievement-card { display: flex; align-items: flex-start; gap: 14px; min-height: 145px; padding: 17px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: color-mix(in srgb, var(--skai-color-surface-raised) 85%, transparent); box-shadow: 0 8px 24px color-mix(in srgb, var(--skai-color-shadow) 14%, transparent); }
+.settings-achievement-icon { display: grid; flex: 0 0 48px; place-items: center; width: 48px; height: 48px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 30%, var(--skai-color-border)); border-radius: var(--skai-radius-xl); background: color-mix(in srgb, var(--skai-color-accent) 9%, var(--skai-color-surface-soft)); font-size: var(--skai-text-4xl); }
+.settings-achievement-card > div { min-width: 0; }
+.settings-achievement-card .section-kicker { margin: 0 0 5px; color: var(--skai-color-accent-text); font-size: var(--skai-text-3xs); }
+.settings-achievement-card h2 { margin: 0 0 6px; color: var(--skai-color-text); font-size: var(--skai-text-lg); }
+.settings-achievement-card p:not(.section-kicker) { margin: 0 0 9px; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.45; }
+.settings-achievement-card small { color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); }
+.settings-content:has(.settings-achievements-grid, .settings-achievements-empty) .settings-footer { display: none; }
+.settings-achievement-count { display: grid; place-items: center; min-width: 20px; height: 20px; margin-left: auto; padding: 0 5px; border-radius: var(--skai-radius-pill); color: var(--skai-color-accent-text); background: color-mix(in srgb, var(--skai-color-accent) 12%, var(--skai-color-surface)); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); }
+.achievement-toast { position: fixed; z-index: 1000; right: 22px; bottom: 22px; display: flex; align-items: center; gap: 12px; width: min(360px, calc(100vw - 32px)); padding: 14px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 45%, var(--skai-color-border)); border-radius: var(--skai-radius-xl); color: var(--skai-color-text); background: var(--skai-color-surface-raised); box-shadow: 0 18px 48px color-mix(in srgb, var(--skai-color-shadow) 35%, transparent); animation: achievement-toast-in 180ms ease-out; }
+.achievement-toast-icon { display: grid; flex: 0 0 40px; place-items: center; width: 40px; height: 40px; border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 12%, var(--skai-color-surface)); font-size: var(--skai-text-3xl); }
+.achievement-toast > span:nth-child(2) { display: grid; min-width: 0; gap: 4px; }
+.achievement-toast small { color: var(--skai-color-accent-text); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); letter-spacing: .1em; }
+.achievement-toast strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.achievement-toast p { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.4; }
+.achievement-toast button { align-self: flex-start; margin-left: auto; border: 0; color: var(--skai-color-text-muted); background: transparent; font-size: var(--skai-text-3xl); line-height: 1; }
+.toolbar-brand { padding: 0; border: 0; background: transparent; }
+.toolbar-brand:focus-visible { outline-offset: 3px; }
+html[data-skai-retro="true"] .app-toolbar { border-bottom-color: color-mix(in srgb, var(--skai-color-accent) 55%, var(--skai-color-border)); }
+html[data-skai-retro="true"] .app-content { text-shadow: 0 0 12px color-mix(in srgb, var(--skai-color-accent) 8%, transparent); }
+@keyframes achievement-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .achievement-toast { animation: none; } }

@@ -39,8 +39,10 @@ if (artifactManifest.executable !== path.basename(executable) || artifactManifes
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
 const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
+let childExit = null;
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
+child.on("exit", (code, signal) => { childExit = { code, signal }; });
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 async function fetchJson(url) {
@@ -88,7 +90,7 @@ async function main() {
     } catch { /* The packaged window is still starting. */ }
     await sleep(250);
   }
-  if (!mainTarget || !petTarget) throw new Error(`Packaged Electron did not expose both main and Percy pages before timeout. Output: ${output.slice(-2_000)}`);
+  if (!mainTarget || !petTarget) throw new Error(`Packaged Electron did not expose both main and Percy pages before timeout. Exit: ${JSON.stringify(childExit)}. Output: ${output.slice(-2_000)}`);
   console.log(`Packaged main target: ${JSON.stringify({ title: mainTarget.title, url: mainTarget.url, type: mainTarget.type, websocket: Boolean(mainTarget.webSocketDebuggerUrl) })}`);
   console.log(`Packaged Percy target: ${JSON.stringify({ url: petTarget.url, type: petTarget.type, websocket: Boolean(petTarget.webSocketDebuggerUrl) })}`);
   // The page target can appear before React mounts (slow CI runners); wait for the app shell before reading it.

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Route } from "../../app/types";
 import { Button, StatusBadge } from "../ui/Primitives";
 import { NavIcon } from "../ui/NavIcon";
 import { PRODUCT_DISPLAY_NAME } from "../../../shared/productIdentity";
+import { unlockAchievement } from "../../features/settings/easterEggs";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 
@@ -24,6 +25,7 @@ function runEditCommand(command: string) {
 
 export function Toolbar({ route, connection, canGoBack, canGoForward, onBack, onForward, onRetryConnection, onNavigate, onNewChat, onToggleSidebar, windowsTitleBarOverlay = false }: { route: Route; connection: "checking" | "ready" | "error"; canGoBack: boolean; canGoForward: boolean; onBack: () => void; onForward: () => void; onRetryConnection: () => void; onNavigate: (route: Route) => void; onNewChat: () => void; onToggleSidebar: () => void; windowsTitleBarOverlay?: boolean }) {
   const [helpPanel, setHelpPanel] = useState<"shortcuts" | "about" | null>(null);
+  const logoTaps = useRef(0);
   const editItems: MenuItem[] = [
     { label: "Undo", shortcut: "Ctrl+Z", onSelect: () => runEditCommand("undo") },
     { label: "Redo", shortcut: "Ctrl+Y", onSelect: () => runEditCommand("redo") },
@@ -34,7 +36,7 @@ export function Toolbar({ route, connection, canGoBack, canGoForward, onBack, on
   ];
   const navigate = (nextRoute: Route) => () => onNavigate(nextRoute);
   return <header className={`app-toolbar ${windowsTitleBarOverlay ? "is-titlebar-overlay" : ""}`}>
-    <div className="toolbar-brand" role="img" aria-label={PRODUCT_DISPLAY_NAME}><img src={SKAI_WOLF_ICON} alt="" aria-hidden="true" /></div>
+    <button className="toolbar-brand" type="button" aria-label={`${PRODUCT_DISPLAY_NAME} logo`} title="Skai Desktop" onClick={() => { logoTaps.current += 1; if (logoTaps.current >= 7) { logoTaps.current = 0; unlockAchievement("mascot-fan"); } }}><img src={SKAI_WOLF_ICON} alt="" aria-hidden="true" /></button>
     <nav className="app-menu-bar" aria-label="Application menu">
       <AppMenu label="File" items={[{ label: "New chat", shortcut: "Ctrl+N", onSelect: onNewChat }, { label: "Projects", onSelect: navigate("projects"), separatorBefore: true }, { label: "Coding workspace", shortcut: "Ctrl+2", onSelect: navigate("coding") }]} />
       <AppMenu label="Edit" items={editItems} />

@@ -3,6 +3,7 @@ import type { Route } from "../../app/types";
 import { ModalDialog } from "../ui/ModalDialog";
 import { NavIcon } from "../ui/NavIcon";
 import { themeCommands } from "../../theme/themeCommands";
+import { unlockAchievement } from "../../features/settings/easterEggs";
 
 type Command = { id: string; label: string; detail: string; route?: Route; run?: () => void };
 const commands: Command[] = [
@@ -23,7 +24,11 @@ export function CommandPalette({ open, onClose, onNavigate }: { open: boolean; o
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const matches = useMemo(() => commands.filter((command) => `${command.label} ${command.detail}`.toLowerCase().includes(query.trim().toLowerCase())), [query]);
+  const matches = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const easterEggCommands: Command[] = normalized === "hello skai" ? [{ id: "easter-hello-skai", label: "Say hello to Skai", detail: "A small hello from the team", run: () => unlockAchievement("hello-skai") }] : normalized === "sudo make me coffee" ? [{ id: "easter-coffee", label: "Make me coffee", detail: "Try the coffee dependency", run: () => unlockAchievement("coffee-command") }] : [];
+    return [...commands.filter((command) => `${command.label} ${command.detail}`.toLowerCase().includes(normalized)), ...easterEggCommands];
+  }, [query]);
   useEffect(() => {
     if (!open) {
       return;

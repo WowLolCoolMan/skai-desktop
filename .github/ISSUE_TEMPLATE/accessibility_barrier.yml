@@ -1,0 +1,40 @@
+name: Accessibility barrier
+description: Report a barrier using keyboard, screen reader, magnification, or motion settings.
+title: "[Accessibility]: "
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include private conversation contents or personal data. Screenshots and recordings are optional.
+  - type: input
+    id: version
+    attributes:
+      label: Skai Desktop version
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and version
+    validations:
+      required: true
+  - type: input
+    id: assistive_technology
+    attributes:
+      label: Assistive technology and input method
+      placeholder: e.g. Narrator, keyboard only
+    validations:
+      required: false
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Page or workflow and reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What happened and what you expected
+    validations:
+      required: true

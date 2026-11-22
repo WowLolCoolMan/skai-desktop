@@ -1,0 +1,202 @@
+<div id="skai-settings-preview">
+  <style>
+    #skai-settings-preview {
+      --skai-bg: light-dark(#f5f6f8, #101216);
+      --skai-panel: light-dark(#ffffff, #17191f);
+      --skai-panel-2: light-dark(#f8f9fb, #1d2027);
+      --skai-border: light-dark(#e5e7eb, #2a2e37);
+      --skai-text: light-dark(#17191f, #f1f2f4);
+      --skai-muted: light-dark(#747985, #969ba8);
+      --skai-accent: light-dark(#5b6cf9, #8792ff);
+      --skai-accent-soft: light-dark(#eef0ff, #282b48);
+      --skai-green: light-dark(#168760, #5bd3a1);
+      --skai-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--skai-text);
+      font: 400 14px/1.45 var(--skai-font);
+      width: 100%;
+    }
+    #skai-settings-preview * { box-sizing: border-box; }
+    #skai-settings-preview .window {
+      min-height: 690px;
+      display: grid;
+      grid-template-columns: 218px minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--skai-border);
+      border-radius: 18px;
+      background: var(--skai-bg);
+      box-shadow: 0 24px 70px rgba(0,0,0,.18);
+    }
+    #skai-settings-preview .rail {
+      padding: 22px 14px 15px;
+      border-right: 1px solid var(--skai-border);
+      background: var(--skai-panel);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    #skai-settings-preview .brand { display:flex; align-items:center; gap:10px; padding: 0 8px 23px; font-size:16px; font-weight:600; letter-spacing:-.02em; }
+    #skai-settings-preview .brandmark { width:27px;height:27px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(145deg,#7480ff,#5964eb);color:#fff;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(91,108,249,.26); }
+    #skai-settings-preview .workspace { margin: 0 4px 20px; padding:10px; display:flex; align-items:center; gap:9px; border:1px solid var(--skai-border); border-radius:11px; background:var(--skai-panel-2); }
+    #skai-settings-preview .workspace-icon { width:27px;height:27px;display:grid;place-items:center;border-radius:8px;background:var(--skai-accent-soft);color:var(--skai-accent);font-size:11px;font-weight:600; }
+    #skai-settings-preview .workspace-label { min-width:0; flex:1; }
+    #skai-settings-preview .workspace-label strong { display:block;font-size:12px;font-weight:500; }
+    #skai-settings-preview .workspace-label small { display:block;color:var(--skai-muted);font-size:11px;margin-top:1px; }
+    #skai-settings-preview .section-label { padding:0 10px 7px;color:var(--skai-muted);font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase; }
+    #skai-settings-preview .nav { display:grid; gap:3px; }
+    #skai-settings-preview .nav button { border:0;background:transparent;color:var(--skai-muted);font:inherit;text-align:left;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;cursor:pointer; }
+    #skai-settings-preview .nav button:hover { background:var(--skai-panel-2);color:var(--skai-text); }
+    #skai-settings-preview .nav button[aria-current="page"] { color:var(--skai-text);background:var(--skai-accent-soft);font-weight:500; }
+    #skai-settings-preview .nav .nav-icon { width:17px;height:17px;display:grid;place-items:center;font-size:14px;opacity:.9; }
+    #skai-settings-preview .nav .count { margin-left:auto;padding:1px 6px;border-radius:6px;background:var(--skai-panel);font-size:10px;color:var(--skai-muted); }
+    #skai-settings-preview .rail-bottom { margin-top:auto; }
+    #skai-settings-preview .profile { margin-top:12px;padding:12px 7px 0;border-top:1px solid var(--skai-border);display:flex;align-items:center;gap:9px; }
+    #skai-settings-preview .avatar { width:29px;height:29px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#e9bd9c,#bd7456);color:white;font-size:11px;font-weight:500; }
+    #skai-settings-preview .profile-name { min-width:0;flex:1;font-size:12px;font-weight:500; }
+    #skai-settings-preview .profile-name small { display:block;color:var(--skai-muted);font-size:10px;font-weight:400; }
+    #skai-settings-preview .main { min-width:0; }
+    #skai-settings-preview .topbar { height:58px;padding:0 29px;border-bottom:1px solid var(--skai-border);display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--skai-bg); }
+    #skai-settings-preview .crumb { color:var(--skai-muted);font-size:12px; }
+    #skai-settings-preview .crumb b { color:var(--skai-text);font-weight:500; }
+    #skai-settings-preview .top-actions { display:flex;gap:8px;align-items:center; }
+    #skai-settings-preview .top-actions button { border:1px solid var(--skai-border);background:var(--skai-panel);color:var(--skai-text);font:inherit;font-size:11px;padding:6px 10px;border-radius:8px;cursor:pointer; }
+    #skai-settings-preview .top-actions .save-state { border:0;background:transparent;color:var(--skai-muted);cursor:default; }
+    #skai-settings-preview .content { max-width:940px;margin:0 auto;padding:31px 34px 40px; }
+    #skai-settings-preview .heading-row { display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px; }
+    #skai-settings-preview h1 { margin:0;font-size:24px;line-height:1.2;letter-spacing:-.035em;font-weight:500; }
+    #skai-settings-preview .intro { color:var(--skai-muted);font-size:12px;margin-top:7px; }
+    #skai-settings-preview .search { width:200px;position:relative; }
+    #skai-settings-preview .search input { width:100%;padding:8px 10px 8px 30px;border:1px solid var(--skai-border);border-radius:9px;background:var(--skai-panel);color:var(--skai-text);font:inherit;font-size:11px;outline:none; }
+    #skai-settings-preview .search input:focus { border-color:var(--skai-accent); }
+    #skai-settings-preview .search span { position:absolute;left:10px;top:7px;color:var(--skai-muted);font-size:13px; }
+    #skai-settings-preview .settings-layout { display:grid;grid-template-columns:162px minmax(0,1fr);gap:24px;align-items:start; }
+    #skai-settings-preview .settings-nav { position:sticky;top:12px;display:grid;gap:3px; }
+    #skai-settings-preview .settings-nav button { text-align:left;border:0;background:transparent;color:var(--skai-muted);padding:8px 10px;border-radius:8px;font:inherit;font-size:11px;cursor:pointer; }
+    #skai-settings-preview .settings-nav button:hover { color:var(--skai-text);background:var(--skai-panel-2); }
+    #skai-settings-preview .settings-nav button[aria-selected="true"] { color:var(--skai-text);background:var(--skai-panel);box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:500; }
+    #skai-settings-preview .settings-body { min-width:0;display:grid;gap:15px; }
+    #skai-settings-preview .group { overflow:hidden;border:1px solid var(--skai-border);border-radius:12px;background:var(--skai-panel); }
+    #skai-settings-preview .group-head { display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--skai-border); }
+    #skai-settings-preview .group-head strong { font-size:12px;font-weight:500; }
+    #skai-settings-preview .group-head span { color:var(--skai-muted);font-size:10px; }
+    #skai-settings-preview .row { min-height:57px;padding:10px 15px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid var(--skai-border); }
+    #skai-settings-preview .row:last-child { border-bottom:0; }
+    #skai-settings-preview .row-copy { min-width:0; }
+    #skai-settings-preview .row-copy strong { display:block;font-size:11px;font-weight:500; }
+    #skai-settings-preview .row-copy small { display:block;margin-top:3px;color:var(--skai-muted);font-size:10px; }
+    #skai-settings-preview .control { display:flex;align-items:center;gap:8px;flex-shrink:0; }
+    #skai-settings-preview select, #skai-settings-preview .text-control { max-width:190px;padding:7px 9px;border:1px solid var(--skai-border);border-radius:8px;background:var(--skai-panel-2);color:var(--skai-text);font:inherit;font-size:10px; }
+    #skai-settings-preview .text-control { width:145px; }
+    #skai-settings-preview .link { color:var(--skai-accent);font-size:10px;text-decoration:none;white-space:nowrap; }
+    #skai-settings-preview .toggle { width:31px;height:18px;border:0;border-radius:20px;background:var(--skai-accent);padding:2px;display:flex;justify-content:flex-end;cursor:pointer; }
+    #skai-settings-preview .toggle::after { content:"";width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2); }
+    #skai-settings-preview .toggle[aria-checked="false"] { background:light-dark(#d4d7de,#444853);justify-content:flex-start; }
+    #skai-settings-preview .model-card { padding:12px 15px;display:flex;align-items:center;gap:11px; }
+    #skai-settings-preview .model-mark { width:34px;height:34px;border-radius:10px;background:var(--skai-accent-soft);display:grid;place-items:center;color:var(--skai-accent);font-size:15px; }
+    #skai-settings-preview .model-info { min-width:0;flex:1; }
+    #skai-settings-preview .model-info strong { display:block;font-size:11px;font-weight:500; }
+    #skai-settings-preview .model-info small { display:block;color:var(--skai-muted);font-size:10px;margin-top:3px; }
+    #skai-settings-preview .ready { display:flex;align-items:center;gap:5px;color:var(--skai-green);font-size:10px;white-space:nowrap; }
+    #skai-settings-preview .ready::before { content:"";width:6px;height:6px;border-radius:50%;background:currentColor; }
+    #skai-settings-preview .footer-note { color:var(--skai-muted);font-size:10px;text-align:center;padding-top:1px; }
+    @media (max-width:760px) {
+      #skai-settings-preview .window { grid-template-columns:58px minmax(0,1fr); }
+      #skai-settings-preview .rail { padding:16px 8px;align-items:center; }
+      #skai-settings-preview .brand { padding:0 0 20px; }
+      #skai-settings-preview .brand-name,#skai-settings-preview .workspace-label,#skai-settings-preview .workspace::after,#skai-settings-preview .section-label,#skai-settings-preview .nav .nav-label,#skai-settings-preview .nav .count,#skai-settings-preview .profile-name { display:none; }
+      #skai-settings-preview .workspace { padding:7px;margin:0 0 16px;border:0;background:transparent; }
+      #skai-settings-preview .nav button { justify-content:center;padding:10px 8px; }
+      #skai-settings-preview .profile { padding:12px 0 0;justify-content:center; }
+      #skai-settings-preview .topbar { padding:0 17px; }
+      #skai-settings-preview .content { padding:25px 18px; }
+      #skai-settings-preview .settings-layout { grid-template-columns:1fr;gap:13px; }
+      #skai-settings-preview .settings-nav { position:static;display:flex;overflow:auto; }
+      #skai-settings-preview .settings-nav button { white-space:nowrap; }
+    }
+    @media (max-width:520px) {
+      #skai-settings-preview .window { grid-template-columns:1fr; }
+      #skai-settings-preview .rail { display:none; }
+      #skai-settings-preview .topbar { height:50px; }
+      #skai-settings-preview .top-actions .save-state { display:none; }
+      #skai-settings-preview .heading-row { display:block; }
+      #skai-settings-preview .search { width:100%;margin-top:14px; }
+      #skai-settings-preview .row { align-items:flex-start; }
+      #skai-settings-preview .control { padding-top:2px; }
+    }
+  </style>
+  <div class="window" aria-label="Skai Desktop settings">
+    <aside class="rail">
+      <div class="brand"><span class="brandmark">S</span><span class="brand-name">Skai Desktop</span></div>
+      <div class="workspace"><span class="workspace-icon">SR</span><span class="workspace-label"><strong>Personal workspace</strong><small>Local + cloud</small></span><span aria-hidden="true">v</span></div>
+      <div class="section-label">Workspace</div>
+      <nav class="nav" aria-label="Main navigation">
+        <button type="button"><span class="nav-icon">H</span><span class="nav-label">Home</span></button>
+        <button type="button"><span class="nav-icon">C</span><span class="nav-label">Chats</span><span class="count">4</span></button>
+        <button type="button"><span class="nav-icon">M</span><span class="nav-label">Models</span></button>
+        <button type="button"><span class="nav-icon">A</span><span class="nav-label">Agents</span></button>
+        <button type="button"><span class="nav-icon">S</span><span class="nav-label">Marketplace</span></button>
+        <button type="button"><span class="nav-icon">R</span><span class="nav-label">Activity</span></button>
+      </nav>
+      <div class="rail-bottom">
+        <div class="section-label">Preferences</div>
+        <nav class="nav" aria-label="Preferences">
+          <button type="button" aria-current="page"><span class="nav-icon">*</span><span class="nav-label">Settings</span></button>
+          <button type="button"><span class="nav-icon">i</span><span class="nav-label">Help center</span></button>
+        </nav>
+        <div class="profile"><span class="avatar">SW</span><span class="profile-name">Seth Wade<small>Personal plan</small></span><span aria-hidden="true">...</span></div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="crumb">Workspace <span aria-hidden="true">/</span> <b>Settings</b></div><div class="top-actions"><button type="button" class="save-state">All changes saved</button><button type="button">View docs</button></div></header>
+      <section class="content">
+        <div class="heading-row"><div><h1>Settings</h1><div class="intro">Make Skai feel like your own. Changes save automatically.</div></div><label class="search"><span aria-hidden="true">Search</span><input aria-label="Search settings" placeholder="Search settings"></label></div>
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="Settings sections">
+            <button type="button" aria-selected="true">General</button>
+            <button type="button" aria-selected="false">Appearance</button>
+            <button type="button" aria-selected="false">Models & providers</button>
+            <button type="button" aria-selected="false">AI routing</button>
+            <button type="button" aria-selected="false">Skills & tools</button>
+            <button type="button" aria-selected="false">Privacy & data</button>
+            <button type="button" aria-selected="false">Shortcuts</button>
+            <button type="button" aria-selected="false">Advanced</button>
+          </nav>
+          <div class="settings-body">
+            <section class="group" aria-label="App preferences">
+              <div class="group-head"><strong>App preferences</strong><span>How Skai behaves on this device</span></div>
+              <div class="row"><div class="row-copy"><strong>Launch at sign in</strong><small>Open Skai when you sign in to your computer.</small></div><button class="toggle" type="button" role="switch" aria-checked="true" aria-label="Launch at sign in"></button></div>
+              <div class="row"><div class="row-copy"><strong>Restore previous workspace</strong><small>Return to your last open chats and tools.</small></div><button class="toggle" type="button" role="switch" aria-checked="true" aria-label="Restore previous workspace"></button></div>
+              <div class="row"><div class="row-copy"><strong>Language</strong><small>Used for menus and system messages.</small></div><div class="control"><select aria-label="Language"><option>English (US)</option><option>English (UK)</option></select></div></div>
+            </section>
+            <section class="group" aria-label="AI defaults">
+              <div class="group-head"><strong>AI defaults</strong><span>Choose what happens when you start a chat</span></div>
+              <div class="row"><div class="row-copy"><strong>Default routing</strong><small>Use local models first, then fall back to cloud.</small></div><div class="control"><select aria-label="Default routing"><option>Auto - local first</option><option>Local only</option><option>Cloud only</option><option>Choose each time</option></select></div></div>
+              <div class="model-card"><span class="model-mark">Q</span><span class="model-info"><strong>Qwen 3 14B - Local</strong><small>Default model - 8.6 GB VRAM - Last used just now</small></span><span class="ready">Ready</span><a class="link" href="#models">Change</a></div>
+            </section>
+            <section class="group" aria-label="Privacy controls">
+              <div class="group-head"><strong>Privacy</strong><span>Control what Skai remembers and shares</span></div>
+              <div class="row"><div class="row-copy"><strong>Improve models with usage data</strong><small>Share anonymous diagnostics to help improve Skai.</small></div><button class="toggle" type="button" role="switch" aria-checked="false" aria-label="Share anonymous diagnostics"></button></div>
+              <div class="row"><div class="row-copy"><strong>Local conversation history</strong><small>Stored on this device and never uploaded.</small></div><div class="control"><span class="ready">On this device</span><a class="link" href="#privacy">Manage</a></div></div>
+            </section>
+            <div class="footer-note">Skai Desktop <span>-</span> Version 0.8.4 <span>-</span> <a class="link" href="#updates">Check for updates</a></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const root = document.getElementById("skai-settings-preview");
+      root.querySelectorAll('[role="switch"]').forEach((toggle) => {
+        toggle.addEventListener("click", () => {
+          const on = toggle.getAttribute("aria-checked") === "true";
+          toggle.setAttribute("aria-checked", String(!on));
+        });
+      });
+      root.querySelectorAll(".settings-nav button").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          root.querySelectorAll(".settings-nav button").forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+        });
+      });
+    })();
+  </script>
+</div>

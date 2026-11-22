@@ -9,7 +9,7 @@ These notices do not change the licenses of the third-party packages. See the in
 
 The native .NET app also uses `PdfPig` 0.1.16 to extract selectable text from user-selected PDFs locally. PdfPig is licensed under Apache License 2.0 and includes additional third-party notices; the full upstream license and notices are included in [licenses/PdfPig-LICENSE.txt](licenses/PdfPig-LICENSE.txt). The package source is pinned to [UglyToad/PdfPig commit a7bb356](https://github.com/UglyToad/PdfPig/tree/a7bb35662bbbf405efddad50aedc9bcdcf515afc).
 
-Open WebUI was researched as product and architecture inspiration only. No Open WebUI source code or assets are included. See [docs/OPEN_WEBUI_RESEARCH.md](docs/OPEN_WEBUI_RESEARCH.md).
+Open WebUI was researched as product and architecture inspiration only. No Open WebUI source code or assets are included. See [the research note](docs/research/OPEN_WEBUI_RESEARCH.md).
 
 The built-in theme gallery (`apps/desktop/src/theme/presets/`) includes color palettes from Catppuccin, Dracula, Nord, Gruvbox, Tokyo Night, Solarized, Rosé Pine, One Dark/One Light (Atom), Everforest, Kanagawa, Night Owl, Monokai (as shipped in VS Code), Ayu (ayu-vim) and GitHub (Primer primitives). They are used under the MIT License or, for Tokyo Night and Ayu, the Apache License 2.0. Each palette's copyright line, license and source repository are listed in [licenses/THEME-PALETTES.md](licenses/THEME-PALETTES.md); the Apache License 2.0 text is in [licenses/Apache-2.0.txt](licenses/Apache-2.0.txt). The Material Theme palette was not included because no permissive license could be confirmed for it.
 

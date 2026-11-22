@@ -1,8 +1,8 @@
 "use strict";
 
-/** Automatic checks can download unless the user opted out; explicit checks always may. */
-function shouldDownloadAvailableUpdate({ enabled, manualCheck }) {
-  return enabled === true || manualCheck === true;
+/** Only the enabled automatic-update preference authorizes background downloads. */
+function shouldDownloadAvailableUpdate({ enabled }) {
+  return enabled === true;
 }
 
 module.exports = { shouldDownloadAvailableUpdate };

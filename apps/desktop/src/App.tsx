@@ -9,6 +9,8 @@ import { GlobalRail } from "./components/layout/GlobalRail";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { UpdateNotice } from "./components/overlays/UpdateNotice";
 import { WorkspaceTabs } from "./components/layout/WorkspaceTabs";
+import { NavIcon } from "./components/ui/NavIcon";
+import { AchievementToast } from "./components/overlays/AchievementToast";
 
 export default function App() {
   const workspace = useDesktopWorkspace();
@@ -25,9 +27,10 @@ export default function App() {
       {(workspace.route === "chat" || workspace.route === "coding") && <WorkspaceTabs tabs={workspace.workspaceTabs} tasks={workspace.routeState.tasks} activeId={workspace.activeWorkspaceTabId} onSelect={workspace.selectWorkspaceTab} onClose={workspace.closeWorkspaceTab} onNew={workspace.openNewWorkspaceTab} canRestore={workspace.canRestoreWorkspaceTab} onRestore={workspace.restoreWorkspaceTab} />}
       <div id="main-content" tabIndex={-1} className={`app-content ${workspace.route === "settings" ? "is-settings-underlay" : ""} ${mainContentRoute === "chat" ? "app-content-chat" : ""} ${["coding", "projects"].includes(mainContentRoute) ? "app-content-coding" : ""} ${mainContentRoute === "images" ? "app-content-images" : ""} ${mainContentRoute === "marketplace" ? "app-content-marketplace" : ""} ${mainContentRoute === "plugins" ? "app-content-plugins" : ""} ${mainContentRoute === "terminal" ? "app-content-terminal" : ""}`}><AppRouteView state={{ ...workspace.routeState, route: mainContentRoute }} actions={workspace.routeActions} />{workspace.error && <div className="global-error" role="alert"><span>{workspace.error}</span><button type="button" onClick={workspace.dismissError} aria-label="Dismiss notification">Dismiss</button></div>}{workspace.health && <span className="sr-only">{workspace.health.service} protocol {workspace.health.protocolVersion}</span>}</div>
     </main>
-    {workspace.route === "settings" && <div className="settings-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) workspace.onNavigate(workspace.settingsReturnRoute); }}><section className="settings-overlay-panel" role="dialog" aria-modal="true" aria-label="Settings"><header><strong>Settings</strong><button type="button" aria-label="Close settings" onClick={() => workspace.onNavigate(workspace.settingsReturnRoute)}>×</button></header><AppRouteView state={{ ...workspace.routeState, route: "settings" }} actions={workspace.routeActions} /></section></div>}
+    {workspace.route === "settings" && <div className="settings-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) workspace.onNavigate(workspace.settingsReturnRoute); }}><section className="settings-overlay-panel" role="dialog" aria-modal="true" aria-label="Settings"><header className="settings-overlay-header"><div className="settings-overlay-title"><span className="settings-overlay-icon"><NavIcon name="settings" /></span><span><strong>Settings</strong><small>Personalize your Skai workspace</small></span></div><button type="button" aria-label="Close settings" onClick={() => workspace.onNavigate(workspace.settingsReturnRoute)}><NavIcon name="close" /></button></header><AppRouteView state={{ ...workspace.routeState, route: "settings" }} actions={workspace.routeActions} /></section></div>}
     <CommandPalette open={workspace.commandOpen} onClose={workspace.closeCommandPalette} onNavigate={workspace.onNavigate} />
     <CloseChoiceDialog />
     <UpdateNotice />
+    <AchievementToast />
   </div></ErrorBoundary>;
 }

@@ -75,7 +75,7 @@ const WORKBENCH_NOTICE_KEY = "skai.voice.workbench.rightsNoticeAcknowledged";
 const VOICE_CLIPS_DB = "skai-voice-workbench";
 const VOICE_CLIPS_STORE = "clips";
 
-type MarketplaceHubSection = "Discover" | "Staff Picks" | "Models" | "MCP Servers" | "Skills" | "Plugins" | "Installed";
+type MarketplaceHubSection = "Discover" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed";
 type StaffPickKind = "Model" | "MCP server" | "Skill" | "Plugin" | "Voice pack" | "Persona" | "Highlight";
 type StaffPickAction =
   | { label: string; type: "external"; url: string }
@@ -328,7 +328,7 @@ export function PluginsPage({
   onNavigate?: (route: Route) => void;
   onSelectAirLlmModel?: (model: Model) => void;
 } = {}) {
-  const [view, setView] = useState<"catalog" | "models" | "installed" | "staff-picks">("catalog");
+  const [view, setView] = useState<"catalog" | "models" | "voices" | "installed" | "staff-picks">("catalog");
   const [catalogSection, setCatalogSection] = useState<MarketplaceHubSection>("Discover");
   const [query, setQuery] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -349,7 +349,7 @@ export function PluginsPage({
 
   const changeCatalogSection = (next: MarketplaceHubSection, nextQuery?: string) => {
     setCatalogSection(next);
-    setView(next === "Models" ? "models" : next === "Installed" ? "installed" : next === "Staff Picks" ? "staff-picks" : "catalog");
+    setView(next === "Models" ? "models" : next === "Voices" ? "voices" : next === "Installed" ? "installed" : next === "Staff Picks" ? "staff-picks" : "catalog");
     if (!["Models", "Installed", "Staff Picks"].includes(next)) {
       setQuery(nextQuery ?? localStorage.getItem(`skai.marketplace.query.${next.toLowerCase()}`) ?? "");
       setSelectedId(null);
@@ -710,6 +710,7 @@ export function PluginsPage({
           ["Discover", "sparkle"],
           ["Staff Picks", "sparkle"],
           ["Models", "model"],
+          ["Voices", "activity"],
           ["MCP Servers", "terminal"],
           ["Skills", "sparkle"],
           ["Plugins", "project"],
@@ -717,9 +718,9 @@ export function PluginsPage({
         ] as const).map(([item, icon]) => <button key={item} type="button" className={catalogSection === item ? "is-active" : ""} aria-current={catalogSection === item ? "page" : undefined} onClick={() => changeCatalogSection(item)}><NavIcon name={icon} />{item}</button>)}
       </aside>
       <div className="plugins-main">
-        {view === "models" || view === "installed" ? (
+        {view === "models" || view === "voices" || view === "installed" ? (
           <MarketplacePage
-            initialSection={view === "models" ? "Models" : "Installed"}
+            initialSection={view === "models" ? "Models" : view === "voices" ? "Voices" : "Installed"}
             initialQuery={view === "models" ? query : undefined}
             onBack={() => changeCatalogSection("Discover")}
             onNavigate={onNavigate}
@@ -771,6 +772,12 @@ export function PluginsPage({
               <div className="plugins-catalog-notice" role="status">
                 {notice}
               </div>
+            )}
+            {catalogSection === "Discover" && !query.trim() && (
+              <section className="plugins-start-panel" aria-labelledby="plugins-start-title">
+                <div><p className="section-kicker">USEFUL STARTING POINTS</p><h3 id="plugins-start-title">Add capability when you have a reason</h3><p>Browse what Skai can use locally, inspect permissions and compatibility, then connect or install only when the next step is clear.</p></div>
+                <div className="plugins-start-actions"><Button variant="primary" type="button" onClick={() => changeCatalogSection("Models")}>Find a model</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("Voices")}>Choose a voice</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("MCP Servers")}>Connect an MCP server</Button><Button variant="ghost" type="button" onClick={() => changeCatalogSection("Installed")}>Review installed</Button></div>
+              </section>
             )}
             {error ? (
               <div className="surface-error" role="alert">

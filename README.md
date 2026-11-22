@@ -118,35 +118,27 @@ apps/desktop/              Electron + React desktop surface
 services/agent-host/       Persistent .NET host and protocol boundary
 native/SkaiDesktop.Core/   Headless provider, persistence, workflow, and safety logic
 assets/                    Skai branding and built-in pet sprite assets
-docs/                      Architecture, capability, release, and feature documentation
+docs/                      Product guides, plans, release evidence, and archived research
 ```
 
-Project documentation:
+## Documentation
 
-- [Project site and documentation index](https://wowlolcoolman.github.io/skai-desktop/)
-- [`docs/INDEX.md`](docs/INDEX.md) — curated index of all project documentation.
-- [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — evidence-backed feature status.
-- [`docs/GITHUB_PAGES.md`](docs/GITHUB_PAGES.md) — project site and deployment notes.
-- [`docs/LOCAL_IMAGE_GENERATION.md`](docs/LOCAL_IMAGE_GENERATION.md) — managed Diffusers runtime, ComfyUI workflows, and remaining acceptance gaps.
-- [`docs/PETS_AND_COMPANIONS.md`](docs/PETS_AND_COMPANIONS.md) — built-in pet personalities, sprite format, Blaze attacks, and guided local generation.
-- [`CHANGELOG.md`](CHANGELOG.md) — version history.
-
-Engineering references:
-
-- [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md) — visual migration ledger and evidence.
-- [`docs/FUTURE_FEATURES.md`](docs/FUTURE_FEATURES.md) — future product backlog.
-- [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) — implemented, partial, and planned capabilities.
-- [`docs/TO_DO_NEXT.md`](docs/TO_DO_NEXT.md) — shared contributor handoff for active work and the next agreed tasks.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Electron, Agent Host, and Core architecture boundary.
-- [`docs/GITHUB_INTEGRATION.md`](docs/GITHUB_INTEGRATION.md) — repository project workflows.
-- [`services/agent-host/README.md`](services/agent-host/README.md) — Agent Host protocol notes.
+Use the [documentation index](docs/INDEX.md) for the organized guides, plans,
+engineering references, release evidence, and research archive. The
+[capability matrix](docs/CAPABILITY_MATRIX.md) is the source of truth for
+current feature status; [To Do Next](docs/TO_DO_NEXT.md) records active work;
+the [future feature backlog](docs/FUTURE_FEATURES.md) holds longer-term ideas.
+The [project site](https://wowlolcoolman.github.io/skai-desktop/) provides a
+short public overview.
 
 ## What is next
 
-The remaining work is tracked in the [Core Chat backlog](docs/FUTURE_FEATURES.md#core-chat) and the [capability matrix](docs/CAPABILITY_MATRIX.md): voice runtime acceptance and advanced voice, live image-generation acceptance, summary-quality acceptance, verified 1M-token execution, and audio/video input remain open. Agent dispatch, packaged platform/accessibility acceptance, retrieval, and additional local integrations are also in progress. These pages distinguish tested behavior from work that still needs compatible runtimes or hardware.
+Pick up active work from [To Do Next](docs/TO_DO_NEXT.md). The [capability
+matrix](docs/CAPABILITY_MATRIX.md) records current evidence and boundaries; the
+[future feature backlog](docs/FUTURE_FEATURES.md) holds longer-term work.
 
 ## Contributing
 
 Keep changes incremental, local-first, and testable. Preserve the Electron → isolated IPC → .NET Agent Host boundary, avoid exposing secrets to the renderer, do not add cloud model routes, and include validation evidence for user-facing changes.
 
-MIT licensed. Third-party notices are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+See [`LICENSE`](LICENSE) for project terms and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for separately licensed components.

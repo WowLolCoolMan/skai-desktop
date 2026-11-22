@@ -129,7 +129,6 @@ let updateSnapshot = { status: "idle", available: false, message: "Updates have 
 let updateChecksEnabled = true;
 let updateDownloadToken = null;
 let updateCheckInFlight = false;
-let updateCheckWasManual = false;
 
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
@@ -1162,23 +1161,31 @@ function publishUpdateState(status, details = {}) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:state", updateSnapshot);
   if (status === "available" && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", updateSnapshot);
 }
+function beginUpdateDownload() {
+  if (!app.isPackaged || process.platform === "darwin" || updateSnapshot.status !== "available") return false;
+  if (updateDownloadToken && !updateDownloadToken.cancelled) return false;
+  const token = new CancellationToken();
+  updateDownloadToken = token;
+  publishUpdateState("downloading", { available: true, version: updateSnapshot.version ?? autoUpdater.updateInfo?.version, percent: 0, message: "Downloading the verified update." });
+  void autoUpdater.downloadUpdate(token).catch((error) => {
+    if (token.cancelled) return;
+    if (updateDownloadToken === token) updateDownloadToken = null;
+    publishUpdateState("error", { version: updateSnapshot.version, error: error instanceof Error ? error.message : String(error), message: "The update download failed. You can retry from Settings." });
+  });
+  return true;
+}
 function configureAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
   autoUpdater.on("checking-for-update", () => publishUpdateState("checking", { message: "Checking the stable release channel…" }));
   autoUpdater.on("update-available", (info) => {
-    if (!shouldDownloadAvailableUpdate({ enabled: updateChecksEnabled, manualCheck: updateCheckWasManual })) {
-      publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Automatic downloads are off; use Check for updates to download it.` });
+    if (!shouldDownloadAvailableUpdate({ enabled: updateChecksEnabled })) {
+      publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Select Download update when you are ready.` });
       return;
     }
     publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Starting a background download…` });
-    updateDownloadToken = new CancellationToken();
-    const token = updateDownloadToken;
-    void autoUpdater.downloadUpdate(token).catch((error) => {
-      if (token.cancelled) return;
-      publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "The update download failed. You can retry from Settings." });
-    });
+    beginUpdateDownload();
   });
   autoUpdater.on("update-not-available", () => publishUpdateState("current", { available: false, message: "You are running the latest stable version." }));
   autoUpdater.on("download-progress", (progress) => publishUpdateState("downloading", { available: true, version: autoUpdater.updateInfo?.version, percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total, message: `Downloading update… ${Math.round(progress.percent)}%` }));
@@ -1202,14 +1209,13 @@ async function checkForUpdates(force = false) {
   if (!app.isPackaged || process.platform === "darwin") return { ...updateSnapshot, available: false, currentVersion, releaseUrl, message: "Updates are available in packaged Windows and Linux builds." };
   if (updateCheckInFlight || ["downloading", "downloaded"].includes(updateSnapshot.status)) return { ...updateSnapshot, currentVersion, releaseUrl };
   updateCheckInFlight = true;
-  updateCheckWasManual = force;
   try {
     await autoUpdater.checkForUpdates();
     return { ...updateSnapshot, currentVersion, releaseUrl };
   } catch (error) {
     publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "Update check failed. You can retry from Settings." });
     return { ...updateSnapshot, currentVersion, releaseUrl };
-  } finally { updateCheckInFlight = false; updateCheckWasManual = false; }
+  } finally { updateCheckInFlight = false; }
 }
 function scheduleUpdateCheck() {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
@@ -1487,7 +1493,7 @@ function applyProductionContentSecurityPolicy() {
       responseHeaders: {
         ...details.responseHeaders,
         "Content-Security-Policy": [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8188 http://localhost:8188; media-src 'self' file:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:8188 http://localhost:8188; media-src 'self' file: data:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
         ],
       },
     });
@@ -1615,6 +1621,13 @@ app.whenReady().then(() => {
     if (!mainWindow || event.sender !== mainWindow.webContents) return readCloseBehavior();
     return writeCloseBehavior(behavior);
   });
+  ipcMain.handle("window:set-titlebar-theme", (event, background, foreground) => {
+    if (process.platform !== "win32" || !mainWindow || event.sender !== mainWindow.webContents || typeof mainWindow.setTitleBarOverlay !== "function") return false;
+    const isHexColor = (value) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+    if (!isHexColor(background) || !isHexColor(foreground)) return false;
+    mainWindow.setTitleBarOverlay({ color: background, symbolColor: foreground, height: 48 });
+    return true;
+  });
   ipcMain.handle("updates:check", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return { available: false, message: "Update checks are unavailable." };
     return checkForUpdates(true);
@@ -1637,6 +1650,10 @@ app.whenReady().then(() => {
     if (!BrowserWindow.fromWebContents(event.sender) || updateSnapshot.status !== "downloading" || !updateDownloadToken) return false;
     updateDownloadToken.cancel();
     return true;
+  });
+  ipcMain.handle("updates:download", (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return false;
+    return beginUpdateDownload();
   });
   ipcMain.handle("updates:retry", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return updateSnapshot;

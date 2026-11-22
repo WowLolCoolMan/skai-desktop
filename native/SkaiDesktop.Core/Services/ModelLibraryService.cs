@@ -32,7 +32,10 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
     ];
     private readonly HttpClient _http = httpClient ?? SharedHttp;
 
-    public async Task<IReadOnlyList<InstalledLocalModel>> DiscoverLocalModelsAsync(string configuredEndpoint, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<InstalledLocalModel>> DiscoverLocalModelsAsync(
+        string configuredEndpoint,
+        CancellationToken cancellationToken = default,
+        bool includeHuggingFaceCache = true)
     {
         var targets = LocalHosts.ToList();
         if (IsLoopbackEndpoint(configuredEndpoint) && !targets.Any(target => SameHost(target.Endpoint, configuredEndpoint)))
@@ -66,7 +69,8 @@ public sealed class ModelLibraryService(HttpClient? httpClient = null)
             // runtime must not hide models served by every other local runtime.
             catch (InvalidDataException) { return Array.Empty<InstalledLocalModel>(); }
         }));
-        return results.SelectMany(models => models).Concat(DiscoverHuggingFaceCacheModels())
+        var cacheModels = includeHuggingFaceCache ? DiscoverHuggingFaceCacheModels() : Array.Empty<InstalledLocalModel>();
+        return results.SelectMany(models => models).Concat(cacheModels)
             .DistinctBy(model => (model.Model, model.Endpoint), StringTupleComparer.Instance)
             .OrderBy(model => model.Provider, StringComparer.OrdinalIgnoreCase)
             .ThenBy(model => model.Model, StringComparer.OrdinalIgnoreCase)

@@ -69,9 +69,17 @@ export type DesktopWorkspace = {
 
 export type WorkspaceSessionTab = { id: string; title: string; route: "chat" | "coding"; conversationId: string | null; projectId: string | null };
 
-const defaultEndpoint = localEndpointOrFallback(localStorage.getItem("skai.endpoint"), "http://localhost:11434/v1");
-const defaultModel = localStorage.getItem("skai.model") ?? "llama3.2";
-const defaultProvider = localProviderOrFallback(localStorage.getItem("skai.provider"));
+function readPreferredChatModel(): { model: string; provider: string; endpoint?: string | null } | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem("skai.preferredModels.v1") ?? "{}");
+    const chat = stored?.chat;
+    return chat && typeof chat.model === "string" && typeof chat.provider === "string" ? chat : null;
+  } catch { return null; }
+}
+const preferredChatModel = readPreferredChatModel();
+const defaultEndpoint = localEndpointOrFallback(preferredChatModel?.endpoint ?? localStorage.getItem("skai.endpoint"), "http://localhost:11434/v1");
+const defaultModel = preferredChatModel?.model ?? localStorage.getItem("skai.model") ?? "llama3.2";
+const defaultProvider = localProviderOrFallback(preferredChatModel?.provider ?? localStorage.getItem("skai.provider"));
 const SIDEBAR_WIDTH_KEY = "skai.sidebar.width";
 const DEFAULT_SIDEBAR_WIDTH = 276;
 const MIN_SIDEBAR_WIDTH = 220;
@@ -231,6 +239,15 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const resizeSidebar = useCallback((width: number) => setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)))), []);
   const setAgentMode = useCallback((mode: "ChatBot" | "Coding Agent") => {
     if (mode === agentMode) return;
+    try {
+      const preferred = JSON.parse(localStorage.getItem("skai.preferredModels.v1") ?? "{}");
+      const choice = preferred?.[mode === "Coding Agent" ? "coding" : "chat"] as { model?: string; provider?: string; endpoint?: string | null } | undefined;
+      if (choice?.model) {
+        setModel(choice.model);
+        if (choice.provider) setProvider(localProviderOrFallback(choice.provider));
+        if (choice.endpoint && isLocalEndpoint(choice.endpoint)) setEndpoint(choice.endpoint);
+      }
+    } catch { /* keep the current model when task preferences are unavailable */ }
     setAgentModeState(mode);
     localStorage.setItem("skai.agentMode", mode);
     const matchingConversation = chat.conversations.find((conversation) => (conversation.mode ?? "ChatBot") === mode);
@@ -307,6 +324,15 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const openProjectTab = useCallback((project: import("../../shared/contracts").DesktopProject) => {
     const existingTab = workspaceTabs.find((tab) => tab.projectId === project.id);
     if (existingTab) { selectWorkspaceTab(existingTab); return; }
+    try {
+      const preferred = JSON.parse(localStorage.getItem("skai.preferredModels.v1") ?? "{}");
+      const choice = preferred?.coding as { model?: string; provider?: string; endpoint?: string | null } | undefined;
+      if (choice?.model) {
+        setModel(choice.model);
+        if (choice.provider) setProvider(localProviderOrFallback(choice.provider));
+        if (choice.endpoint && isLocalEndpoint(choice.endpoint)) setEndpoint(choice.endpoint);
+      }
+    } catch { /* keep the current model when task preferences are unavailable */ }
     setAgentModeState("Coding Agent");
     localStorage.setItem("skai.agentMode", "Coding Agent");
     const projectThread = chat.conversations.find((conversation) => conversation.projectId === project.id && (conversation.mode ?? "ChatBot") === "Coding Agent");

@@ -4,6 +4,7 @@ import App from "./App";
 import { PetWindow } from "./components/overlays/PetWindow";
 import "./design-system/tokens.css";
 import "./styles.css";
+import "./features/settings/easterEggs.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

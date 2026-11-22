@@ -3,5 +3,5 @@ const { shouldDownloadAvailableUpdate } = require("../apps/desktop/electron/upda
 
 assert.equal(shouldDownloadAvailableUpdate({ enabled: true, manualCheck: false }), true, "automatic checks download when enabled");
 assert.equal(shouldDownloadAvailableUpdate({ enabled: false, manualCheck: false }), false, "in-flight automatic checks respect a later opt-out");
-assert.equal(shouldDownloadAvailableUpdate({ enabled: false, manualCheck: true }), true, "manual checks work with automatic checks disabled");
+assert.equal(shouldDownloadAvailableUpdate({ enabled: false, manualCheck: true }), false, "manual checks report availability without downloading when auto-download is disabled");
 console.log("Update policy checks passed.");

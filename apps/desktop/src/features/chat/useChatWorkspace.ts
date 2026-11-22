@@ -25,6 +25,13 @@ function normalizeResponseMode(value: unknown): ChatResponseMode {
   return CHAT_RESPONSE_MODES.includes(value as ChatResponseMode) ? value as ChatResponseMode : "think";
 }
 
+function readPreferredModel(slot: "coding" | "rewrite" | "vision", fallback: string) {
+  try {
+    const stored = JSON.parse(localStorage.getItem("skai.preferredModels.v1") ?? "{}");
+    return typeof stored?.[slot]?.model === "string" ? stored[slot].model : fallback;
+  } catch { return fallback; }
+}
+
 function readFileAsBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -111,6 +118,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const savedId = temporary ? null : await saveConversation(next);
     if (mode === "Coding Agent") {
       try {
+        const taskModel = readPreferredModel("coding", modelMetadata?.model ?? model);
         const planned = await request("tasks.plan", {
           title: text.slice(0, 200) || "Coding task",
           instruction: project?.instructions ? `${text}\n\nProject instructions:\n${project.instructions}` : text,
@@ -118,11 +126,11 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
           projectId: project?.id ?? null,
           conversationId: savedId,
           responseMode,
-          model: modelMetadata?.model ?? model,
+          model: taskModel,
           modelProvider: modelMetadata?.provider ?? provider,
           modelSizeBytes: modelMetadata?.sizeBytes ?? null,
           modelContextLength: modelMetadata?.contextLength ?? null,
-          airLlmCompatible: (modelMetadata?.provider ?? provider).toLowerCase() === "airllm" || model.includes("/"),
+          airLlmCompatible: (modelMetadata?.provider ?? provider).toLowerCase() === "airllm" || taskModel.includes("/"),
         });
         if (!planned.ok) throw new Error(planned.error?.message ?? "The coding task could not be created.");
         const taskId = (planned.result as { id: string }).id;
@@ -138,7 +146,9 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         return;
       }
     }
-    const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
+    const hasImageAttachment = messageAttachments.some((attachment) => attachment.mediaType?.startsWith("image/"));
+    const responseModel = hasImageAttachment ? readPreferredModel("vision", model) : model;
+    const response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
     if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
@@ -173,7 +183,8 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     ];
     onError(null);
     try {
-      const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: rewriteMessages });
+      const rewriteModel = readPreferredModel("rewrite", model);
+      const response = await request("chat.complete", { provider, endpoint, model: rewriteModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: rewriteMessages });
       if (!response.ok) throw new Error(response.error?.message ?? "The selected model could not rewrite this prompt.");
       const candidate = (response.result as { content?: unknown }).content;
       if (typeof candidate !== "string" || candidate.trim().length < 2 || candidate.trim().length > 24_000) {

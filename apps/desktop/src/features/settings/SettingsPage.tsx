@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { Model, Route, ThemeMode } from "../../app/types";
 import type { AgentResponse, CloseBehavior, UpdateCheckResult } from "../../../shared/contracts";
-import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
+import { cloudVoiceApiKeyConfigured, installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, setCloudVoiceApiKey, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
 import { listPetSpriteProfiles, savePetSpriteProfile, validatePetStrip, type PetSpriteProfile } from "./petSprites";
 import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 import { ThemeSettings } from "../../theme/ThemeSettings";
 import { AppearancePreview } from "../../theme/AppearanceOptions";
+import { enableRetroTheme, readAchievements, unlockAchievement, type SkaiAchievement } from "./easterEggs";
 
-const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Updates", "Advanced"] as const;
+const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Achievements", "Updates", "Advanced"] as const;
 type Category = typeof categories[number];
 type AirLlmRuntimeStatus = { workerAvailable: boolean; dependenciesAvailable: boolean; pythonCommand: string; status: string; message: string };
 type AirLlmInstallSession = { id: string; status: string; progress: string[]; error?: string | null };
@@ -25,11 +26,12 @@ const categoryIcons: Record<Category, NavIconName> = {
   "Privacy & Security": "settings",
   Storage: "memory",
   Updates: "arrow-up-right",
+  Achievements: "sparkle",
   Advanced: "terminal",
 };
 
 const categorySearchText: Record<Category, string> = {
-  General: "runtime provider model answer local preferred close window background tray quit linux",
+  General: "runtime provider model preferred chat coding rewrite vision voice answer local close window background tray quit linux",
   Appearance: "theme color accent density backdrop reduced motion pet companion animation",
   Pet: "pets companions sprite sheet character walk wander always on top overlay custom",
   "Models & Providers": "endpoint runtime model discover Ollama LM Studio AirLLM provider local context window tokens 1M",
@@ -39,6 +41,7 @@ const categorySearchText: Record<Category, string> = {
   Integrations: "GitHub local services ComfyUI integrations repository",
   "Privacy & Security": "privacy security local storage memory credentials data boundary",
   Storage: "export backup data workspace local memory",
+  Achievements: "achievements easter eggs unlocked badges secrets",
   Updates: "release channel automatic update delivery",
   Advanced: "developer diagnostics motion routing provider",
 };
@@ -101,9 +104,11 @@ export function SettingsPage(props: SettingsProps) {
   const [airLlmInstall, setAirLlmInstall] = useState<AirLlmInstallSession | null>(null);
   const [startingAirLlmInstall, setStartingAirLlmInstall] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
+  const [cloudApiKey, setCloudApiKey] = useState("");
   const [updateState, setUpdateState] = useState<UpdateCheckResult | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updateChecksEnabled, setUpdateChecksEnabled] = useState(true);
+  const [achievements, setAchievements] = useState<SkaiAchievement[]>(readAchievements);
   const normalizedQuery = query.trim().toLowerCase();
   const visibleCategories = useMemo(() => categories.filter((category) => !normalizedQuery || `${category} ${categoryDescription(category)} ${categorySearchText[category]}`.toLowerCase().includes(normalizedQuery)), [normalizedQuery]);
   useEffect(() => {
@@ -114,8 +119,15 @@ export function SettingsPage(props: SettingsProps) {
   useEffect(() => {
     const updates = window.skaiAgent?.updates;
     if (!updates) return;
-    void updates.enabled().then((enabled) => { setUpdateChecksEnabled(enabled); if (enabled) void updates.state().then((state) => { if (state) setUpdateState(state); }); });
+    void updates.enabled().then(setUpdateChecksEnabled).catch(() => undefined);
+    void updates.state().then((state) => { if (state) setUpdateState(state); }).catch(() => undefined);
     return updates.onState(setUpdateState);
+  }, []);
+  useEffect(() => {
+    if (localStorage.getItem("skai.easterEgg.retro") === "true") enableRetroTheme();
+    const refresh = () => setAchievements(readAchievements());
+    window.addEventListener("skai:achievement-unlocked", refresh);
+    return () => window.removeEventListener("skai:achievement-unlocked", refresh);
   }, []);
   const change = (key: string, value: string | boolean) => { setSaveState("idle"); props.onChange(key, value); };
   const selectedOllamaModel = props.models.find((entry) => entry.model === props.model && (entry.provider ?? "").toLowerCase() === "ollama");
@@ -159,7 +171,7 @@ export function SettingsPage(props: SettingsProps) {
     const response = await window.skaiAgent?.request("airllm.install.cancel", { id: airLlmInstall.id });
     if (response?.ok) setAirLlmInstall(response.result as AirLlmInstallSession);
   };
-  const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled", value: string | boolean) => { saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
+  const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudVoiceId", value: string | boolean) => { saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
   const checkUpdates = async () => {
     if (checkingUpdates || !window.skaiAgent?.updates) return;
     setCheckingUpdates(true);
@@ -173,11 +185,11 @@ export function SettingsPage(props: SettingsProps) {
   return <div className="feature-page settings-page">
     <PageHeader className="settings-page-header" eyebrow="CONTROL CENTER" title="Workspace settings" description="Tune the local runtime, appearance, voice, media, memory, and workspace behavior." />
     <div className="settings-window">
-      <aside className="settings-nav"><p className="section-kicker">SETTINGS</p><input className="settings-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search settings…" aria-label="Search settings" />{normalizedQuery && <p className="settings-search-status" role="status">{visibleCategories.length} matching {visibleCategories.length === 1 ? "section" : "sections"}</p>}{visibleCategories.map((category) => <button className={activeCategory === category ? "is-active" : ""} key={category} onClick={() => setActiveCategory(category)} type="button"><NavIcon name={categoryIcons[category]} /><span>{category}</span></button>)}{visibleCategories.length === 0 && <p className="settings-no-results">No settings match. Try a label such as endpoint, motion, or memory.</p>}</aside>
+      <aside className="settings-nav" aria-label="Settings sections"><p className="section-kicker">PREFERENCES</p><label className="settings-search-wrap"><NavIcon name="search" /><input className="settings-search" value={query} onChange={(event) => { const value = event.target.value; setQuery(value); if (value.trim().toLowerCase() === "konami") { enableRetroTheme(); unlockAchievement("retro-search"); } }} placeholder="Find a setting" aria-label="Search settings" /></label>{normalizedQuery && <p className="settings-search-status" role="status">{visibleCategories.length} matching {visibleCategories.length === 1 ? "section" : "sections"}</p>}<nav className="settings-category-list" aria-label="Settings categories">{visibleCategories.map((category) => <button className={activeCategory === category ? "is-active" : ""} aria-current={activeCategory === category ? "page" : undefined} key={category} onClick={() => setActiveCategory(category)} type="button"><NavIcon name={categoryIcons[category]} /><span>{category}</span>{category === "Achievements" && achievements.length > 0 && <small className="settings-achievement-count">{achievements.length}</small>}</button>)}</nav>{visibleCategories.length === 0 && <p className="settings-no-results">No settings match. Try a label such as endpoint, motion, or memory.</p>}</aside>
       <main className="settings-content">
-        <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h3>{activeCategory}</h3><p>{categoryDescription(activeCategory)}</p></div></div>
+        <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h1>{activeCategory}</h1><p>{categoryDescription(activeCategory)}</p></div></div>
 
-        {activeCategory === "General" && <><AboutYouSetting /><CloseBehaviorSetting /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
+        {activeCategory === "General" && <><AboutYouSetting /><PreferredModelsSetting props={props} change={change} /><CloseBehaviorSetting /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
 
         {activeCategory === "Appearance" && <><AppearancePreview /><div className="settings-field"><label>Color theme<select value={props.themeMode} onChange={(event) => change("themeMode", event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label>{/* Theme: the old Accent select (Cyan/Violet/Amber/Rose) was removed at the user's request: nothing read it. Appearance → Layout and motion → Accent sets the accent now. */}</div><ThemeSettings /><div className="settings-field"><label>Interface density<select value={props.density} onChange={(event) => change("density", event.target.value)}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label><label>Backdrop<select value={props.backdrop} onChange={(event) => change("backdrop", event.target.value)}><option value="none">None</option><option value="deep-sea">Deep sea</option><option value="deep-space">Deep space</option></select></label></div><Toggle label="Reduced motion" detail="Minimize interface animations and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /></>}
 
@@ -185,7 +197,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Models & Providers" && <><div className="settings-field"><label>Provider<select value={selectedProviderId} onChange={(event) => change("provider", event.target.value)}>{providerChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><label>Model endpoint<input value={props.endpoint} onChange={(event) => change("endpoint", event.target.value)} placeholder="http://localhost:11434/v1" /></label></div><div className="settings-field"><label>Ollama context window<select value={props.ollamaContextWindowTokens} disabled={props.provider !== "Ollama"} onChange={(event) => change("ollamaContextWindowTokens", event.target.value)}><option value={0}>Runtime default</option><option value={32768}>32K tokens</option><option value={131072}>128K tokens</option><option value={1048576}>1M tokens</option></select></label><span className="settings-help">For Ollama only. Runtime default leaves Ollama unchanged. Larger windows use substantially more memory and require a model that supports the selected context.</span></div><div className="settings-field settings-budget-fields"><label>RAM budget (GiB)<input type="number" min="0" max="1024" step="1" value={props.localRamBudgetBytes ? Math.round(props.localRamBudgetBytes / 1073741824) : ""} onChange={(event) => { const value = Number(event.target.value); change("localRamBudgetBytes", Number.isFinite(value) && value > 0 ? String(Math.round(value * 1073741824)) : "0"); }} placeholder="Automatic" /></label><label>VRAM budget (GiB)<input type="number" min="0" max="1024" step="1" value={props.localGpuBudgetBytes ? Math.round(props.localGpuBudgetBytes / 1073741824) : ""} onChange={(event) => { const value = Number(event.target.value); change("localGpuBudgetBytes", Number.isFinite(value) && value > 0 ? String(Math.round(value * 1073741824)) : "0"); }} placeholder="Automatic" /></label><span className="settings-help">Optional caps for concurrent local coding tasks. Leave blank for automatic measurement; the scheduler stays conservative when telemetry is unavailable.</span></div>{props.provider === "Ollama" && <div className="settings-context-support" role="status"><StatusBadge tone={contextSupport === "supported" ? "success" : contextSupport === "unsupported" ? "warning" : "neutral"}>{contextSupport === "supported" ? "1M advertised" : contextSupport === "unsupported" ? "Below 1M" : "Context unknown"}</StatusBadge><span>{selectedOllamaModel?.contextLength == null ? "Discover local models to read Ollama model metadata for the selected model." : `${props.model} advertises a ${selectedOllamaModel.contextLength.toLocaleString()} token context. This is model metadata; available RAM and the runtime configuration still determine whether it can run.`}</span></div>}<div className="settings-model-actions"><Button variant="secondary" disabled={discoveringModels} onClick={() => void discoverModels()}>{discoveringModels ? "Discovering…" : "Discover local models"}</Button><span>AirLLM can take over when a selected model exceeds available memory.</span></div><div className="settings-callout airllm-callout"><strong>Optional AirLLM runtime</strong><span>{airLlmStatus ? `${airLlmStatus.message} ${airLlmStatus.pythonCommand ? `Python: ${airLlmStatus.pythonCommand}` : ""}` : "AirLLM is an optional, slower runtime for compatible Hugging Face models that exceed your usual local model's memory."} Installing it downloads Python dependencies and may use several gigabytes of disk. Model weights are separate and download only when you select a model.</span><div className="settings-model-actions"><StatusBadge tone={airLlmInstall?.status === "running" ? "warning" : airLlmStatus?.dependenciesAvailable ? "success" : airLlmStatus ? "warning" : "neutral"}>{airLlmInstall?.status === "running" ? "Installing" : airLlmStatus?.status ?? "Not checked"}</StatusBadge><Button variant="secondary" disabled={checkingAirLlm || startingAirLlmInstall} onClick={() => void checkAirLlm()}>{checkingAirLlm ? "Checking…" : "Check readiness"}</Button>{!airLlmStatus?.dependenciesAvailable && <Button variant="primary" disabled={startingAirLlmInstall || airLlmInstall?.status === "running"} onClick={() => void installAirLlm()}>{startingAirLlmInstall || airLlmInstall?.status === "running" ? "Installing…" : "Install optional runtime"}</Button>}{airLlmInstall?.status === "running" && <Button variant="ghost" onClick={() => void cancelAirLlmInstall()}>Cancel setup</Button>}</div>{airLlmInstall && <div className={`airllm-install-log${airLlmInstall.status === "failed" ? " is-error" : ""}`} role="status" aria-live="polite">{airLlmInstall.error && <strong>{airLlmInstall.error}</strong>}{airLlmInstall.progress.slice(-4).map((line, index) => <span key={`${index}-${line}`}>{line}</span>)}</div>}</div><details className="airllm-help"><summary>What is AirLLM?</summary><p>AirLLM can run some compatible Hugging Face models that do not fit in your usual runtime by streaming model layers from disk. It can be much slower and needs model storage space. Skai only uses the optional runtime after you install it; compatible model weights are downloaded separately when you choose them.</p></details><div className="settings-provider-list">{providerChoices.map((choice) => <div className="settings-provider-row" key={choice.id}><span><strong>{choice.label}</strong><small>{choice.detail}</small></span><StatusBadge tone="neutral">Supported locally</StatusBadge></div>)}</div></>}
 
-        {activeCategory === "Voice & Audio" && <><div className="settings-field"><label>Primary voice runtime<select value={voiceSettings.primaryModelId} onChange={(event) => updateVoice("primaryModelId", event.target.value)}>{installedVoiceModels.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>{installedVoiceModels.some((voice) => voice.lowResource && voice.id !== voiceSettings.primaryModelId) && <label>Low-resource runtime<select value={voiceSettings.lowResourceModelId} onChange={(event) => updateVoice("lowResourceModelId", event.target.value)}>{installedVoiceModels.filter((voice) => voice.lowResource).map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>}</div><div className="settings-field"><label>Voice profile<select value={voiceSettings.profileId} onChange={(event) => updateVoice("profileId", event.target.value)}>{voiceProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="settings-inline-action"><span>Preview the current system voice.</span><Button variant="secondary" onClick={() => void speakNativeResponse("Skai voice preview. Your voice settings are working.", true)}>Preview</Button><Button variant="ghost" onClick={stopNativeSpeech}>Stop</Button></div></div><Toggle label="Speak completed replies" detail="Voice output stays off until you turn it on." checked={voiceSettings.voiceOutputEnabled} onChange={(value) => updateVoice("voiceOutputEnabled", value)} />{installedVoiceModels.some((voice) => voice.lowResource && voice.id !== voiceSettings.primaryModelId) && <Toggle label="Use low-resource mode" detail="Prefer the smaller CPU-first voice runtime." checked={voiceSettings.lowResourceMode} onChange={(value) => updateVoice("lowResourceMode", value)} />}</>}
+        {activeCategory === "Voice & Audio" && <><div className="settings-field"><label>Voice source<select value={voiceSettings.source} onChange={(event) => updateVoice("source", event.target.value)}><option value="local">Local downloaded/system voice</option><option value="cloud">ElevenLabs cloud voice</option></select></label><span className="settings-help">Local keeps audio on this computer. Cloud sends the text of each spoken reply to ElevenLabs using your key.</span></div>{voiceSettings.source === "cloud" && <div className="settings-callout"><strong>ElevenLabs cloud voice</strong><span>Your API key is kept only in this running Skai session and is never written to workspace settings or sent to the model.</span><div className="settings-field"><label>API key<input type="password" value={cloudApiKey} onChange={(event) => { setCloudApiKey(event.target.value); setCloudVoiceApiKey(event.target.value); }} placeholder={cloudVoiceApiKeyConfigured() ? "Key configured for this session" : "Paste your ElevenLabs API key"} autoComplete="off" /></label><label>Voice ID<input value={voiceSettings.cloudVoiceId} onChange={(event) => updateVoice("cloudVoiceId", event.target.value)} placeholder="ElevenLabs voice ID" /></label></div><p className="settings-help">Cloud voice requires an ElevenLabs key and a voice ID. If it fails, Skai announces the failure and uses the native fallback voice.</p></div>}<div className="settings-field"><label>Primary local runtime<select value={voiceSettings.primaryModelId} onChange={(event) => updateVoice("primaryModelId", event.target.value)} disabled={voiceSettings.source === "cloud"}>{installedVoiceModels.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>{installedVoiceModels.some((voice) => voice.lowResource && voice.id !== voiceSettings.primaryModelId) && <label>Low-resource runtime<select value={voiceSettings.lowResourceModelId} onChange={(event) => updateVoice("lowResourceModelId", event.target.value)}>{installedVoiceModels.filter((voice) => voice.lowResource).map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>}</div><div className="settings-field"><label>Voice profile<select value={voiceSettings.profileId} onChange={(event) => updateVoice("profileId", event.target.value)}>{voiceProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="settings-inline-action"><span>Preview the selected voice.</span><Button variant="secondary" onClick={() => void speakNativeResponse("Skai voice preview. Your voice settings are working.", true)}>Preview</Button><Button variant="ghost" onClick={stopNativeSpeech}>Stop</Button></div></div><Toggle label="Speak completed replies" detail="Voice output stays off until you turn it on." checked={voiceSettings.voiceOutputEnabled} onChange={(value) => updateVoice("voiceOutputEnabled", value)} />{installedVoiceModels.some((voice) => voice.lowResource && voice.id !== voiceSettings.primaryModelId) && <Toggle label="Use low-resource mode" detail="Prefer the smaller CPU-first voice runtime." checked={voiceSettings.lowResourceMode} onChange={(value) => updateVoice("lowResourceMode", value)} />}</>}
 
         {activeCategory === "Image Generation" && <><div className="settings-field"><label>ComfyUI endpoint<input value={props.imageEndpoint} onChange={(event) => props.onImageChange("endpoint", event.target.value)} placeholder="http://127.0.0.1:8188" /></label><label>Workflow JSON<input value={props.imageWorkflow} onChange={(event) => props.onImageChange("workflow", event.target.value)} placeholder="Paste a ComfyUI workflow JSON" /></label></div><p className="settings-help">Image Studio offers direct local Stable Diffusion Turbo generation after you install its optional runtime. ComfyUI remains available for custom workflows and image editing.</p></>}
 
@@ -195,7 +207,9 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Privacy & Security" && <><div className="settings-callout"><strong>Local route in use</strong><span>Prompts, attachments, memory, voice, and image requests stay on this computer.</span></div><p className="settings-help">GitHub is used only for explicit project workflows. Local model and media endpoints are restricted to loopback addresses.</p><Toggle label="Use saved memory in prompts" detail="This is also available in Agents so the setting is easy to find." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /></>}
 
-        {activeCategory === "Storage" && <><div className="settings-callout"><strong>Workspace data is local</strong><span>Conversations, task plans, memory, and preferences are stored in the local Skai data directory.</span></div><div className="settings-model-actions"><Button variant="secondary" onClick={props.onExportMemory}>Export memory backup</Button><span>Exports a portable JSON backup without deleting anything.</span></div><p className="settings-help">There is no destructive “clear everything” button in the release candidate.</p></>}
+        {activeCategory === "Storage" && <><div className="settings-callout"><strong>Workspace data is local</strong><span>Conversations, task plans, memory, and preferences are stored in the local Skai data directory.</span></div><div className="settings-model-actions"><Button variant="secondary" onClick={props.onExportMemory}>Export memory backup</Button><span>Exports a portable JSON backup without deleting anything.</span></div><p className="settings-help">There is no destructive "clear everything" button in the release candidate.</p></>}
+
+        {activeCategory === "Achievements" && <AchievementsPanel achievements={achievements} />}
 
         {activeCategory === "Updates" && <><div className="settings-callout"><strong>Automatic updates</strong><span>Skai checks the official stable channel at startup and every six hours. Available updates download in the background and are verified by the updater before you choose when to restart.</span></div><Toggle label="Check for and download updates automatically" detail="Turn this off to stop background checks and downloads. Manual checks remain available below." checked={updateChecksEnabled} onChange={(enabled) => { setUpdateChecksEnabled(enabled); void window.skaiAgent?.updates?.setEnabled(enabled); }} /><div className="settings-provider-list"><div className="settings-provider-row"><span><strong>Installed version</strong><small>{updateState?.currentVersion ?? "Checking…"}</small></span><StatusBadge tone="neutral">Skai Desktop</StatusBadge></div><div className="settings-provider-row"><span><strong>Update status</strong><small>{updateState?.error ?? updateState?.message ?? "Checking the stable release channel…"}{updateState?.status === "downloading" && ` (${updateState.percent ?? 0}%)`}</small></span><StatusBadge tone={updateState?.status === "error" ? "warning" : updateState?.status === "downloaded" ? "success" : "neutral"}>{updateState?.status === "downloaded" ? "Ready to restart" : updateState?.status === "downloading" ? "Downloading" : updateState?.status === "available" ? "Available" : updateState?.status === "error" ? "Needs attention" : updateState?.status === "current" ? "Up to date" : "Checking"}</StatusBadge></div></div><div className="settings-model-actions"><Button variant="secondary" disabled={checkingUpdates} onClick={() => void checkUpdates()}>{checkingUpdates ? "Checking…" : updateState?.status === "error" ? "Retry update" : "Check for updates"}</Button>{updateState?.status === "downloading" && <Button variant="ghost" onClick={() => void window.skaiAgent?.updates?.cancelDownload()}>Cancel download</Button>}{updateState?.status === "downloaded" && <Button variant="primary" onClick={() => void window.skaiAgent?.updates?.install()}>Restart to update</Button>}</div><p className="settings-help">Updates are supported for packaged Windows x64 and Linux x64 builds. Downloaded updates are verified before staging; Skai never restarts without your confirmation.</p></>}
 
@@ -209,12 +223,66 @@ export function SettingsPage(props: SettingsProps) {
 }
 
 function categoryDescription(category: Category) {
-  const descriptions: Record<Category, string> = { General: "Choose the local runtime and model Skai should use first.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize your desktop pets.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, prompt rewriting, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review the local data boundary and storage controls.", Storage: "Back up local workspace data without destructive shortcuts.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
+  const descriptions: Record<Category, string> = { General: "Choose the local runtime, default model, and preferred model for each kind of work.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize your desktop pets.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, prompt rewriting, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review the local data boundary and storage controls.", Storage: "Back up local workspace data without destructive shortcuts.", Achievements: "A private collection of the little secrets you have found in Skai.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
   return descriptions[category];
+}
+
+function AchievementsPanel({ achievements }: { achievements: SkaiAchievement[] }) {
+  if (achievements.length === 0) return <div className="settings-achievements-empty"><span aria-hidden="true">{"\u2726"}</span><h2>No achievements unlocked yet</h2><p>Keep exploring Skai. Hidden discoveries will appear here once you find them.</p></div>;
+  return <div className="settings-achievements-grid" aria-label="Unlocked achievements">{achievements.map((achievement) => <article className="settings-achievement-card" key={achievement.id}><span className="settings-achievement-icon" aria-hidden="true">{achievement.icon}</span><div><p className="section-kicker">UNLOCKED</p><h2>{achievement.title}</h2><p>{achievement.description}</p><small>{new Date(achievement.unlockedAt).toLocaleDateString()}</small></div></article>)}</div>;
 }
 
 // Linux only: what closing the main window does (see electron/main.cjs). Saved immediately in the shell.
 type UserProfile = { name: string; gender: string; age: string };
+
+type PreferredModelSlot = "chat" | "coding" | "rewrite" | "vision";
+type PreferredModelChoice = { model: string; provider: string; endpoint?: string | null };
+type PreferredModelMap = Partial<Record<PreferredModelSlot, PreferredModelChoice>>;
+const PREFERRED_MODELS_KEY = "skai.preferredModels.v1";
+
+function readPreferredModels(): PreferredModelMap {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PREFERRED_MODELS_KEY) ?? "{}");
+    if (!stored || typeof stored !== "object") return {};
+    return stored as PreferredModelMap;
+  } catch { return {}; }
+}
+
+function modelChoiceKey(model: Model) { return `${model.provider ?? "Local API"}::${model.model}`; }
+
+function PreferredModelsSetting({ props, change }: { props: SettingsProps; change: (key: string, value: string | boolean) => void }) {
+  const [preferred, setPreferred] = useState<PreferredModelMap>(readPreferredModels);
+  const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
+  const modelOptions = useMemo(() => {
+    const options = [...props.models];
+    if (props.model && !options.some((model) => model.model === props.model && (model.provider ?? "") === props.provider)) options.unshift({ model: props.model, displayName: props.model, provider: props.provider, endpoint: props.endpoint, vision: "unknown", capabilities: [] });
+    return options;
+  }, [props.endpoint, props.model, props.models, props.provider]);
+  const savePreferred = (slot: PreferredModelSlot, key: string) => {
+    const selected = modelOptions.find((model) => modelChoiceKey(model) === key);
+    const next = { ...preferred };
+    if (!selected) delete next[slot];
+    else next[slot] = { model: selected.model, provider: selected.provider ?? "Local API", endpoint: selected.endpoint };
+    setPreferred(next);
+    localStorage.setItem(PREFERRED_MODELS_KEY, JSON.stringify(next));
+    if (slot === "chat" && selected) {
+      change("model", selected.model);
+      change("provider", selected.provider ?? "Local API");
+      if (selected.endpoint) change("endpoint", selected.endpoint);
+    }
+  };
+  const selectedKey = (slot: PreferredModelSlot) => {
+    const value = preferred[slot];
+    return value ? `${value.provider}::${value.model}` : slot === "chat" ? `${props.provider}::${props.model}` : "";
+  };
+  return <section className="settings-preferred-models" aria-labelledby="preferred-models-heading">
+    <div className="settings-subsection-heading"><div><p className="section-kicker">PREFERRED MODELS</p><h3 id="preferred-models-heading">Choose a model for each job</h3><p>These assignments stay on this computer. Chat uses its assignment now; coding, rewriting, and vision assignments are saved for task-specific routing.</p></div><StatusBadge tone={modelOptions.length ? "success" : "warning"}>{modelOptions.length ? `${modelOptions.length} models available` : "Discover models first"}</StatusBadge></div>
+    <div className="settings-field settings-preferred-model-grid">
+      {([["chat", "Chat and reasoning", "The default model for everyday conversations."], ["coding", "Coding agent", "Use when working in a project or reviewing code."], ["rewrite", "Prompt rewriting", "Use for the optional rewrite preview before sending."], ["vision", "Image understanding", "Use when an image-capable model is needed."]] as const).map(([slot, label, detail]) => <label key={slot}>{label}<select value={selectedKey(slot)} onChange={(event) => savePreferred(slot, event.target.value)} disabled={!modelOptions.length}><option value="">Use the current chat model</option>{modelOptions.map((model) => <option value={modelChoiceKey(model)} key={modelChoiceKey(model)}>{model.displayName || model.model} · {model.provider ?? "Local API"}</option>)}</select><small className="settings-help">{detail}</small></label>)}
+      <label>Voice runtime<select value={voiceSettings.primaryModelId} onChange={(event) => { saveVoiceSetting("primaryModelId", event.target.value); setVoiceSettings(selectedVoiceSettings()); }}><option value="">Use the installed default</option>{installedVoiceModels.map((voice) => <option key={voice.id} value={voice.id}>{voice.name} · {voice.detail}</option>)}</select><small className="settings-help">Voice engines are managed locally; browse Marketplace to see available voice adapters.</small></label>
+    </div>
+  </section>;
+}
 
 /** Optional details the user shares with every chat and persona, so the AI knows who it's talking to. */
 function AboutYouSetting() {

@@ -6,7 +6,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const desktopRoot = path.join(root, "apps", "desktop");
 const electronDist = path.join(desktopRoot, "node_modules", "electron", "dist");
-const outputRoot = path.join(root, "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`);
+const finalOutputRoot = path.join(root, "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`);
+const outputRoot = `${finalOutputRoot}.staging-${process.pid}-${Date.now()}`;
 const appRoot = path.join(outputRoot, "resources", "app");
 const hostRoot = path.join(outputRoot, "resources", "agent-host");
 const runtime = process.platform === "win32" ? "win-x64" : process.platform === "linux" ? "linux-x64" : "osx-x64";
@@ -14,11 +15,55 @@ const electronBinary = process.platform === "win32" ? "electron.exe" : "electron
 const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop";
 const hostBinary = process.platform === "win32" ? "SkaiDesktop.AgentHost.exe" : "SkaiDesktop.AgentHost";
 const desktopPackage = JSON.parse(fs.readFileSync(path.join(desktopRoot, "package.json"), "utf8"));
+let committed = false;
+process.on("exit", () => {
+  if (!committed) {
+    try { fs.rmSync(outputRoot, { recursive: true, force: true }); } catch { /* preserve the original failure */ }
+  }
+});
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit", shell: false });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}.`);
+}
+
+function resolveInstalledPackage(packageName, sourceNodeModules) {
+  let searchDirectory = sourceNodeModules;
+  while (true) {
+    const candidate = path.join(searchDirectory, packageName);
+    if (fs.existsSync(path.join(candidate, "package.json"))) return candidate;
+    const parent = path.dirname(searchDirectory);
+    if (parent === searchDirectory) break;
+    searchDirectory = path.join(parent, "node_modules");
+  }
+  throw new Error(`Offline packaging could not find installed dependency ${packageName}.`);
+}
+
+function stageOfflineProductionDependencies() {
+  const sourceNodeModules = path.join(desktopRoot, "node_modules");
+  const destinationNodeModules = path.join(appRoot, "node_modules");
+  if (!fs.existsSync(sourceNodeModules)) throw new Error("Offline packaging requires apps/desktop/node_modules.");
+  const pending = Object.keys(desktopPackage.dependencies ?? {});
+  const copied = new Set();
+  fs.mkdirSync(destinationNodeModules, { recursive: true });
+
+  while (pending.length > 0) {
+    const packageName = pending.pop();
+    if (!packageName || copied.has(packageName)) continue;
+    const sourcePackage = resolveInstalledPackage(packageName, sourceNodeModules);
+    const manifest = JSON.parse(fs.readFileSync(path.join(sourcePackage, "package.json"), "utf8"));
+    const destinationPackage = path.join(destinationNodeModules, packageName);
+    fs.mkdirSync(path.dirname(destinationPackage), { recursive: true });
+    fs.cpSync(sourcePackage, destinationPackage, {
+      recursive: true,
+      force: true,
+      filter: (source) => path.basename(source) !== "node_modules",
+    });
+    copied.add(packageName);
+    for (const dependency of Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies })) pending.push(dependency);
+  }
+  console.warn(`Offline dependency staging used the existing installed production graph (${copied.size} packages).`);
 }
 
 if (!fs.existsSync(electronDist)) throw new Error("Electron dependencies are not installed. Run npm run desktop:install first.");
@@ -34,7 +79,6 @@ if (!fs.existsSync(path.join(desktopRoot, "dist", "index.html"))) throw new Erro
   if (builtMtime < sourceMtime) throw new Error("The Electron renderer build is older than apps/desktop/src. Run npm run desktop:build first so the package matches the sources.");
 }
 
-fs.rmSync(outputRoot, { recursive: true, force: true });
 fs.mkdirSync(appRoot, { recursive: true });
 fs.mkdirSync(hostRoot, { recursive: true });
 
@@ -55,7 +99,13 @@ fs.cpSync(path.join(desktopRoot, "package.json"), path.join(appRoot, "package.js
 fs.cpSync(path.join(desktopRoot, "package-lock.json"), path.join(appRoot, "package-lock.json"), { force: true });
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("Run packaging through npm so the locked production dependencies can be staged reproducibly.");
-run(process.execPath, [npmCli, "ci", "--omit=dev", "--ignore-scripts", "--prefix", appRoot]);
+try {
+  run(process.execPath, [npmCli, "ci", "--omit=dev", "--ignore-scripts", "--prefix", appRoot]);
+} catch (error) {
+  console.warn(`Locked production dependency install failed (${error.message}); attempting the installed offline dependency graph.`);
+  fs.rmSync(path.join(appRoot, "node_modules"), { recursive: true, force: true });
+  stageOfflineProductionDependencies();
+}
 if (!fs.existsSync(path.join(appRoot, "node_modules", "electron-updater", "out", "main.js"))) {
   throw new Error("The runtime electron-updater dependency was not staged into the packaged app.");
 }
@@ -113,4 +163,14 @@ fs.writeFileSync(path.join(outputRoot, "README-release.txt"), [
   "",
 ].join("\n"), "utf8");
 
-console.log(`Electron artifact staged: ${outputRoot}`);
+const previousOutputRoot = `${finalOutputRoot}.previous-${process.pid}`;
+if (fs.existsSync(finalOutputRoot)) fs.renameSync(finalOutputRoot, previousOutputRoot);
+try {
+  fs.renameSync(outputRoot, finalOutputRoot);
+  committed = true;
+  if (fs.existsSync(previousOutputRoot)) fs.rmSync(previousOutputRoot, { recursive: true, force: true });
+} catch (error) {
+  if (!fs.existsSync(finalOutputRoot) && fs.existsSync(previousOutputRoot)) fs.renameSync(previousOutputRoot, finalOutputRoot);
+  throw error;
+}
+console.log(`Electron artifact staged: ${finalOutputRoot}`);

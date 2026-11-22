@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("skaiAgent", {
     respondToClose: (choice, remember) => ipcRenderer.send("window:close-choice", { choice: String(choice), remember: Boolean(remember) }),
     getCloseBehavior: () => ipcRenderer.invoke("window:get-close-behavior"),
     setCloseBehavior: (behavior) => ipcRenderer.invoke("window:set-close-behavior", String(behavior)),
+    setTitleBarTheme: (background, foreground) => ipcRenderer.invoke("window:set-titlebar-theme", String(background), String(foreground)),
   },
   updates: {
     check: () => ipcRenderer.invoke("updates:check"),
@@ -35,6 +36,7 @@ contextBridge.exposeInMainWorld("skaiAgent", {
     setEnabled: (enabled) => ipcRenderer.invoke("updates:set-enabled", Boolean(enabled)),
     install: () => ipcRenderer.invoke("updates:install"),
     cancelDownload: () => ipcRenderer.invoke("updates:cancel-download"),
+    download: () => ipcRenderer.invoke("updates:download"),
     retry: () => ipcRenderer.invoke("updates:retry"),
     onState: (handler) => {
       const listener = (_event, result) => handler(result);

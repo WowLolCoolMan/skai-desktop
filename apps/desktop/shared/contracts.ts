@@ -313,6 +313,8 @@ export interface WindowBridge {
   respondToClose(choice: CloseChoice, remember: boolean): void;
   getCloseBehavior(): Promise<CloseBehavior>;
   setCloseBehavior(behavior: CloseBehavior): Promise<CloseBehavior>;
+  /** Update the Windows native title-bar button area to match the active app theme. */
+  setTitleBarTheme(background: string, foreground: string): Promise<boolean>;
 }
 
 export type UpdateCheckResult = {
@@ -341,6 +343,7 @@ export interface UpdatesBridge {
   setEnabled(enabled: boolean): Promise<boolean>;
   install(): Promise<boolean>;
   cancelDownload(): Promise<boolean>;
+  download(): Promise<boolean>;
   retry(): Promise<UpdateCheckResult>;
   onState(handler: (result: UpdateCheckResult) => void): () => void;
   onAvailable(handler: (result: UpdateCheckResult) => void): () => void;

@@ -30,6 +30,72 @@ what they cover.
 - Coding, Workbench, Terminal, Memory, Images, Usage, and project/GitHub flows
   expose honest empty, unavailable, loading, and failure states.
 
+## Professional and comfortable UI goal loop
+
+The product owner wants every Skai Desktop page to feel professional and
+comfortable, with Settings and Coding Agent as the first priorities. Keep this
+work in the existing Electron + React design system and preserve the behavior
+behind every control.
+
+For each page or closely related page group, repeat this loop:
+
+1. Inspect the live page, its behavior, the relevant UI reference, and its
+   empty, loading, error, and success states.
+2. Make a focused hierarchy, spacing, navigation, and responsive-layout pass
+   with existing components and theme tokens.
+3. Run renderer typecheck/build. Inspect the Electron page at 1920, 1440,
+   1280, 960, and 640 px in dark, light, and system themes; fix overflow,
+   clipped controls, poor contrast, and confusing states.
+4. Record evidence and remaining gaps here, then pick the next page from the
+   active task in `docs/TO_DO_NEXT.md`.
+
+The goal is complete after every listed route has been reviewed in the live
+app and representative screenshots and interaction evidence are recorded.
+
+### First pass completed
+
+- Settings now has a clearer modal header, searchable preference navigation,
+  active-category state, stronger section hierarchy, and responsive layouts.
+  Existing categories, save behavior, runtime controls, and platform states are
+  preserved.
+- The Coding Agent project session now separates conversation, project files,
+  Git review, and task inspection more clearly. The repeated project title was
+  removed from the status strip, and the workspace adapts at narrower widths.
+- Shared page headers, panel headings, empty states, and form controls received
+  a consistent spacing and hierarchy pass.
+- Marketplace Discover now starts with a concrete local-workspace action strip,
+  reports the active runtime and local inventory, routes directly to model
+  search or installed inventory, and labels catalog entries as ready, setup
+  required, or limited instead of presenting every card as an available
+  feature. Its catalog cards now describe the actual next action. The main
+  Marketplace hub also has direct starting actions for model discovery, MCP
+  connection, and installed inventory; Updates now performs a real release
+  channel check through the existing update bridge. Usage now reports truthful
+  local workspace counts and selected provider/model context while keeping
+  unmeasured token, cost, GPU, and latency values out.
+- Marketplace now exposes Voices as a first-class destination, includes locally
+  installed voice runtimes when the host catalog has no voice entries, and
+  General settings now stores per-job preferred model assignments for chat,
+  coding, prompt rewriting, vision, and voice. The Chat assignment is restored
+  as the default model on the next workspace start.
+- `npm run desktop:typecheck` and `npm run desktop:build` passed after these
+  changes. Vite still reports its existing large-chunk warning.
+- `npm run package:electron` published the Agent Host but could not finish
+  staging runtime dependencies because `registry.npmjs.org` was unreachable
+  while fetching `universalify@2.0.1`. Retrying the UI matrix against that
+  partial package failed before the renderer opened, so it is not acceptance
+  evidence.
+
+### Remaining visual review
+
+The first pass has not been visually accepted in a running Electron window.
+Continue the route-by-route review with Chat and the Coding Agent, then Projects,
+Models, Images, Marketplace, Plugins, Memory, Personas, Pet Workshop, Voice
+Workbench, Terminal, Usage, and the remaining Settings sections. Check the
+supported widths and dark, light, and system themes; retain the existing shell
+and verify that each page's controls and empty, loading, error, and success
+states remain clear.
+
 ## Acceptance evidence
 
 Run `npm run smoke:windows` from the repository root. It currently runs:

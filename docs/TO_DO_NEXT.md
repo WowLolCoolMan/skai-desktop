@@ -29,6 +29,50 @@ and to any detailed plan rather than copying their full contents here.
 
 ## Active and next-up work
 
+### Skai Desktop professional and comfortable UI goal loop
+
+- **Status:** In progress
+- **Priority:** High, product quality
+- **Owner:** Codex
+- **Context:** The owner wants every page cleaned up so Skai feels professional,
+  comfortable, calm, and welcoming. Settings and Coding Agent are the first
+  priorities. The first styling pass is implemented; visual acceptance in the
+  running Electron app is still open.
+- **Agreed approach:** Work one page or tightly related page group at a time.
+  Inspect its current behavior and relevant UI reference, improve hierarchy,
+  spacing, navigation, and responsive behavior using the existing Electron +
+  React components and theme tokens, and preserve working controls and honest
+  states. Treat usefulness as a release requirement: every page needs a clear
+  job, a real next action, and a truthful empty/loading/error/success state;
+  remove copy and cards that only describe a future feature. Marketplace may
+  receive a structural layout change; other pages keep their current layout
+  while their content and actions become more useful. After each pass, run
+  renderer typecheck/build, inspect the live UI at supported widths and themes,
+  fix clipping or confusing states, and record evidence in
+  `docs/SKAI_PREMIUM_UI_PROGRESS.md`. Repeat with the next page until the full
+  route list is accepted.
+- **Latest implementation:** Marketplace now includes a Voices destination and
+  local voice runtime entries. General settings includes per-job preferred model
+  assignments for chat, coding, prompt rewriting, vision, and voice; the Chat
+  assignment is restored as the workspace default.
+- **Acceptance:** Chat and Coding Agent, Projects, Models, Images, Marketplace,
+  Plugins, Memory, Personas, Pet Workshop, Voice Workbench, Terminal, Usage,
+  and Settings are reviewed in the running app. Each has readable hierarchy,
+  comfortable density, visible keyboard focus, usable narrow layouts, and
+  clear empty/loading/error/success states. Capture and inspect representative
+  screenshots across 1920, 1440, 1280, 960, and 640 px plus dark, light, and
+  system themes. In Pet Workshop, exercise Blaze's pounce and fire-breath
+  animations and verify the lunge and flame align with the cursor target. Do
+  not mark the goal complete based on compilation alone.
+- **References:** [UI evidence and progress](SKAI_PREMIUM_UI_PROGRESS.md),
+  [UI reference guide](UI_REFERENCE_GUIDE.md), and [design contract](../DESIGN.md).
+- **Blockers / decisions:** Live visual review remains open; preserve the
+  existing product shell and local-first behavior. The packaged UI matrix is
+  currently blocked: `npm run package:electron` could not fetch
+  `universalify@2.0.1` from `registry.npmjs.org`, and the partial package did
+  not expose its renderer to the smoke runner. Retry packaging and the matrix
+  when registry access is available; do not count the build as visual proof.
+
 ### 1. Run selected project checks and keep their evidence with the task
 
 - **Status:** Ready

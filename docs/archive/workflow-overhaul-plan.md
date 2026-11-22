@@ -96,7 +96,7 @@
 
 ### 6. Difference register and release readiness
 
-- Keep `docs/CHATGPT_CODEX_VS_SKAI_DIFFERENCES.md` as the repository-grounded comparison. Update it as each phase changes the actual product, and distinguish implemented behavior from planned behavior.
+- Keep `docs/research/CHATGPT_CODEX_VS_SKAI_DIFFERENCES.md` as the repository-grounded comparison. Update it as each phase changes the actual product, and distinguish implemented behavior from planned behavior.
 - Verify key flows at wide and narrow sizes and across supported Windows/Linux packaging. Keep review evidence tied to the tested build and avoid claiming every UI combination was covered unless that matrix was exercised.
 
 ## Current implementation snapshot
