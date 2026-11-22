@@ -1,4 +1,5 @@
 node_modules/
+.playwright-cli/
 electron/update-config.generated.cjs
 dist/
 release/
