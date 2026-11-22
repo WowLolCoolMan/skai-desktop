@@ -1756,7 +1756,8 @@ public static class AgentHostLoop
 
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
         var settings = CreateSettingsStore().Load();
-        var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(task.ModelProvider));
+        var effectiveProvider = string.IsNullOrWhiteSpace(task.ModelProvider) ? settings.ModelProvider : task.ModelProvider;
+        var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(effectiveProvider));
         var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
@@ -1820,7 +1821,8 @@ public static class AgentHostLoop
         {
             var snapshot = await new LocalCapacityProbe().GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
             var settings = CreateSettingsStore().Load();
-            var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(task.ModelProvider), cancellationToken);
+            var effectiveProvider = string.IsNullOrWhiteSpace(task.ModelProvider) ? settings.ModelProvider : task.ModelProvider;
+            var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(effectiveProvider), cancellationToken);
             var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
             lock (LocalExecutionGate)
             {
