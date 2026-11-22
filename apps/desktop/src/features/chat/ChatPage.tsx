@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
+import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, TaskEnvironment } from "../../../shared/contracts";
 import type { Message, Model, Route } from "../../app/types";
 import { Button, Card, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
@@ -9,7 +9,6 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatComposer } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";
 import { ChatSchedulesPanel } from "./ChatSchedulesPanel";
-import type { TaskEnvironment } from "../../../shared/contracts";
 import type { ChatResponseMode } from "./useChatWorkspace";
 import { loadChatDraft, saveChatDraft } from "./chatDraftStore";
 import { estimateModelCapacity } from "./capacityEstimate";
