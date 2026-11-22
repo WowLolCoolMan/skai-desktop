@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, TaskEnvironment } from "../../../shared/contracts";
 import type { Message, Model, Route } from "../../app/types";
-import { Button, Card, EmptyState, StatusBadge } from "../../components/ui/Primitives";
+import { Button, Card, StatusBadge } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
 import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { ModelPicker } from "../../components/ui/ModelPicker";
