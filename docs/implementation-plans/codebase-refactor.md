@@ -132,6 +132,9 @@ that users touch as each slice is moved.
 - Moved voice catalog serialization and native/cloud speech dispatch into
   `AgentHostLoop.Voice.cs`; method names, validation, and provider selection are
   unchanged.
+- Moved local model inventory, capacity reporting, AirLLM setup, and model pull
+  status/cancellation handlers into `AgentHostLoop.Models.cs`; runtime methods
+  and response shapes are unchanged.
 - Moved update IPC registration and its sender/URL checks into
   `update-ipc.cjs`; the existing updater manager remains responsible for update
   lifecycle and download state.
