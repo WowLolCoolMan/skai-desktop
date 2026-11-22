@@ -18,3 +18,5 @@ and [future features](../planning/FUTURE_FEATURES.md) for current work.
   retained for historical reference only.
 The old root `TODO.md` was removed because it duplicated the shared queue and
 contained machine-specific notes. Git history preserves the original file.
+
+- [Detailed To Do Next snapshot](planning/TO_DO_NEXT-2026-11-22.md) — contributor queue and evidence as recorded on 2026-11-22; the current queue is shorter and points to canonical plans.

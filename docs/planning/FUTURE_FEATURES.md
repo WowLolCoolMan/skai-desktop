@@ -1,53 +1,16 @@
 # Skai Desktop — Future Features
 
-This is the product backlog for future capabilities. It is intentionally broader
-than the current release roadmap. Features should be implemented one bounded
-vertical slice at a time, starting with the simplest useful item, and checked
-off only after the feature works in the Electron app with the appropriate tests
-and acceptance evidence.
+Longer-term proposals live here. The [active queue](TO_DO_NEXT.md) owns near-term
+work; the [capability matrix](CAPABILITY_MATRIX.md) owns current status. Keep
+entries outcome-oriented, split delivery into reviewable slices, and verify
+the user workflow before marking an item complete.
 
-## How to use this list
-
-- Keep this document in sync with the repository and review it before starting
-  a new feature.
-- Choose the simplest unblocked feature that advances the product, then split
-  it into a small, reviewable implementation slice.
-- Record design, privacy, platform, and licensing constraints before adding a
-  dependency or promising a capability.
-- Move completed items to the implemented state only after the user-facing
-  workflow and failure states are verified.
-
-## Priority order
-
-The active near-term queue is [To Do Next](TO_DO_NEXT.md); the
-[capability matrix](CAPABILITY_MATRIX.md) records current implementation and
-acceptance boundaries. Keep this file focused on longer-term proposals rather
-than duplicating the active queue. Packaged image generation, editing,
-cancellation, history restoration, and missing-runtime recovery now pass on
-Windows; live ComfyUI and broader hardware acceptance remain open.
-
-Optional user-connected cloud model execution is an approved product direction
-and is tracked as active implementation work in
-[To Do Next](TO_DO_NEXT.md). Skai will not sell provider access. Remote device
-control, cloud sync, team administration, and unattended computer use still
-need separate product, privacy, and security decisions; they are not assumed
-commitments. Full 1M-token context execution requires a compatible model and
-sufficient runtime hardware; a request-size contract is not evidence of
-full-context execution.
-
-## Current product boundary
-
-Shipped releases currently use local model inference and do not route prompts
-to hosted models. The planned gateway adds optional user-connected cloud models
-and intentional local/cloud combinations. Users bring their own supported
-provider accounts and keys; Skai does not resell access. Prompts and
-attachments remain local unless the user selects a remote connection and
-reviews what that route will send. A complete offline/local-only mode remains a
-requirement. No route may silently fall back to a different provider.
-
-Cloud sync and remote device control remain separate product decisions, not
-implied by model-provider support. Earlier backlog entries must be interpreted
-under this boundary and the active provider-gateway acceptance plan.
+Product boundary: shipped inference is local. Optional user-connected cloud
+and hybrid routes are planned in the [provider gateway plan](implementation-plans/provider-gateway.md);
+they require explicit routing, protected credentials, clear data disclosure,
+and offline-only behavior. Skai does not resell provider access. Cloud sync,
+remote device control, teams, and unattended computer use require separate
+product decisions. A request-size limit does not prove 1M-token execution.
 
 ## Core chat
 
