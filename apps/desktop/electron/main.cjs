@@ -18,6 +18,7 @@ const { createUpdateManager } = require("./update-manager.cjs");
 const { registerUpdateIpc } = require("./update-ipc.cjs");
 const { registerLocalMediaIpc } = require("./local-media-ipc.cjs");
 const { registerWindowIpc } = require("./window-ipc.cjs");
+const { registerPetIpc } = require("./pet-ipc.cjs");
 const { createThemeService } = require("./theme-service.cjs");
 const { createAgentHostClient } = require("./agent-host-client.cjs");
 const { createPetStateStore } = require("./pet-state-store.cjs");
@@ -1355,74 +1356,72 @@ app.whenReady().then(() => {
     applyCloseChoice,
     readCloseBehavior,
     writeCloseBehavior,
-  });  registerUpdateIpc({ ipcMain, BrowserWindow, updateManager, shell });
+  });
+  registerUpdateIpc({ ipcMain, BrowserWindow, updateManager, shell });
   ipcMain.handle("plugins:open-downloads", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;
     const downloadsPath = path.join(app.getPath("downloads"), "Skai Plugins");
     await fs.mkdir(downloadsPath, { recursive: true });
     return !(await shell.openPath(downloadsPath));
   });
-  ipcMain.on("pet:set-visible", (event, visible) => {
-    if (BrowserWindow.fromWebContents(event.sender)) setPetVisible(Boolean(visible));
-  });
-  ipcMain.on("pet:set-motion", (event, settings) => {
-    if (!BrowserWindow.fromWebContents(event.sender) || !settings || typeof settings !== "object") return;
-    petMotion = {
-      wander: Boolean(settings.wander),
-      reduceMotion: Boolean(settings.reduceMotion),
-      interactionDemo: process.platform === "win32" && Boolean(settings.interactionDemo),
-    };
-    if (petMotion.reduceMotion || osPrefersReducedMotion()) {
-      stopPetEntrance(true);
+  registerPetIpc({
+    ipcMain,
+    BrowserWindow,
+    getPetWindow: () => petWindow,
+    canPositionWindows: windowPositioningAvailable,
+    onSetVisible: setPetVisible,
+    onSetMotion: (settings) => {
+      petMotion = {
+        wander: Boolean(settings.wander),
+        reduceMotion: Boolean(settings.reduceMotion),
+        interactionDemo: process.platform === "win32" && Boolean(settings.interactionDemo),
+      };
+      if (petMotion.reduceMotion || osPrefersReducedMotion()) {
+        stopPetEntrance(true);
+        stopPetBehavior(true);
+      }
+      stopPetWander();
+      petWindow?.webContents.send("pet:motion", petMotion);
+      schedulePetWander();
+      schedulePetBehaviorAttack();
+    },
+    onSetBehavior: (settings) => {
       stopPetBehavior(true);
-    }
-    stopPetWander();
-    petWindow?.webContents.send("pet:motion", petMotion);
-    schedulePetWander();
-    schedulePetBehaviorAttack();
-  });
-  ipcMain.on("pet:set-behavior", (event, settings) => {
-    if (BrowserWindow.fromWebContents(event.sender) !== petWindow) return;
-    stopPetBehavior(true);
-    if (petBehaviorPauseTimer) clearTimeout(petBehaviorPauseTimer);
-    petBehaviorPauseTimer = undefined;
-    petBehaviorSettings = normalizePetBehaviorSettings(settings);
-    schedulePetBehaviorAttack();
-  });
-  ipcMain.on("pet:set-state", (event, state) => {
-    if (!BrowserWindow.fromWebContents(event.sender)) return;
-    const allowedStates = new Set(["idle", "thinking", "coding", "coding_malicious", "stuck", "needs-attention"]);
-    if (typeof state !== "string" || !allowedStates.has(state)) return;
-    // Workspace activity is a higher-level source than a demo attack. If work
-    // starts, cancel the attack cleanly; an idle update must never interrupt an
-    // attack that is already in progress.
-    if (petBehaviorRunning && state === "idle") return;
-    if (petBehaviorRunning) stopPetBehavior(true);
-    if (state === "idle" && petEntranceMoving) return;
-    if (state === "idle") { schedulePetWander(); schedulePetBehaviorAttack(); }
-    else { stopPetBehavior(true); stopPetWander(); }
-    setPetActivity(state);
-  });
-  ipcMain.on("pet:drag-start", (event, point) => {
-    if (!windowPositioningAvailable || BrowserWindow.fromWebContents(event.sender) !== petWindow || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
-    stopPetBehavior(false);
-    stopPetWander();
-    stopPetDrag();
-    const bounds = petWindow.getBounds();
-    petDragOffset = { x: point.x - bounds.x, y: point.y - bounds.y };
-    petDragTimer = setInterval(movePetWithCursor, 16);
-  });
-  ipcMain.on("pet:drag-move", (event, point) => {
-    if (BrowserWindow.fromWebContents(event.sender) !== petWindow || !petDragOffset || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
-    const position = clampPetPosition({ x: point.x - petDragOffset.x, y: point.y - petDragOffset.y });
-    petWindow.setPosition(position.x, position.y);
-  });
-  ipcMain.on("pet:drag-end", (event) => {
-    if (BrowserWindow.fromWebContents(event.sender) !== petWindow) return;
-    stopPetDrag();
-    persistPetState();
-    schedulePetWander();
-    schedulePetBehaviorAttack();
+      if (petBehaviorPauseTimer) clearTimeout(petBehaviorPauseTimer);
+      petBehaviorPauseTimer = undefined;
+      petBehaviorSettings = normalizePetBehaviorSettings(settings);
+      schedulePetBehaviorAttack();
+    },
+    onSetActivity: (state) => {
+      // Workspace activity is a higher-level source than a demo attack. If work
+      // starts, cancel the attack cleanly; an idle update must never interrupt an
+      // attack that is already in progress.
+      if (petBehaviorRunning && state === "idle") return;
+      if (petBehaviorRunning) stopPetBehavior(true);
+      if (state === "idle" && petEntranceMoving) return;
+      if (state === "idle") { schedulePetWander(); schedulePetBehaviorAttack(); }
+      else { stopPetBehavior(true); stopPetWander(); }
+      setPetActivity(state);
+    },
+    onDragStart: (point) => {
+      stopPetBehavior(false);
+      stopPetWander();
+      stopPetDrag();
+      const bounds = petWindow.getBounds();
+      petDragOffset = { x: point.x - bounds.x, y: point.y - bounds.y };
+      petDragTimer = setInterval(movePetWithCursor, 16);
+    },
+    onDragMove: (point) => {
+      if (!petDragOffset) return;
+      const position = clampPetPosition({ x: point.x - petDragOffset.x, y: point.y - petDragOffset.y });
+      petWindow.setPosition(position.x, position.y);
+    },
+    onDragEnd: () => {
+      stopPetDrag();
+      persistPetState();
+      schedulePetWander();
+      schedulePetBehaviorAttack();
+    },
   });
   createWindow();
   registerGlobalLauncher();

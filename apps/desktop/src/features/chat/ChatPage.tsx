@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, TaskEnvironment } from "../../../shared/contracts";
 import type { Message, Model, Route } from "../../app/types";
-import { Button, Card, StatusBadge } from "../../components/ui/Primitives";
+import { Button, Card } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
 import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { ModelPicker } from "../../components/ui/ModelPicker";
@@ -11,18 +11,12 @@ import { ChatTaskComposer } from "./ChatTaskComposer";
 import { ChatSchedulesPanel } from "./ChatSchedulesPanel";
 import type { ChatResponseMode } from "./useChatWorkspace";
 import { loadChatDraft, saveChatDraft } from "./chatDraftStore";
-import { estimateModelCapacity } from "./capacityEstimate";
+import { ChatCapacityPopover } from "./ChatCapacityPopover";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 const CHAT_SCROLL_KEY_PREFIX = "skai.chat.scroll.";
 const CHAT_DRAFT_KEY_PREFIX = "skai.chat.draft.";
 const LEGACY_CHAT_DRAFT_KEY = "skai.chat.draft";
-
-function formatCapacityBytes(value: number | null | undefined) {
-  if (value == null) return "Unknown";
-  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
-  return `${(value / 1024 ** 2).toFixed(0)} MB`;
-}
 
 function chatScrollKey(conversationId: string | null) {
   return `${CHAT_SCROLL_KEY_PREFIX}${conversationId ?? "new"}`;
@@ -99,7 +93,7 @@ type ChatPageProps = {
 };
 
 export function ChatPage({ workspaceTabId, capacity, recentConversations, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onSelectConversation, onNewWorkspaceTab, onTaskAction, onOpenFile, onExport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onTransitionScheduledTask, workspaceMode = "conversation" }: ChatPageProps) {
-  const capacityEstimate = estimateModelCapacity(models.find((item) => item.model === model), capacity);
+  const selectedModel = models.find((item) => item.model === model);
   const [draft, setDraft] = useState(() => readChatDraft(workspaceTabId, conversationId));
   const latestDraftRef = useRef(draft);
   const updateDraft = (value: string) => { latestDraftRef.current = value; setDraft(value); };
@@ -267,7 +261,7 @@ export function ChatPage({ workspaceTabId, capacity, recentConversations, provid
   return <div className={`feature-page chat-page ${workspaceMode === "project" ? "project-task-chat" : ""} ${isCodingAgent ? "is-coding-agent" : ""}`}>
     <div className="chat-context-bar">
       <div><p className="section-kicker">{temporaryChat ? "TEMPORARY CHAT" : isCodingAgent ? "CODING AGENT" : "CONVERSATION"}</p><strong>{conversationId ? conversationTitle : isCodingAgent ? "New coding thread" : "New chat"}</strong><span>{temporaryChat ? "This chat stays in memory only and won’t appear in Recents." : `${provider} · saved on this device · keep the thread focused, then turn work into a reviewed task when needed.`}</span></div>
-      <div className="chat-header-actions">{isCodingAgent ? <span className="coding-mode-badge">CODING AGENT</span> : <div className="chat-response-mode" role="group" aria-label="Conversation response mode"><span>MODE</span><div className="chat-response-mode-options">{([{ id: "think", label: "Chat" }, { id: "coding", label: "Coding" }, { id: "security", label: "Security" }] as Array<{ id: ChatResponseMode; label: string }>).map((item) => <button type="button" key={item.id} className={responseMode === item.id ? "is-active" : ""} aria-pressed={responseMode === item.id} onClick={() => onResponseModeChange(item.id)}>{item.label}</button>)}</div></div>}<ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><details className="capacity-popover"><summary><StatusBadge tone={capacityEstimate.state === "room" ? "success" : capacityEstimate.state === "tight" ? "warning" : "neutral"}>Device capacity · {capacityEstimate.state === "room" ? "rough fit" : capacityEstimate.state === "tight" ? "tight" : "unknown"}</StatusBadge></summary><div className="capacity-popover-content"><strong>Local device · measurements stay here</strong><span>Selected model: {model || "None selected"}</span><span>Model size: {formatCapacityBytes(capacityEstimate.modelBytes)}</span><span>Rough startup RAM floor: {formatCapacityBytes(capacityEstimate.startupRamBytes)}</span><span>Available RAM after loaded models: {formatCapacityBytes(capacityEstimate.availableRamBytes)}</span><span>Model context: {capacityEstimate.contextLength ? `${capacityEstimate.contextLength.toLocaleString()} tokens` : "Unknown"}</span><span>CPU load: {capacity?.cpuUtilizationPercent == null ? "Unknown" : `${capacity.cpuUtilizationPercent.toFixed(0)}%`}</span><span>GPU: {capacity?.gpu?.name ?? "Not detected"}</span><span>GPU memory: {formatCapacityBytes(capacityEstimate.gpuAvailableBytes)}</span>{capacity?.runtime && <span>Loaded models: {capacity.runtime.loadedModelsKnown ? `${capacity.runtime.loadedModels.length} reported · ${formatCapacityBytes(capacity.runtime.loadedRamBytes)} RAM` : "Not reported by this runtime"}</span>}{capacity?.runtime?.airLlmReady !== null && capacity?.runtime?.airLlmReady !== undefined && <span>AirLLM readiness: {capacity.runtime.airLlmReady ? "Ready" : "Not ready"}</span>}{capacity?.scheduler && <span>Local runs: {capacity.scheduler.activeTaskCount} active · {capacity.scheduler.queuedTaskCount} queued · {capacity.scheduler.executionSlotLimit} slot</span>}{capacity?.scheduler?.queuedTaskCount ? <small>Queued coding tasks start automatically when the current local run finishes.</small> : null}<small>{capacityEstimate.note}</small>{capacity?.runtime?.loadedModelNote && <small>{capacity.runtime.loadedModelNote}</small>}{capacity?.measurementNote && <small>{capacity.measurementNote}</small>}</div></details><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: showCodingWorkflowTools ? "Hide task tools" : "Show task tools", onSelect: () => setShowCodingWorkflowTools((value) => !value) }, { label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>
+      <div className="chat-header-actions">{isCodingAgent ? <span className="coding-mode-badge">CODING AGENT</span> : <div className="chat-response-mode" role="group" aria-label="Conversation response mode"><span>MODE</span><div className="chat-response-mode-options">{([{ id: "think", label: "Chat" }, { id: "coding", label: "Coding" }, { id: "security", label: "Security" }] as Array<{ id: ChatResponseMode; label: string }>).map((item) => <button type="button" key={item.id} className={responseMode === item.id ? "is-active" : ""} aria-pressed={responseMode === item.id} onClick={() => onResponseModeChange(item.id)}>{item.label}</button>)}</div></div>}<ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} /><ChatCapacityPopover capacity={capacity} model={selectedModel} modelName={model} /><Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary chat"}</Button><Button variant="ghost" disabled={temporaryChat || !conversationId} onClick={() => setRenameOpen(true)}>Rename</Button><Button variant="ghost" onClick={onExport}>Export</Button><OverflowMenu label="More" items={[{ label: showCodingWorkflowTools ? "Hide task tools" : "Show task tools", onSelect: () => setShowCodingWorkflowTools((value) => !value) }, { label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} /></div>
     </div>
     <div className={`chat-layout${messages.length === 0 ? " is-start-screen" : ""}`}>
       <main className="chat-column">

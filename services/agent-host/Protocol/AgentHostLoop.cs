@@ -26,7 +26,6 @@ public static partial class AgentHostLoop
     private static readonly object AirLlmInstallsGate = new();
     private static readonly Dictionary<string, ImageRuntimeInstallOperation> ImageRuntimeInstalls = new(StringComparer.Ordinal);
     private static readonly object ImageRuntimeInstallsGate = new();
-    private static readonly object PersonaConversationRetentionGate = new();
     private static readonly Dictionary<string, ImageGenerationOperation> ImageGenerations = new(StringComparer.Ordinal);
     private static readonly object ImageGenerationsGate = new();
     private static readonly Dictionary<string, MarketplaceDownloadOperation> MarketplaceDownloads = new(StringComparer.Ordinal);
@@ -118,64 +117,6 @@ public static partial class AgentHostLoop
         }
         await DisposeTerminalSessionsAsync().ConfigureAwait(false);
         await DisposeMcpClientsAsync().ConfigureAwait(false);
-    }
-
-    private static async Task RunPersonaConversationCleanupAsync(CancellationToken cancellationToken)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
-        while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            CleanupExpiredPersonaConversations();
-    }
-
-    private static void CleanupExpiredPersonaConversations()
-    {
-        lock (PersonaConversationRetentionGate)
-        {
-            var settings = CreateSettingsStore().Load();
-            var retentionMinutes = Math.Clamp(settings.PersonaConversationRetentionMinutes, 15, 10_080);
-            var expiresBefore = DateTimeOffset.UtcNow.AddMinutes(-retentionMinutes);
-            var store = CreateConversationStore();
-            var sessions = store.Load();
-            var remaining = sessions.Where(session =>
-                !(session.PersonaId is not null || session.IsPersonaGroup)
-                || session.UpdatedAt > expiresBefore).ToList();
-            if (remaining.Count != sessions.Count) store.Save(remaining);
-        }
-    }
-
-    private static AgentResponse ListProjects(AgentRequest request)
-    {
-        var projects = CreateProjectStore().Load()
-            .OrderByDescending(project => project.UpdatedAt)
-            .Select(project => new
-            {
-                id = project.Id,
-                name = project.Name,
-                instructions = project.Instructions,
-                folderPaths = project.FolderPaths,
-                gitHubRepository = project.GitHubRepository,
-                updatedAt = project.UpdatedAt,
-            })
-            .ToArray();
-        return new(ProtocolVersion, request.Id, true, projects);
-    }
-
-    private static AgentResponse RunProjectPreflight(AgentRequest request)
-    {
-        var id = RequiredBoundedString(request, "id", 128);
-        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
-            ?? throw new InvalidOperationException("The selected local project is no longer available.");
-        var report = new ProjectPreflightService().Inspect(project.FolderPaths);
-        return new(ProtocolVersion, request.Id, true, new
-        {
-            projectId = project.Id,
-            projectName = project.Name,
-            inspectedAt = DateTimeOffset.UtcNow,
-            manifests = report.Manifests,
-            runtimes = report.Runtimes,
-            suggestedChecks = report.SuggestedChecks,
-            executionNote = "Read-only scan only. Suggested checks have not been run; choose and review a command explicitly before execution."
-        });
     }
 
     internal static bool RunsInBackground(string method) => method is "chat.complete" or "persona.group.complete" or "persona.discover"

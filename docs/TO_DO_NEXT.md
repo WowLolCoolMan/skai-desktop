@@ -72,40 +72,7 @@ and to any detailed plan rather than copying their full contents here.
   variants. Continue manual interaction and pet-animation review before
   considering the UI goal complete.
 
-### 1. Incrementally refactor the codebase across layers
-
-- **Status:** In progress
-- **Priority:** High, maintainability and workflow quality
-- **Owner:** Codex
-- **Context:** Several large modules still combine unrelated responsibilities.
-  Agent Host handlers and the Voice Workbench have been separated, while
-  Marketplace, persona research, model library, and workspace orchestration
-  remain large. Persona matching and HTML parsing are now in focused Core
-  helpers, and bounded public-source requests are isolated in an injectable
-  client; speaker-labelled turns and quote evidence now have a dedicated
-  extraction helper. Persona identity resolution and research orchestration
-  now have dedicated partials, with provider-specific source gathering split
-  into its own module. Model
-  runtime discovery/management and remote search/download operations now live
-  in separate partials of the same service.
-  Agent Host request validation and method dispatch are also separated from
-  the main loop. Update and local-media IPC registration now live outside
-  Electron's shell entry point, and desktop pet state persistence has its own
-  store. Window close/theme IPC is also extracted. Marketplace catalog shaping
-  and MCP connection lifecycle state are separated from the React page; MCP
-  connection review and Staff Picks each
-  have their own focused panel.
-  Agent Host user-profile/settings handlers, long-running operation state, and
-  image, voice, model/runtime, memory/corpus, and scheduled-task workflows now
-  have dedicated protocol modules.
-- **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
-  bridge and storage contracts, keep current behavior, and integrate one
-  reviewable slice at a time after syncing with main.
-- **Acceptance:** Each slice has a clear responsibility boundary, passes the
-  appropriate checks for its layer, and is committed to main with upstream
-  work preserved. See [incremental codebase refactor](implementation-plans/codebase-refactor.md).
-
-### 2. Complete local voice acceptance
+### 1. Complete local voice acceptance
 
 - **Status:** Ready
 - **Priority:** High
@@ -124,7 +91,7 @@ and to any detailed plan rather than copying their full contents here.
   [voice architecture](ELECTRON_CSHARP_VOICE_ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
 
-### 3. Strengthen OS isolation for Coding Agent commands
+### 2. Strengthen OS isolation for Coding Agent commands
 
 - **Status:** Ready
 - **Priority:** High, before unattended or parallel execution
@@ -146,7 +113,7 @@ and to any detailed plan rather than copying their full contents here.
   [architecture and trust boundaries](ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
 
-### 4. Finish image generation progress and cancellation
+### 3. Finish image generation progress and cancellation
 
 - **Status:** Ready
 - **Priority:** High
@@ -163,7 +130,7 @@ and to any detailed plan rather than copying their full contents here.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [local image generation](LOCAL_IMAGE_GENERATION.md).
 
-### 5. Close release signing and upgrade acceptance
+### 4. Close release signing and upgrade acceptance
 
 - **Status:** Ready
 - **Priority:** Release gate
@@ -182,7 +149,7 @@ and to any detailed plan rather than copying their full contents here.
   [release guide](RELEASING.md),
   [production readiness gaps](PRODUCTION_READINESS_GAPS.md).
 
-### 6. Finish evidence-grounded Persona dialogue research and chat
+### 5. Finish evidence-grounded Persona dialogue research and chat
 
 - **Status:** In progress
 - **Priority:** High
@@ -231,6 +198,16 @@ and to any detailed plan rather than copying their full contents here.
 ## Recently completed
 
 Move finished entries here with their commit/PR and verification evidence.
+
+- **2026-11-22 — Completed the first all-layer codebase refactor pass.** Kept
+  protocol, bridge, storage, and runtime behavior stable while extracting
+  cohesive boundaries across the renderer, Electron shell, Agent Host, and
+  Core. Final slices include the chat device-capacity panel, project-list and
+  read-only preflight queries, persona retention cleanup, and pet IPC
+  registration. Renderer typecheck/build, Agent Host/Core Release build,
+  Electron syntax checks and packaging, bridge-method audit, and local-only
+  audit pass. Follow-on candidates and unfinished product acceptance are
+  listed separately in the [refactor plan](implementation-plans/codebase-refactor.md).
 
 - **2026-11-22 — Selected project checks with durable task evidence.** The
   Coding Agent already supports explicit detected-check selection, bounded

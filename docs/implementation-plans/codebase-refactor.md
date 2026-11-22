@@ -84,6 +84,12 @@ that users touch as each slice is moved.
 6. Keep release and capability gaps visible; do not mark unrelated voice,
    image, isolation, or cross-platform acceptance complete without evidence.
 
+The planned first all-layer refactor pass is complete. This means each layer
+received reviewable responsibility-boundary work and retained its existing
+contracts; it does not mean every large file in the repository has been split.
+Further candidates below are tracked as follow-on maintenance, with acceptance
+checked per slice.
+
 ## Work completed so far
 
 - Extracted Agent Host task execution, project operations, chat/conversation
@@ -169,6 +175,22 @@ that users touch as each slice is moved.
 - Restructured Settings so its content scrolls above a separate persistent
   Save bar. Packaged UI matrix passed for 17 routes, five window sizes, and
   four theme/sidebar variants.
+- Extracted the chat device-capacity details into `ChatCapacityPopover`, keeping
+  capacity estimation and display together without changing the advisory or
+  telemetry behavior.
+- Moved Agent Host project listing and read-only preflight queries into
+  `AgentHostLoop.ProjectQueries.cs`; the preflight still reports suggested
+  checks without executing them.
+- Moved persona-conversation retention cleanup into
+  `AgentHostLoop.PersonaRetention.cs`, preserving the configured retention
+  bounds and periodic cleanup lifecycle.
+- Moved pet IPC channel registration and sender/point validation into
+  `pet-ipc.cjs`. Pet movement, behavior, activity, and persistence callbacks
+  remain in the Electron shell, with the same channel names and validation.
+- Re-ran renderer typecheck/build, Agent Host/Core Release build, Electron
+  syntax checks and packaging, bridge-method audit, and local-only audit after
+  the final slices. The packaged renderer still reports the existing large
+  Monaco/editor chunk advisory.
 
 ## Acceptance
 
@@ -182,13 +204,19 @@ that users touch as each slice is moved.
 - Main is fetched before integration, upstream commits are preserved, and each
   finished slice is committed and pushed separately.
 
-## Remaining work
+## Follow-on maintenance and product acceptance
 
-- Continue the renderer and Electron shell extraction. `PluginsPage.tsx` and
-  Electron `main.cjs` remain large mixed-responsibility modules. Continue
-  reducing their responsibilities while reviewing remaining large Core and
-  workspace coordination modules.
+- Continue with small, independently reviewable slices when these areas are
+  next touched: Electron pet-window orchestration in `main.cjs`, persona
+  research orchestration/evidence in Agent Host, workspace coordination in
+  `useDesktopWorkspace.ts`, Marketplace/Plugins page composition, and the
+  GitHub/model/workflow Core services. Their size alone is not a reason for
+  mechanical splitting; extract only cohesive behavior with a clear owner.
+- Keep the protocol entry point responsible for process I/O and lifecycle,
+  Electron `main.cjs` responsible for app startup/orchestration, and feature
+  pages responsible for composition. Continue moving domain behavior behind
+  focused helpers as maintenance exposes concrete boundaries.
 - Complete installed speech-pack and real audio acceptance for local voice.
 - Keep OS isolation, image-runtime acceptance, and release/platform gaps in
   their existing capability entries; these are product completion work, not
-  code-movement tasks.
+  code-movement tasks and are not marked complete by this refactor pass.
