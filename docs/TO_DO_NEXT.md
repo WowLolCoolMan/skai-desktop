@@ -247,7 +247,7 @@ and to any detailed plan rather than copying their full contents here.
 
 ### 7. Add the user-controlled local, cloud, and hybrid model gateway
 
-- **Status:** Ready
+- **Status:** In progress
 - **Priority:** High
 - **Owner:** Codex
 - **Context:** Shipped model execution is currently local-only. The product
@@ -263,6 +263,10 @@ and to any detailed plan rather than copying their full contents here.
   credential facility, disclose remote data at route selection, and preserve
   offline-only mode. Never silently change provider or send data to a remote
   endpoint without the user's selected connection.
+- **Progress:** Cloud voice keys now use per-provider OS-protected storage on
+  Windows and the Linux desktop keyring. Speech requests no longer carry keys.
+  This is a voice-specific credential slice; generic model-provider connection
+  metadata, routing, and macOS secure storage remain unfinished.
 - **Acceptance:** Users can add, verify, select, and remove supported local and
   remote connections; secrets are stored by the OS and do not appear in
   renderer state, logs, settings files, or diagnostics; chat streams and

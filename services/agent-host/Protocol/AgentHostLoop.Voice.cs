@@ -43,9 +43,12 @@ public static partial class AgentHostLoop
         var provider = OptionalString(request, "provider");
         if (!string.IsNullOrWhiteSpace(provider))
         {
+            if (request.Params is { ValueKind: System.Text.Json.JsonValueKind.Object } parameters && parameters.TryGetProperty("apiKey", out _))
+                throw new InvalidOperationException("Voice API keys must be saved in secure voice settings, not sent with speech requests.");
             var definition = VoiceModelCatalog.CloudProviders.FirstOrDefault(item => item.Id.Equals(provider, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException("That cloud voice provider is not supported by this build.");
-            var apiKey = RequiredBoundedString(request, "apiKey", 512);
+            var apiKey = VoiceCredentials.ReadAsync(definition.Id).GetAwaiter().GetResult()
+                ?? throw new InvalidOperationException("Save this provider's API key in Voice settings before using cloud voice.");
             var requestedVoice = OptionalString(request, "voiceId");
             var requestedModel = OptionalString(request, "modelId");
             var voiceId = string.IsNullOrWhiteSpace(requestedVoice) ? definition.DefaultVoiceId : RequiredBoundedString(request, "voiceId", 128);
@@ -56,6 +59,28 @@ public static partial class AgentHostLoop
         }
         var engine = voice.Speak(text, rate);
         return new(ProtocolVersion, request.Id, true, new { spoken = true, engine, interruptible = true });
+    }
+
+    private static AgentResponse SaveVoiceCredential(AgentRequest request)
+    {
+        var provider = RequiredBoundedString(request, "provider", 32);
+        var apiKey = RequiredBoundedString(request, "apiKey", 512);
+        VoiceCredentials.SaveAsync(provider, apiKey).GetAwaiter().GetResult();
+        return new(ProtocolVersion, request.Id, true, new { saved = true, configured = true });
+    }
+
+    private static AgentResponse GetVoiceCredentialStatus(AgentRequest request)
+    {
+        var provider = RequiredBoundedString(request, "provider", 32);
+        var configured = VoiceCredentials.HasAsync(provider).GetAwaiter().GetResult();
+        return new(ProtocolVersion, request.Id, true, new { available = VoiceCredentials.IsAvailable, configured });
+    }
+
+    private static AgentResponse RemoveVoiceCredential(AgentRequest request)
+    {
+        var provider = RequiredBoundedString(request, "provider", 32);
+        VoiceCredentials.DeleteAsync(provider).GetAwaiter().GetResult();
+        return new(ProtocolVersion, request.Id, true, new { removed = true, configured = false });
     }
 
     private static AgentResponse StopVoice(AgentRequest request, OsNativeTtsService voice)

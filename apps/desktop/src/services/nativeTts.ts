@@ -67,7 +67,6 @@ const voiceSourceKey = "skai.voice.source";
 const cloudProviderKey = "skai.voice.cloudProvider";
 const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
 const cloudModelIdKey = "skai.voice.cloudModelId";
-let sessionCloudApiKey = "";
 let activeCloudAudio: HTMLAudioElement | null = null;
 
 export function selectedVoiceSettings() {
@@ -90,9 +89,6 @@ export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResou
   const safeValue = key === "primaryModelId" || key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value)) : value;
   localStorage.setItem(storageKey, String(safeValue));
 }
-
-export function setCloudVoiceApiKey(value: string) { sessionCloudApiKey = value.trim(); }
-export function cloudVoiceApiKeyConfigured() { return sessionCloudApiKey.length >= 8; }
 
 export function stopNativeSpeech() {
   void window.skaiAgent?.request("voice.stop");
@@ -128,7 +124,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const profile = voiceProfiles.find((item) => item.id === (profileId || settings.profileId)) ?? voiceProfiles[0];
   try {
     const speech = settings.source === "cloud"
-      ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId, apiKey: sessionCloudApiKey })
+      ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId })
       : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, modelId: settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId });
     if (speech?.ok) {
       const audioDataUrl = (speech.result as { audioDataUrl?: unknown } | undefined)?.audioDataUrl;

@@ -15,9 +15,11 @@ complete, enforceable operating mode.
   separate local route and narrowly scoped local capacity fallback.
 - `RequiredLocalEndpoint`, settings normalization, endpoint checks, and
   `scripts/audit-local-only.cjs` currently prohibit hosted model routing.
-- Chat request objects have an `apiKey` field in some paths, but credentials
-  are not yet managed as durable OS-protected provider connections. Do not use
-  renderer-owned plain text or `settings.json` for the future credential store.
+- Chat provider connections do not yet have a durable secret store. Optional
+  cloud voice now stores its own provider keys with Windows user encryption or
+  the Linux desktop keyring; this is a voice-specific implementation, not yet
+  the provider-neutral connection store described below. Keys are entered in
+  Settings transiently and are not sent with speech requests.
 - Chat prompt compaction and several internal completion helpers call provider
   code directly; they must use the same selected connection and cancellation
   rules as the visible chat turn.
@@ -64,6 +66,11 @@ complete, enforceable operating mode.
 
 ### Slice A — provider and secret contracts
 
+- **Progress:** Cloud voice keys now use per-provider OS-protected storage on
+  Windows and the Linux Secret Service. The renderer can save, check, replace,
+  and remove keys; speech requests identify a provider but do not carry its
+  credential. The generic provider-connection contract and macOS credential
+  support remain open.
 - Define typed provider-connection metadata, provider capabilities, and
   per-request route identity.
 - Add provider-neutral OS credential storage and tests for unavailable,

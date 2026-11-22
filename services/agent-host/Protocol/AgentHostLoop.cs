@@ -36,6 +36,7 @@ public static partial class AgentHostLoop
     private static readonly object McpClientsGate = new();
     private static readonly object TaskJournalGate = new();
     private static readonly Lazy<OperationJournal> TaskJournal = new(CreateTaskOperationJournal);
+    private static readonly CloudVoiceCredentialStore VoiceCredentials = new();
 
     private static JsonSettingsStore CreateSettingsStore() =>
         new(Environment.GetEnvironmentVariable("SRAI_SETTINGS_PATH"));

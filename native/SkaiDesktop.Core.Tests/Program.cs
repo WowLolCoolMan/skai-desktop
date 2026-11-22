@@ -23,6 +23,7 @@ PetWanderPlannerTests.Run();
 await WebSearchTests.RunAsync();
 await PersonaKnowledgeTests.RunAsync();
 await GitHubTests.RunAsync();
+await CloudVoiceCredentialTests.RunAsync();
 ChatMessageTests.Run();
 PromptVariableTests.Run();
 OpenApiToolDiscoveryTests.Run();
