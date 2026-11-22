@@ -160,7 +160,10 @@ and to any detailed plan rather than copying their full contents here.
   endpoint enforcement. The packaged Windows renderer-to-host path now cancels
   live inference, generates and edits images, and restores both outputs from
   local history after reload. Offline-only packaged smokes automate the
-  successful workflow and missing-runtime recovery.
+  successful workflow and missing-runtime recovery. A missing-model mode now
+  verifies that offline cache misses are reported as actionable setup guidance
+  and leave generation retryable; worker tracebacks and local cache paths are
+  suppressed from that user-facing error.
 - **Agreed approach:** Exercise the supported local runtimes and expose real
   stage/progress state when the runtime provides it. Cancellation must stop the
   active operation, preserve completed outputs, and return the UI to a usable
@@ -170,9 +173,11 @@ and to any detailed plan rather than copying their full contents here.
   automated tests. Packaged Windows generation, edit, persistent history after
   reload, live cancellation, and starting another generation after cancellation
   now pass. The packaged missing-dependency state offers runtime setup and
-  disables generation. Still open: verify worker/runtime failure recovery,
-  exercise a live ComfyUI instance, and validate additional hardware. Progress
-  must continue to reflect runtime evidence.
+  disables generation. Worker/runtime recovery is covered by a packaged-app
+  smoke and focused summary tests. Still open: rerun the packaged missing-model
+  smoke against a freshly rebuilt artifact, exercise a live ComfyUI instance,
+  and validate additional hardware. Progress must continue to reflect runtime
+  evidence.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [local image generation](LOCAL_IMAGE_GENERATION.md).
 

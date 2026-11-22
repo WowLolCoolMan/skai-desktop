@@ -64,6 +64,7 @@
     "smoke:personas": "node scripts/smoke-personas.cjs",
     "smoke:image:workflow": "node scripts/smoke-image-workflow.cjs",
     "smoke:image:runtime-unavailable": "node scripts/smoke-image-workflow.cjs --runtime-unavailable",
+    "smoke:image:model-unavailable": "node scripts/smoke-image-workflow.cjs --model-unavailable",
     "check:syntax:image-workflow": "node --check scripts/smoke-image-workflow.cjs"
   }
 }

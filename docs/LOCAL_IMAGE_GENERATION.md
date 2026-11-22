@@ -39,6 +39,12 @@ with an unavailable Python executable and verifies that the UI offers setup
 while disabling generation. Live generation was CPU-backed on this machine;
 this does not validate GPU or ComfyUI behavior.
 
+`npm run smoke:image:model-unavailable` verifies the packaged offline cache-miss
+path. The UI should explain that SD-Turbo is not cached, offer one-time internet
+download guidance, and remain ready for retry. Python tracebacks and local cache
+paths are reduced to a short diagnostic before reaching the UI. Focused native
+tests cover this case and ordinary first-line worker errors.
+
 ## ComfyUI integration
 
 The Electron client can connect to a user-configured local ComfyUI server,

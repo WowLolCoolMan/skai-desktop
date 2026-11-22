@@ -13,6 +13,16 @@ internal static class ImageGenerationTests
 {
     public static async Task RunAsync()
     {
+        var missingModelMessage = DiffusersImageProvider.SummarizeWorkerError(
+            "LocalEntryNotFoundError: stabilityai/sd-turbo does not appear to have a file named model_index.json\nTraceback: private cache path\nOfflineModeIsEnabled");
+        Check(missingModelMessage.Contains("not in the local model cache", StringComparison.Ordinal) &&
+              missingModelMessage.Contains("Connect to the internet once", StringComparison.Ordinal) &&
+              !missingModelMessage.Contains("Traceback", StringComparison.Ordinal) &&
+              !missingModelMessage.Contains("private cache path", StringComparison.Ordinal),
+            "offline image model misses produce concise download guidance without traceback or local paths");
+        Check(DiffusersImageProvider.SummarizeWorkerError("RuntimeError: device out of memory\nTraceback: details") == "RuntimeError: device out of memory",
+            "other image worker failures keep their concise first-line diagnostic");
+
         var comfyRequests = 0;
         var comfy = new ComfyImageProvider(new HttpClient(new StubHandler((request, _) =>
         {

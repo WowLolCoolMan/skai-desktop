@@ -14,6 +14,7 @@ const artifactArgument = process.argv.slice(2).find((argument) => !argument.star
 const artifactRoot = path.resolve(artifactArgument || path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`));
 const executable = path.join(artifactRoot, process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop");
 const verifyMissingRuntime = process.argv.includes("--runtime-unavailable");
+const verifyMissingModel = process.argv.includes("--model-unavailable");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function findPort() {
@@ -33,7 +34,7 @@ async function main() {
   const python = path.join(localData, "Skai", "Diffusers", "venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
   const modelCache = process.env.HF_HUB_CACHE || process.env.HUGGINGFACE_HUB_CACHE || path.join(process.env.HF_HOME || path.join(os.homedir(), ".cache", "huggingface"), "hub");
   if (!verifyMissingRuntime && !fs.existsSync(python)) throw new Error(`Install Skai's local Diffusers runtime before running this smoke: ${python}`);
-  if (!verifyMissingRuntime && !fs.existsSync(path.join(modelCache, "models--stabilityai--sd-turbo")))
+  if (!verifyMissingRuntime && !verifyMissingModel && !fs.existsSync(path.join(modelCache, "models--stabilityai--sd-turbo")))
     throw new Error(`This smoke never downloads model weights. Cache stabilityai/sd-turbo first: ${modelCache}`);
 
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-image-workflow-"));
@@ -46,6 +47,11 @@ async function main() {
       HF_HUB_OFFLINE: "1",
       SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
       ...(verifyMissingRuntime ? { SKAI_DIFFUSERS_PYTHON: path.join(userDataDir, "missing-python.exe") } : {}),
+      ...(verifyMissingModel ? {
+        HF_HOME: path.join(userDataDir, "empty-huggingface-home"),
+        HF_HUB_CACHE: path.join(userDataDir, "empty-huggingface-home", "hub"),
+        HUGGINGFACE_HUB_CACHE: path.join(userDataDir, "empty-huggingface-home", "hub"),
+      } : {}),
     },
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -100,6 +106,7 @@ async function main() {
     await waitFor(target, "Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]'))", "app navigation");
     await evaluate(target, "location.hash = '#/images'; 'navigated'");
     await waitFor(target, "Boolean(document.querySelector('.image-studio-page textarea[aria-describedby=\\\"image-prompt-help\\\"]'))", "Images page");
+    const setPrompt = async (value) => evaluate(target, `(() => { const field = document.querySelector('.image-studio-page textarea[aria-describedby="image-prompt-help"]'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()`);
 
     if (verifyMissingRuntime) {
       await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('dependencies-missing')", "missing-runtime state");
@@ -111,7 +118,19 @@ async function main() {
       return;
     }
 
-    const setPrompt = async (value) => evaluate(target, `(() => { const field = document.querySelector('.image-studio-page textarea[aria-describedby="image-prompt-help"]'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()`);
+    if (verifyMissingModel) {
+      await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('The local image runtime is ready.')", "installed image dependencies");
+      await setPrompt("A small red paper kite on a clear sky, simple illustration.");
+      await waitFor(target, "[...document.querySelectorAll('.form-footer button')].some(button => button.textContent.trim() === 'Generate image' && !button.disabled)", "model-failure test to become available");
+      await evaluate(target, "[...document.querySelectorAll('.form-footer button')].find(button => button.textContent.trim() === 'Generate image').click(); true");
+      const failure = await waitFor(target, "document.querySelector('[role=alert]')?.textContent.trim() || null", "offline model-cache error", 90_000);
+      const recovered = await waitFor(target, "[...document.querySelectorAll('.form-footer button')].some(button => button.textContent.trim() === 'Generate image' && !button.disabled) && document.querySelectorAll('.image-result').length === 0 ? 'ready' : null", "retryable image page after worker failure", 30_000);
+      if (!failure.includes("not in the local model cache") || !failure.includes("Connect to the internet once") || recovered !== "ready")
+        throw new Error(`Missing-model failure was not actionable or retryable: ${JSON.stringify({ failure, recovered })}`);
+      console.log(`Packaged missing-model recovery passed: ${failure.slice(0, 240)}.`);
+      return;
+    }
+
     await evaluate(target, "(() => { const field = document.querySelector('.image-provider-picker select'); const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(field, 'diffusers'); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()");
     await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('Ready') || Boolean(document.querySelector('.image-runtime-callout .status-badge'))", "local image runtime status");
 

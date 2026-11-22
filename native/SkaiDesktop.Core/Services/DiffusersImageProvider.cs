@@ -102,7 +102,7 @@ public sealed class DiffusersImageProvider
                 if (type == "progress" && root.TryGetProperty("step", out var step) && step.TryGetInt32(out var completed)
                     && root.TryGetProperty("total", out var total) && total.TryGetInt32(out var count) && count > 0 && completed >= 0 && completed <= count)
                     reportProgress?.Invoke($"Generating locally… step {completed} of {count}.");
-                if (type == "error") throw new InvalidOperationException(root.TryGetProperty("message", out var message) ? message.GetString() : "Local image generation failed.");
+                if (type == "error") throw new InvalidOperationException(SummarizeWorkerError(root.TryGetProperty("message", out var message) ? message.GetString() : null));
                 if (type == "result")
                 {
                     var mediaType = root.GetProperty("mediaType").GetString();
@@ -221,6 +221,18 @@ public sealed class DiffusersImageProvider
         }
         catch (System.ComponentModel.Win32Exception) { return false; }
         catch (InvalidOperationException) { return false; }
+    }
+
+    public static string SummarizeWorkerError(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return "Local image generation failed.";
+        if (message.Contains("OfflineModeIsEnabled", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("LocalEntryNotFoundError", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("does not appear to have a file named model_index.json", StringComparison.OrdinalIgnoreCase))
+            return "Stable Diffusion Turbo is not in the local model cache. Connect to the internet once to download the model, then retry.";
+
+        var firstLine = message.Split(['\r', '\n'], 2, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+        return firstLine.Length <= 500 ? firstLine : firstLine[..500];
     }
 
     private static bool CheckBackgroundDependencies(string python)
