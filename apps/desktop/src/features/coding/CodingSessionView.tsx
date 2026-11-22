@@ -4,7 +4,6 @@ import { useMonacoTheme } from "../../theme/useMonacoTheme";
 import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreflight, DesktopProjectPreview, DesktopTask } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
-import { NavIcon } from "../../components/ui/NavIcon";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { ProjectFileTree } from "./ProjectFileTree";
 import { CodingTaskInspector } from "./CodingTaskInspector";
