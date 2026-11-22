@@ -119,6 +119,9 @@ that users touch as each slice is moved.
 - Moved local media URL IPC registration, ownership checks, validation, and
   revocation into `local-media-ipc.cjs`; the renderer-visible channel names and
   local media behavior are unchanged.
+- Moved desktop pet JSON persistence into `pet-state-store.cjs`; the existing
+  file location, tolerant read behavior, and serialized state shape remain the
+  same, while window positioning and pet lifecycle stay in the Electron shell.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent

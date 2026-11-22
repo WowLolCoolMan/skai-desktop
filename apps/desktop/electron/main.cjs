@@ -19,6 +19,7 @@ const { registerUpdateIpc } = require("./update-ipc.cjs");
 const { registerLocalMediaIpc } = require("./local-media-ipc.cjs");
 const { createThemeService } = require("./theme-service.cjs");
 const { createAgentHostClient } = require("./agent-host-client.cjs");
+const { createPetStateStore } = require("./pet-state-store.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -39,6 +40,7 @@ const windowPositioningAvailable = canPositionWindows(displayBackend);
 if (process.platform === "linux" && !relaunchingForDisplayBackend) console.log(`[windowing] display backend: ${displayBackend.backend} (${displayBackend.reason})`);
 
 const repoRoot = path.resolve(__dirname, "../../..");
+const petStateStore = createPetStateStore({ app, fs, fsSync, path });
 const hostProject = path.join(repoRoot, "services", "agent-host", "SkaiDesktop.AgentHost.csproj");
 const hostBinary = process.platform === "win32" ? "SkaiDesktop.AgentHost.exe" : "SkaiDesktop.AgentHost";
 const packagedRoot = path.join(process.resourcesPath, "app");
@@ -144,21 +146,8 @@ function decodeDroppedAttachment(attachment) {
   return { fileName, mediaType: null, content, byteLength: bytes.length, textLength: content.length };
 }
 
-function petStatePath() {
-  return path.join(app.getPath("userData"), "pet-window.json");
-}
-
-function readPetState() {
-  try {
-    const parsed = JSON.parse(fsSync.readFileSync(petStatePath(), "utf8"));
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
 function petBounds() {
-  const stored = readPetState().bounds;
+  const stored = petStateStore.read().bounds;
   const width = PET_WINDOW_WIDTH;
   const height = PET_WINDOW_HEIGHT;
   const workArea = screen.getPrimaryDisplay().workArea;
@@ -727,11 +716,11 @@ function movePetTowardTarget() {
 
 function persistPetState() {
   if (!petWindow || petWindow.isDestroyed()) return;
-  const state = readPetState();
+  const state = petStateStore.read();
   state.visible = petWindow.isVisible();
   // getBounds() reports 0,0 on native Wayland; keep the last real position.
   if (windowPositioningAvailable && !petEntranceMoving) state.bounds = petWindow.getBounds();
-  void fs.mkdir(app.getPath("userData"), { recursive: true }).then(() => fs.writeFile(petStatePath(), JSON.stringify(state, null, 2), "utf8")).catch(() => {});
+  void petStateStore.write(state).catch(() => {});
 }
 
 function movePetWithCursor() {
@@ -934,7 +923,7 @@ async function resolvePetSurface() {
 
 function createPetWindow() {
   if (petWindow && !petWindow.isDestroyed()) return petWindow;
-  const savedState = readPetState();
+  const savedState = petStateStore.read();
   petReady = false;
   petWindow = new BrowserWindow({
     // Native Wayland ignores client-chosen positions; let the compositor place it.
