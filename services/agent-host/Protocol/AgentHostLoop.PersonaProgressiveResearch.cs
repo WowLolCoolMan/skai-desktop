@@ -31,7 +31,7 @@ public static partial class AgentHostLoop
                 if (!IsPersonaResearchHostAllowed(result.Url) || !IsPersonaSearchResultRelevant(persona.Name, persona.Roles, result.Title, result.Snippet) || persona.Sources.Any(source => source.Url.Equals(result.Url, StringComparison.OrdinalIgnoreCase)) || persona.ExcludedResearchUrls.Contains(result.Url, StringComparer.OrdinalIgnoreCase)) continue;
                 WebPageText? page = null;
                 try { page = await new WebSearchProvider().FetchTextAsync(result.Url).ConfigureAwait(false); } catch { }
-                if (page?.PublishedDate is { } published && DateTimeOffset.TryParse(persona.KnowledgeCutoffDate, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var cutoff) && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > cutoff) continue;
+                if (page is not null && !PersonaKnowledgeCutoffPolicy.IsAvailableByCutoff(new SavedPersonaSource { PublishedDate = page.PublishedDate ?? string.Empty }, PersonaKnowledgeCutoffPolicy.EffectiveCutoff(persona))) continue;
                 var text = page?.Text ?? string.Empty;
                 if (text.Length < 240 || !IsPersonaSourceRelevant(persona.Name, page?.Title ?? result.Title, text)) continue;
                 var excerpt = SelectPersonaEvidenceExcerpt(persona.Name, persona.Roles, page?.Title ?? result.Title, text);
@@ -83,7 +83,9 @@ public static partial class AgentHostLoop
     {
         var settings = CreateSettingsStore().Load();
         if (string.IsNullOrWhiteSpace(settings.Endpoint) || string.IsNullOrWhiteSpace(settings.Model)) return null;
-        var usableSources = persona.Sources.Where(source => !string.IsNullOrWhiteSpace(source.Excerpt))
+        var cutoff = PersonaKnowledgeCutoffPolicy.EffectiveCutoff(persona);
+        var usableSources = persona.Sources.Where(source => PersonaKnowledgeCutoffPolicy.IsAvailableByCutoff(source, cutoff))
+            .Where(source => !string.IsNullOrWhiteSpace(source.Excerpt))
             .Where(source => !IsDialogueSource(source) || PersonaDialogueEvidence.IsUsableSpeechEvidence(source.Type, source.SpeakerAttribution, source.AttributedTurnCount))
             .TakeLast(12).ToArray();
         var evidence = usableSources.Select((source, index) =>

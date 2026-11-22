@@ -121,7 +121,7 @@ public static partial class AgentHostLoop
             query = persona.Name,
             subjectType = persona.SubjectType,
             notes = string.IsNullOrWhiteSpace(focus) ? "Find additional independent biography, attributed dialogue or interviews, and useful topic-specific evidence" : focus,
-            cutoffDate = persona.KnowledgeCutoffDate,
+            cutoffDate = PersonaKnowledgeCutoffPolicy.EffectiveCutoff(persona)?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? persona.KnowledgeCutoffDate,
             sourceUrls = Array.Empty<string>(),
         }, JsonOptions));
         var researchResponse = await ResearchPersonaAsync(researchRequest).ConfigureAwait(false);
@@ -163,7 +163,7 @@ public static partial class AgentHostLoop
         var subjectType = OptionalString(request, "subjectType")?.Equals("character", StringComparison.OrdinalIgnoreCase) == true ? "character" : "person";
         var notes = OptionalString(request, "notes") ?? string.Empty;
         var cutoffText = OptionalString(request, "cutoffDate");
-        DateTimeOffset? cutoff = DateTimeOffset.TryParse(cutoffText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedCutoff) ? parsedCutoff : null;
+        var cutoff = PersonaKnowledgeCutoffPolicy.ParseDate(cutoffText);
         if (notes.Length > 600 || notes.Any(char.IsControl)) throw new InvalidOperationException("Research notes exceed the safety limit.");
         var search = new WebSearchProvider();
         var requestedUrls = OptionalStringList(request, "sourceUrls", 64, 2_000)
@@ -277,7 +277,7 @@ public static partial class AgentHostLoop
                 }
                 if (page is null && requestedUrls.Contains(item.Result.Url, StringComparer.OrdinalIgnoreCase))
                     fetchWarnings.Add($"{new Uri(item.Result.Url).Host}: no readable text was available from this selected source.");
-                if (page?.PublishedDate is { } published && cutoff is { } sourceCutoff && DateTimeOffset.TryParse(published, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var publishedAt) && publishedAt > sourceCutoff)
+                if (PersonaKnowledgeCutoffPolicy.IsPublishedAfterCutoff(page?.PublishedDate, cutoff))
                     return null;
                 var title = page?.Title ?? item.Result.Title;
                 var pageText = page?.Text ?? item.Result.Snippet;

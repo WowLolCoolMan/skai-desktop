@@ -20,6 +20,7 @@ internal static class PersonaKnowledgeTests
         SpeakerLabelsAndVoiceCard();
         DraftCoercionAndSchema();
         PersonaPromptUsesCharacterFramingAndCoreEvidence();
+        PersonaPromptRespectsKnowledgeAndEraCutoffs();
     }
 
     private static void QueryParsingAndMatching()
@@ -209,6 +210,92 @@ internal static class PersonaKnowledgeTests
               !publicPrompt.Contains("low-stakes improvisation", StringComparison.Ordinal) &&
               publicPrompt.Contains("claim that newly generated dialogue is a real public person's quotation", StringComparison.Ordinal),
             "public-figure prompts allow expressive roleplay while distinguishing it from factual claims and real quotations");
+    }
+
+    private static void PersonaPromptRespectsKnowledgeAndEraCutoffs()
+    {
+        var persona = new SavedPersona
+        {
+            Name = "Ada Example",
+            SourceMode = "public-research",
+            SubjectType = "person",
+            KnowledgeCutoffDate = "2020-12-31",
+            EraDate = "2010-06-01",
+            Roles = "After era role from a later biography",
+            Voice = "Later-era communication style",
+            Personality = "Later-era personality summary",
+            ThinkingStyle = "Later-era reasoning summary",
+            InteractionStyle = "Later-era interaction summary",
+            Values = "Later-era values summary",
+            Knowledge = "Later-era knowledge summary",
+            EvidenceBoundaries = "Later-era evidence summary",
+            Timeline = "Later-era event",
+            ProfileEvidenceUrls = ["https://example.org/after-era"],
+            Sources =
+            [
+                new() { Title = "Pre-era biography", Url = "https://example.org/before-era-biography", Type = "Biography", PublishedDate = "2010-05-20", Excerpt = "Ada Example's public work before the chosen era is documented here." },
+                new() { Title = "Pre-era transcript", Url = "https://example.org/before-era", Type = "Interview", PublishedDate = "2010-05-31", SpeakerAttribution = "subject-attributed", AttributedTurnCount = 3, EvidenceQuality = "explicit-speaker-labels", Excerpt = "Ada: Before era phrase.\nAda: Earlier wording, with careful rhythm.\nAda: The evidence is available by this date." },
+                new() { Title = "Later interview", Url = "https://example.org/after-era", Type = "Interview", PublishedDate = "2010-06-02", SpeakerAttribution = "subject-attributed", AttributedTurnCount = 3, EvidenceQuality = "explicit-speaker-labels", Excerpt = "Ada: Post era phrase.\nAda: Later wording with a different rhythm.\nAda: This evidence is outside the chosen era." },
+                new() { Title = "Recent biography", Url = "https://example.org/after-cutoff", Type = "Biography", PublishedDate = "2021-01-01", Excerpt = "Later biography fact." },
+            ],
+            VerifiedQuotes =
+            [
+                new() { Text = "Quote from before the era", SourceId = "https://example.org/before-era" },
+                new() { Text = "Quote from after the era", SourceId = "https://example.org/after-era" },
+            ],
+            LatestDistillation = new SavedPersonaDistillation
+            {
+                SourceUrls = ["https://example.org/before-era", "https://example.org/after-era"],
+                Knowledge = "Mixed-era synthesis",
+            },
+        };
+
+        Check(PersonaKnowledgeCutoffPolicy.EffectiveCutoff(persona) == new DateOnly(2010, 6, 1),
+            "persona era is the effective cutoff when it predates the general knowledge cutoff");
+        Check(PersonaKnowledgeCutoffPolicy.IsAvailableByCutoff(persona.Sources[0], persona) &&
+              !PersonaKnowledgeCutoffPolicy.IsAvailableByCutoff(persona.Sources[2], persona),
+            "dated persona sources are compared against the earlier of era and knowledge cutoffs");
+        Check(!PersonaKnowledgeCutoffPolicy.IsPublishedAfterCutoff("2010-06-01T23:59:00Z", new DateOnly(2010, 6, 1)) &&
+              PersonaKnowledgeCutoffPolicy.IsPublishedAfterCutoff("2010-06-02", new DateOnly(2010, 6, 1)),
+            "persona research treats a selected cutoff as a calendar date including the full day");
+        var prompt = ModelInstructions.PersonaSimulation(persona, "Tell me about your work");
+        Check(prompt.Contains("Pre-era biography", StringComparison.Ordinal) && !prompt.Contains("Later interview", StringComparison.Ordinal) && !prompt.Contains("Recent biography", StringComparison.Ordinal),
+            $"persona chat omits source material published after its effective era cutoff (pre={prompt.Contains("Pre-era biography", StringComparison.Ordinal)}, later={prompt.Contains("Later interview", StringComparison.Ordinal)}, recent={prompt.Contains("Recent biography", StringComparison.Ordinal)})");
+        Check(prompt.Contains("Earlier wording, with careful rhythm.", StringComparison.Ordinal) && !prompt.Contains("Post era phrase", StringComparison.Ordinal),
+            "voice examples are built only from sources within the persona's era cutoff");
+        Check(prompt.Contains("Quote from before the era", StringComparison.Ordinal) && !prompt.Contains("Quote from after the era", StringComparison.Ordinal),
+            "only verified quotes tied to eligible sources are supplied to the persona");
+        Check(!prompt.Contains("After era role", StringComparison.Ordinal) && !prompt.Contains("Later-era reasoning summary", StringComparison.Ordinal) &&
+              prompt.Contains("profile synthesis relied on at least one source published after the effective cutoff", StringComparison.Ordinal),
+            "generated profile fields are withheld when their supporting source is later than the era");
+        Check(!prompt.Contains("Mixed-era synthesis", StringComparison.Ordinal) && prompt.Contains("Temporal evidence filter", StringComparison.Ordinal),
+            "mixed-era distillations are withheld and the prompt records excluded temporal evidence");
+
+        var undated = new SavedPersonaSource { Url = "https://example.org/undated", Excerpt = "Undated reference." };
+        Check(PersonaKnowledgeCutoffPolicy.IsAvailableByCutoff(undated, persona) &&
+              prompt.Contains("Undated sources do not establish when a fact became known", StringComparison.Ordinal),
+            "undated sources stay explicitly uncertain instead of being treated as post-cutoff facts");
+
+        var legacyPersona = new SavedPersona
+        {
+            Name = "Legacy Research Persona",
+            SourceMode = "public-research",
+            KnowledgeCutoffDate = "2010-06-01",
+            Roles = "Unattributed imported profile",
+            Sources = [new() { Url = "https://example.org/later", PublishedDate = "2021-01-01", Excerpt = "Later evidence." }],
+        };
+        Check(!ModelInstructions.PersonaSimulation(legacyPersona).Contains("Unattributed imported profile", StringComparison.Ordinal),
+            "legacy profile fields without evidence links are withheld when later sources exist");
+
+        var handcraftedPersona = new SavedPersona
+        {
+            Name = "Handcrafted Persona",
+            SourceMode = "own-material",
+            KnowledgeCutoffDate = "2010-06-01",
+            VerifiedQuotes = [new() { Text = "A line from the user's material", SourceId = "user-material" }],
+        };
+        Check(ModelInstructions.PersonaSimulation(handcraftedPersona).Contains("A line from the user's material", StringComparison.Ordinal),
+            "handcrafted persona quotes remain available without public source URLs");
     }
 
     private static Task<HttpResponseMessage> Json(string json) =>

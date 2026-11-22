@@ -24,7 +24,7 @@ keep this queue focused on unfinished work.
 | Coding Agent isolation | In progress · Unclaimed | Add Windows filesystem and network containment, then verify it on supported Windows profiles. | Linux now fails closed and uses Bubblewrap isolation. Windows must retain approvals, time/resource limits, and cancellation; no unattended or parallel commands without verified containment. | [Architecture](../engineering/ARCHITECTURE.md), [readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md) |
 | Image runtime coverage | In progress · Unclaimed | Exercise a live ComfyUI server and validate GPU or additional hardware. | Show only runtime-reported progress; cancellation must stop the job and leave the page usable. | [Image guide](../guides/LOCAL_IMAGE_GENERATION.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Release validation | In progress · Unclaimed | Verify the real update-feed install and rollback path; complete Linux packaged acceptance. | Preserve user data through upgrades and fail closed on invalid signatures. Production signing is deferred by the owner. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
-| Persona research and chat | In progress · Unclaimed | Improve name-only transcript discovery and evaluate multi-turn factual boundaries with a local model. | Attribute speech conservatively; distinguish sourced facts and quotations from newly written roleplay. Removing evidence must also remove its influence. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
+| Persona research and chat | In progress · Unclaimed | Improve name-only transcript discovery and evaluate multi-turn factual boundaries with a local model. | Dated source filtering now applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. Continue conservative attribution and evidence removal. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Local, cloud, and hybrid gateway | In progress · Codex | Continue the provider and secret-store contracts; add a supported provider only after consent and credential handling are ready. | Require explicit routing, OS-protected secrets, clear data-destination disclosure, and a working offline-only mode. No silent fallback. | [Provider gateway plan](implementation-plans/provider-gateway.md) |
 
 ## Recently completed
@@ -32,6 +32,13 @@ keep this queue focused on unfinished work.
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 
+- **2026-11-22:** Persona chats and progressive research now filter dated evidence
+  by the earlier knowledge/era cutoff; mixed-era syntheses and unsupported
+  generated profile fields are withheld. Core regression coverage, Agent Host
+  Release build, desktop typecheck/build pass. The live local-model workflow
+  was intermittent: research and drafting passed, but one repeated chat returned
+  an incomplete reply. Semantic cutoff fidelity still needs a multi-turn
+  evaluation.
 - **2026-11-22:** Linux Coding Agent commands now fail closed unless
   Bubblewrap provides process, network, IPC, and UTS isolation. Commands receive
   a read-only system view and a writable project mount.

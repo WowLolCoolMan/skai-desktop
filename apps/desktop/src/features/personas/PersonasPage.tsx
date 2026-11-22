@@ -11,6 +11,11 @@ type DiscoveryResult = { matches: PersonMatch[] };
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+function sourceIsAfterCutoff(source: DesktopPersonaSource, cutoffDate: string): boolean {
+  const timestamp = Date.parse(source.publishedDate);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) > cutoffDate;
+}
+
 type ProfileDraft = { roles?: string; speechPatterns?: string; personality?: string; thinkingStyle?: string; interactionStyle?: string; values?: string; knowledge?: string; evidenceBoundaries?: string; timeline?: string; quoteText?: string; quoteSourceUrl?: string };
 
 function hasRepeatedSpeakerAttribution(sources: DesktopPersonaSource[], subject: string): boolean {
@@ -278,8 +283,15 @@ export function PersonasPage({ onChanged, editingPersona, onCancel, onSaved, end
     finally { setForceResearchBusy(false); }
   };
 
+  const effectiveCutoffDate = [cutoff, eraDate].filter(Boolean).sort()[0];
+  const sourcesAfterCutoff = mode === "public-research" && effectiveCutoffDate
+    ? sources.filter((source) => sourceIsAfterCutoff(source, effectiveCutoffDate))
+    : [];
+  const profileUsesLaterEvidence = editingId !== null && sourcesAfterCutoff.some((source) => editingPersona?.profileEvidenceUrls?.includes(source.url));
+
   return <main className="app-content feature-page personas-page">
     <PageHeader eyebrow="PERSONA WORKSHOP" title={editingId ? "Persona settings" : "Create a persona"} description="Build a conversation-ready profile for a real person or a fictional character, grounded in sources you choose." actions={onCancel ? <Button variant="ghost" type="button" onClick={onCancel}>Back to Workshop</Button> : undefined} />
+    {sourcesAfterCutoff.length > 0 && <p className="persona-research-gap" role="status">{sourcesAfterCutoff.length} source{sourcesAfterCutoff.length === 1 ? " is" : "s are"} published after the effective cutoff ({effectiveCutoffDate}) and will be left out of persona chats.{profileUsesLaterEvidence ? " Generated profile fields citing later evidence are omitted until you rebuild from sources within the cutoff." : ""}</p>}
     <div className="persona-builder-grid">
       <Card className={`persona-builder-card${onSaved ? " persona-builder-card-full" : ""}`}>
         {error && <p className="form-error" role="alert">{error}</p>}
