@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Route } from "../../app/types";
 import type { DesktopConversation, DesktopProject } from "../../../shared/contracts";
 import { NavIcon } from "../ui/NavIcon";
@@ -11,8 +11,6 @@ const activeSessionLabels: Record<Route, string> = { chat: "Home chat", projects
 export function Sidebar({ route, agentMode, onAgentModeChange, onNavigate, conversations, projects, query, collapsed, sidebarWidth, onSidebarWidthChange, onQueryChange, onToggleCollapsed, onNewChat, onOpenProject, onSelectConversation, onConversationMetadata, className = "" }: { route: Route; agentMode: AgentMode; onAgentModeChange: (mode: AgentMode) => void; onNavigate: (route: Route) => void; conversations: DesktopConversation[]; projects: DesktopProject[]; query: string; collapsed: boolean; sidebarWidth: number; onSidebarWidthChange: (width: number) => void; onQueryChange: (query: string) => void; onToggleCollapsed: () => void; onNewChat: () => void; onOpenProject: (project: DesktopProject) => void; onSelectConversation: (id: string) => void; onConversationMetadata: (id: string, patch: ConversationPatch) => Promise<boolean>; className?: string }) {
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [menuConversationId, setMenuConversationId] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState("");
-  const [renameBusy, setRenameBusy] = useState(false);
   const resizeState = useRef<{ startX: number; startWidth: number } | null>(null);
   const [resizing, setResizing] = useState(false);
   const menuFirstActionRef = useRef<HTMLButtonElement>(null);
@@ -55,7 +53,7 @@ export function Sidebar({ route, agentMode, onAgentModeChange, onNavigate, conve
     window.addEventListener("blur", stopResizing, { once: true });
     return () => { window.removeEventListener("pointermove", onPointerMove); window.removeEventListener("pointerup", stopResizing); window.removeEventListener("blur", stopResizing); };
   }, [onSidebarWidthChange, resizing]);
-  const openMenu = (conversation: DesktopConversation, trigger?: HTMLButtonElement | null) => { menuTriggerRef.current = trigger ?? (document.activeElement instanceof HTMLButtonElement ? document.activeElement : null); setMenuConversationId(conversation.id); setRenameDraft(conversation.title); };
+  const openMenu = (conversation: DesktopConversation, trigger?: HTMLButtonElement | null) => { menuTriggerRef.current = trigger ?? (document.activeElement instanceof HTMLButtonElement ? document.activeElement : null); setMenuConversationId(conversation.id); };
   const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const menu = menuRef.current;
     if (!menu) return;
@@ -70,7 +68,6 @@ export function Sidebar({ route, agentMode, onAgentModeChange, onNavigate, conve
   };
   const runMetadataAction = async (id: string, patch: ConversationPatch) => { const saved = await onConversationMetadata(id, patch); if (saved) setMenuConversationId(null); };
   const visibleConversations = conversations.filter((conversation) => (conversation.mode ?? "ChatBot") === agentMode && conversation.title.toLowerCase().includes(query.toLowerCase()));
-  const renameConversation = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const title = renameDraft.trim(); if (!menuConversationId || !title || renameBusy) return; setRenameBusy(true); const saved = await onConversationMetadata(menuConversationId, { title }); setRenameBusy(false); if (saved) setMenuConversationId(null); };
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => { if (collapsed) return; event.preventDefault(); resizeState.current = { startX: event.clientX, startWidth: sidebarWidth }; event.currentTarget.setPointerCapture?.(event.pointerId); setResizing(true); };
   const resizeWithKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => { if (collapsed) return; const amount = event.key === "ArrowRight" ? 16 : event.key === "ArrowLeft" ? -16 : event.key === "Home" ? 220 - sidebarWidth : event.key === "End" ? 360 - sidebarWidth : 0; if (!amount) return; event.preventDefault(); onSidebarWidthChange(sidebarWidth + amount); };
   return <aside className={`app-sidebar ${className} ${collapsed ? "is-collapsed" : ""} ${resizing ? "is-resizing" : ""}`} aria-label="Threads and projects">
