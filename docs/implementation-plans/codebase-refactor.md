@@ -208,6 +208,10 @@ checked per slice.
 - Moved workspace tab schema validation, local persistence, recovery limits,
   and ID creation into `workspaceTabStore.ts`. Existing storage keys and the
   16-open/10-closed tab limits remain unchanged.
+- Split `WebSearchProvider` public-page and transcript fetching into
+  `WebSearchProvider.Fetching.cs`; search result parsing and URL policy remain
+  in the original partial. Existing timeouts, response-size limits, transcript
+  metadata, and public method signatures are unchanged.
 - Moved Percy’s Electron window construction, display-surface fallback, load
   setup, and native window event wiring into `pet-window.cjs`. App startup still
   owns pet behavior and callbacks; Wayland positioning, X11 transparency,

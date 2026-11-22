@@ -83,8 +83,9 @@ and to any detailed plan rather than copying their full contents here.
   journal, Electron tray behavior and Percy window construction, and workspace
   tab persistence have now been extracted. Remaining high-value candidates
   include pet movement/behavior orchestration, Agent Host research sequencing,
-  workspace state coordination, Marketplace/Plugins composition, and
-  model/workflow services.
+  workspace state coordination, Marketplace/Plugins composition, and remaining
+  model/workflow services. Web search now separates search-result handling from
+  bounded public-page and transcript fetching.
 - **Agreed approach:** Refactor incrementally by cohesive responsibility,
   preserve bridge/storage/runtime behavior, sync with `main` before each
   commit, and verify the layer being changed. Do not split files mechanically
