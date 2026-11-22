@@ -20,10 +20,19 @@ public static class MarketplaceCatalogService
             new { id = "comfyui", name = "ComfyUI", kinds = new[] { "image" }, remote = false },
             new { id = "github", name = "GitHub", kinds = new[] { "skill", "tool" }, remote = true },
         },
-        voiceProviders = new[]
+        voiceProviders = VoiceModelCatalog.CloudProviders.Select(provider => new
         {
-            new { id = "elevenlabs", name = "ElevenLabs", kind = "cloud voice", requiresUserKey = true, status = "Optional connector; bring your own API key." },
-        },
+            id = provider.Id,
+            name = provider.Name,
+            kind = provider.Kind,
+            model = provider.Model,
+            defaultVoiceId = provider.DefaultVoiceId,
+            endpoint = provider.Endpoint,
+            sourceUrl = provider.SourceUrl,
+            requiresUserKey = provider.RequiresUserKey,
+            supportsStreaming = provider.SupportsStreaming,
+            status = provider.AvailabilityNote,
+        }).ToArray(),
         voices = VoiceModelCatalog.All.Select(voice => new
         {
             id = voice.Id,

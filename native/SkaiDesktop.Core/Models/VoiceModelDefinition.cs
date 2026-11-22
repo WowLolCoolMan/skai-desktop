@@ -21,6 +21,22 @@ public sealed record VoiceModelDefinition(
     public string AvailabilityNote { get; init; } = "Catalog entry; adapter not connected.";
 }
 
+/// <summary>Describes a hosted voice provider that can be used with an explicit user key.</summary>
+public sealed record CloudVoiceProviderDefinition(
+    string Id,
+    string Name,
+    string Model,
+    string DefaultVoiceId,
+    string Endpoint,
+    string Description,
+    string SourceUrl)
+{
+    public string Kind { get; init; } = "cloud voice";
+    public bool RequiresUserKey { get; init; } = true;
+    public bool SupportsStreaming { get; init; }
+    public string AvailabilityNote { get; init; } = "Bring your own API key; the key remains in the running Skai session.";
+}
+
 public static class VoiceModelCatalog
 {
     public static IReadOnlyList<VoiceModelDefinition> All { get; } =
@@ -32,6 +48,26 @@ public static class VoiceModelCatalog
         new("kokoro-82m-onnx", "Kokoro 82M ONNX", "Fast, natural multi-voice speech through a local ONNX runtime.", "ONNX Runtime", "Apache-2.0", "~163 MB fp16 model + voices", false, false, "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX")
         {
             SupportsStreaming = true, SupportsEmotion = false, AvailabilityNote = "Model cataloged; local adapter and model install are not connected yet."
+        },
+        new("chatterbox", "Chatterbox", "Expressive local speech with voice cloning and paralinguistic cues.", "PyTorch", "MIT / model-specific", "Model-dependent", false, false, "https://github.com/resemble-ai/chatterbox")
+        {
+            SupportsVoiceCloning = true, SupportsEmotion = true, SupportsAudioEffects = true,
+            AvailabilityNote = "Cataloged for local setup. The upstream repository is archived; install only after reviewing its current maintenance and model terms."
+        },
+        new("qwen3-tts", "Qwen3-TTS", "Multilingual local speech with voice design, cloning, and streaming generation.", "PyTorch", "Apache-2.0 / model-specific", "0.6B or 1.7B model", false, false, "https://github.com/QwenLM/Qwen3-TTS")
+        {
+            SupportsStreaming = true, SupportsVoiceCloning = true, SupportsEmotion = true,
+            AvailabilityNote = "Cataloged for local setup; Qwen3-TTS Python runtime and weights are not installed by Skai yet."
+        },
+        new("omnivoice", "OmniVoice", "Omnilingual zero-shot speech synthesis with broad language coverage.", "PyTorch", "Upstream model terms", "Model-dependent", false, false, "https://github.com/k2-fsa/OmniVoice")
+        {
+            SupportsVoiceCloning = true, SupportsStreaming = true,
+            AvailabilityNote = "Cataloged for local setup; review the upstream model card and runtime requirements before installation."
+        },
+        new("higgs-audio-v2", "Higgs Audio v2", "Expressive local audio generation with multi-speaker and reference-audio support.", "PyTorch", "Apache-2.0 / model-specific", "3B model", false, false, "https://github.com/boson-ai/higgs-audio")
+        {
+            SupportsVoiceCloning = true, SupportsEmotion = true, SupportsAudioEffects = true,
+            AvailabilityNote = "Cataloged for local setup; the v2 runtime requires a compatible Python/PyTorch environment."
         },
         new("pocket-tts", "Pocket TTS", "CPU-first streaming speech with voice cloning support.", "Pocket TTS", "MIT", "Model-dependent", false, false, "https://github.com/kyutai-labs/pocket-tts")
         {
@@ -73,6 +109,22 @@ public static class VoiceModelCatalog
         {
             SupportsStreaming = true, SupportsVoiceCloning = true, SupportsEmotion = false, AvailabilityNote = "Review the upstream license and model terms before installation."
         }
+    ];
+
+    public static IReadOnlyList<CloudVoiceProviderDefinition> CloudProviders { get; } =
+    [
+        new("elevenlabs", "ElevenLabs", "eleven_v4", "21m00Tcm4TlvDq8ikWAM", "https://api.elevenlabs.io/v1/text-to-speech", "Expressive hosted TTS with voice library, cloning, and streaming models.", "https://elevenlabs.io/docs/api-reference/text-to-speech/convert")
+        {
+            SupportsStreaming = true,
+        },
+        new("inworld", "Inworld Realtime TTS-2", "inworld-tts-2", "Ashley", "https://api.inworld.ai/v1/audio/speech", "OpenAI-compatible hosted speech optimized for realtime conversational turns.", "https://docs.inworld.ai/tts/tts-models")
+        {
+            SupportsStreaming = true,
+        },
+        new("cartesia", "Cartesia Sonic 3.5", "sonic-3.5", "f786b574-daa5-4673-aa0c-cbe3e8534c02", "https://api.cartesia.ai/tts/bytes", "Low-latency hosted speech through Cartesia's Sonic family.", "https://docs.cartesia.ai/api-reference/tts/bytes")
+        {
+            SupportsStreaming = true,
+        },
     ];
 
     public static VoiceModelDefinition Resolve(string? id) =>

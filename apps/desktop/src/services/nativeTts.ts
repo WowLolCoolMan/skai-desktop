@@ -12,6 +12,7 @@ export type VoiceCapabilities = {
 };
 
 export type VoiceSource = "local" | "cloud";
+export type CloudVoiceProviderId = "elevenlabs" | "inworld" | "cartesia";
 
 /**
  * Speech controls are deliberately structured tags, not free-form prompts for
@@ -37,8 +38,18 @@ export const voiceProfiles: VoiceProfile[] = [
 export const voiceModels = [
   { id: "os-native", name: "OS-native speech", detail: "Windows and Linux system voices", size: "No model", installed: true, lowResource: true },
   { id: "kokoro-82m-onnx", name: "Kokoro 82M ONNX", detail: "Natural multi-voice local runtime", size: "~163 MB fp16 model + voices", installed: false, lowResource: false },
+  { id: "chatterbox", name: "Chatterbox", detail: "Expressive local speech with voice cloning and paralinguistic cues", size: "Model-dependent", installed: false, lowResource: false },
+  { id: "qwen3-tts", name: "Qwen3-TTS", detail: "Multilingual local voice design, cloning, and streaming", size: "0.6B or 1.7B model", installed: false, lowResource: false },
+  { id: "omnivoice", name: "OmniVoice", detail: "Omnilingual zero-shot local speech", size: "Model-dependent", installed: false, lowResource: false },
+  { id: "higgs-audio-v2", name: "Higgs Audio v2", detail: "Expressive local multi-speaker audio generation", size: "3B model", installed: false, lowResource: false },
   { id: "pocket-tts", name: "Pocket TTS", detail: "CPU-first streaming voice runtime", size: "Model-dependent", installed: false, lowResource: false },
   { id: "pocket-tts-low-resource", name: "Pocket TTS Low Resource", detail: "Small CPU-first English runtime", size: "Small model", installed: false, lowResource: true },
+] as const;
+
+export const cloudVoiceProviders = [
+  { id: "elevenlabs" as const, name: "ElevenLabs", model: "eleven_v4", defaultVoiceId: "21m00Tcm4TlvDq8ikWAM", detail: "Hosted expressive speech and voice library", supportsStreaming: true },
+  { id: "inworld" as const, name: "Inworld Realtime TTS-2", model: "inworld-tts-2", defaultVoiceId: "Ashley", detail: "Hosted realtime conversational speech", supportsStreaming: true },
+  { id: "cartesia" as const, name: "Cartesia Sonic 3.5", model: "sonic-3.5", defaultVoiceId: "f786b574-daa5-4673-aa0c-cbe3e8534c02", detail: "Hosted low-latency speech", supportsStreaming: true },
 ] as const;
 
 export const installedVoiceModels = voiceModels.filter((voice) => voice.installed);
@@ -53,12 +64,14 @@ const lowResourceModelKey = "skai.voice.lowResourceModel";
 const lowResourceModeKey = "skai.voice.lowResourceMode";
 const voiceOutputKey = "skai.voice.outputEnabled";
 const voiceSourceKey = "skai.voice.source";
+const cloudProviderKey = "skai.voice.cloudProvider";
 const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
-const cloudVoiceEndpoint = "https://api.elevenlabs.io/v1/text-to-speech";
+const cloudModelIdKey = "skai.voice.cloudModelId";
 let sessionCloudApiKey = "";
 let activeCloudAudio: HTMLAudioElement | null = null;
 
 export function selectedVoiceSettings() {
+  const selectedProvider = cloudVoiceProviders.find((provider) => provider.id === localStorage.getItem(cloudProviderKey)) ?? cloudVoiceProviders[0];
   return {
     profileId: localStorage.getItem(selectedProfileKey) ?? "skai-neutral",
     primaryModelId: resolveInstalledVoiceModel(localStorage.getItem(primaryModelKey)),
@@ -66,12 +79,14 @@ export function selectedVoiceSettings() {
     lowResourceMode: localStorage.getItem(lowResourceModeKey) === "true",
     voiceOutputEnabled: localStorage.getItem(voiceOutputKey) === "true",
     source: localStorage.getItem(voiceSourceKey) === "cloud" ? "cloud" as VoiceSource : "local" as VoiceSource,
-    cloudVoiceId: localStorage.getItem(cloudVoiceIdKey) ?? "21m00Tcm4TlvDq8ikWAM",
+    cloudProvider: selectedProvider.id,
+    cloudModelId: localStorage.getItem(cloudModelIdKey) ?? selectedProvider.model,
+    cloudVoiceId: localStorage.getItem(cloudVoiceIdKey) ?? selectedProvider.defaultVoiceId,
   };
 }
 
-export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudVoiceId", value: string | boolean) {
-  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudVoiceId: cloudVoiceIdKey }[key];
+export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId", value: string | boolean) {
+  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey }[key];
   const safeValue = key === "primaryModelId" || key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value)) : value;
   localStorage.setItem(storageKey, String(safeValue));
 }
@@ -113,11 +128,11 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const profile = voiceProfiles.find((item) => item.id === (profileId || settings.profileId)) ?? voiceProfiles[0];
   try {
     const speech = settings.source === "cloud"
-      ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, provider: "elevenlabs", endpoint: cloudVoiceEndpoint, voiceId: settings.cloudVoiceId, apiKey: sessionCloudApiKey })
-      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate });
+      ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId, apiKey: sessionCloudApiKey })
+      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, modelId: settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId });
     if (speech?.ok) {
       const audioDataUrl = (speech.result as { audioDataUrl?: unknown } | undefined)?.audioDataUrl;
-      if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/mpeg;base64,")) {
+      if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/")) {
         activeCloudAudio?.pause();
         activeCloudAudio = new Audio(audioDataUrl);
         activeCloudAudio.addEventListener("ended", () => { activeCloudAudio = null; }, { once: true });
