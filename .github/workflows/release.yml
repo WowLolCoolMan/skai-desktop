@@ -346,7 +346,7 @@ jobs:
             echo 'Release blocked: missing clean Windows install/upgrade/uninstall evidence.' >&2
             exit 1
           fi
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: release-assets/*
           generate_release_notes: true
