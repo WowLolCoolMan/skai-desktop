@@ -72,33 +72,23 @@ and to any detailed plan rather than copying their full contents here.
   variants. Continue manual interaction and pet-animation review before
   considering the UI goal complete.
 
-### 1. Continue the cross-layer codebase refactor
+### 1. Cross-layer codebase refactor
 
-- **Status:** In progress
+- **Status:** Done
 - **Priority:** High, maintainability and workflow quality
 - **Owner:** Codex
-- **Context:** The first all-layer pass is pushed, and follow-on slices are
-  underway. Persona evidence and progressive research, GitHub workspace
-  status/process boundaries, Agent Host Marketplace model handlers and task
-  journal, Electron tray behavior and Percy window construction, and workspace
-  tab persistence have now been extracted. Remaining high-value candidates
-  include pet movement/behavior orchestration, Agent Host research sequencing,
-  workspace state coordination, Marketplace/Plugins composition, and remaining
-  model/workflow services. Persona candidate discovery is now separate from
-  identity resolution and source research; Core web search separates
-  search-result handling from bounded public-page and transcript fetching.
-  Marketplace model facets and compatibility rules now live in a focused
-  catalog helper; the tool/skill grid and inspector are now a separate
-  presentation component. The Agent Host’s stdio lifecycle is separated from
-  its process state and store declarations. Electron Agent Host request and
-  workspace file-selection IPC now has its own registration module.
+- **Context:** The incremental renderer, Electron, Agent Host, and Core slices
+  in the linked plan are complete. The remaining app entry points and workflow
+  coordinators were reviewed and documented as intentional state-owning
+  boundaries; they are candidates for future work only when their state can be
+  moved cohesively.
 - **Agreed approach:** Refactor incrementally by cohesive responsibility,
   preserve bridge/storage/runtime behavior, sync with `main` before each
   commit, and verify the layer being changed. Do not split files mechanically
   just to reduce line counts.
-- **Acceptance:** The remaining candidates are reviewed and either separated
-  with focused builds/checks or documented as intentional orchestration
-  boundaries. Product acceptance gaps remain tracked separately. See the
+- **Acceptance:** Complete. Each touched boundary has layer-appropriate build,
+  audit, syntax, or packaging evidence; product acceptance gaps remain tracked
+  separately. See the
   [incremental codebase refactor](implementation-plans/codebase-refactor.md).
 
 ### 2. Complete local voice acceptance
@@ -227,6 +217,15 @@ and to any detailed plan rather than copying their full contents here.
 ## Recently completed
 
 Move finished entries here with their commit/PR and verification evidence.
+
+- **2026-11-22 — Completed the planned cross-layer refactor cycle.** Added
+  focused boundaries for Percy native window lifecycle, public web-page and
+  transcript fetching, persona candidate discovery, Marketplace model
+  filtering and catalog presentation, Agent Host protocol lifecycle, and
+  Electron workspace request IPC. Renderer typecheck/build, Core and Agent Host
+  Release builds, Electron syntax/package checks, bridge-method audit, and
+  local-only audit pass. Commits: `111a79d9`, `9933b567`, `33ce9d63`,
+  `b5739979`, `a98a6ffd`, `f96006e3`, `ba0f2e02`.
 
 - **2026-11-22 — Completed the first all-layer codebase refactor pass.** Kept
   protocol, bridge, storage, and runtime behavior stable while extracting

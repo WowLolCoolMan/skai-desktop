@@ -217,12 +217,26 @@ checked per slice.
 - Moved persona candidate discovery and name matching into
   `AgentHostLoop.PersonaDiscovery.cs`; selected-identity resolution and source
   research remain in `AgentHostLoop.PersonaResearch.cs`.
+- Moved persona candidate discovery and name matching into
+  `AgentHostLoop.PersonaDiscovery.cs`; selected-identity resolution and source
+  research remain in `AgentHostLoop.PersonaResearch.cs`.
 - Moved system-tray menu state, recent-chat items, refresh sequencing, and tray
   creation into `tray-controller.cjs`; Electron startup still supplies the
   existing window, pet, and Agent Host callbacks.
 - Moved workspace tab schema validation, local persistence, recovery limits,
   and ID creation into `workspaceTabStore.ts`. Existing storage keys and the
   16-open/10-closed tab limits remain unchanged.
+- Moved the tool/skill result grid and detail inspector into
+  `MarketplaceCatalogBrowser.tsx`; `PluginsPage` retains section navigation,
+  catalog loading, and MCP state.
+- Moved Marketplace model tag facets, combined filtering, active-filter counts,
+  and runtime compatibility checks into `marketplaceModelFilters.ts`.
+- Moved the Agent Host stdio read/dispatch/write loop, background request
+  scheduling, and shutdown cleanup into `AgentHostLoop.Host.cs`; process state
+  and store factories remain in the main partial.
+- Moved Agent Host request IPC and local workspace file/folder selection into
+  `workspace-ipc.cjs`; existing bridge method names, response shapes, and file
+  validation remain unchanged.
 - Split `WebSearchProvider` public-page and transcript fetching into
   `WebSearchProvider.Fetching.cs`; search result parsing and URL policy remain
   in the original partial. Existing timeouts, response-size limits, transcript
@@ -248,19 +262,34 @@ checked per slice.
 - Main is fetched before integration, upstream commits are preserved, and each
   finished slice is committed and pushed separately.
 
-## Follow-on maintenance and product acceptance
+## Reviewed orchestration boundaries and product acceptance
 
-- Continue with small, independently reviewable slices when these areas are
-  next touched: remaining pet movement/behavior orchestration in `main.cjs`,
-  remaining persona research orchestration in Agent Host, workspace
-  coordination in `useDesktopWorkspace.ts`, Marketplace/Plugins page
-  composition, and other model or workflow Core services. Their size alone is
-  not a reason for mechanical splitting; extract only cohesive behavior with a
-  clear owner.
-- Keep the protocol entry point responsible for process I/O and lifecycle,
-  Electron `main.cjs` responsible for app startup/orchestration, and feature
-  pages responsible for composition. Continue moving domain behavior behind
-  focused helpers as maintenance exposes concrete boundaries.
+This planned refactor cycle is complete. The remaining larger coordinators
+were reviewed and are intentionally retained until their state can move as a
+whole responsibility without introducing duplicated ownership:
+
+- Electron `main.cjs` owns app startup and coordinates pet movement, drag,
+  entrance, wander, and behavior timers that share the same native window and
+  mutable state. Native window construction, pet IPC, tray, update IPC,
+  workspace request IPC, and window IPC now have separate modules.
+- `useDesktopWorkspace.ts` remains the renderer’s app-level coordinator for
+  routing, active project/chat tabs, and the chat/coding hooks. Tab schema,
+  persistence, and recovery are isolated in `workspaceTabStore.ts`.
+- `AgentHostLoop.PersonaResearch.cs` remains responsible for sequencing
+  identity resolution, evidence gathering, cutoff handling, profile updates,
+  and persistence. Discovery, evidence cleanup, source retrieval, and
+  progressive enrichment now have distinct modules.
+- `PluginsPage.tsx` remains the Marketplace section and data coordinator;
+  catalog derivation, MCP connection behavior, the result grid, and the detail
+  inspector are separated.
+
+Keep the protocol entry point responsible for process I/O and lifecycle,
+Electron `main.cjs` responsible for app startup/orchestration, and feature pages
+responsible for composition. Continue refactoring these coordinators only when
+a cohesive state owner can be identified; do not split them mechanically.
+
+### Product acceptance gaps (separate from refactor)
+
 - Complete installed speech-pack and real audio acceptance for local voice.
 - Keep OS isolation, image-runtime acceptance, and release/platform gaps in
   their existing capability entries; these are product completion work, not
