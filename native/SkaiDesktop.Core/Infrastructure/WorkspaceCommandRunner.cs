@@ -85,7 +85,13 @@ public sealed class WorkspaceCommandRunner
             throw;
         }
         await Task.WhenAll(standardOutput, standardError).ConfigureAwait(false);
-        return new WorkspaceCommandResult(process.ExitCode, output.ToString(), timedOut, truncated != 0, workingDirectory);
+        return new WorkspaceCommandResult(
+            process.ExitCode,
+            output.ToString(),
+            timedOut,
+            truncated != 0,
+            workingDirectory,
+            OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached));
     }
 
     public static string ResolveWorkingDirectory(string selectedRoot, string relativeWorkingDirectory)
@@ -152,4 +158,4 @@ public sealed class WorkspaceCommandRunner
         name.Contains("COOKIE", StringComparison.OrdinalIgnoreCase);
 }
 
-public sealed record WorkspaceCommandResult(int ExitCode, string Output, bool TimedOut, bool OutputTruncated, string WorkingDirectory);
+public sealed record WorkspaceCommandResult(int ExitCode, string Output, bool TimedOut, bool OutputTruncated, string WorkingDirectory, string IsolationStatus);

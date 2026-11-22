@@ -7,11 +7,12 @@ namespace SkaiDesktop.Core.Infrastructure;
 
 /// <summary>
 /// Attaches a command process to an OS containment boundary when the platform provides one.
-/// Windows uses a kill-on-close Job Object so descendants cannot outlive an approved run.
-/// Other platforms continue to use the runner's process-tree cancellation path.
+/// Windows uses a kill-on-close Job Object to bound descendants and prevent process-spawn bombs.
+/// This is process containment only; it does not restrict filesystem or network access.
 /// </summary>
 internal sealed class OsProcessIsolation : IDisposable
 {
+    public const uint MaxActiveProcesses = 128;
     private readonly SafeFileHandle? jobHandle;
 
     private OsProcessIsolation(SafeFileHandle? jobHandle) => this.jobHandle = jobHandle;
@@ -30,7 +31,8 @@ internal sealed class OsProcessIsolation : IDisposable
             {
                 BasicLimitInformation = new JobObjectBasicLimitInformation
                 {
-                    LimitFlags = JobObjectLimitFlags.KillOnJobClose
+                    LimitFlags = JobObjectLimitFlags.KillOnJobClose | JobObjectLimitFlags.ActiveProcess,
+                    ActiveProcessLimit = MaxActiveProcesses
                 }
             };
             var size = Marshal.SizeOf<JobObjectExtendedLimitInformation>();
@@ -50,6 +52,12 @@ internal sealed class OsProcessIsolation : IDisposable
             return new OsProcessIsolation(null);
         }
     }
+
+    public static string DescribeCurrentPlatform(bool attached) => OperatingSystem.IsWindows()
+        ? attached
+            ? $"Windows process containment active (maximum {MaxActiveProcesses} processes); filesystem and network access are not sandboxed."
+            : "Windows process containment could not be enabled; filesystem and network access are not sandboxed."
+        : "OS process containment is unavailable on this platform; filesystem and network access are not sandboxed.";
 
     public void Dispose() => jobHandle?.Dispose();
 
@@ -72,6 +80,7 @@ internal sealed class OsProcessIsolation : IDisposable
     [Flags]
     private enum JobObjectLimitFlags : uint
     {
+        ActiveProcess = 0x00000008,
         KillOnJobClose = 0x00002000
     }
 

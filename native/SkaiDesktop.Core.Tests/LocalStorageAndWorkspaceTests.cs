@@ -352,6 +352,8 @@ internal static class LocalStorageAndWorkspaceTests
                 TimeSpan.FromSeconds(10));
             Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
             Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
+            Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
+            Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "project command clearly reports that filesystem and network are not sandboxed");
             var timedCommand = await commandRunner.RunAsync(workspacePath, ".",
                 OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",
                 TimeSpan.FromSeconds(1));

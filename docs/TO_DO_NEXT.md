@@ -119,15 +119,17 @@ and to any detailed plan rather than copying their full contents here.
 
 ### 3. Strengthen OS isolation for Coding Agent commands
 
-- **Status:** Ready
+- **Status:** In progress
 - **Priority:** High, before unattended or parallel execution
 - **Owner:** Unclaimed
 - **Context:** The command runner bounds duration/output, removes
   secret-shaped environment variables, checks the working directory, and kills
   process trees on cancellation. Windows also attaches a kill-on-close Job
   Object when available. This does not sandbox filesystem or network access;
-  Linux has no equivalent boundary yet. Unattended/parallel commands remain
-  gated on a real OS sandbox.
+  Windows now limits a command tree to 128 processes and reports whether its
+  Job Object attached. The Coding workspace displays that isolation status
+  alongside output. Linux still has no OS containment boundary. Unattended/
+  parallel commands remain gated on a real OS sandbox.
 - **Agreed approach:** Define the supported platform boundary first. Prototype
   a per-run restricted process with a project-root working directory, explicit
   environment allowlist, resource/time limits, and a clear cancellation path.

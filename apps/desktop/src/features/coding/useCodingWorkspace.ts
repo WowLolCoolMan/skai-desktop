@@ -272,8 +272,8 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     const response = await request("project.command.run", { id: projectId, command, relativeWorkingDirectory: cwd || ".", timeoutSeconds: 30 });
     setTerminalBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Command failed to run."); return; }
-    const result = response.result as { output: string; exitCode: number; timedOut: boolean; outputTruncated: boolean };
-    setTerminalOutput(`${result.output || "(no output)"}${result.timedOut ? "\n\n[command timed out]" : result.outputTruncated ? "\n\n[output truncated]" : ""}`);
+    const result = response.result as { output: string; exitCode: number; timedOut: boolean; outputTruncated: boolean; isolationStatus?: string };
+    setTerminalOutput(`${result.output || "(no output)"}${result.timedOut ? "\n\n[command timed out]" : result.outputTruncated ? "\n\n[output truncated]" : ""}${result.isolationStatus ? `\n\n[${result.isolationStatus}]` : ""}`);
     setTerminalExitCode(result.exitCode);
   };
 
