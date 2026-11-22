@@ -18,6 +18,7 @@ public sealed class AgentTaskArtifactStore
     public const int MaxWorktreePathCharacters = 4_096;
     public const int MaxWorktreeBranchCharacters = 256;
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { WriteIndented = true, MaxDepth = 12 };
+    private static readonly object StoreGate = new();
     private readonly string _path;
 
     public AgentTaskArtifactStore(string? path = null)
@@ -191,6 +192,8 @@ public sealed class AgentTaskArtifactStore
     /// <summary>Claims one specific dependency-ready queued task for explicit execution.</summary>
     public AgentTaskArtifact TryClaim(string id, DateTimeOffset? now = null)
     {
+        lock (StoreGate)
+        {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id)
@@ -200,6 +203,7 @@ public sealed class AgentTaskArtifactStore
         if (!IsReady(task, tasks))
             throw new InvalidOperationException("The task is waiting for a dependency to complete.");
         return Claim(tasks, task, now ?? DateTimeOffset.UtcNow);
+        }
     }
 
     private AgentTaskArtifact Claim(List<AgentTaskArtifact> tasks, AgentTaskArtifact task, DateTimeOffset now)
@@ -219,6 +223,8 @@ public sealed class AgentTaskArtifactStore
 
     public AgentTaskArtifact BeginVerification(string id, string resultSummary, IEnumerable<string>? artifactLabels = null)
     {
+        lock (StoreGate)
+        {
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
         if (task.Status != AgentTaskStatuses.Running) throw new InvalidOperationException("Only a running task can enter verification.");
@@ -228,10 +234,13 @@ public sealed class AgentTaskArtifactStore
         task.UpdatedAtUtc = DateTimeOffset.UtcNow;
         Save(tasks);
         return Copy(task);
+        }
     }
 
     public AgentTaskArtifact Verify(string id)
     {
+        lock (StoreGate)
+        {
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
         if (task.Status != AgentTaskStatuses.Verifying) throw new InvalidOperationException("Only a task in verification can be completed.");
@@ -241,6 +250,7 @@ public sealed class AgentTaskArtifactStore
         task.UpdatedAtUtc = DateTimeOffset.UtcNow;
         Save(tasks);
         return Copy(task);
+        }
     }
 
     public AgentTaskArtifact AttachVerificationEvidence(string id, ProjectCheckEvidence evidence)
@@ -270,6 +280,8 @@ public sealed class AgentTaskArtifactStore
 
     private AgentTaskArtifact Transition(string id, string expected, string next, string? summary = null)
     {
+        lock (StoreGate)
+        {
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
         if (task.Status != expected) throw new InvalidOperationException($"A task in {task.Status} state cannot be changed to {next}.");
@@ -278,10 +290,13 @@ public sealed class AgentTaskArtifactStore
         task.UpdatedAtUtc = DateTimeOffset.UtcNow;
         Save(tasks);
         return Copy(task);
+        }
     }
 
     private AgentTaskArtifact Finish(string id, string status, string resultSummary, IEnumerable<string>? artifactLabels)
     {
+        lock (StoreGate)
+        {
         var tasks = Load().ToList();
         var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
         if (task.Status is not (AgentTaskStatuses.Running or AgentTaskStatuses.Verifying)) throw new InvalidOperationException("Only a claimed running or verifying task can be finished.");
@@ -291,6 +306,7 @@ public sealed class AgentTaskArtifactStore
         task.UpdatedAtUtc = DateTimeOffset.UtcNow;
         Save(tasks);
         return Copy(task);
+        }
     }
 
     private void Save(IEnumerable<AgentTaskArtifact> tasks)
