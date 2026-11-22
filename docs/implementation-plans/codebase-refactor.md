@@ -125,6 +125,9 @@ that users touch as each slice is moved.
   and Marketplace-download operation state containers into
   `AgentHostLoop.Operations.cs`; their locks, progress caps, cancellation,
   terminal states, and response serialization are unchanged.
+- Moved image background removal, generation lifecycle, generation runtime,
+  and checkpoint listing into `AgentHostLoop.Images.cs`; protocol methods,
+  progress reporting, cancellation, and error responses are unchanged.
 - Moved update IPC registration and its sender/URL checks into
   `update-ipc.cjs`; the existing updater manager remains responsible for update
   lifecycle and download state.
