@@ -20,7 +20,7 @@ public sealed class WorkspaceCommandRunner
         "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TERM", "CI",
         "SystemRoot", "WINDIR", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA",
         "LOCALAPPDATA", "ProgramData", "ComSpec", "PATHEXT", "DOTNET_ROOT",
-        "DOTNET_ROOT_X64", "NUGET_PACKAGES"
+        "DOTNET_ROOT_X64", "NUGET_PACKAGES", "PSModulePath"
     };
 
     public async Task<WorkspaceCommandResult> RunAsync(
@@ -60,33 +60,29 @@ public sealed class WorkspaceCommandRunner
             if (AllowedCommandEnvironmentNames.Contains(name) && !IsSensitiveEnvironmentName(name))
                 startInfo.Environment[name] = value;
         }
-        if (isWindows)
-        {
-            startInfo.ArgumentList.Add("-NoLogo");
-            startInfo.ArgumentList.Add("-NoProfile");
-            startInfo.ArgumentList.Add("-NonInteractive");
-            startInfo.ArgumentList.Add("-Command");
-            startInfo.ArgumentList.Add(command);
-        }
-        else if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux())
         {
             startInfo = LinuxCommandSandbox.CreateStartInfo(Path.GetFullPath(selectedRoot), workingDirectory, command, startInfo.Environment.ToArray());
         }
-        else
+        else if (!isWindows)
         {
             startInfo.ArgumentList.Add("-c");
             startInfo.ArgumentList.Add(command);
         }
 
-        using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-        if (!process.Start()) throw new InvalidOperationException("The command process could not be started.");
-        using var isolation = OsProcessIsolation.Attach(process, jobMemoryLimitBytesOverride);
-        process.StandardInput.Close();
+        using var windowsSandbox = isWindows
+            ? WindowsCommandSandbox.Start(Path.GetFullPath(selectedRoot), workingDirectory, command, startInfo.Environment.ToArray(), jobMemoryLimitBytesOverride)
+            : null;
+        using var process = windowsSandbox?.Process ?? new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+        if (windowsSandbox is null && !process.Start()) throw new InvalidOperationException("The command process could not be started.");
+        process.EnableRaisingEvents = true;
+        using var isolation = windowsSandbox?.Isolation ?? OsProcessIsolation.Attach(process, jobMemoryLimitBytesOverride);
+        if (windowsSandbox is null) process.StandardInput.Close();
         var output = new StringBuilder();
         var outputGate = new object();
         var truncated = 0;
-        var standardOutput = DrainAsync(process.StandardOutput, output, outputGate, () => Interlocked.Exchange(ref truncated, 1));
-        var standardError = DrainAsync(process.StandardError, output, outputGate, () => Interlocked.Exchange(ref truncated, 1));
+        var standardOutput = DrainAsync(windowsSandbox?.StandardOutput ?? process.StandardOutput, output, outputGate, () => Interlocked.Exchange(ref truncated, 1));
+        var standardError = DrainAsync(windowsSandbox?.StandardError ?? process.StandardError, output, outputGate, () => Interlocked.Exchange(ref truncated, 1));
         var timedOut = false;
         using var timeoutSource = new CancellationTokenSource(timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
@@ -109,9 +105,9 @@ public sealed class WorkspaceCommandRunner
         await Task.WhenAll(standardOutput, standardError).ConfigureAwait(false);
         var capturedOutput = TerminalControlSequence.Replace(output.ToString(), string.Empty);
         capturedOutput = new string(capturedOutput.Where(character => !char.IsControl(character) || character is '\r' or '\n' or '\t').ToArray());
-        var isolationStatus = OperatingSystem.IsLinux()
+        var isolationStatus = windowsSandbox?.Status ?? (OperatingSystem.IsLinux()
             ? LinuxCommandSandbox.Status
-            : OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes);
+            : OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes));
         if (OperatingSystem.IsLinux())
         {
             if (!capturedOutput.StartsWith(LinuxCommandSandbox.ExecutionStartedMarker, StringComparison.Ordinal))

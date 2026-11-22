@@ -6,6 +6,9 @@
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
 using SkaiDesktop.Core.Services;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.AccessControl;
 using static TestSupport;
 
 internal static class LocalStorageAndWorkspaceTests
@@ -397,14 +400,50 @@ internal static class LocalStorageAndWorkspaceTests
                     TimeSpan.FromSeconds(30));
                 Check(coloredCommand.Output.Contains("check-output", StringComparison.Ordinal) && !coloredCommand.Output.Contains('\u001b'),
                     $"project command output strips terminal control sequences before it is saved as verification evidence (exit={coloredCommand.ExitCode}, timedOut={coloredCommand.TimedOut}, output={coloredCommand.Output.Trim()[..Math.Min(180, coloredCommand.Output.Trim().Length)]})");
+                var workspaceAccessBeforeCommand = OperatingSystem.IsWindows()
+                    ? FileSystemAclExtensions.GetAccessControl(new DirectoryInfo(workspacePath), AccessControlSections.Access).GetSecurityDescriptorSddlForm(AccessControlSections.Access)
+                    : null;
                 var commandResult = await commandRunner.RunAsync(workspacePath, "src",
                     OperatingSystem.IsWindows() ? "Write-Output skai-command-ok" : "printf skai-command-ok",
                     TimeSpan.FromSeconds(30));
                 Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
                 Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
-                Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
+                Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows Process Security Environment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
                 if (OperatingSystem.IsWindows())
-                    Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal), "Windows Coding Agent process containment reports its enforced job memory cap");
+                {
+                    Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal) && commandResult.IsolationStatus.Contains("network denied", StringComparison.Ordinal), "Windows Coding Agent evidence reports PSEC filesystem/network and Job Object boundaries");
+                    var insideWindowsPath = Path.Combine(workspacePath, "src", "windows-sandbox-write-probe.txt");
+                    var insideWindowsWrite = await commandRunner.RunAsync(workspacePath, "src",
+                        "Set-Content -NoNewline -LiteralPath 'windows-sandbox-write-probe.txt' -Value 'sandbox-write'",
+                        TimeSpan.FromSeconds(15));
+                    Check(insideWindowsWrite.ExitCode == 0 && File.ReadAllText(insideWindowsPath) == "sandbox-write",
+                        $"Windows AppContainer can write into an existing nested project folder (exit={insideWindowsWrite.ExitCode}, timedOut={insideWindowsWrite.TimedOut}, output={insideWindowsWrite.Output.Trim().Replace("\n", " | ")})");
+                    File.Delete(insideWindowsPath);
+
+                    var outsideWindowsPath = Path.Combine(settingsDirectory, "outside-project-sentinel.txt");
+                    const string windowsOutsideSentinel = "host-outside-project-must-stay-hidden";
+                    File.WriteAllText(outsideWindowsPath, windowsOutsideSentinel);
+                    var outsideWindowsLiteral = outsideWindowsPath.Replace("'", "''", StringComparison.Ordinal);
+                    var outsideWindowsRead = await commandRunner.RunAsync(workspacePath, ".",
+                        $"$ErrorActionPreference='Stop'; try {{ Get-Content -Raw -LiteralPath '{outsideWindowsLiteral}'; exit 0 }} catch {{ exit 71 }}",
+                        TimeSpan.FromSeconds(15));
+                    Check(outsideWindowsRead.ExitCode != 0 && !outsideWindowsRead.Output.Contains(windowsOutsideSentinel, StringComparison.Ordinal),
+                        $"Windows AppContainer cannot read a neighboring host file (exit={outsideWindowsRead.ExitCode}, output={outsideWindowsRead.Output.Trim().Replace("\n", " | ")})");
+                    var outsideWindowsWrite = await commandRunner.RunAsync(workspacePath, ".",
+                        $"try {{ Set-Content -NoNewline -LiteralPath '{outsideWindowsLiteral}' -Value 'changed'; exit 0 }} catch {{ exit 72 }}",
+                        TimeSpan.FromSeconds(15));
+                    Check(outsideWindowsWrite.ExitCode != 0 && File.ReadAllText(outsideWindowsPath) == windowsOutsideSentinel, "Windows AppContainer cannot modify a neighboring host file");
+
+                    using var loopbackListener = new TcpListener(IPAddress.Loopback, 0);
+                    loopbackListener.Start();
+                    var loopbackPort = ((IPEndPoint)loopbackListener.LocalEndpoint).Port;
+                    var networkProbe = await commandRunner.RunAsync(workspacePath, ".",
+                        "try { $tcp = New-Object System.Net.Sockets.TcpClient; $tcp.Connect('127.0.0.1', " + loopbackPort + "); Write-Output network-connected; exit 0 } catch { exit 73 }",
+                        TimeSpan.FromSeconds(15));
+                    Check(networkProbe.ExitCode != 0 && !networkProbe.Output.Contains("network-connected", StringComparison.Ordinal), "Windows capability-free AppContainer cannot connect to a host loopback listener");
+                    var workspaceAccessAfterCommand = FileSystemAclExtensions.GetAccessControl(new DirectoryInfo(workspacePath), AccessControlSections.Access).GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+                    Check(workspaceAccessBeforeCommand is not null && workspaceAccessAfterCommand == workspaceAccessBeforeCommand, "Windows sandbox leaves the project ACL unchanged after each approved command");
+                }
                 if (OperatingSystem.IsLinux())
                 {
                     Check(commandResult.IsolationStatus.Contains("network disabled", StringComparison.Ordinal), "Linux command evidence confirms network namespace isolation");
@@ -427,7 +466,7 @@ internal static class LocalStorageAndWorkspaceTests
                     Check(!networkProbe.Output.Contains("not found", StringComparison.OrdinalIgnoreCase), "Linux sandbox network probe has its Python runtime available");
                     Check(networkProbe.ExitCode != 0 && !networkProbe.Output.Contains("network-connected", StringComparison.Ordinal), "Linux sandbox cannot reach an external network address");
                 }
-                else
+                else if (!OperatingSystem.IsWindows())
                     Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "unsupported process boundaries clearly report that filesystem and network are not sandboxed");
                 if (OperatingSystem.IsWindows() && GC.GetGCMemoryInfo().TotalAvailableMemoryBytes >= 2L * 1024 * 1024 * 1024)
                 {

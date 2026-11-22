@@ -6,9 +6,8 @@ using Microsoft.Win32.SafeHandles;
 namespace SkaiDesktop.Core.Infrastructure;
 
 /// <summary>
-/// Attaches a command process to an OS containment boundary when the platform provides one.
-/// Windows uses a kill-on-close Job Object to bound descendants and prevent process-spawn bombs.
-/// This is process containment only; it does not restrict filesystem or network access.
+/// Attaches Windows command processes to a kill-on-close Job Object for descendant and memory limits.
+/// WindowsCommandSandbox supplies the AppContainer filesystem and network boundary before launch.
 /// </summary>
 internal sealed class OsProcessIsolation : IDisposable
 {
@@ -72,8 +71,8 @@ internal sealed class OsProcessIsolation : IDisposable
 
     public static string DescribeCurrentPlatform(bool attached, ulong? memoryLimitBytes) => OperatingSystem.IsWindows()
         ? attached
-            ? $"Windows process containment active (maximum {MaxActiveProcesses} processes; job memory cap {FormatGigabytes(memoryLimitBytes ?? 0)} GiB); filesystem and network access are not sandboxed."
-            : "Windows process containment could not be enabled; filesystem and network access are not sandboxed."
+            ? $"Windows Job Object process containment active (maximum {MaxActiveProcesses} processes; job memory cap {FormatGigabytes(memoryLimitBytes ?? 0)} GiB)."
+            : "Windows Job Object process containment could not be enabled; filesystem and network access are not sandboxed."
         : "OS process containment is unavailable on this platform; filesystem and network access are not sandboxed.";
 
     public void Dispose() => jobHandle?.Dispose();

@@ -98,10 +98,15 @@ npm run open:desktop
 dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj
 ```
 
+### Coding Agent command isolation
+
+- **Windows:** Approved project commands require the Windows Process Security Environment (PSEC) API and a Windows AppContainer. They can write only in the selected project, read the project runtime paths, and have no network capability; a Windows Job Object bounds process count and memory. If PSEC or Job Object setup fails, the command is not started.
+- **Linux:** Approved project commands require Bubblewrap (`bwrap`) and working PID, network, IPC, and UTS namespaces (a user namespace is used when available). Commands see system runtime paths read-only, the selected project as the only writable host path, an isolated temporary directory, and no network. If Bubblewrap or required namespace support is unavailable, Skai refuses to run the command and explains the isolation requirement. Install it from your distribution’s packages (Ubuntu: `sudo apt install bubblewrap`). Linux memory/resource caps and acceptance on additional Windows/Linux profiles remain open.
+- **Interactive Terminal:** These restrictions apply to approved Coding Agent commands. Interactive Terminal is a separately user-opened host shell and is not covered by this command sandbox.
+
 ### Linux window managers
 
 - **Installing a Linux build:** extract the `Skai-Desktop-electron-linux-x64` archive and run `./install.sh`. It installs for your user (no root needed) and adds Skai to your app launcher and a `skai-desktop` command. On distributions that restrict unprivileged user namespaces (such as Ubuntu 24.04+), it offers the one `sudo` step Chromium's sandbox needs. `./uninstall.sh` removes the app and keeps your data.
-- **Coding Agent command isolation on Linux:** approved project commands require Bubblewrap (`bwrap`) and working PID, network, IPC, and UTS namespaces (a user namespace is used when available). Commands see system runtime paths read-only, the selected project as the only writable host path, an isolated temporary directory, and no network. If Bubblewrap is missing, install it from your distribution’s packages (Ubuntu: `sudo apt install bubblewrap`). If Bubblewrap or required namespace support is unavailable, Skai refuses to run the command and explains the isolation requirement. Interactive Terminal sessions remain a separately user-opened shell and are not covered by this command sandbox. Windows currently has process and memory limits, but no filesystem/network sandbox. Linux memory/resource caps also remain open.
 - **Wayland (Hyprland, Sway, GNOME, KDE):** Skai runs under XWayland by default because native Wayland does not let apps position their own windows. Set `SKAI_OZONE_PLATFORM=wayland` (or pass `--ozone-platform=wayland`) to use native Wayland; pets then stay where the compositor places them and use compositor-driven dragging.
 - **Tiling WMs (i3, bspwm, Hyprland, Sway):** Pets ask to float. Your WM decides borders, stickiness and always-on-top, so add rules for the pet window title if needed.
 - **X11 without a compositor** (plain i3, bspwm): transparent windows render with a black background. Run a compositor such as `picom`, or hide pets from the tray or Settings.

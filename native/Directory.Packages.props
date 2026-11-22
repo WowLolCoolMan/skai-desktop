@@ -2,6 +2,7 @@
   <ItemGroup>
   </ItemGroup>
   <ItemGroup>
+    <PackageVersion Include="Google.FlatBuffers" Version="25.2.10" />
     <PackageVersion Include="Markdig" Version="1.4.0" />
     <PackageVersion Include="PdfPig" Version="0.1.16" />
     <PackageVersion Include="Porta.Pty" Version="2.2.4" />

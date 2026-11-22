@@ -13,6 +13,7 @@
     <EmbeddedResource Remove=".build\**" />
     <None Remove="artifacts\**" />
     <None Remove=".build\**" />
+    <PackageReference Include="Google.FlatBuffers" />
     <PackageReference Include="PdfPig" />
     <PackageReference Include="Porta.Pty" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
