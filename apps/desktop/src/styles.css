@@ -880,13 +880,19 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .app-content-settings .settings-page-header { flex: 0 0 auto; margin-bottom: 14px; }
 .app-content-settings .settings-page-header h1 { font-size: calc(var(--skai-text-5xl) * var(--skai-heading-scale)); }
 .app-content-settings .settings-window { min-height: 0; flex: 1 1 0; }
-.app-content-settings .settings-nav, .app-content-settings .settings-content { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.app-content-settings .settings-nav { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.app-content-settings .settings-content { display: flex; min-height: 0; flex-direction: column; overflow: hidden; padding: 0; }
+.app-content-settings .settings-content-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 22px 18px 24px; scrollbar-gutter: stable; }
+.app-content-settings .settings-footer { flex: 0 0 auto; margin: 0; padding: 12px 18px; border-top: 1px solid var(--skai-color-border); background: var(--skai-color-canvas); }
 .app-content-settings .settings-page, .app-content-settings .settings-window, .app-content-settings .settings-content { min-width: 0; }
 @media (max-width: 640px) {
   .app-content-settings { overflow: auto; }
   .app-content-settings .settings-page { height: auto; }
   .app-content-settings .settings-window { flex: none; }
   .app-content-settings .settings-nav, .app-content-settings .settings-content { overflow: visible; }
+  .app-content-settings .settings-content { display: block; padding: 0; }
+  .app-content-settings .settings-content-scroll { overflow: visible; padding: 22px 18px 24px; }
+  .app-content-settings .settings-footer { margin: 0 18px 18px; padding: 12px 0; }
 }
 .app-content-images { display: flex; height: 100%; min-height: 0; flex-direction: column; padding-bottom: 24px; overflow: hidden; }
 .app-content-images .image-studio-page { display: flex; min-height: 0; height: 100%; flex: 1 1 0; max-width: none; flex-direction: column; }
@@ -2027,7 +2033,8 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .settings-category-list .nav-icon { width: 16px; height: 16px; flex: 0 0 16px; color: var(--skai-color-text-muted); }
 .settings-category-list button.is-active .nav-icon { color: var(--skai-color-accent-text); }
 .settings-overlay-panel .settings-no-results { margin: 4px 9px; line-height: 1.5; }
-.settings-overlay-panel .settings-content { width: 100%; max-width: 1180px; min-width: 0; min-height: 0; overflow-y: auto; margin: 0 auto; padding: 37px clamp(24px, 5vw, 70px) 24px; scrollbar-gutter: stable; }
+.settings-overlay-panel .settings-content { display: flex; width: 100%; max-width: 1180px; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; margin: 0 auto; padding: 0; }
+.settings-overlay-panel .settings-content-scroll { width: 100%; min-height: 0; flex: 1 1 auto; overflow-y: auto; margin: 0 auto; padding: 37px clamp(24px, 5vw, 70px) 24px; scrollbar-gutter: stable; }
 .settings-overlay-panel .settings-section-heading { margin-bottom: 7px; padding-bottom: 21px; border-bottom: 1px solid var(--skai-color-border); }
 .settings-overlay-panel .settings-section-heading .section-kicker { margin: 0 0 5px; color: var(--skai-color-accent-text); font-size: var(--skai-text-2xs); font-weight: 600; letter-spacing: .1em; }
 .settings-overlay-panel .settings-section-heading h1 { margin: 0; color: var(--skai-color-text); font-size: calc(var(--skai-text-5xl) * var(--skai-heading-scale)); font-weight: 600; letter-spacing: -.045em; }
@@ -2042,10 +2049,11 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .settings-overlay-panel .settings-toggle small { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
 .settings-overlay-panel .settings-callout, .settings-overlay-panel .settings-about-you { border-color: var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
 .settings-overlay-panel .settings-callout { padding: 15px 16px; }
+.settings-callout > .ui-button { width: fit-content; justify-self: start; }
 .settings-overlay-panel .settings-callout strong, .settings-overlay-panel .settings-about-you h3 { color: var(--skai-color-text); font-size: var(--skai-text-md); font-weight: 600; }
 .settings-overlay-panel .settings-callout span, .settings-overlay-panel .settings-about-you-note { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.5; }
 .settings-overlay-panel .settings-provider-row { padding: 14px 15px; border-color: var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }
-.settings-overlay-panel .settings-footer { position: sticky; z-index: 2; bottom: -24px; display: flex; align-items: center; gap: 16px; margin: 22px calc(clamp(24px, 5vw, 70px) * -1) -24px; padding: 13px clamp(24px, 5vw, 70px); border-top: 1px solid var(--skai-color-border); background: var(--skai-color-canvas); }
+.settings-overlay-panel .settings-footer { position: relative; z-index: 2; display: flex; flex: 0 0 auto; align-items: center; gap: 16px; margin: 0 calc(clamp(24px, 5vw, 70px) * -1); padding: 13px clamp(24px, 5vw, 70px); border-top: 1px solid var(--skai-color-border); background: var(--skai-color-canvas); }
 .settings-overlay-panel .settings-footer > span { flex: 1; font-size: var(--skai-text-sm); }
 .settings-overlay-panel .settings-footer .btn { min-width: 128px; }
 .settings-overlay-panel .settings-footer .settings-save-saved { color: var(--skai-color-success-text, var(--skai-color-accent-text)); }
@@ -2056,17 +2064,17 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .settings-search-wrap { margin: 0 0 11px; }
   .settings-category-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 7px; max-height: 118px; overflow-y: auto; }
   .settings-category-list button { min-height: 35px; }
-  .settings-overlay-panel .settings-content { padding: 25px 22px 20px; }
-  .settings-overlay-panel .settings-footer { bottom: -20px; margin: 18px -22px -20px; padding: 12px 22px; }
+  .settings-overlay-panel .settings-content-scroll { padding: 25px 22px 20px; }
+  .settings-overlay-panel .settings-footer { margin: 0 -22px; padding: 12px 22px; }
 }
 @media (max-width: 480px) {
   .settings-overlay-header { padding: 0 16px !important; }
   .settings-overlay-title small { display: none; }
   .settings-overlay-panel .settings-nav { max-height: 290px; padding: 13px 13px 10px; }
   .settings-category-list { grid-template-columns: minmax(0, 1fr); max-height: 148px; }
-  .settings-overlay-panel .settings-content { padding: 21px 16px 18px; }
+  .settings-overlay-panel .settings-content-scroll { padding: 21px 16px 18px; }
   .settings-overlay-panel .settings-field, .settings-overlay-panel .settings-about-you-fields { grid-template-columns: minmax(0, 1fr); }
-  .settings-overlay-panel .settings-footer { bottom: -18px; margin: 16px -16px -18px; padding: 11px 16px; }
+  .settings-overlay-panel .settings-footer { margin: 0 -16px; padding: 11px 16px; }
   .settings-overlay-panel .settings-footer > span { font-size: var(--skai-text-xs); }
   .settings-overlay-panel .settings-footer .btn { min-width: 112px; }
 }
