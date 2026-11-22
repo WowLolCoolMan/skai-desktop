@@ -82,7 +82,8 @@ and to any detailed plan rather than copying their full contents here.
   Marketplace, persona research, model library, and workspace orchestration
   remain large. Persona matching and HTML parsing are now in focused Core
   helpers, and bounded public-source requests are isolated in an injectable
-  client; research orchestration and evidence selection remain to be separated.
+  client; speaker-labelled turns and quote evidence now have a dedicated
+  extraction helper, while the broader research orchestration still remains.
   Agent Host request validation and method dispatch are also separated from
   the main loop. Update and local-media IPC registration now live outside
   Electron's shell entry point. Marketplace catalog shaping and MCP connection

@@ -97,6 +97,9 @@ that users touch as each slice is moved.
 - Extracted bounded Wikipedia/Fandom requests, timeouts, host pacing, and
   retry handling into an injectable `PersonaWikiClient`; the coordinator still
   owns the existing research decisions and evidence selection.
+- Moved transcript-turn cleanup, speaker alias selection, and quote-line
+  filtering into `PersonaQuoteEvidence`, retaining the old public speaker-label
+  facade while keeping citation and evidence policy unchanged.
 - Moved Agent Host request-parameter validation, bounds, and local endpoint
   checks into `AgentHostLoop.RequestValidation.cs`; the public protocol and
   guard behavior are unchanged.

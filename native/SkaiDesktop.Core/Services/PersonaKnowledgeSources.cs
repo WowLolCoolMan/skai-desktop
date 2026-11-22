@@ -391,13 +391,13 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             ? "Fan-maintained aggregator wiki; prefer franchise wiki or official canon where they disagree."
             : "Fan-maintained franchise wiki; usually detailed and canon-focused, but check disputed details.";
         var documents = new List<PersonaKnowledgeDocument>();
-        var canon = JoinSections(sections.Where(section => !IsBoilerplateSection(section.Heading) && !IsAnalysisSection(section.Heading) && !IsQuoteSection(section.Heading)), 9_000);
+        var canon = JoinSections(sections.Where(section => !IsBoilerplateSection(section.Heading) && !IsAnalysisSection(section.Heading) && !PersonaQuoteEvidence.IsQuoteSection(section.Heading)), 9_000);
         if (canon.Length > 0)
             documents.Add(new($"{identity.FandomTitle} — {site}", url, identity.FandomHost, identity.SubjectType == "person" ? "Other reference" : "Canon reference", canon, "not-applicable", 0, "reference-text", note));
         var analysis = JoinSections(sections.Where(section => IsAnalysisSection(section.Heading)), 8_000);
         if (analysis.Length > 0)
             documents.Add(new($"{identity.FandomTitle} — {site} (personality and relationships)", url + "#Personality", identity.FandomHost, identity.SubjectType == "person" ? "Other reference" : "Character analysis", analysis, "not-applicable", 0, "reference-text", note));
-        var quotes = QuoteLines(sections.Where(section => IsQuoteSection(section.Heading)).SelectMany(section => section.Lines), identity);
+        var quotes = PersonaQuoteEvidence.QuoteLines(sections.Where(section => PersonaQuoteEvidence.IsQuoteSection(section.Heading)).SelectMany(section => section.Lines), identity);
         if (quotes.Count >= 3)
             documents.Add(new($"{identity.FandomTitle} — {site} (quotes)", url + "#Quotes", identity.FandomHost, "Character dialogue", string.Join('\n', quotes.Select(line => $"{identity.CanonicalName}: {line}")),
                 "subject-attributed", quotes.Count, "wiki-quote-section", "Quotes the wiki attributes to this subject; verify against the episode or scene when exact wording matters."));
@@ -416,9 +416,9 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             var html = await _wiki.Quietly(() => _wiki.ParseHtmlAsync(identity.FandomHost, "/api.php", title, cancellationToken), null).ConfigureAwait(false);
             if (html is null) continue;
             var text = string.Join('\n', HtmlToSections(html).SelectMany(section => section.Lines));
-            var attribution = PersonaDialogueEvidence.DetectSpeaker(SpeakerLabels(identity), text);
+            var attribution = PersonaDialogueEvidence.DetectSpeaker(PersonaQuoteEvidence.SpeakerLabels(identity), text);
             if (!attribution.IsUsable) continue;
-            var turns = CleanTurns(PersonaDialogueEvidence.SelectSpeakerTurns(SpeakerLabels(identity), text, 6_000));
+            var turns = PersonaQuoteEvidence.CleanTurns(PersonaDialogueEvidence.SelectSpeakerTurns(PersonaQuoteEvidence.SpeakerLabels(identity), text, 6_000));
             if (turns.Count < 3) continue;
             documents.Add(new($"{title} — {identity.FandomSiteName ?? identity.FandomHost}", PersonaIdentityMatcher.WikiUrl(identity.FandomHost, title), identity.FandomHost, "Story transcript", string.Join('\n', turns),
                 "subject-attributed", Math.Max(turns.Count, attribution.TurnCount), "explicit-speaker-labels", "Fan transcript with explicit speaker labels; compare with the episode or film for transcription errors."));
@@ -451,7 +451,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             if (html is not null && !html.Contains("disambiguation", StringComparison.OrdinalIgnoreCase))
             {
                 var sections = HtmlToSections(html);
-                var quotes = QuoteLines(sections.Where(section => section.Heading.Length > 0 && !IsBoilerplateSection(section.Heading) && !Regex.IsMatch(section.Heading, @"^(?:quotes about|about|misattributed|disputed)", RegexOptions.IgnoreCase)).SelectMany(section => section.Lines), identity);
+                var quotes = PersonaQuoteEvidence.QuoteLines(sections.Where(section => section.Heading.Length > 0 && !IsBoilerplateSection(section.Heading) && !Regex.IsMatch(section.Heading, @"^(?:quotes about|about|misattributed|disputed)", RegexOptions.IgnoreCase)).SelectMany(section => section.Lines), identity);
                 if (quotes.Count >= 3)
                     documents.Add(new($"{personPage} — Wikiquote", PersonaIdentityMatcher.WikiUrl("en.wikiquote.org", personPage), "en.wikiquote.org", identity.SubjectType == "person" ? "Interview" : "Character dialogue",
                         string.Join('\n', quotes.Select(line => $"{identity.CanonicalName}: {line}")), "subject-attributed", quotes.Count, "sourced-quote-collection",
@@ -463,9 +463,9 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             var html = await _wiki.Quietly(() => _wiki.ParseHtmlAsync("en.wikiquote.org", "/w/api.php", title, cancellationToken), null).ConfigureAwait(false);
             if (html is null) continue;
             var text = string.Join('\n', HtmlToSections(html).SelectMany(section => section.Lines));
-            var attribution = PersonaDialogueEvidence.DetectSpeaker(SpeakerLabels(identity), text);
+            var attribution = PersonaDialogueEvidence.DetectSpeaker(PersonaQuoteEvidence.SpeakerLabels(identity), text);
             if (!attribution.IsUsable) continue;
-            var turns = CleanTurns(PersonaDialogueEvidence.SelectSpeakerTurns(SpeakerLabels(identity), text, 5_000));
+            var turns = PersonaQuoteEvidence.CleanTurns(PersonaDialogueEvidence.SelectSpeakerTurns(PersonaQuoteEvidence.SpeakerLabels(identity), text, 5_000));
             if (turns.Count < 3) continue;
             documents.Add(new($"{title} — Wikiquote", PersonaIdentityMatcher.WikiUrl("en.wikiquote.org", title), "en.wikiquote.org", "Character dialogue",
                 string.Join('\n', turns), "subject-attributed", turns.Count, "explicit-speaker-labels",
@@ -474,42 +474,8 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         return documents;
     }
 
-    /// <summary>Speaker labels for transcripts: the display name first, then aliases such as a first name.</summary>
-    public static IReadOnlyList<string> SpeakerLabels(PersonaIdentity identity) =>
-        new[] { identity.CanonicalName }.Concat(identity.Aliases).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-
-    /// <summary>Drops navigation and list residue ("Seasons: 1 2 3 4 …", "a | b | c") that page chrome leaves among dialogue turns.</summary>
-    private static List<string> CleanTurns(string turns) =>
-        turns.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Where(line => !line.Contains(" | ", StringComparison.Ordinal))
-            .Where(line => Regex.Matches(line, @"(?<![\p{L}\p{N}])\d{1,2}(?![\p{L}\p{N}])").Count < 5)
-            .Where(line => !Regex.IsMatch(line, @":\s*(?:seasons?|episodes?|movies?|films?|specials?|see also|main article)\s*:", RegexOptions.IgnoreCase))
-            .ToList();
-
-    private static List<string> QuoteLines(IEnumerable<string> lines, PersonaIdentity identity)
-    {
-        var otherSpeaker = new Regex(@"^\s*(?<speaker>[\p{Lu}][\p{L}'’.\- ]{1,40}):\s*\S");
-        var labels = SpeakerLabels(identity).Select(Normalize).ToHashSet(StringComparer.Ordinal);
-        var quotes = new List<string>();
-        foreach (var raw in lines)
-        {
-            var line = Regex.Replace(raw, @"\s+", " ").Trim().Trim('"', '“', '”', '•', '-', ' ');
-            if (line.Length is < 12 or > 600) continue;
-            if (Regex.IsMatch(line, @"^(?:\[\s*edit\s*\]|edit|source|see also|external links|references|notes)$", RegexOptions.IgnoreCase)) continue;
-            var speaker = otherSpeaker.Match(line);
-            if (speaker.Success)
-            {
-                // A labelled line belongs to the subject only when the label is one of its names.
-                if (!labels.Contains(PersonaIdentityMatcher.Normalize(speaker.Groups["speaker"].Value))) continue;
-                line = line[(line.IndexOf(':') + 1)..].Trim();
-            }
-            // Source citations under a quote ("Interview with X, 2016") are not quotes.
-            if (Regex.IsMatch(line, @"^(?:—|–|-)?\s*(?:as quoted in|interview|source|in an interview|episode \d|season \d)", RegexOptions.IgnoreCase)) continue;
-            quotes.Add(line);
-            if (quotes.Count >= 60) break;
-        }
-        return quotes;
-    }
+    /// <summary>Compatibility facade: display name first, followed by transcript aliases.</summary>
+    public static IReadOnlyList<string> SpeakerLabels(PersonaIdentity identity) => PersonaQuoteEvidence.SpeakerLabels(identity);
 
     // ---------------------------------------------------------------- API calls
 
@@ -529,8 +495,6 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
 
     private static bool IsAnalysisSection(string heading) =>
         Regex.IsMatch(heading, @"\b(?:personality|characteri[sz]ation|character|portrayal|depiction|reception|legacy|relationships?|abilities|skills|traits|views|beliefs|politic|style|persona|public image|comedy|humou?r|behaviou?r|psychology|motivations?|attitude)\b", RegexOptions.IgnoreCase);
-
-    private static bool IsQuoteSection(string heading) => Regex.IsMatch(heading, @"\bquotes?\b|\bquotations?\b|\bdialogue\b|\bcatchphrases?\b", RegexOptions.IgnoreCase);
 
     private static string JoinSections(IEnumerable<HtmlSection> sections, int maxCharacters)
     {
