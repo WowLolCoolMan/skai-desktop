@@ -2,5 +2,5 @@
 airllm>=4.0.0
 torch>=2.1
 transformers>=5.23.0
-safetensors>=0.4
+safetensors>=0.8.0
 accelerate>=0.27
