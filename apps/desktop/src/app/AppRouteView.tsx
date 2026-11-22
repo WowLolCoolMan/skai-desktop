@@ -9,7 +9,8 @@ import { MemoryPage } from "../features/memory/MemoryPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { TerminalPage } from "../features/terminal/TerminalPage";
 import { UsagePage } from "../features/usage/UsagePage";
-import { PluginsPage, VoiceWorkbench } from "../features/catalog/PluginsPage";
+import { PluginsPage } from "../features/catalog/PluginsPage";
+import { VoiceWorkbench } from "../features/catalog/VoiceWorkbench";
 import { PetWorkshopPage } from "../features/pets/PetWorkshopPage";
 import { PersonaWorkshopPage } from "../features/personas/PersonaWorkshopPage";
 
