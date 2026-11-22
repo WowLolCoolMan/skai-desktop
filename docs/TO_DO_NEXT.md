@@ -95,8 +95,8 @@ and to any detailed plan rather than copying their full contents here.
   and MCP connection lifecycle state are separated from the React page; MCP
   connection review and Staff Picks each
   have their own focused panel.
-  Agent Host user-profile and settings handlers now have a dedicated protocol
-  module.
+  Agent Host user-profile/settings handlers and long-running operation state
+  now have dedicated protocol modules.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
   bridge and storage contracts, keep current behavior, and integrate one
   reviewable slice at a time after syncing with main.

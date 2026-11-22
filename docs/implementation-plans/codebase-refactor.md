@@ -121,6 +121,10 @@ that users touch as each slice is moved.
 - Moved user profile and app settings protocol handlers into
   `AgentHostLoop.Settings.cs`; response fields, validation, persistence, and the
   local endpoint restriction are unchanged.
+- Moved mutable model-pull, AirLLM-install, image-runtime, image-generation,
+  and Marketplace-download operation state containers into
+  `AgentHostLoop.Operations.cs`; their locks, progress caps, cancellation,
+  terminal states, and response serialization are unchanged.
 - Moved update IPC registration and its sender/URL checks into
   `update-ipc.cjs`; the existing updater manager remains responsible for update
   lifecycle and download state.
