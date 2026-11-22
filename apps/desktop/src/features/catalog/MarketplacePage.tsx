@@ -45,7 +45,6 @@ const EMBEDDED_SECTIONS: Section[] = ["Models", "Installed"];
 
 export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSection = "Discover", onBack, initialQuery }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; initialSection?: Section; onBack?: () => void; initialQuery?: string }) {
   const [section, setSection] = useState<Section>(initialSection);
-  const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState(() => initialQuery ?? marketplacePreference(`query.${initialSection.toLowerCase()}`, ""));
   const [selectedId, setSelectedId] = useState(items[0].id);
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
@@ -194,9 +193,8 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const sectionCategory: Partial<Record<Section, Filter>> = { Models: "Local models", Voices: "Voices", "Image workflows": "Image workflows", Skills: "Skills", Tools: "Tools" };
   const visible = useMemo(() => marketplaceItems.filter((item) => {
     const category = sectionCategory[section];
-    const filterMatch = filter === "All" || item.filter === filter;
-    return (!category || item.filter === category) && filterMatch && `${item.title} ${item.description} ${item.detail} ${item.publisher}`.toLowerCase().includes(query.trim().toLowerCase());
-  }), [filter, marketplaceItems, query, section]);
+    return (!category || item.filter === category) && `${item.title} ${item.description} ${item.detail} ${item.publisher}`.toLowerCase().includes(query.trim().toLowerCase());
+  }), [marketplaceItems, query, section]);
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
   // Live provider search gets the full width under Models; Discover stays a capability overview.
   const showModels = section === "Models";
