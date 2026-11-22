@@ -118,13 +118,25 @@ async function main() {
   await devtools.open;
   await devtools.evaluate("(document.querySelector('.sidebar-settings') ?? document.querySelector('[aria-label=\"Settings\"]'))?.click(); if (!location.hash.includes('settings')) { location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate')); } 'settings'");
   await waitFor(devtools.evaluate, "document.querySelector('.settings-content')?.textContent || ''", (value) => typeof value === "string" && value.includes("General"), "Settings page");
+  // Let the initial persisted-settings hydration settle before driving the
+  // controlled selects; otherwise a late settings response can overwrite the
+  // first theme choice in the acceptance fixture.
+  await sleep(1200);
   await devtools.evaluate("[...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === 'Appearance')?.click(); 'appearance'");
   await waitFor(devtools.evaluate, "document.querySelector('.settings-content select')?.value", (value) => typeof value === "string", "Appearance controls");
 
   const setAppearance = async (theme, backdrop) => {
-    const selected = await devtools.callFunction("function (theme, backdrop) { const labels = [...document.querySelectorAll('.settings-content label')]; const set = (labelText, value) => { const select = labels.find((label) => label.firstChild?.nodeType === Node.TEXT_NODE && label.firstChild.textContent?.trim() === labelText)?.querySelector('select'); if (!select) return false; select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); return true; }; return { theme: set('Color theme', theme), backdrop: set('Backdrop', backdrop) } }", [theme, backdrop]);
-    if (!selected?.theme || !selected?.backdrop) throw new Error(`Appearance controls were not found for ${theme}/${backdrop}`);
-    const state = await waitFor(devtools.evaluate, "JSON.stringify((() => { const root = document.documentElement; const styles = getComputedStyle(root); return { theme: root.dataset.theme, backdrop: root.dataset.backdrop, canvas: styles.getPropertyValue('--skai-color-canvas').trim(), accent: styles.getPropertyValue('--skai-color-accent').trim(), overflow: Math.max(root.scrollWidth, document.body.scrollWidth) <= window.innerWidth + 1, width: window.innerWidth }; })())", (value) => { try { const parsed = JSON.parse(value); return parsed.theme === theme && parsed.backdrop === backdrop; } catch { return false; } }, `${theme}/${backdrop} state`);
+    const selected = await devtools.callFunction("function (theme) { const label = [...document.querySelectorAll('.settings-content label')].find((item) => item.firstChild?.nodeType === Node.TEXT_NODE && item.firstChild.textContent?.trim() === 'Color theme'); const select = label?.querySelector('select'); if (!select) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, theme); select.dispatchEvent(new Event('input', { bubbles: true })); select.dispatchEvent(new Event('change', { bubbles: true })); return select.value === theme; }", [theme]);
+    await sleep(75);
+    const backdropSelected = await devtools.callFunction("function (backdrop) { const label = [...document.querySelectorAll('.settings-content label')].find((item) => item.firstChild?.nodeType === Node.TEXT_NODE && item.firstChild.textContent?.trim() === 'Backdrop'); const select = label?.querySelector('select'); if (!select) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, backdrop); select.dispatchEvent(new Event('input', { bubbles: true })); select.dispatchEvent(new Event('change', { bubbles: true })); return select.value === backdrop; }", [backdrop]);
+    if (!selected || !backdropSelected) throw new Error(`Appearance controls were not found for ${theme}/${backdrop}`);
+    let state;
+    try {
+      state = await waitFor(devtools.evaluate, "JSON.stringify((() => { const root = document.documentElement; const styles = getComputedStyle(root); return { theme: root.dataset.theme, backdrop: root.dataset.backdrop, canvas: styles.getPropertyValue('--skai-color-canvas').trim(), accent: styles.getPropertyValue('--skai-color-accent').trim(), overflow: Math.max(root.scrollWidth, document.body.scrollWidth) <= window.innerWidth + 1, width: window.innerWidth }; })())", (value) => { try { const parsed = JSON.parse(value); return parsed.theme === theme && parsed.backdrop === backdrop; } catch { return false; } }, `${theme}/${backdrop} state`);
+    } catch (error) {
+      const current = await devtools.evaluate("JSON.stringify({ theme: document.documentElement.dataset.theme, backdrop: document.documentElement.dataset.backdrop, scheme: document.documentElement.dataset.scheme })");
+      throw new Error(`${error.message}; current state: ${current}`);
+    }
     const parsed = JSON.parse(state);
     if (!parsed.overflow || !parsed.canvas || !parsed.accent) throw new Error(`Appearance state overflowed or lacked tokens: ${state}`);
     // Theme: native popups. Linux draws <select> popups from each <option>'s own colors
