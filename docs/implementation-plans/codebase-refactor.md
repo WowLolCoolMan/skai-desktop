@@ -121,6 +121,9 @@ checked per slice.
 - Moved Agent Host request-parameter validation, bounds, and local endpoint
   checks into `AgentHostLoop.RequestValidation.cs`; the public protocol and
   guard behavior are unchanged.
+- Moved the Agent Host stdio read/dispatch/write loop, background request
+  scheduling, and shutdown cleanup into `AgentHostLoop.Host.cs`; domain state
+  and store factories remain in the main loop partial.
 - Moved the stable protocol method-to-handler table into
   `AgentHostLoop.Dispatch.cs`, leaving process I/O and lifecycle in the main
   loop and request validation in its own module.
