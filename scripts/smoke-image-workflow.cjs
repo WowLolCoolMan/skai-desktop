@@ -10,8 +10,10 @@ const net = require("node:net");
 const { spawn } = require("node:child_process");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
 
-const artifactRoot = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`));
+const artifactArgument = process.argv.slice(2).find((argument) => !argument.startsWith("--"));
+const artifactRoot = path.resolve(artifactArgument || path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`));
 const executable = path.join(artifactRoot, process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop");
+const verifyMissingRuntime = process.argv.includes("--runtime-unavailable");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function findPort() {
@@ -30,8 +32,8 @@ async function main() {
   const localData = process.env.LOCALAPPDATA || path.join(os.homedir(), ".local", "share");
   const python = path.join(localData, "Skai", "Diffusers", "venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
   const modelCache = process.env.HF_HUB_CACHE || process.env.HUGGINGFACE_HUB_CACHE || path.join(process.env.HF_HOME || path.join(os.homedir(), ".cache", "huggingface"), "hub");
-  if (!fs.existsSync(python)) throw new Error(`Install Skai's local Diffusers runtime before running this smoke: ${python}`);
-  if (!fs.existsSync(path.join(modelCache, "models--stabilityai--sd-turbo")))
+  if (!verifyMissingRuntime && !fs.existsSync(python)) throw new Error(`Install Skai's local Diffusers runtime before running this smoke: ${python}`);
+  if (!verifyMissingRuntime && !fs.existsSync(path.join(modelCache, "models--stabilityai--sd-turbo")))
     throw new Error(`This smoke never downloads model weights. Cache stabilityai/sd-turbo first: ${modelCache}`);
 
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-image-workflow-"));
@@ -39,7 +41,12 @@ async function main() {
   const display = resolveDisplayBackend({ argv: [] });
   const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...(display.switchValue ? [`--ozone-platform=${display.switchValue}`] : []), `--user-data-dir=${userDataDir}`], {
     cwd: artifactRoot,
-    env: { ...process.env, HF_HUB_OFFLINE: "1", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" },
+    env: {
+      ...process.env,
+      HF_HUB_OFFLINE: "1",
+      SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
+      ...(verifyMissingRuntime ? { SKAI_DIFFUSERS_PYTHON: path.join(userDataDir, "missing-python.exe") } : {}),
+    },
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -93,6 +100,16 @@ async function main() {
     await waitFor(target, "Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]'))", "app navigation");
     await evaluate(target, "location.hash = '#/images'; 'navigated'");
     await waitFor(target, "Boolean(document.querySelector('.image-studio-page textarea[aria-describedby=\\\"image-prompt-help\\\"]'))", "Images page");
+
+    if (verifyMissingRuntime) {
+      await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('dependencies-missing')", "missing-runtime state");
+      const unavailable = await evaluate(target, "JSON.stringify({ message: document.querySelector('.image-runtime-callout')?.innerText, installAction: [...document.querySelectorAll('.image-runtime-callout button')].some(button => button.textContent.includes('Install optional runtime')), generateDisabled: [...document.querySelectorAll('.form-footer button')].find(button => button.textContent.trim() === 'Generate image')?.disabled })");
+      const unavailableState = JSON.parse(unavailable);
+      if (!unavailableState.message?.includes("Install the optional local image runtime") || !unavailableState.installAction || unavailableState.generateDisabled !== true)
+        throw new Error(`Missing-runtime state was not actionable or allowed a run: ${unavailable}`);
+      console.log(`Packaged missing-runtime recovery passed: ${JSON.stringify(unavailableState)}.`);
+      return;
+    }
 
     const setPrompt = async (value) => evaluate(target, `(() => { const field = document.querySelector('.image-studio-page textarea[aria-describedby="image-prompt-help"]'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()`);
     await evaluate(target, "(() => { const field = document.querySelector('.image-provider-picker select'); const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(field, 'diffusers'); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()");

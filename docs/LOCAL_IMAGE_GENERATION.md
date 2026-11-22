@@ -33,8 +33,11 @@ editing, generated a second valid 512×512 JPEG, and restored both images after
 reloading the packaged app. `npm run smoke:image:workflow` automates this path
 against a packaged artifact using a disposable app profile. It requires the
 local runtime and cached weights and sets Hugging Face offline mode so it never
-downloads a model as part of the smoke. Live generation was CPU-backed on this
-machine; this does not validate GPU or ComfyUI behavior.
+downloads a model as part of the smoke. `npm run
+smoke:image:runtime-unavailable` checks the packaged missing-dependency state
+with an unavailable Python executable and verifies that the UI offers setup
+while disabling generation. Live generation was CPU-backed on this machine;
+this does not validate GPU or ComfyUI behavior.
 
 ## ComfyUI integration
 

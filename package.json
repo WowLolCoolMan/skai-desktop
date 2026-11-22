@@ -63,6 +63,7 @@
     "check:release-readiness": "node scripts/validate-release-readiness.cjs",
     "smoke:personas": "node scripts/smoke-personas.cjs",
     "smoke:image:workflow": "node scripts/smoke-image-workflow.cjs",
+    "smoke:image:runtime-unavailable": "node scripts/smoke-image-workflow.cjs --runtime-unavailable",
     "check:syntax:image-workflow": "node --check scripts/smoke-image-workflow.cjs"
   }
 }

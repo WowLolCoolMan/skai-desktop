@@ -159,7 +159,8 @@ and to any detailed plan rather than copying their full contents here.
   provider tests cover ComfyUI queue polling, scoped cancellation, and local
   endpoint enforcement. The packaged Windows renderer-to-host path now cancels
   live inference, generates and edits images, and restores both outputs from
-  local history after reload. An offline-only packaged smoke automates this.
+  local history after reload. Offline-only packaged smokes automate the
+  successful workflow and missing-runtime recovery.
 - **Agreed approach:** Exercise the supported local runtimes and expose real
   stage/progress state when the runtime provides it. Cancellation must stop the
   active operation, preserve completed outputs, and return the UI to a usable
@@ -168,9 +169,10 @@ and to any detailed plan rather than copying their full contents here.
   ComfyUI queue polling/cancellation and local-only endpoint checks pass in
   automated tests. Packaged Windows generation, edit, persistent history after
   reload, live cancellation, and starting another generation after cancellation
-  now pass. Still open: confirm actionable missing-dependency and failure states
-  in the packaged UI, exercise a live ComfyUI instance, and validate additional
-  hardware. Progress must continue to reflect runtime evidence.
+  now pass. The packaged missing-dependency state offers runtime setup and
+  disables generation. Still open: verify worker/runtime failure recovery,
+  exercise a live ComfyUI instance, and validate additional hardware. Progress
+  must continue to reflect runtime evidence.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [local image generation](LOCAL_IMAGE_GENERATION.md).
 
