@@ -30,13 +30,14 @@ export type MarketplaceEntry = {
   status: string;
   availability: string;
   installed: boolean;
-  tone: "success" | "neutral";
+  tone: "success" | "neutral" | "warning";
   source: string;
   license?: string;
   installReview?: string;
+  adapter?: string;
 };
 
-export type CuratedCatalogEntry = { id: string; name: string; provider: string; category: string; license: string; description: string; runtime: string; capabilities: string[]; source: string; localOnly: boolean; installable: boolean; installReview: string };
+export type CuratedCatalogEntry = { id: string; name: string; provider: string; category: string; license: string; description: string; runtime: string; capabilities: string[]; source: string; localOnly: boolean; adapter: string; installable: boolean; installReview: string };
 
 export type McpConnectionStatus = {
   serverId: string;
@@ -75,7 +76,12 @@ export function createMarketplaceEntries(
     builtIn: false,
     status: "Downloadable MCP",
   };
-  const toolEntries: MarketplaceEntry[] = [...tools, reaTool].map((tool) => {
+  const toolEntries: MarketplaceEntry[] = [...tools, reaTool].filter((tool) => {
+    const installed = tool.id === "rea"
+      ? connections.some((connection) => connection.serverId === "rea" && connection.state === "healthy")
+      : tool.builtIn || /installed|connected/i.test(tool.status);
+    return installed || tool.id === "rea";
+  }).map((tool) => {
     const isRea = tool.id === "rea";
     const installed = isRea
       ? connections.some((connection) => connection.serverId === "rea" && connection.state === "healthy")
@@ -95,12 +101,21 @@ export function createMarketplaceEntries(
     };
   });
 
-  const curatedEntries: MarketplaceEntry[] = curated.map((item) => ({
-    id: `catalog:${item.id}`, kind: "Catalog", name: item.name, description: item.description,
-    category: item.category, access: item.capabilities.join(" · "), status: item.license.toLowerCase().includes("non-commercial") || item.license.toLowerCase().includes("research") || item.license.toLowerCase().includes("llama") || item.license.toLowerCase().includes("custom") ? `License review · ${item.license}` : item.license,
-    availability: `${item.runtime} · Local only`, installed: false, tone: "neutral", source: `${item.provider} · ${item.source}`,
-    license: item.license, installReview: item.installReview,
-  }));
+  const curatedEntries: MarketplaceEntry[] = curated.filter((item) => item.localOnly && item.installable && item.adapter !== "none").map((item) => {
+    const restrictedLicense = /non[- ]commercial|\bresearch\b|\bNC\b|BY-NC|CC-BY|Llama License|GPL-3\.0|\bcustom\b|OpenRAIL|CPML|modified MIT/i.test(item.license);
+    const localNpmPackage = ["local-mcp-filesystem", "local-mcp-playwright", "local-mcp-postgres"].includes(item.adapter);
+    const voiceStorageKey = item.adapter === "local-voice-kokoro" ? "skai.voice.kokoroInstalled" : item.adapter === "local-voice-piper" ? "skai.voice.piperInstalled" : "skai.voice.whisperInstalled";
+    const localVoiceInstalled = item.adapter?.startsWith("local-voice-") && localStorage.getItem(voiceStorageKey) === "true";
+    const statusLabel = item.adapter === "local-model-search" ? "Local model search" : item.adapter?.startsWith("local-voice-") ? "Local voice" : "Local MCP";
+    return {
+      id: `catalog:${item.id}`, kind: "Catalog", name: item.name, description: item.description,
+      category: item.category, access: item.capabilities.join(" · "), status: localVoiceInstalled ? "Installed · local voice" : restrictedLicense
+        ? `License review · ${item.license}`
+        : `${statusLabel} · ${item.license}`,
+      availability: localVoiceInstalled ? "Ready for local speech" : item.adapter === "local-model-search" ? "Search and install local model files" : item.adapter?.startsWith("local-voice-") ? "Install isolated local speech runtime" : localNpmPackage ? "Install local package and connect" : "Connect to a running local service", installed: Boolean(localVoiceInstalled), tone: restrictedLicense && !localVoiceInstalled ? "warning" : "success", source: `${item.provider} · ${item.source}`,
+      license: item.license, installReview: item.installReview, adapter: item.adapter,
+    };
+  });
   return [...skillEntries, ...toolEntries, ...curatedEntries].filter((entry) =>
     !term || `${entry.name} ${entry.description} ${entry.category} ${entry.access} ${entry.source}`.toLowerCase().includes(term),
   );
@@ -111,6 +126,7 @@ export function filterMarketplaceEntries(
   section: MarketplaceCatalogSection,
 ): MarketplaceEntry[] {
   return entries.filter((entry) => {
+    if (section === "Voices") return entry.kind === "Catalog" && entry.category === "Voice (TTS/STT)";
     if (section === "Skills") return entry.kind === "Skills";
     if (section === "MCP Servers") return (entry.kind === "Tools" && (entry.id === "tool:rea" || /mcp/i.test(entry.category))) || (entry.kind === "Catalog" && entry.category === "MCP Servers");
     if (section === "Skai built-ins") return entry.kind === "Tools" && entry.category === "Skai built-ins";

@@ -25,6 +25,7 @@ internal static class McpStdioClientTests
         var responses = string.Join("\n", [
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\"}}",
             largeToolCatalog,
+            "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progress\":1,\"total\":1}}",
             "{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"safe result\"}]}}"
         ]) + "\n";
         await using var input = new MemoryStream(Encoding.UTF8.GetBytes(responses));
@@ -45,7 +46,7 @@ internal static class McpStdioClientTests
             ApprovalId = "approval-1",
             Capabilities = [McpCapabilities.InvokeRead]
         }, arguments.RootElement);
-        Check(!result.IsError && result.Text == "safe result", "MCP stdio client invokes an approved read-only tool");
+        Check(!result.IsError && result.Text == "safe result", "MCP stdio client skips server notifications and invokes an approved read-only tool");
 
         var refused = false;
         try

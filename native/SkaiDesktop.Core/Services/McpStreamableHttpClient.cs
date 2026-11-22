@@ -28,7 +28,7 @@ public sealed class McpStreamableHttpClient : IMcpClient
     public McpStreamableHttpClient(string serverId, string endpoint, HttpClient? httpClient = null, TimeSpan? requestTimeout = null, McpConnectionRegistry? connectionRegistry = null)
     {
         if (string.IsNullOrWhiteSpace(serverId) || serverId.Length > 128 || serverId.Any(char.IsControl)) throw new ArgumentException("The MCP server identity is invalid.", nameof(serverId));
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var parsedEndpoint) || parsedEndpoint.Scheme is not ("https" or "http") || !string.IsNullOrEmpty(parsedEndpoint.UserInfo) || !parsedEndpoint.Query.Equals("", StringComparison.Ordinal) || !parsedEndpoint.Fragment.Equals("", StringComparison.Ordinal) || (parsedEndpoint.Scheme == "http" && !IsLoopback(parsedEndpoint))) throw new ArgumentException("The MCP endpoint must be HTTPS, or loopback HTTP without credentials or query data.", nameof(endpoint));
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var parsedEndpoint) || parsedEndpoint.Scheme is not ("https" or "http") || !string.IsNullOrEmpty(parsedEndpoint.UserInfo) || !parsedEndpoint.Query.Equals("", StringComparison.Ordinal) || !parsedEndpoint.Fragment.Equals("", StringComparison.Ordinal) || (parsedEndpoint.Scheme == "http" && !IsLoopbackEndpoint(parsedEndpoint))) throw new ArgumentException("The MCP endpoint must be HTTPS, or loopback HTTP without credentials or query data.", nameof(endpoint));
         _endpoint = parsedEndpoint;
         _serverId = serverId;
         _connectionRegistry = connectionRegistry;
@@ -115,7 +115,7 @@ public sealed class McpStreamableHttpClient : IMcpClient
     }
 
     private void EnsureInitialized() { if (!_initialized) throw new InvalidOperationException("The MCP server must be initialized before a tool call."); }
-    private static bool IsLoopback(Uri uri) => uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || System.Net.IPAddress.TryParse(uri.Host, out var address) && System.Net.IPAddress.IsLoopback(address);
+    public static bool IsLoopbackEndpoint(Uri uri) => uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || System.Net.IPAddress.TryParse(uri.Host, out var address) && System.Net.IPAddress.IsLoopback(address);
 
     private static async Task<JsonDocument> ReadJsonRpcResponseAsync(HttpContent content, CancellationToken cancellationToken)
     {

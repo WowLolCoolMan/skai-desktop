@@ -65,14 +65,46 @@ public static partial class AgentHostLoop
             if (transport == "stdio")
             {
                 var profileId = RequiredBoundedString(request, "profileId", 32);
-                if (!serverId.Equals("rea", StringComparison.Ordinal) || !profileId.Equals("rea", StringComparison.Ordinal) || endpoint.Length != 0)
-                    throw new InvalidOperationException("Only Skai's pinned REA stdio profile can be launched; arbitrary process commands are not accepted.");
-                client = McpReaProcessClient.Start(McpConnections);
+                if (endpoint.Length != 0) throw new InvalidOperationException("Local MCP profiles do not accept an endpoint.");
+                if (serverId.Equals("rea", StringComparison.Ordinal) && profileId.Equals("rea", StringComparison.Ordinal))
+                {
+                    client = McpReaProcessClient.Start(McpConnections);
+                }
+                else if (serverId.Equals(profileId, StringComparison.Ordinal) && (profileId is "filesystem" or "playwright"))
+                {
+                    string? folderPath = null;
+                    if (profileId == "filesystem")
+                    {
+                        var requestedFolder = RequiredBoundedString(request, "folderPath", 4_000);
+                        folderPath = Path.GetFullPath(requestedFolder);
+                        if (!Directory.Exists(folderPath) || !Path.IsPathFullyQualified(requestedFolder))
+                            throw new InvalidOperationException("Choose an existing local folder before connecting Filesystem MCP.");
+                        if (string.Equals(Path.GetPathRoot(folderPath)?.TrimEnd(Path.DirectorySeparatorChar), folderPath.TrimEnd(Path.DirectorySeparatorChar), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                            throw new InvalidOperationException("Choose a folder inside the drive, not the drive root.");
+                    }
+                    client = McpMarketplaceNpmProcessClient.Start(McpConnections, profileId, folderPath);
+                }
+                else if (serverId == "postgres-mcp-pro" && profileId == "postgres")
+                {
+                    var connectionString = RequiredBoundedString(request, "connectionString", 2_000);
+                    if (!Uri.TryCreate(connectionString, UriKind.Absolute, out var databaseEndpoint)
+                        || databaseEndpoint.Scheme is not ("postgresql" or "postgres")
+                        || !McpStreamableHttpClient.IsLoopbackEndpoint(databaseEndpoint)
+                        || string.IsNullOrWhiteSpace(databaseEndpoint.UserInfo)
+                        || databaseEndpoint.AbsolutePath.Length <= 1
+                        || !string.IsNullOrEmpty(databaseEndpoint.Query)
+                        || !string.IsNullOrEmpty(databaseEndpoint.Fragment))
+                        throw new InvalidOperationException("Enter a PostgreSQL connection for a local database on 127.0.0.1 or localhost. Hosted database connections are not available here.");
+                    client = McpMarketplaceNpmProcessClient.Start(McpConnections, profileId, connectionString: connectionString, serverId: serverId);
+                }
+                else throw new InvalidOperationException("That local MCP profile is not in Skai's reviewed package catalog; arbitrary process commands are not accepted.");
             }
             else
             {
                 if (transport != "streamable-http") throw new InvalidOperationException("The MCP transport is unsupported.");
                 if (endpoint.Length == 0 || endpoint.Length > 2_048) throw new InvalidOperationException("A valid MCP endpoint is required.");
+                if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var localEndpoint) || !McpStreamableHttpClient.IsLoopbackEndpoint(localEndpoint))
+                    throw new InvalidOperationException("Marketplace MCP connections must point to a local server on this device. Hosted MCP endpoints are not available here.");
                 client = new McpStreamableHttpClient(serverId, endpoint, connectionRegistry: McpConnections);
             }
         }

@@ -1,9 +1,21 @@
+import { useState } from "react";
 import { Button, Card, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon } from "../../components/ui/NavIcon";
 import type { MarketplaceEntry } from "./marketplaceEntries";
 import type { McpConnection } from "./useMarketplaceMcp";
 
 type GroupedEntries = Array<[string, MarketplaceEntry[]]>;
+
+function entryIcon(entry: MarketplaceEntry) {
+  if (entry.kind === "Skills") return "sparkle" as const;
+  if (entry.kind === "Catalog") {
+    if (entry.category === "Coding") return "code" as const;
+    if (entry.category === "Chat / General LLM") return "model" as const;
+    if (entry.category === "Voice (TTS/STT)") return "audio" as const;
+    if (entry.category === "Image Generation") return "image" as const;
+  }
+  return "terminal" as const;
+}
 
 type Props = {
   groups: GroupedEntries;
@@ -14,11 +26,34 @@ type Props = {
   onToggleSelect: (id: string) => void;
   onDownloadRea: () => void;
   onConnectRea: () => void;
+  onFindLocalPackage: (entry: MarketplaceEntry) => void;
+  onInstallMcp: (entry: MarketplaceEntry, connectionString?: string) => void;
+  onInstallVoice: (entry: MarketplaceEntry) => void;
+  voiceBusy: boolean;
 };
 
 export function MarketplaceCatalogBrowser({
-  groups, selected, connections, busy, error, onToggleSelect, onDownloadRea, onConnectRea,
+  groups, selected, connections, busy, error, onToggleSelect, onDownloadRea, onConnectRea, onFindLocalPackage, onInstallMcp, onInstallVoice, voiceBusy,
 }: Props) {
+  const [postgresUser, setPostgresUser] = useState("postgres");
+  const [postgresDatabase, setPostgresDatabase] = useState("postgres");
+  const [postgresPort, setPostgresPort] = useState("5432");
+  const [postgresPassword, setPostgresPassword] = useState("");
+  const [postgresError, setPostgresError] = useState<string | null>(null);
+
+  const connectPostgres = (entry: MarketplaceEntry) => {
+    const port = Number(postgresPort);
+    if (!Number.isInteger(port) || port < 1 || port > 65535 || !postgresUser.trim() || !postgresDatabase.trim()) {
+      setPostgresError("Enter a valid local database name, user, and port.");
+      return;
+    }
+    const credentials = postgresPassword ? `${encodeURIComponent(postgresUser.trim())}:${encodeURIComponent(postgresPassword)}@` : `${encodeURIComponent(postgresUser.trim())}@`;
+    const connectionString = `postgresql://${credentials}127.0.0.1:${port}/${encodeURIComponent(postgresDatabase.trim())}`;
+    setPostgresError(null);
+    setPostgresPassword("");
+    onInstallMcp(entry, connectionString);
+  };
+
   return (
 <div className="plugins-browser">
                 <div className="plugins-catalog" aria-label="Skai capabilities">
@@ -41,11 +76,7 @@ export function MarketplaceCatalogBrowser({
                               className={`plugins-catalog-icon ${entry.kind === "Skills" ? "is-skill" : "is-tool"}`}
                             >
                               <NavIcon
-                                name={
-                                  entry.kind === "Skills"
-                                    ? "sparkle"
-                                    : "project"
-                                }
+                                name={entryIcon(entry)}
                               />
                             </span>
                             <button
@@ -83,13 +114,13 @@ export function MarketplaceCatalogBrowser({
                 </div>
                 <aside
                   className="plugins-inspector"
-                  aria-label="Plugin details"
+                  aria-label="Marketplace details"
                 >
                   {selected ? (
                     <Card className="plugins-detail">
                       <div className="plugins-detail-heading">
                         <div>
-                          <p className="section-kicker">PLUGIN DETAILS</p>
+                          <p className="section-kicker">MARKETPLACE DETAILS</p>
                           <h3>{selected.name}</h3>
                         </div>
                         <StatusBadge tone={selected.tone}>
@@ -105,9 +136,11 @@ export function MarketplaceCatalogBrowser({
                         <div>
                           <dt>Type</dt>
                           <dd>
-                            {selected.kind === "Skills"
-                              ? "Reusable local skill"
-                              : "Tool integration"}
+                            {selected.kind === "Catalog"
+                              ? selected.category === "MCP Servers" ? "Local MCP server integration" : "Self-hostable model listing"
+                              : selected.kind === "Skills"
+                                ? "Reusable local skill"
+                                : "Tool integration"}
                           </dd>
                         </div>
                         <div>
@@ -125,7 +158,55 @@ export function MarketplaceCatalogBrowser({
                         {selected.license && <div><dt>License</dt><dd>{selected.license}</dd></div>}
                       </dl>
                       {selected.kind === "Catalog" ? (
-                        <div className="plugins-detail-note"><strong>Local setup review</strong><span>{selected.installReview} No hosted route is configured for this catalog entry.</span></div>
+                        <div className="plugins-detail-note">
+                            <strong>{selected.adapter === "local-model-search" ? "Local model adapter" : selected.adapter?.startsWith("local-mcp-") ? "Local MCP adapter" : selected.adapter?.startsWith("local-voice-") ? "Local voice adapter" : "Not available in Skai yet"}</strong>
+                          <span>{selected.installReview}{selected.adapter === "local-model-search" ? " Model files download through the selected local runtime; inference remains on this device." : ""}</span>
+                          {selected.adapter === "local-model-search" && (
+                            <div className="plugins-detail-actions">
+                              <Button variant="primary" type="button" onClick={() => onFindLocalPackage(selected)}>
+                                Search local model packages
+                              </Button>
+                            </div>
+                          )}
+                          {["local-voice-kokoro", "local-voice-piper"].includes(selected.adapter ?? "") && (() => {
+                            const isPiper = selected.adapter === "local-voice-piper";
+                            const installKey = isPiper ? "skai.voice.piperInstalled" : "skai.voice.kokoroInstalled";
+                            const installed = localStorage.getItem(installKey) === "true";
+                            return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? `Installed · ${isPiper ? "Piper" : "Kokoro"} ready` : voiceBusy ? "Installing local runtime…" : `Install ${isPiper ? "Piper" : "Kokoro"} locally`}</Button></div>;
+                          })()}
+                          {selected.adapter === "local-voice-whisper" && (() => {
+                            const installed = localStorage.getItem("skai.voice.whisperInstalled") === "true";
+                            return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? "Installed · Whisper ready" : voiceBusy ? "Installing local model…" : "Install Whisper large-v3 · 3.09 GB"}</Button></div>;
+                          })()}
+                          {["local-mcp-filesystem", "local-mcp-playwright"].includes(selected.adapter ?? "") && (
+                            <div className="plugins-detail-actions">
+                              <Button variant="primary" type="button" disabled={busy} onClick={() => onInstallMcp(selected)}>
+                                {busy ? "Connecting…" : selected.adapter === "local-mcp-filesystem" ? "Choose folder and connect" : selected.adapter === "local-mcp-playwright" ? "Install and connect locally" : "Connect local Figma server"}
+                              </Button>
+                            </div>
+                          )}
+                          {selected.adapter === "local-mcp-postgres" && (
+                            <div className="plugins-local-db-form">
+                              <strong>Local database connection</strong>
+                              <p>Only 127.0.0.1 is accepted. Skai holds this password in memory only while connecting.</p>
+                              <label>Database<input value={postgresDatabase} onChange={(event) => setPostgresDatabase(event.target.value)} autoComplete="off" /></label>
+                              <label>User<input value={postgresUser} onChange={(event) => setPostgresUser(event.target.value)} autoComplete="username" /></label>
+                              <label>Port<input inputMode="numeric" value={postgresPort} onChange={(event) => setPostgresPort(event.target.value)} /></label>
+                              <label>Password<input type="password" value={postgresPassword} onChange={(event) => setPostgresPassword(event.target.value)} autoComplete="new-password" /></label>
+                              {postgresError && <span className="surface-error" role="alert">{postgresError}</span>}
+                              <Button variant="primary" type="button" disabled={busy} onClick={() => connectPostgres(selected)}>
+                                {busy ? "Installing and connecting…" : "Install and connect locally"}
+                              </Button>
+                            </div>
+                          )}
+                          {selected.adapter === "local-mcp-supabase" && (
+                            <div className="plugins-detail-actions">
+                              <Button variant="primary" type="button" disabled={busy} onClick={() => onInstallMcp(selected)}>
+                                {busy ? "Connecting…" : "Connect local Supabase stack"}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       ) : selected.id === "tool:rea" ? (
                         <div className="plugins-detail-note">
                           <strong>

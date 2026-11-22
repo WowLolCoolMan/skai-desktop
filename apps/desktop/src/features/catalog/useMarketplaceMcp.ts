@@ -15,6 +15,7 @@ export type McpTool = {
   serverId: string;
   toolName: string;
   description: string;
+  inputSchemaJson?: string;
   isMutating: boolean;
   requiredCapabilities: string[];
 };
@@ -115,6 +116,86 @@ export function useMarketplaceMcp(onNotice: (notice: string) => void) {
     }
   };
 
+  const connectFilesystem = async (folderPath: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await request("mcp.connection.connect", {
+        serverId: "filesystem", transport: "stdio", profileId: "filesystem", folderPath,
+      });
+      if (!response.ok) throw new Error(response.error?.message ?? "Filesystem MCP could not be installed or started.");
+      const result = response.result as ConnectionResult;
+      acceptConnection(result);
+      onNotice(`Filesystem MCP is connected in read-only mode for the selected folder, with ${result.tools?.length ?? 0} tools. npm package installation runs locally.`);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Filesystem MCP could not be installed or started.";
+      setError(message);
+      onNotice(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectPlaywright = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await request("mcp.connection.connect", {
+        serverId: "playwright", transport: "stdio", profileId: "playwright",
+      });
+      if (!response.ok) throw new Error(response.error?.message ?? "Playwright MCP could not be installed or started.");
+      const result = response.result as ConnectionResult;
+      acceptConnection(result);
+      onNotice(`Playwright MCP is connected locally with ${result.tools?.length ?? 0} browser tools. Each tool call still requires its configured approval.`);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Playwright MCP could not be installed or started.";
+      setError(message);
+      onNotice(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectPostgres = async (connectionString: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await request("mcp.connection.connect", {
+        serverId: "postgres-mcp-pro", transport: "stdio", profileId: "postgres", connectionString,
+      });
+      if (!response.ok) throw new Error(response.error?.message ?? "PostgreSQL MCP could not be installed or started.");
+      const result = response.result as ConnectionResult;
+      acceptConnection(result);
+      onNotice(`PostgreSQL MCP is connected to the local database with ${result.tools?.length ?? 0} tools. Credentials were provided only to the server process; tool approvals still apply.`);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "PostgreSQL MCP could not be installed or started.";
+      setError(message);
+      onNotice(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectLocalServer = async (localServerId: string, localEndpoint: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await request("mcp.connection.connect", {
+        serverId: localServerId, transport: "streamable-http", endpoint: localEndpoint,
+      });
+      if (!response.ok) throw new Error(response.error?.message ?? "The local MCP server could not be connected.");
+      const result = response.result as ConnectionResult;
+      acceptConnection(result);
+      onNotice(`${localServerId} is connected over loopback with ${result.tools?.length ?? 0} tools. Review each tool call before execution.`);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "The local MCP server could not be connected.";
+      setError(message);
+      onNotice(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const changeState = async (connection: McpConnection, method: "mcp.connection.disconnect" | "mcp.connection.revoke") => {
     setBusy(true);
     setError(null);
@@ -134,6 +215,6 @@ export function useMarketplaceMcp(onNotice: (notice: string) => void) {
   return {
     connections, tools, selectedConnectionId, setSelectedConnectionId,
     serverId, setServerId, endpoint, setEndpoint, busy, error,
-    loadConnections, connect, refreshHealth, downloadRea, connectRea, changeState,
+    loadConnections, connect, refreshHealth, downloadRea, connectRea, connectFilesystem, connectPlaywright, connectPostgres, connectLocalServer, changeState,
   };
 }

@@ -35,16 +35,19 @@ export const voiceProfiles: VoiceProfile[] = [
   { id: "skai-calm", name: "Skai Calm", description: "Slower pacing for focused listening.", rate: 0.88, pitch: 0.98 },
 ];
 
-export const voiceModels = [
+export type InstalledVoiceModel = { id: string; name: string; detail: string; size: string; installed: boolean; lowResource: boolean };
+
+export const voiceModels: InstalledVoiceModel[] = [
   { id: "os-native", name: "OS-native speech", detail: "Windows and Linux system voices", size: "No model", installed: true, lowResource: true },
-  { id: "kokoro-82m-onnx", name: "Kokoro 82M ONNX", detail: "Natural multi-voice local runtime", size: "~163 MB fp16 model + voices", installed: false, lowResource: false },
+  { id: "kokoro-82m-onnx", name: "Kokoro 82M ONNX", detail: "English offline local speech", size: "~136 MB INT8 model + voices", installed: false, lowResource: false },
+  { id: "piper", name: "Piper English", detail: "Compact offline English speech", size: "~64 MB voice model", installed: false, lowResource: true },
   { id: "chatterbox", name: "Chatterbox", detail: "Expressive local speech with voice cloning and paralinguistic cues", size: "Model-dependent", installed: false, lowResource: false },
   { id: "qwen3-tts", name: "Qwen3-TTS", detail: "Multilingual local voice design, cloning, and streaming", size: "0.6B or 1.7B model", installed: false, lowResource: false },
   { id: "omnivoice", name: "OmniVoice", detail: "Omnilingual zero-shot local speech", size: "Model-dependent", installed: false, lowResource: false },
   { id: "higgs-audio-v2", name: "Higgs Audio v2", detail: "Expressive local multi-speaker audio generation", size: "3B model", installed: false, lowResource: false },
   { id: "pocket-tts", name: "Pocket TTS", detail: "CPU-first streaming voice runtime", size: "Model-dependent", installed: false, lowResource: false },
   { id: "pocket-tts-low-resource", name: "Pocket TTS Low Resource", detail: "Small CPU-first English runtime", size: "Small model", installed: false, lowResource: true },
-] as const;
+];
 
 export const cloudVoiceProviders = [
   { id: "elevenlabs" as const, name: "ElevenLabs", model: "eleven_v4", defaultVoiceId: "21m00Tcm4TlvDq8ikWAM", detail: "Hosted expressive speech and voice library", supportsStreaming: true },
@@ -52,7 +55,17 @@ export const cloudVoiceProviders = [
   { id: "cartesia" as const, name: "Cartesia Sonic 3.5", model: "sonic-3.5", defaultVoiceId: "f786b574-daa5-4673-aa0c-cbe3e8534c02", detail: "Hosted low-latency speech", supportsStreaming: true },
 ] as const;
 
-export const installedVoiceModels = voiceModels.filter((voice) => voice.installed);
+export const installedVoiceModels = voiceModels.filter((voice) => voice.installed
+  || (voice.id === "kokoro-82m-onnx" && localStorage.getItem("skai.voice.kokoroInstalled") === "true")
+  || (voice.id === "piper" && localStorage.getItem("skai.voice.piperInstalled") === "true"));
+
+export function registerInstalledVoiceModel(id: string) {
+  const voice = voiceModels.find((item) => item.id === id);
+  if (!voice || installedVoiceModels.some((item) => item.id === id)) return;
+  installedVoiceModels.push({ ...voice, installed: true });
+  if (id === "kokoro-82m-onnx") localStorage.setItem("skai.voice.kokoroInstalled", "true");
+  if (id === "piper") localStorage.setItem("skai.voice.piperInstalled", "true");
+}
 
 function resolveInstalledVoiceModel(value: string | null) {
   return installedVoiceModels.find((voice) => voice.id === value)?.id ?? installedVoiceModels[0]?.id ?? "os-native";

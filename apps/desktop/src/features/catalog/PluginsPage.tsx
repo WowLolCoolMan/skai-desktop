@@ -19,8 +19,10 @@ import {
   type Skill,
   type Tool,
   type CuratedCatalogEntry,
+  type MarketplaceEntry,
 } from "./marketplaceEntries";
-import { useMarketplaceMcp, type McpConnection } from "./useMarketplaceMcp";
+import { useMarketplaceMcp, type McpConnection, type McpTool } from "./useMarketplaceMcp";
+import { registerInstalledVoiceModel } from "../../services/nativeTts";
 export { VoiceWorkbench } from "./VoiceWorkbench";
 
 export function PluginsPage({
@@ -40,6 +42,9 @@ export function PluginsPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [runtimeStatus, setRuntimeStatus] = useState("Checking local runtime");
+  const [runtimeModelCount, setRuntimeModelCount] = useState(0);
+  const [voiceBusy, setVoiceBusy] = useState(false);
   const mcp = useMarketplaceMcp(setNotice);
   const {
     connections,
@@ -59,9 +64,86 @@ export function PluginsPage({
     changeState: changeMcpState,
   } = mcp;
 
+  const installMcpEntry = async (entry: MarketplaceEntry, connectionString?: string) => {
+    if (entry.adapter === "local-mcp-filesystem") {
+      setNotice("Choose one local folder to share with the read-only Filesystem MCP server.");
+      const picked = await request("workspace.pickFolder");
+      if (!picked.ok) {
+        setNotice(picked.error?.message ?? "The folder picker could not be opened.");
+        return;
+      }
+      const folderPath = (picked.result as { path?: string | null }).path;
+      if (!folderPath) return;
+      setNotice("Installing the pinned Filesystem MCP package and connecting locally…");
+      await mcp.connectFilesystem(folderPath);
+    } else if (entry.adapter === "local-mcp-playwright") {
+      setNotice("Installing the pinned Playwright MCP package and connecting locally…");
+      await mcp.connectPlaywright();
+    } else if (entry.adapter === "local-mcp-postgres" && connectionString) {
+      setNotice("Installing the pinned PostgreSQL MCP package and connecting to localhost…");
+      await mcp.connectPostgres(connectionString);
+    } else if (entry.adapter === "local-mcp-figma") {
+      setNotice("Connecting to Figma's local desktop MCP server…");
+      await mcp.connectLocalServer("figma-desktop", "http://127.0.0.1:3845/mcp");
+    } else if (entry.adapter === "local-mcp-supabase") {
+      setNotice("Connecting to the local Supabase CLI MCP endpoint…");
+      await mcp.connectLocalServer("supabase-local", "http://127.0.0.1:54321/mcp");
+    }
+  };
+
+  const installVoiceEntry = async (entry: MarketplaceEntry) => {
+    if (voiceBusy) return;
+    const isPiper = entry.adapter === "local-voice-piper";
+    const isWhisper = entry.adapter === "local-voice-whisper";
+    const method = isWhisper ? "whisper" : isPiper ? "piper" : "kokoro";
+    const modelName = isWhisper ? "Whisper large-v3" : isPiper ? "Piper" : "Kokoro";
+    const voiceId = isPiper ? "piper" : "kokoro-82m-onnx";
+    setVoiceBusy(true);
+    setNotice(`Preparing an isolated local ${modelName} runtime…`);
+    try {
+      const started = await request(`voice.${method}.install.start`);
+      if (!started.ok) throw new Error(started.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation could not start.`);
+      const deadline = Date.now() + (isWhisper ? 60 : 10) * 60_000;
+      while (Date.now() < deadline) {
+        const status = await request(`voice.${method}.install.status`);
+        if (!status.ok) throw new Error(status.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation status could not be read.`);
+        const state = status.result as { installed?: boolean; status?: string; step?: string; error?: string };
+        if (state.installed || state.status === "installed") {
+          if (isWhisper) localStorage.setItem("skai.voice.whisperInstalled", "true");
+          else registerInstalledVoiceModel(voiceId);
+          setNotice(`${modelName} is installed, checksum-verified, and ready for ${isWhisper ? "offline transcription" : "local speech"}.`);
+          return;
+        }
+        if (state.status === "failed") throw new Error(state.error ?? `${modelName} installation failed.`);
+        setNotice(state.step ? `${modelName} setup · ${state.step}` : `Installing ${modelName} locally…`);
+        await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+      }
+      throw new Error(`${modelName} setup is still running. Return to Marketplace later to check its installed status.`);
+    } catch (installError) {
+      setNotice(installError instanceof Error ? installError.message : `${modelName} installation failed.`);
+    } finally { setVoiceBusy(false); }
+  };
+
+  const callMcpTool = async (connection: McpConnection, tool: McpTool, argumentsValue: Record<string, unknown>) => {
+    const capabilities = tool.requiredCapabilities.length > 0
+      ? tool.requiredCapabilities
+      : [tool.isMutating ? "mcp.invoke.write" : "mcp.invoke.read"];
+    const response = await request("mcp.tool.call", {
+      connectionId: connection.connectionId,
+      toolName: tool.toolName,
+      approvalId: crypto.randomUUID(),
+      capabilities,
+      arguments: argumentsValue,
+    });
+    if (!response.ok) throw new Error(response.error?.message ?? "The MCP tool call failed.");
+    const result = response.result as { isError?: boolean; text?: string };
+    if (result.isError) throw new Error(result.text || "The MCP server reported a tool error.");
+    return result.text ?? "Tool completed without text output.";
+  };
+
   const changeCatalogSection = (next: MarketplaceCatalogSection, nextQuery?: string) => {
     setCatalogSection(next);
-    setView(next === "Models" ? "models" : next === "Voices" ? "voices" : next === "Installed" ? "installed" : next === "Updates" ? "updates" : "catalog");
+    setView(next === "Models" ? "models" : next === "Installed" ? "installed" : next === "Updates" ? "updates" : "catalog");
     if (!["Installed", "Staff Picks"].includes(next)) {
       setQuery(nextQuery ?? localStorage.getItem(`skai.marketplace.query.${next.toLowerCase()}`) ?? "");
       setSelectedId(null);
@@ -73,12 +155,21 @@ export function PluginsPage({
     setError(null);
     setNotice(null);
     try {
-      const [catalogResponse, skillsResponse, connectionsResponse] =
+      const endpoint = localStorage.getItem("skai.endpoint") ?? "http://localhost:11434/v1";
+      const provider = localStorage.getItem("skai.provider") ?? "Ollama";
+      const [catalogResponse, skillsResponse, connectionsResponse, runtimeResponse, kokoroResponse, piperResponse, whisperResponse] =
         await Promise.all([
           request("marketplace.catalog"),
           request("skills.list"),
           request("mcp.connections.list"),
+          request("models.list", { endpoint, provider }),
+          request("voice.kokoro.install.status"),
+          request("voice.piper.install.status"),
+          request("voice.whisper.install.status"),
         ]);
+      if (kokoroResponse.ok && (kokoroResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("kokoro-82m-onnx");
+      if (piperResponse.ok && (piperResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("piper");
+      if (whisperResponse.ok && (whisperResponse.result as { installed?: boolean }).installed) localStorage.setItem("skai.voice.whisperInstalled", "true");
       if (!catalogResponse.ok)
         throw new Error(
           catalogResponse.error?.message ??
@@ -92,6 +183,11 @@ export function PluginsPage({
       setTools(catalog.tools ?? []);
       setCurated(catalog.catalogEntries ?? []);
       setSkills((skillsResponse.result as Skill[]) ?? []);
+      if (runtimeResponse.ok) {
+        const runtimeModels = (runtimeResponse.result as unknown[]) ?? [];
+        setRuntimeModelCount(runtimeModels.length);
+        setRuntimeStatus("ready");
+      } else setRuntimeStatus("setup required");
       if (connectionsResponse.ok) {
         const nextConnections =
           (connectionsResponse.result as { connections?: McpConnection[] })
@@ -109,6 +205,7 @@ export function PluginsPage({
           ? loadError.message
           : "Plugins could not be loaded.",
       );
+      setRuntimeStatus("unavailable");
     } finally {
       setLoading(false);
     }
@@ -166,9 +263,11 @@ export function PluginsPage({
       <div className="plugins-main">
         {view === "models" || view === "voices" || view === "installed" || view === "updates" ? (
           <MarketplacePage
+            key={view}
             initialSection={view === "models" ? "Models" : view === "voices" ? "Voices" : view === "updates" ? "Updates" : "Installed"}
             initialQuery={view === "models" ? query : undefined}
             onBack={() => changeCatalogSection("Discover")}
+            onSectionChange={(section) => changeCatalogSection(section as MarketplaceCatalogSection)}
             onNavigate={onNavigate}
             onSelectAirLlmModel={onSelectAirLlmModel}
           />
@@ -220,7 +319,7 @@ export function PluginsPage({
             )}
             {catalogSection === "Discover" && !query.trim() && (
               <section className="plugins-start-panel" aria-label="Marketplace actions">
-                <div><p className="section-kicker">LOCAL WORKSPACE</p><h3>Marketplace</h3><p>Model search finds packages for local runtimes. Inference stays on your configured runtime.</p></div>
+                <div><p className="section-kicker">LOCAL WORKSPACE</p><h3>Marketplace</h3><p>Model search finds packages for local runtimes. Inference stays on your configured runtime.</p><div className="marketplace-runtime-state"><strong>Local runtime</strong><StatusBadge tone={runtimeStatus === "ready" ? "success" : runtimeStatus === "unavailable" ? "danger" : "warning"}>{runtimeStatus}</StatusBadge><span>{localStorage.getItem("skai.provider") ?? "Ollama"}{runtimeStatus === "ready" ? ` · ${runtimeModelCount} models` : ""}</span></div></div>
                 <div className="plugins-start-actions"><Button variant="primary" type="button" onClick={() => changeCatalogSection("Models")}>Search models</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("MCP Servers")}>Connect MCP</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("Installed")}>Open installed</Button><Button variant="ghost" type="button" onClick={() => changeCatalogSection("Updates")}>Check updates</Button></div>
               </section>
             )}
@@ -272,6 +371,10 @@ export function PluginsPage({
                 onToggleSelect={(id) => setSelectedId((current) => current === id ? null : id)}
                 onDownloadRea={downloadRea}
                 onConnectRea={connectRea}
+              onFindLocalPackage={(entry) => changeCatalogSection("Models", entry.name)}
+                onInstallMcp={(entry) => void installMcpEntry(entry)}
+                onInstallVoice={(entry) => void installVoiceEntry(entry)}
+                voiceBusy={voiceBusy}
               />
             )}
             {catalogSection === "MCP Servers" && <McpConnectionsPanel
@@ -287,6 +390,7 @@ export function PluginsPage({
               endpoint={endpoint}
               onEndpointChange={setEndpoint}
               onConnect={() => void connectMcp()}
+              onCallTool={callMcpTool}
               error={mcpError}
             />}
           </>

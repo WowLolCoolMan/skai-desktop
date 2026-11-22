@@ -24,9 +24,9 @@ public static partial class AgentHostLoop
                 name = model.Name,
                 detail = model.Description,
                 size = model.Size,
-                installed = model.IsInstalled,
+                installed = model.Id == "kokoro-82m-onnx" ? KokoroVoiceRuntime.IsInstalled : model.Id == "piper" ? PiperVoiceRuntime.IsInstalled : model.IsInstalled,
                 lowResource = model.IsLowResource,
-                adapterAvailable = model.AdapterAvailable,
+                adapterAvailable = model.AdapterAvailable || model.Id is "kokoro-82m-onnx" or "piper",
                 supportsStreaming = model.SupportsStreaming,
                 supportsVoiceCloning = model.SupportsVoiceCloning,
                 supportsEmotion = model.SupportsEmotion,
@@ -34,6 +34,19 @@ public static partial class AgentHostLoop
                 availabilityNote = model.AvailabilityNote,
             }).ToArray(),
         });
+
+    private static AgentResponse TranscribeVoice(AgentRequest request)
+    {
+        var parameters = request.Params ?? throw new InvalidOperationException("Audio data is required.");
+        if (!parameters.TryGetProperty("audioBase64", out var audioValue) || audioValue.ValueKind != System.Text.Json.JsonValueKind.String)
+            throw new InvalidOperationException("Audio data is required.");
+        var audio = audioValue.GetString() ?? "";
+        if (audio.Length is < 4 or > 28_000_000) throw new InvalidOperationException("Choose an audio file smaller than 20 MB.");
+        var fileName = RequiredBoundedString(request, "fileName", 128);
+        var language = OptionalString(request, "language");
+        var result = WhisperVoiceRuntime.TranscribeAsync(audio, fileName, language).GetAwaiter().GetResult();
+        return new(ProtocolVersion, request.Id, true, result);
+    }
 
     private static AgentResponse SpeakVoice(AgentRequest request, OsNativeTtsService voice)
     {
@@ -56,6 +69,17 @@ public static partial class AgentHostLoop
             var endpoint = definition.Endpoint;
             var audio = CloudVoiceService.SynthesizeAsync(definition.Id, endpoint, modelId, voiceId, apiKey, text, rate).GetAwaiter().GetResult();
             return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = $"{definition.Id}-cloud", interruptible = true, audioDataUrl = audio });
+        }
+        var selectedModelId = OptionalString(request, "modelId");
+        if (selectedModelId?.Equals("kokoro-82m-onnx", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var audio = KokoroVoiceRuntime.SynthesizeDataUrlAsync(text, rate).GetAwaiter().GetResult();
+            return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "kokoro-onnx-local", interruptible = true, audioDataUrl = audio });
+        }
+        if (selectedModelId?.Equals("piper", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var audio = PiperVoiceRuntime.SynthesizeDataUrlAsync(text, rate).GetAwaiter().GetResult();
+            return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "piper-local", interruptible = true, audioDataUrl = audio });
         }
         var engine = voice.Speak(text, rate);
         return new(ProtocolVersion, request.Id, true, new { spoken = true, engine, interruptible = true });

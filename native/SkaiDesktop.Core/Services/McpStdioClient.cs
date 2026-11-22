@@ -111,22 +111,45 @@ public sealed class McpStdioClient : IMcpClient
         {
             var id = Interlocked.Increment(ref _nextRequestId);
             await WriteMessageAsync(new { jsonrpc = "2.0", id, method, @params = parameters }, timeout.Token).ConfigureAwait(false);
-            var line = await _lines.ReadLineAsync(timeout.Token).ConfigureAwait(false) ?? throw new EndOfStreamException("The MCP server closed its stdio stream.");
-            if (line.Length > MaxMessageCharacters) throw new InvalidDataException("The MCP response exceeds the bounded message limit.");
-            JsonDocument document;
-            try { document = JsonDocument.Parse(line); } catch (JsonException exception) { throw new InvalidDataException("The MCP server returned invalid JSON.", exception); }
-            if (!document.RootElement.TryGetProperty("id", out var responseId) || responseId.ValueKind != JsonValueKind.Number || responseId.GetInt32() != id)
+            // Servers may emit notifications (progress, logging, resource updates)
+            // before returning a tool response. They are not responses to the
+            // outstanding request, so skip a bounded number of valid notifications.
+            for (var notifications = 0; notifications <= 64; notifications++)
             {
-                document.Dispose();
-                throw new InvalidDataException("The MCP response did not match the outstanding request.");
+                var line = await _lines.ReadLineAsync(timeout.Token).ConfigureAwait(false) ?? throw new EndOfStreamException("The MCP server closed its stdio stream.");
+                if (line.Length > MaxMessageCharacters) throw new InvalidDataException("The MCP response exceeds the bounded message limit.");
+                JsonDocument document;
+                try { document = JsonDocument.Parse(line); } catch (JsonException exception) { throw new InvalidDataException("The MCP server returned invalid JSON.", exception); }
+                var root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object)
+                {
+                    document.Dispose();
+                    throw new InvalidDataException("The MCP server returned a non-object JSON-RPC message.");
+                }
+                if (!root.TryGetProperty("id", out var responseId))
+                {
+                    var isNotification = root.ValueKind == JsonValueKind.Object
+                        && root.TryGetProperty("jsonrpc", out var version) && version.ValueKind == JsonValueKind.String && version.GetString() == "2.0"
+                        && root.TryGetProperty("method", out var notificationMethod) && notificationMethod.ValueKind == JsonValueKind.String;
+                    document.Dispose();
+                    if (!isNotification) throw new InvalidDataException("The MCP server returned a message without a response ID or notification method.");
+                    if (notifications == 64) throw new InvalidDataException("The MCP server emitted too many notifications before its response.");
+                    continue;
+                }
+                if (responseId.ValueKind != JsonValueKind.Number || responseId.GetInt32() != id)
+                {
+                    document.Dispose();
+                    throw new InvalidDataException("The MCP response did not match the outstanding request.");
+                }
+                if (root.TryGetProperty("error", out var error))
+                {
+                    var message = error.TryGetProperty("message", out var errorMessage) && errorMessage.ValueKind == JsonValueKind.String ? errorMessage.GetString() : "unknown MCP error";
+                    document.Dispose();
+                    throw new InvalidOperationException($"The MCP server rejected {method}: {message}");
+                }
+                return document;
             }
-            if (document.RootElement.TryGetProperty("error", out var error))
-            {
-                var message = error.TryGetProperty("message", out var errorMessage) && errorMessage.ValueKind == JsonValueKind.String ? errorMessage.GetString() : "unknown MCP error";
-                document.Dispose();
-                throw new InvalidOperationException($"The MCP server rejected {method}: {message}");
-            }
-            return document;
+            throw new InvalidDataException("The MCP server did not return a response.");
         }
         finally { _requestLock.Release(); }
     }

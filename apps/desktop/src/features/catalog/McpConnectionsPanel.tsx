@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button, Card, StatusBadge } from "../../components/ui/Primitives";
 import type { McpConnection, McpTool } from "./useMarketplaceMcp";
 
@@ -14,6 +15,7 @@ export function McpConnectionsPanel({
   endpoint,
   onEndpointChange,
   onConnect,
+  onCallTool,
   error,
 }: {
   connections: McpConnection[];
@@ -28,17 +30,48 @@ export function McpConnectionsPanel({
   endpoint: string;
   onEndpointChange: (value: string) => void;
   onConnect: () => void;
+  onCallTool: (connection: McpConnection, tool: McpTool, argumentsValue: Record<string, unknown>) => Promise<string>;
   error: string | null;
 }) {
+  const [draft, setDraft] = useState<{ connection: McpConnection; tool: McpTool } | null>(null);
+  const [argumentsText, setArgumentsText] = useState("{}");
+  const [callBusy, setCallBusy] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
+  const [callResult, setCallResult] = useState<string | null>(null);
+
+  const reviewCall = (connection: McpConnection, tool: McpTool) => {
+    setDraft({ connection, tool });
+    setArgumentsText("{}");
+    setCallError(null);
+    setCallResult(null);
+  };
+
+  const submitCall = async () => {
+    if (!draft) return;
+    let argumentsValue: unknown;
+    try { argumentsValue = JSON.parse(argumentsText); }
+    catch { setCallError("Enter valid JSON before approving this call."); return; }
+    if (!argumentsValue || typeof argumentsValue !== "object" || Array.isArray(argumentsValue)) {
+      setCallError("Tool arguments must be a JSON object.");
+      return;
+    }
+    setCallBusy(true);
+    setCallError(null);
+    setCallResult(null);
+    try { setCallResult(await onCallTool(draft.connection, draft.tool, argumentsValue as Record<string, unknown>)); }
+    catch (cause) { setCallError(cause instanceof Error ? cause.message : "The MCP tool call failed."); }
+    finally { setCallBusy(false); }
+  };
+
   return <>
     <Card className="plugins-mcp-note" id="plugins-mcp-connections">
       <div className="plugins-mcp-copy">
         <p className="section-kicker">MCP CONNECTIONS</p>
         <h3>Connect a compatible server</h3>
-        <p>Connect a Streamable HTTP MCP server explicitly. HTTPS is required for remote servers; plain HTTP is accepted only for loopback development endpoints.</p>
+        <p>Connect a self-hosted Streamable HTTP MCP server running on this device. Marketplace connections accept local loopback endpoints only.</p>
         <div className="plugins-mcp-form">
           <input value={serverId} onChange={(event) => onServerIdChange(event.target.value)} placeholder="Server ID" aria-label="MCP server ID" />
-          <input id="plugins-endpoint" value={endpoint} onChange={(event) => onEndpointChange(event.target.value)} placeholder="https://example.com/mcp" aria-label="MCP endpoint" />
+          <input id="plugins-endpoint" value={endpoint} onChange={(event) => onEndpointChange(event.target.value)} placeholder="http://127.0.0.1:3000/mcp" aria-label="Local MCP endpoint" />
           <Button variant="primary" disabled={busy || !serverId.trim() || !endpoint.trim()} onClick={onConnect}>{busy ? "Connecting…" : "Connect and review tools"}</Button>
         </div>
         {error && <p className="surface-error" role="alert">{error}</p>}
@@ -83,9 +116,25 @@ export function McpConnectionsPanel({
                 <span><b>Access</b>Explicit approval per call</span>
               </div>
               {tools.length === 0 ? <p className="plugins-tool-empty">No live tool manifest. Refresh health while the server is connected to inspect its current tools.</p> : <div className="plugins-tool-groups">
-                <ToolReviewGroup title="Read-only tools" tools={readTools} access="Read approval" />
-                <ToolReviewGroup title="Mutating tools" tools={writeTools} access="Write approval" mutating />
+                <ToolReviewGroup title="Read-only tools" tools={readTools} access="Read approval" onRun={(tool) => reviewCall(connection, tool)} />
+                <ToolReviewGroup title="Mutating tools" tools={writeTools} access="Write approval" mutating onRun={(tool) => reviewCall(connection, tool)} />
               </div>}
+              {draft?.connection.connectionId === connection.connectionId && <section className="plugins-tool-call" aria-label="Review MCP tool call">
+                <div className="plugins-tool-call-heading">
+                  <div><p className="section-kicker">REVIEW TOOL CALL</p><h4>{draft.tool.toolName}</h4></div>
+                  <Button variant="ghost" disabled={callBusy} onClick={() => { setDraft(null); setCallError(null); setCallResult(null); }}>Cancel</Button>
+                </div>
+                <p>{draft.tool.isMutating ? "This tool can change data. Review the arguments, then approve this write call." : "Review the arguments, then approve this read-only call."}</p>
+                {draft.tool.inputSchemaJson && <details><summary>View input schema</summary><pre>{draft.tool.inputSchemaJson}</pre></details>}
+                <label>Arguments (JSON)
+                  <textarea value={argumentsText} onChange={(event) => setArgumentsText(event.target.value)} rows={5} spellCheck={false} aria-label="MCP tool arguments as JSON" />
+                </label>
+                {callError && <p className="surface-error" role="alert">{callError}</p>}
+                {callResult && <div className="plugins-tool-call-result"><strong>Tool result</strong><pre>{callResult}</pre></div>}
+                <Button variant={draft.tool.isMutating ? "danger" : "primary"} disabled={callBusy || connection.state !== "healthy"} onClick={() => void submitCall()}>
+                  {callBusy ? "Running…" : draft.tool.isMutating ? "Approve write and run" : "Approve read and run"}
+                </Button>
+              </section>}
               <p className="plugins-approval-boundary">Listing a tool only shows untrusted server metadata. Skai still requires an explicit approval grant when a tool is called.</p>
             </div>}
           </div>;
@@ -95,12 +144,12 @@ export function McpConnectionsPanel({
   </>;
 }
 
-function ToolReviewGroup({ title, tools, access, mutating = false }: { title: string; tools: McpTool[]; access: string; mutating?: boolean }) {
+function ToolReviewGroup({ title, tools, access, mutating = false, onRun }: { title: string; tools: McpTool[]; access: string; mutating?: boolean; onRun: (tool: McpTool) => void }) {
   return <div>
     <h4>{title} <span>{tools.length}</span></h4>
     {tools.length === 0 ? <p className="plugins-tool-empty">None discovered.</p> : tools.map((tool) => <div className={`plugins-tool-review${mutating ? " is-mutating" : ""}`} key={tool.toolName}>
       <span><strong>{tool.toolName}</strong><small>{tool.description || "No description provided by the server."}</small></span>
-      <em>{tool.requiredCapabilities.join(" · ") || access}</em>
+      <span className="plugins-tool-review-actions"><em>{tool.requiredCapabilities.join(" · ") || access}</em><Button variant="secondary" onClick={() => onRun(tool)}>Review &amp; run</Button></span>
     </div>)}
   </div>;
 }

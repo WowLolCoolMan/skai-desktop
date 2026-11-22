@@ -2,3 +2,18 @@
 .plugins-connection-health > span { max-width: 240px; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); text-align: right; }
 .plugins-connection-health > p { max-width: 300px; margin: 0; color: var(--skai-color-warning); font-size: var(--skai-text-xs); line-height: 1.4; overflow-wrap: anywhere; text-align: right; }
 @media (max-width: 720px) { .plugins-connection-health { justify-items: start; }.plugins-connection-health > span, .plugins-connection-health > p { text-align: left; } }
+.plugins-local-db-form { display: grid; gap: 10px; margin-top: 14px; padding: 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.plugins-local-db-form > strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
+.plugins-local-db-form > p { margin: -5px 0 2px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
+.plugins-local-db-form > label { display: grid; gap: 5px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.plugins-local-db-form > label input { width: 100%; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; }
+.plugins-tool-review-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.plugins-tool-call { display: grid; gap: 12px; margin-top: 14px; padding: 16px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.plugins-tool-call-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plugins-tool-call-heading h4 { margin: 4px 0 0; color: var(--skai-color-text); }
+.plugins-tool-call > p { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.45; }
+.plugins-tool-call > label { display: grid; gap: 6px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.plugins-tool-call textarea { width: 100%; min-height: 100px; resize: vertical; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font: 12px/1.5 var(--skai-font-mono, ui-monospace, monospace); }
+.plugins-tool-call details { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.plugins-tool-call details pre, .plugins-tool-call-result pre { max-height: 240px; overflow: auto; margin: 8px 0 0; padding: 10px; border-radius: var(--skai-radius-md); background: var(--skai-color-surface); color: var(--skai-color-text); white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--skai-font-mono, ui-monospace, monospace); }
+.plugins-tool-call-result { min-width: 0; color: var(--skai-color-text); font-size: var(--skai-text-xs); }

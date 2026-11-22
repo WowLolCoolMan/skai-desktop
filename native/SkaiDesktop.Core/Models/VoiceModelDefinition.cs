@@ -45,9 +45,9 @@ public static class VoiceModelCatalog
         {
             AdapterAvailable = true, SupportsStreaming = false, AvailabilityNote = "Ready through the operating system."
         },
-        new("kokoro-82m-onnx", "Kokoro 82M ONNX", "Fast, natural multi-voice speech through a local ONNX runtime.", "ONNX Runtime", "Apache-2.0", "~163 MB fp16 model + voices", false, false, "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX")
+        new("kokoro-82m-onnx", "Kokoro 82M ONNX", "Fast English speech through Skai's local INT8 ONNX adapter.", "kokoro-onnx 0.6.1 · Python", "Apache-2.0 model / MIT runtime", "~136 MB INT8 model + voices", false, false, "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX")
         {
-            SupportsStreaming = true, SupportsEmotion = false, AvailabilityNote = "Model cataloged; local adapter and model install are not connected yet."
+            SupportsStreaming = false, SupportsEmotion = false, AvailabilityNote = "Install the local runtime and checksum-verified model files from Marketplace."
         },
         new("chatterbox", "Chatterbox", "Expressive local speech with voice cloning and paralinguistic cues.", "PyTorch", "MIT / model-specific", "Model-dependent", false, false, "https://github.com/resemble-ai/chatterbox")
         {
@@ -101,9 +101,9 @@ public static class VoiceModelCatalog
         {
             SupportsVoiceCloning = true, SupportsEmotion = true, AvailabilityNote = "Model cataloged; adapter and model install are not connected yet."
         },
-        new("piper", "Piper", "Compact, fast local neural speech for offline devices.", "ONNX Runtime", "MIT / voice-specific", "Model-dependent", false, true, "https://github.com/rhasspy/piper")
+        new("piper", "Piper", "Compact English local speech with a pinned US English voice and CC BY attribution terms.", "piper-tts 1.5.0 · ONNX Runtime", "GPL-3.0 engine / CC-BY-4.0 voice data", "~64 MB voice model", false, true, "https://github.com/OHF-Voice/piper1-gpl")
         {
-            SupportsStreaming = true, AvailabilityNote = "Model cataloged; adapter and model install are not connected yet."
+            SupportsStreaming = false, AvailabilityNote = "Install Piper and the attributed voice files from Marketplace."
         },
         new("xtts-v2", "XTTS v2", "Multilingual local speech with reference-audio cloning.", "Coqui TTS / PyTorch", "Coqui Public Model License", "Model-dependent", false, false, "https://github.com/coqui-ai/TTS")
         {

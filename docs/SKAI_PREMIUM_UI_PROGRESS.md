@@ -131,3 +131,44 @@ The full `smoke:windows` run passed on 2026-11-16. Pet asset and behavior checks
 passed as well. The packaged UI matrix also passed across fourteen routes, five
 supported sizes, and four theme/sidebar variants. Live accessibility and
 cross-platform visual acceptance remain open.
+
+### Marketplace focused rebuild — 2026-11-22
+
+- Reduced the Marketplace navigation to Discover, Models, Voices, MCP, Installed,
+  and Updates. Staff Picks, Skills, and Plugins are no longer promoted as primary
+  destinations.
+- Replaced the Discover pitch panel with direct model search, MCP connection,
+  Installed, and Updates actions. Added Voice, Coding, Chat, Image, and MCP
+  category shortcuts. The hub reports the configured local runtime and whether
+  its existing local model inventory endpoint responds.
+- Normalized catalog availability labels to ready, limited, installed, or
+  unavailable, and disclose when model source metadata has no license value.
+- Kept catalog discovery and model installation on the existing Agent Host
+  contracts. Model installs still require review, poll host progress, allow
+  cancellation, verify through the host, and move to Installed on completion.
+- Removed cloud voice connectors from the local voice catalog surface. Model
+  results include an explicit license disclosure when the source catalog does not
+  publish one. Updates run the existing signed release check when opened from the
+  Marketplace action.
+- Installed inventory now supports locally stored pins, MCP health checks and
+  revocation, and image asset removal. The existing host protocol does not expose
+  model deletion, so model rows do not claim to offer removal.
+- Added compact theme-token-based styling and focus states for the action strip,
+  category shortcuts, and installed rows at narrow widths. The Electron shell,
+  command palette, theme system, and Agent Host contracts were not changed.
+- Verification on 2026-11-22: `npm run desktop:typecheck` passed and
+  `npm run desktop:build` passed. Vite emitted its existing large-chunk warning.
+  A live Electron width/theme matrix was not run for this pass.
+
+### Marketplace three-panel refinement — 2026-11-22
+
+- Removed the embedded Marketplace section rail from Models, Voices, Installed,
+  and Updates. The Marketplace browse navigation is now the sole page menu.
+- Kept the content and selected-item inspector side by side. Installed inventory
+  now uses a compact selectable list in the center and a details/actions card on
+  the right; pin, MCP health/revoke, and image asset removal are in that card.
+- Added a route key so switching from Installed to Updates (or another catalog
+  page) resets the content page to the selected destination instead of retaining
+  the previous section state.
+- Verification: `desktop:typecheck` and `desktop:build` passed. No live visual
+  matrix was run after this refinement.

@@ -6,11 +6,12 @@ internal static class VoiceModelTests
     public static void Run()
     {
         Check(VoiceModelCatalog.Resolve("unknown").Id == "os-native", "voice catalog falls back to the installed OS-native runtime");
-        Check(VoiceModelCatalog.All.Any(model => model.Id == "kokoro-82m-onnx" && model.License == "Apache-2.0"), "voice catalog exposes the Kokoro ONNX option");
+        Check(VoiceModelCatalog.All.Any(model => model.Id == "kokoro-82m-onnx" && model.License == "Apache-2.0 model / MIT runtime"), "voice catalog exposes the Kokoro ONNX model and runtime licenses");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "pocket-tts-low-resource" && model.IsLowResource), "voice catalog exposes a low-resource Pocket TTS option");
         Check(VoiceModelCatalog.All.Count >= 10, "voice catalog exposes a broad local engine set");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "fish-speech" && model.SupportsAudioEffects), "voice catalog exposes expressive audio capability metadata");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "piper" && model.IsLowResource), "voice catalog exposes a compact offline runtime");
+        Check(VoiceModelCatalog.All.Any(model => model.Id == "piper" && model.License.Contains("GPL-3.0") && model.License.Contains("CC-BY-4.0")), "voice catalog exposes Piper engine and voice-data license terms");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "chatterbox" && model.SupportsVoiceCloning), "voice catalog exposes Chatterbox voice cloning");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "qwen3-tts" && model.SupportsStreaming), "voice catalog exposes Qwen3-TTS streaming");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "omnivoice"), "voice catalog exposes OmniVoice");

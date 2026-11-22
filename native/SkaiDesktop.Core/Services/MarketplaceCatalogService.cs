@@ -23,7 +23,7 @@ public static class MarketplaceCatalogService
         }
 
         Add("Voice (TTS/STT)", "Replit", "MIT", "Local Python runtime; install path not yet connected", "text-to-speech|voice-cloning", ("chatterbox", "Chatterbox / Chatterbox-Turbo", "Local expressive speech synthesis with optional reference voice input.", "https://github.com/resemble-ai/chatterbox"));
-        Add("Voice (TTS/STT)", "hexgrad", "Apache-2.0", "ONNX local runtime; installer not connected", "text-to-speech|multivoice", ("kokoro-82m", "Kokoro-82M", "Compact local neural speech synthesis.", "https://huggingface.co/hexgrad/Kokoro-82M"));
+        Add("Voice (TTS/STT)", "hexgrad", "Apache-2.0 model / MIT runtime", "Pinned kokoro-onnx 0.6.1 · isolated Python · local ONNX", "text-to-speech|offline|english", ("kokoro-82m", "Kokoro-82M", "English offline neural speech synthesis with a Skai installer and local playback adapter.", "https://huggingface.co/hexgrad/Kokoro-82M"));
         Add("Voice (TTS/STT)", "Alibaba", "Apache-2.0", "Local Python/PyTorch; installer not connected", "text-to-speech|voice-design|voice-cloning|streaming", ("qwen3-tts", "Qwen3-TTS", "Multilingual local speech with voice design and cloning.", "https://github.com/QwenLM/Qwen3-TTS"));
         Add("Voice (TTS/STT)", "Fish Audio", "Research NC", "Local runtime; verify model terms", "text-to-speech|voice-cloning|emotion", ("fish-audio-s2-pro", "Fish Audio S2 Pro", "Expressive speech generation; research non-commercial terms apply.", "https://github.com/fishaudio/fish-speech"));
         Add("Voice (TTS/STT)", "BreezeBlue", "Research NC", "Local runtime; verify model terms", "text-to-speech", ("breeze-tts-2", "Breeze TTS 2", "Local speech synthesis; research non-commercial terms apply.", "https://huggingface.co/BreezeBlue"));
@@ -32,7 +32,7 @@ public static class MarketplaceCatalogService
         Add("Voice (TTS/STT)", "NVIDIA", "Open", "Local runtime; setup not connected", "text-to-speech|multilingual", ("magpie-multilingual-357m", "Magpie-Multilingual 357M", "Multilingual local speech model.", "https://huggingface.co/nvidia"));
         Add("Voice (TTS/STT)", "SWivid", "CC-BY-NC", "Local Python/PyTorch; non-commercial", "text-to-speech|voice-cloning", ("f5-tts", "F5-TTS", "Local flow-matching speech and reference voice cloning.", "https://github.com/SWivid/F5-TTS"));
         Add("Voice (TTS/STT)", "Coqui", "CPML NC", "Local Python/PyTorch; non-commercial", "text-to-speech|multilingual|voice-cloning", ("xtts-v2", "XTTS v2", "Multilingual local speech and reference voice cloning.", "https://github.com/coqui-ai/TTS"));
-        Add("Voice (TTS/STT)", "Piper", "MIT / GPL-3.0", "Local ONNX; voice-specific terms", "text-to-speech|offline", ("piper", "Piper", "Compact offline neural speech; individual voice licenses vary.", "https://github.com/rhasspy/piper"));
+        Add("Voice (TTS/STT)", "Open Home Foundation", "GPL-3.0 engine / CC-BY-4.0 voice data", "Pinned piper-tts 1.5.0 · isolated Python · local ONNX", "text-to-speech|offline|english|attribution", ("piper", "Piper", "Compact offline English neural speech. Skai retains the selected voice's model card and attribution terms.", "https://github.com/OHF-Voice/piper1-gpl"));
         Add("Voice (TTS/STT)", "Kitten AI", "Apache-2.0", "Local runtime; setup not connected", "text-to-speech|small-model", ("kitten-tts-08", "Kitten TTS 0.8", "Small local text-to-speech model.", "https://github.com/KittenML/KittenTTS"));
         Add("Voice (TTS/STT)", "Alibaba", "Apache-2.0", "Local Python/PyTorch; setup not connected", "text-to-speech|multilingual|voice-cloning", ("cosyvoice2", "CosyVoice2", "Multilingual local speech with zero-shot voice support.", "https://github.com/FunAudioLLM/CosyVoice"));
         Add("Voice (TTS/STT)", "NVIDIA", "Apache-2.0", "Local runtime; setup not connected", "text-to-speech|multispeaker", ("dia-2", "Dia 2", "Local multi-speaker speech generation.", "https://huggingface.co/nvidia"));
@@ -40,7 +40,7 @@ public static class MarketplaceCatalogService
         Add("Voice (TTS/STT)", "Maya Research", "Apache-2.0", "Local runtime; setup not connected", "text-to-speech", ("maya1", "Maya1", "Local expressive speech model.", "https://huggingface.co"));
         Add("Voice (TTS/STT)", "Kyutai", "MIT", "Local Python runtime; setup not connected", "speech-to-speech|streaming", ("moshi", "Moshi", "Local realtime speech conversation model.", "https://github.com/kyutai-labs/moshi"));
         Add("Voice (TTS/STT)", "Meta", "Llama License", "Local runtime; license gated", "speech|multimodal", ("llama-omni", "Llama-Omni", "Local multimodal model with speech output; Meta license applies.", "https://github.com/ictnlp/LLaMA-Omni"));
-        Add("Voice (TTS/STT)", "OpenAI", "MIT", "Local Whisper runtime; setup not connected", "speech-to-text|transcription", ("whisper-large-v3", "Whisper large-v3", "Local speech recognition and transcription.", "https://github.com/openai/whisper"));
+        Add("Voice (TTS/STT)", "OpenAI · Systran conversion", "MIT", "faster-whisper 1.2.1 · local CPU int8 · 3.09 GB model", "speech-to-text|transcription|offline|multilingual", ("whisper-large-v3", "Whisper large-v3", "Offline multilingual audio transcription through a checksum-pinned local model.", "https://github.com/SYSTRAN/faster-whisper"));
         Add("Voice (TTS/STT)", "NVIDIA", "CC-BY-NC", "Local NeMo runtime; non-commercial", "speech-to-text|transcription", ("parakeet-tdt-11b", "Parakeet TDT 1.1B", "Local speech recognition; non-commercial license applies.", "https://huggingface.co/nvidia"));
 
         var coding = new (string id, string name, string provider, string license, string source)[] {
@@ -57,7 +57,21 @@ public static class MarketplaceCatalogService
 
         var mcps = new (string id, string name, string provider, string access)[] {
             ("playwright-mcp","Playwright MCP","Microsoft","stdio MCP"),("github-mcp","GitHub MCP","GitHub","stdio MCP; local credentials required"),("context7-mcp","Context7","Upstash","stdio MCP"),("filesystem-mcp","Filesystem MCP","Model Context Protocol","stdio MCP; explicit folder permissions"),("supabase-mcp","Supabase MCP","Supabase","stdio or HTTP MCP; local setup"),("postgres-mcp-pro","Postgres MCP Pro","Postgres MCP","stdio MCP; database credentials required"),("figma-mcp","Figma MCP","Figma","stdio or HTTP MCP; provider auth may be required"),("linear-mcp","Linear MCP","Linear","stdio or HTTP MCP; provider auth may be required"),("notion-mcp","Notion MCP","Notion","stdio or HTTP MCP; provider auth may be required"),("atlassian-rovo-mcp","Atlassian Rovo MCP","Atlassian","stdio or HTTP MCP; provider auth may be required"),("sentry-mcp","Sentry MCP","Sentry","stdio or HTTP MCP; provider auth may be required"),("stripe-mcp","Stripe MCP","Stripe","stdio or HTTP MCP; provider auth may be required"),("cloudflare-mcp","Cloudflare MCP","Cloudflare","stdio or HTTP MCP; provider auth may be required"),("slack-mcp","Slack MCP","Slack","stdio or HTTP MCP; provider auth may be required"),("exa-mcp","Exa MCP","Exa","stdio or HTTP MCP; provider auth may be required"),("firecrawl-mcp","Firecrawl MCP","Firecrawl","stdio MCP; local server and key may be required"),("brave-search-mcp","Brave Search MCP","Brave","stdio MCP; local server and key may be required"),("tavily-mcp","Tavily MCP","Tavily","stdio MCP; local server and key may be required"),("terraform-mcp","Terraform MCP","HashiCorp","stdio MCP"),("aws-mcp-server","AWS MCP Server","AWS","stdio MCP; local AWS credentials required")};
-        foreach (var item in mcps) Add("MCP Servers", item.provider, "See upstream repository", item.access, "tools|explicit-approval", (item.id, item.name, $"MCP server integration. Setup requires reviewing the upstream server and its local configuration. {item.access}.", "https://github.com"));
+        foreach (var item in mcps)
+        {
+            if (item.id == "playwright-mcp")
+                Add("MCP Servers", "Microsoft", "Apache-2.0", "Node.js 20+ · local stdio", "browser-automation|local-tools|explicit-approval", (item.id, item.name, "Run the official Playwright MCP server locally to inspect and control browser pages. Network access follows the pages you choose to open; tool calls remain behind explicit approval.", "https://github.com/microsoft/playwright-mcp"));
+            else if (item.id == "postgres-mcp-pro")
+                Add("MCP Servers", "Microsoft", "MIT", "Node.js 22+ · local stdio · localhost PostgreSQL", "database-query|local-only|explicit-approval", (item.id, item.name, "Connect the local server to a PostgreSQL database on this device. Credentials are used only by the server process for this session and are not saved by Skai.", "https://github.com/microsoft/postgres-mcp"));
+            else if (item.id == "filesystem-mcp")
+                Add("MCP Servers", "Model Context Protocol", "MIT / Apache-2.0 transition", "Node.js 24+ · local stdio · read-only by default", "filesystem|read-only|local-tools", (item.id, item.name, "Browse files in one folder you choose. Skai starts the official local server in read-only mode and keeps tool calls behind explicit approval.", "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem"));
+            else if (item.id == "figma-mcp")
+                Add("MCP Servers", "Figma", "Proprietary · Figma desktop", "Figma desktop · loopback HTTP", "design-context|local-desktop-server|explicit-approval", (item.id, item.name, "Connect to Figma's local desktop MCP server after enabling it in Dev Mode. The official desktop server listens on 127.0.0.1:3845 and requires a Figma account and eligible seat.", "https://help.figma.com/hc/en-us/articles/39216419318551-Get-started-with-the-Figma-MCP-server"));
+            else if (item.id == "supabase-mcp")
+                Add("MCP Servers", "Supabase", "Apache-2.0", "Supabase CLI · local loopback HTTP", "database|local-development|explicit-approval", (item.id, item.name, "Connect to the MCP endpoint exposed by a running local Supabase CLI stack. This supports the local project only and does not connect to Supabase's hosted MCP service.", "https://github.com/supabase/mcp"));
+            else
+                Add("MCP Servers", item.provider, "See upstream repository", item.access, "tools|explicit-approval", (item.id, item.name, $"MCP server integration. Setup requires reviewing the upstream server and its local configuration. {item.access}.", "https://github.com"));
+        }
         return entries.ToArray();
     }
 
@@ -93,16 +107,16 @@ public static class MarketplaceCatalogService
             runtime = voice.Runtime,
             license = voice.License,
             size = voice.Size,
-            installed = voice.IsInstalled,
+            installed = voice.Id == "kokoro-82m-onnx" ? VoiceRuntimeStatus.IsKokoroInstalled : voice.Id == "piper" ? VoiceRuntimeStatus.IsPiperInstalled : voice.IsInstalled,
             lowResource = voice.IsLowResource,
             sourceUrl = voice.SourceUrl,
-            adapterAvailable = voice.AdapterAvailable,
+            adapterAvailable = voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper",
             supportsStreaming = voice.SupportsStreaming,
             supportsVoiceCloning = voice.SupportsVoiceCloning,
             supportsEmotion = voice.SupportsEmotion,
             supportsAudioEffects = voice.SupportsAudioEffects,
             availabilityNote = voice.AvailabilityNote,
-            installable = voice.AdapterAvailable && !string.IsNullOrWhiteSpace(voice.SourceUrl) && !voice.IsInstalled,
+            installable = (voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper") && !string.IsNullOrWhiteSpace(voice.SourceUrl) && !(voice.Id == "kokoro-82m-onnx" && VoiceRuntimeStatus.IsKokoroInstalled) && !(voice.Id == "piper" && VoiceRuntimeStatus.IsPiperInstalled),
         }).ToArray(),
         skills = SkillCatalogService.BuiltIns.Select(skill => new
         {
@@ -144,7 +158,42 @@ public static class MarketplaceCatalogService
             id = entry.Id, name = entry.Name, provider = entry.Provider, category = entry.Category,
             license = entry.License, description = entry.Description, runtime = entry.Runtime,
             capabilities = entry.Capabilities, source = entry.Source, localOnly = true,
-            installable = false, installReview = "No verified installer is connected. Review upstream source and license before local setup.",
+            adapter = ResolveAdapter(entry),
+            installable = ResolveAdapter(entry) != "none",
+            installReview = ResolveAdapter(entry) == "local-model-search"
+                ? "Search supported local GGUF packages, confirm the exact repository and active runtime, then install after reviewing the license and hardware fit. This does not imply the named upstream weights are directly downloadable."
+                : ResolveAdapter(entry) == "local-voice-kokoro"
+                    ? "Skai creates an isolated Python environment, installs kokoro-onnx 0.6.1, and downloads the INT8 Kokoro ONNX weights and voice pack. Both model files are checked against pinned SHA-256 digests before use. The Kokoro model is Apache-2.0; runtime package is MIT. Speech is synthesized locally."
+                : ResolveAdapter(entry) == "local-voice-piper"
+                    ? "Skai installs the pinned Windows-compatible piper-tts 1.5.0 runtime in an isolated Python environment and downloads a pinned English voice, JSON config, and MODEL_CARD from a fixed Hugging Face revision. SHA-256 hashes are checked before use. Piper engine is GPL-3.0; voice data is CC BY 4.0 and requires attribution. Synthesis stays local."
+                : ResolveAdapter(entry) == "local-voice-whisper"
+                    ? "Skai installs faster-whisper 1.2.1 into an isolated Python environment and downloads the 3.09 GB Systran large-v3 conversion at a pinned Hugging Face revision. SHA-256 hashes are verified for every model file. Transcription uses CPU int8, runs offline, and sends no audio to a service. Keep at least 4 GB free for download and additional RAM for inference."
+                : ResolveAdapter(entry) == "local-mcp-playwright"
+                    ? "Skai installs @playwright/mcp@0.0.86 on first connect and runs it locally over stdio. Node.js 20 or newer is required. On Windows Skai uses Microsoft Edge when found; other platforms need a Playwright-compatible browser installed."
+                : ResolveAdapter(entry) == "local-mcp-postgres"
+                    ? "Skai installs @microsoft/postgres-mcp@0.3.1 on first connect, disables telemetry, and passes the localhost connection string only to the child process. Credentials are not persisted; re-enter them after restarting Skai."
+                : ResolveAdapter(entry) == "local-mcp-filesystem"
+                    ? "Skai installs @modelcontextprotocol/server-filesystem@2.4.0 on first connect and starts it locally over stdio. Choose one folder to share; the server exposes read-only tools by default and requires Node.js 24 or newer."
+                : ResolveAdapter(entry) == "local-mcp-figma"
+                    ? "Requires Figma desktop to be running with its local MCP server enabled in Dev Mode. Skai connects only to http://127.0.0.1:3845/mcp; hosted Figma MCP endpoints are not used. Review each tool call before execution."
+                : ResolveAdapter(entry) == "local-mcp-supabase"
+                    ? "Requires Supabase CLI with a local stack already running. Skai connects only to http://127.0.0.1:54321/mcp; hosted Supabase MCP routes are not used. Experimental multi-project stacks may use another port; add that local endpoint in MCP Connections."
+                : "No verified in-app installer is connected for this category yet. This listing is unavailable for installation until Skai has a compatible local adapter.",
         }).ToArray(),
     };
+
+    private static string ResolveAdapter(CuratedEntry entry) => entry.Category is "Coding" or "Chat / General LLM"
+        ? "local-model-search"
+        : entry.Id switch
+        {
+            "kokoro-82m" => "local-voice-kokoro",
+            "piper" => "local-voice-piper",
+            "whisper-large-v3" => "local-voice-whisper",
+            "filesystem-mcp" => "local-mcp-filesystem",
+            "playwright-mcp" => "local-mcp-playwright",
+            "postgres-mcp-pro" => "local-mcp-postgres",
+            "figma-mcp" => "local-mcp-figma",
+            "supabase-mcp" => "local-mcp-supabase",
+            _ => "none",
+        };
 }
