@@ -92,7 +92,8 @@ and to any detailed plan rather than copying their full contents here.
   the main loop. Update and local-media IPC registration now live outside
   Electron's shell entry point, and desktop pet state persistence has its own
   store. Marketplace catalog shaping and MCP connection lifecycle state are
-  separated from the React page, and MCP connection review has its own panel.
+  separated from the React page; MCP connection review and Staff Picks each
+  have their own focused panel.
   Agent Host user-profile and settings handlers now have a dedicated protocol
   module.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve

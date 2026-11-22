@@ -134,6 +134,8 @@ that users touch as each slice is moved.
 - Extracted the Marketplace MCP connection form, connection list, health state,
   and tool-manifest review into `McpConnectionsPanel`; the page supplies the
   same state and callbacks without changing the in-app review flow.
+- Moved developer-curated Marketplace staff picks and their action routing into
+  `StaffPicksPanel`, keeping curated navigation separate from catalog state.
 - Moved local media URL IPC registration, ownership checks, validation, and
   revocation into `local-media-ipc.cjs`; the renderer-visible channel names and
   local media behavior are unchanged.
