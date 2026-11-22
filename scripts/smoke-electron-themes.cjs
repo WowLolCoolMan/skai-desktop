@@ -26,10 +26,15 @@ child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-async function fetchJson(url) {
+async function fetchJson(url, attempts = 5) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status} from ${url}`);
-  return response.json();
+  const body = await response.text();
+  try { return JSON.parse(body); } catch (error) {
+    if (attempts <= 1) throw error;
+    await sleep(100);
+    return fetchJson(url, attempts - 1);
+  }
 }
 
 function connect(target) {
@@ -37,7 +42,8 @@ function connect(target) {
   const pending = new Map();
   let nextId = 1;
   socket.addEventListener("message", (event) => {
-    const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+    let message;
+    try { message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data)); } catch { return; }
     const resolve = pending.get(message.id);
     if (typeof resolve !== "function") return;
     pending.delete(message.id);
