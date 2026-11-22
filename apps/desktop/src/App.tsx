@@ -18,7 +18,7 @@ export default function App() {
   return <ErrorBoundary><div className={`app-shell ${workspace.sidebarCollapsed ? "sidebar-collapsed" : ""} ${hideThreadSidebar ? "thread-sidebar-hidden" : ""}`} style={shellStyle}>
     <a className="skip-link" href="#main-content">Skip to content</a>
     <Toolbar route={workspace.route} connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onToggleSidebar={workspace.toggleSidebar} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
-    <GlobalRail route={workspace.route} agentMode={workspace.agentMode} onNavigate={workspace.onNavigate} />
+    <GlobalRail route={workspace.route} onNavigate={workspace.onNavigate} />
     {!hideThreadSidebar && <Sidebar className="thread-sidebar" route={workspace.routeState.route} agentMode={workspace.agentMode} onAgentModeChange={workspace.setAgentMode} onNavigate={workspace.onNavigate} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} collapsed={workspace.sidebarCollapsed} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onToggleCollapsed={workspace.toggleSidebar} onNewChat={workspace.startNewChat} onOpenProject={workspace.routeActions.onOpenProject} onSelectConversation={workspace.selectConversation} onConversationMetadata={workspace.updateConversationMetadata} />}
     <main className="app-main">
       <div className="backdrop-effects" aria-hidden="true" />

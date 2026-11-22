@@ -12,7 +12,7 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
 
 const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];
 
-export function GlobalRail({ route, agentMode, onNavigate }: { route: Route; agentMode: "ChatBot" | "Coding Agent"; onNavigate: (route: Route) => void }) {
+export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (route: Route) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPetWorkshop, setShowPetWorkshop] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
   const [query, setQuery] = useState("");
