@@ -99,7 +99,17 @@ function osPrefersReducedMotion() {
 }
 let petActivityGeneration = 0;
 let petActivity = { state: "idle", facing: 1, generation: petActivityGeneration };
-const petMotionEngine = createPetMotionEngine({ onError: (id, error) => console.warn(`[pet-motion] stopping ${id} after an update error`, error instanceof Error ? error.message : String(error)) });
+function warnSafely(...values) {
+  try {
+    console.warn(...values);
+  } catch (error) {
+    // Electron can close its inherited console pipe before an unref'ed pet
+    // timer stops. A diagnostic write must never escape a timer callback.
+    if (error?.code !== "EPIPE") throw error;
+  }
+}
+
+const petMotionEngine = createPetMotionEngine({ onError: (id, error) => warnSafely(`[pet-motion] stopping ${id} after an update error`, error instanceof Error ? error.message : String(error)) });
 const pendingPetMessages = [];
 const PET_WINDOW_WIDTH = 220;
 const PET_WINDOW_HEIGHT = 190;
@@ -680,7 +690,7 @@ function movePetTowardTarget() {
   const targetX = Math.trunc(screenX);
   const targetY = Math.trunc(screenY);
   if (!Number.isSafeInteger(targetX) || !Number.isSafeInteger(targetY) || Math.abs(targetX) > 10_000_000 || Math.abs(targetY) > 10_000_000) {
-    console.warn("[pet] Skipping wander step with invalid screen coordinates.");
+    warnSafely("[pet] Skipping wander step with invalid screen coordinates.");
     petWanderWalk = null;
     petMotionEngine.unregister("wander");
     petWanderStepTimer = undefined;
@@ -695,7 +705,7 @@ function movePetTowardTarget() {
   try {
     petWindow.setPosition(targetX, targetY);
   } catch (error) {
-    console.warn("[pet] Stopping wander after an invalid native window position.", { targetX, targetY, screenX, screenY, area }, error instanceof Error ? error.message : String(error));
+    warnSafely("[pet] Stopping wander after an invalid native window position.", { targetX, targetY, screenX, screenY, area }, error instanceof Error ? error.message : String(error));
     petWanderWalk = null;
     petMotionEngine.unregister("wander");
     petWanderStepTimer = undefined;
