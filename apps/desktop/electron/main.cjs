@@ -1,9 +1,7 @@
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, screen, session, shell, systemPreferences, Tray } = require("electron");
-const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const readline = require("node:readline");
 const { createHash, randomUUID } = require("node:crypto");
 const { autoUpdater } = require("electron-updater");
 const { CancellationToken } = require("builder-util-runtime");
@@ -17,6 +15,7 @@ const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTray
 const { augmentUserPath } = require("./user-path.cjs");
 const { createUpdateManager } = require("./update-manager.cjs");
 const { createThemeService } = require("./theme-service.cjs");
+const { createAgentHostClient } = require("./agent-host-client.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -44,29 +43,6 @@ const packagedHost = path.join(process.resourcesPath, "agent-host", hostBinary);
 const packagedRuntime = fsSync.existsSync(path.join(packagedRoot, "dist", "index.html")) && fsSync.existsSync(packagedHost);
 const runtimeRoot = packagedRuntime ? packagedRoot : repoRoot;
 const rendererRoot = packagedRuntime ? runtimeRoot : path.join(runtimeRoot, "apps", "desktop");
-let host;
-let hostReader;
-let nextRequestId = 1;
-const pending = new Map();
-const standardRequestTimeoutMs = 30_000;
-// Local image generation includes a multi-gigabyte first-run model download and
-// CPU inference. Keep the Agent Host alive long enough for that operation.
-const imageGenerationRequestTimeoutMs = 60 * 60_000;
-const chatRequestTimeoutMs = 5 * 60_000;
-// Persona research fans out across public sources; drafting runs two model passes, each up to the
-// chat deadline. Both used to hit the 30-second default, which restarted the host mid-work.
-const personaResearchRequestTimeoutMs = 4 * 60_000;
-const personaDraftRequestTimeoutMs = 12 * 60_000;
-const longRequestTimeouts = {
-  "chat.complete": chatRequestTimeoutMs,
-  "persona.group.complete": 15 * 60_000,
-  "persona.discover": 2 * 60_000,
-  "persona.research": personaResearchRequestTimeoutMs,
-  "persona.research.force": 10 * 60_000,
-  "persona.draft": personaDraftRequestTimeoutMs,
-  "marketplace.models.search": 2 * 60_000,
-};
-const chatHostDeadlineSeconds = 285;
 const globalLauncherAccelerator = "CommandOrControl+Alt+Space";
 let isQuitting = false;
 let mainWindow;
@@ -1137,143 +1113,35 @@ const allowedMethods = new Set([
   "workspace.pickFolder",
 ]);
 
-function startAgentHost() {
-  const command = packagedRuntime ? packagedHost : "dotnet";
-  const args = packagedRuntime ? ["--stdio"] : ["run", "--project", hostProject, "--no-launch-profile", "--", "--stdio"];
-  host = spawn(command, args, {
-    cwd: packagedRuntime ? path.dirname(packagedHost) : repoRoot,
-    // Launcher-started Linux sessions lack ~/.bashrc PATH additions (nvm, pyenv, ~/.local/bin).
-    env: { ...process.env, PATH: augmentUserPath(), SKAI_PLUGIN_DOWNLOADS: path.join(app.getPath("downloads"), "Skai Plugins") },
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-  });
-  const startedHost = host;
-
-  // A dead host can close stdin between the destroyed check and write().
-  // Writable emits EPIPE asynchronously, so a surrounding try/catch alone does
-  // not protect Electron's main process from an uncaught pipe error.
-  host.stdin.on("error", () => {
-    const response = { v: 1, ok: false, error: { code: "HOST_WRITE_FAILED", message: "The local agent host closed its request pipe." } };
-    for (const entry of pending.values()) {
-      clearTimeout(entry.timer);
-      const completion = petCompletionText(entry.method, response);
-      if (completion) sendPetMessage(completion.text, completion.kind);
-      entry.resolve(response);
-    }
-    pending.clear();
-  });
-
-  hostReader = readline.createInterface({ input: host.stdout });
-  hostReader.on("line", (line) => {
-    let message;
-    try {
-      message = JSON.parse(line);
-    } catch {
-      return;
-    }
-    const entry = pending.get(message.id);
-    if (!entry) return;
-    pending.delete(message.id);
-    clearTimeout(entry.timer);
-    const completion = petCompletionText(entry.method, message);
-    if (completion) sendPetMessage(completion.text, completion.kind);
-    entry.resolve(message);
-  });
-
-  host.stderr.on("data", (chunk) => {
-    console.error(`[agent-host] ${chunk.toString().trimEnd()}`);
-  });
-
-  host.on("exit", (code, signal) => {
-    const error = { v: 1, ok: false, error: { code: "HOST_EXITED", message: `Agent host exited (${code ?? signal}).` } };
-    hostReader?.close();
-    for (const entry of pending.values()) {
-      clearTimeout(entry.timer);
-      const completion = petCompletionText(entry.method, error);
-      if (completion) sendPetMessage(completion.text, completion.kind);
-      entry.resolve(error);
-    }
-    pending.clear();
-    if (host === startedHost) host = undefined;
-  });
-}
-
-function stopAgentHost(onStopped) {
-  if (!host) {
-    onStopped?.();
-    return;
-  }
-  const currentHost = host;
-  host = undefined;
-  const error = { v: 1, ok: false, error: { code: "HOST_STOPPED", message: "Agent host is shutting down." } };
-  for (const entry of pending.values()) {
-    clearTimeout(entry.timer);
-    entry.resolve(error);
-  }
-  pending.clear();
-  if (!currentHost.stdin.destroyed) currentHost.stdin.end();
-  const forceStop = setTimeout(() => {
-    if (currentHost.exitCode !== null) return;
-    if (process.platform === "win32" && currentHost.pid) {
-      const killer = spawn("taskkill", ["/pid", String(currentHost.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
-      killer.on("error", () => { if (!currentHost.killed) currentHost.kill(); });
-    } else if (!currentHost.killed) currentHost.kill("SIGTERM");
-  }, 1500);
-  currentHost.once("exit", () => {
-    clearTimeout(forceStop);
-    onStopped?.();
-  });
-}
-
-function restartAgentHost() {
-  stopAgentHost(() => {
-    if (!isQuitting) startAgentHost();
-  });
-}
-
-function requestAgent(method, params) {
-  if (typeof method !== "string" || !allowedMethods.has(method)) {
-    return Promise.resolve({ v: 1, ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "That desktop operation is not exposed by the renderer bridge." } });
-  }
-  if (params !== undefined && (params === null || typeof params !== "object" || Array.isArray(params))) {
-    return Promise.resolve({ v: 1, ok: false, error: { code: "INVALID_PARAMS", message: "Agent parameters must be an object." } });
-  }
-  if (!host || host.stdin.destroyed) {
-    const response = { v: 1, ok: false, error: { code: "HOST_UNAVAILABLE", message: "Agent host is not running." } };
-    const completion = petCompletionText(method, response);
-    if (completion) sendPetMessage(completion.text, completion.kind);
-    return Promise.resolve(response);
-  }
-  const id = `desktop-${nextRequestId++}`;
-  const requestParams = method === "chat.complete"
-    ? { ...params, timeoutSeconds: chatHostDeadlineSeconds }
-    : params;
-  return new Promise((resolve) => {
-    const timeoutMs = method === "image.generate" || method === "pet.background.remove"
-      ? imageGenerationRequestTimeoutMs
-      : longRequestTimeouts[method] ?? standardRequestTimeoutMs;
-    const timer = setTimeout(() => {
-      if (!pending.has(id)) return;
-      pending.delete(id);
-      const response = { v: 1, ok: false, error: { code: "HOST_TIMEOUT", message: `The local agent host did not answer ${method} within the allowed time.` } };
-      const completion = petCompletionText(method, response);
-      if (completion) sendPetMessage(completion.text, completion.kind);
-      resolve(response);
-      restartAgentHost();
-    }, timeoutMs);
-    pending.set(id, { resolve, timer, method });
-    try {
-      host.stdin.write(`${JSON.stringify({ v: 1, id, method, params: requestParams })}\n`);
-    } catch {
-      clearTimeout(timer);
-      pending.delete(id);
-      const response = { v: 1, ok: false, error: { code: "HOST_WRITE_FAILED", message: "The local agent host could not accept the request." } };
-      const completion = petCompletionText(method, response);
-      if (completion) sendPetMessage(completion.text, completion.kind);
-      resolve(response);
-    }
-  });
-}
+// The client owns the local stdio process and request lifecycle; IPC continues
+// to expose only the explicitly allow-listed operations below.
+const agentHostClient = createAgentHostClient({
+  app,
+  allowedMethods,
+  augmentUserPath,
+  chatHostDeadlineSeconds: 285,
+  hostProject,
+  packagedHost,
+  packagedRuntime,
+  petCompletionText,
+  process,
+  repoRoot,
+  sendPetMessage,
+  spawn,
+  longRequestTimeouts: {
+    "chat.complete": 5 * 60_000,
+    "persona.group.complete": 15 * 60_000,
+    "persona.discover": 2 * 60_000,
+    "persona.research": 4 * 60_000,
+    "persona.research.force": 10 * 60_000,
+    "persona.draft": 12 * 60_000,
+    "marketplace.models.search": 2 * 60_000,
+  },
+  isQuitting: () => isQuitting,
+});
+const startAgentHost = () => agentHostClient.start();
+const stopAgentHost = (onStopped) => agentHostClient.stop(onStopped);
+const requestAgent = (method, params) => agentHostClient.request(method, params);
 
 function createWindow() {
   mainWindow = new BrowserWindow({

@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, "..");
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const desktopPackage = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "package.json"), "utf8"));
 const main = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "main.cjs"), "utf8");
+const agentHostClient = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "agent-host-client.cjs"), "utf8");
 const preload = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "preload.cjs"), "utf8");
 const petWindow = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "overlays", "PetWindow.tsx"), "utf8");
 const modelPicker = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "ui", "ModelPicker.tsx"), "utf8");
@@ -44,7 +45,7 @@ expect(!packageJson.scripts["build:native"] && !packageJson.scripts["open:native
 expect(desktopPackage.main === "electron/main.cjs", "desktop package must use Electron main");
 expect(main.includes("contextIsolation: true"), "context isolation must remain enabled");
 expect(main.includes("nodeIntegration: false"), "Node integration must remain disabled");
-expect(main.includes('host.stdin.on("error"') && main.includes('code: "HOST_WRITE_FAILED"'), "Electron must handle asynchronous Agent Host pipe errors without crashing the main process");
+expect(agentHostClient.includes('host.stdin.on("error"') && agentHostClient.includes('code: "HOST_WRITE_FAILED"'), "Electron must handle asynchronous Agent Host pipe errors without crashing the main process");
 expect(main.includes("sandbox: true"), "renderer sandbox must remain enabled");
 expect(main.includes("media-src 'self' file:"), "local video decoding must permit only local file media sources");
 expect(main.includes('path.join(app.getPath("userData"), "media-samples")'), "local media samples must be written only to the private app data folder");
@@ -70,16 +71,16 @@ expect(navigation.includes("window.history.replaceState") && navigation.includes
 for (const method of ["scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow"]) {
   expect(main.includes(`"${method}"`), `Electron bridge must expose the local scheduled method ${method}`);
 }
-expect(main.includes("HOST_TIMEOUT"), "Electron bridge must bound pending host requests");
+expect(agentHostClient.includes("HOST_TIMEOUT"), "Electron bridge must bound pending host requests");
 expect(main.includes("new Tray") && main.includes("event.preventDefault()") && main.includes("mainWindow.hide()"), "Closing the main Electron window must hide it to the system tray instead of quitting");
 expect(main.includes("requestSingleInstanceLock") && main.includes('app.on("second-instance"'), "Electron must reopen the resident instance instead of creating duplicate desktop processes");
 expect(main.includes("globalShortcut.register") && main.includes("CommandOrControl+Alt+Space") && main.includes("globalShortcut.unregister"), "Electron must expose and clean up the system-wide launcher shortcut");
 expect(main.includes("Recent chats") && main.includes("tray:open-conversation") && main.includes("Quit Skai Desktop"), "The system tray menu must expose recent chats, reopen, and explicit quit actions");
 expect(main.includes("Hide all pets") && main.includes("Show all pets"), "The system tray menu must expose companion visibility control");
 expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "The preload bridge must expose typed tray navigation events");
-expect(main.includes("taskkill") && main.includes("/T"), "Electron shutdown must terminate the full Windows host process tree");
-expect(main.includes("restartAgentHost"), "Electron must restart a timed-out host after resolving pending requests");
-expect(main.includes("timeoutSeconds: chatHostDeadlineSeconds"), "Electron must give chat requests a host-side deadline before the renderer deadline");
+expect(agentHostClient.includes("taskkill") && agentHostClient.includes("/T"), "Electron shutdown must terminate the full Windows host process tree");
+expect(agentHostClient.includes("restart()") && agentHostClient.includes("resolve(response)"), "Electron must restart a timed-out host after resolving pending requests");
+expect(agentHostClient.includes("timeoutSeconds: chatHostDeadlineSeconds"), "Electron must give chat requests a host-side deadline before the renderer deadline");
 expect(main.includes("function clampPetPosition") && main.includes("petWindow.setPosition(position.x, position.y)"), "Percy drag movement must remain inside the active monitor work area");
 expect(main.includes("function movePetWithCursor") && main.includes("setInterval(movePetWithCursor, 16)"), "Percy desktop dragging must continue while the pointer leaves the companion window");
 // Percy stays transparent everywhere except X11 sessions where the probe confirms no compositor
