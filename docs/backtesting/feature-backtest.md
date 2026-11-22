@@ -20,9 +20,9 @@ worktree.
 | Chat queue, conversation search, metadata, fork/export/archive | `smoke-chat-queue`, `smoke-conversation-search`, `smoke-conversation-metadata` |
 | Memory workflows | `smoke-memory` |
 | PDF attachment policy | `smoke-pdf-attachment` |
-| Local voice output and cancellation contract | `smoke:voice:acceptance -- --require-installed-pack` |
+| Local voice engines | Kokoro and Piper generated valid WAV audio through Skai's Agent Host; Whisper large-v3 transcribed a Piper-generated local audio fixture. |
 | Installed AirLLM sidecar preflight | `npm run smoke:airllm` |
-| Packaged Electron routes, Marketplace, Percy, video sampling, local audio fail-closed behavior | `smoke:electron:artifact` |
+| Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, and unavailable-language dictation behavior | `smoke:electron:artifact` |
 | Accessibility | 14 routes, 0 WCAG violations in `smoke:electron:accessibility` |
 | Responsive overflow | 11 routes × 5 viewport widths |
 | UI matrix | 17 routes × 5 sizes × 4 theme/sidebar variants |
@@ -39,7 +39,7 @@ worktree.
 | Area | Current evidence and next validation |
 | --- | --- |
 | AirLLM inference | AirLLM and Torch import successfully from `%LOCALAPPDATA%\\Skai\\AirLLM\\venv`; the worker’s CUDA preflight and malformed-input paths return structured errors. A real model run still requires an NVIDIA GPU and CUDA-capable PyTorch, plus a compatible Hugging Face model and enough disk/RAM/VRAM. |
-| Microphone dictation | Packaged Electron reports the `en-US` on-device speech pack unavailable and correctly refuses remote recognition. Requires an installed speech pack or approved local STT fixture. |
+| Microphone dictation and hands-free voice mode | Packaged Electron reports the `en-US` on-device speech pack unavailable and refuses remote recognition. Install the OS speech capability with elevation, then verify real microphone capture, one-shot dictation, live hands-free turns, cancellation, and device-error recovery. |
 | Packaged Marketplace workflow | `smoke:electron:artifact` passes Models search/review and explicitly verifies Tools → Installed inventory in the packaged app. |
 | Persona model quality | The David Lynch smoke passed identity, death-date, research, attributed-turn, draft, and chat checks with Qwen3 14B (3 sources, 60 attributed turns, 8 drafted fields). Existing one-subject Sam Hyde coverage also passes. These checks do not establish semantic fidelity or cutoff truthfulness across multiple turns and subjects. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |

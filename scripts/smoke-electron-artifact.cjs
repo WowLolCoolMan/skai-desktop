@@ -126,7 +126,9 @@ async function main() {
   const audioInputStarted = await evaluate(mainTarget, "(() => { const input = document.querySelector('input[accept^=\\\".mp3\\\"]'); if (!input) return 'missing'; const sampleRate = 16000; const buffer = new ArrayBuffer(44 + sampleRate * 2); const bytes = new Uint8Array(buffer); const view = new DataView(buffer); const write = (offset, value) => { for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index); }; write(0, 'RIFF'); view.setUint32(4, buffer.byteLength - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, sampleRate * 2, true); const data = new DataTransfer(); data.items.add(new File([buffer], 'smoke-silence.wav', { type: 'audio/wav' })); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); return 'selected'; })()");
   let localAudioResult = JSON.stringify({ input: audioInputStarted === "selected", transcribing: false, transcript: false, error: "" });
   if (audioInputStarted === "selected") {
-    const audioDeadline = Date.now() + 5_000;
+    // The local Whisper path loads a multi-gigabyte model on CPU. Give the
+    // packaged worker enough time to report a transcript or a real error.
+    const audioDeadline = Date.now() + 60_000;
     while (Date.now() < audioDeadline) {
       localAudioResult = await evaluate(mainTarget, "(() => JSON.stringify({ input: Boolean(document.querySelector('input[accept^=\\\".mp3\\\"]')), transcribing: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Transcribing the selected audio')), transcript: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Local transcript added')), error: document.querySelector('.composer-voice-error')?.textContent ?? '' }))()");
       const audioState = JSON.parse(localAudioResult);
@@ -135,6 +137,8 @@ async function main() {
     }
   }
   console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}`);
+  await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+  await sleep(150);
   let dictationResult;
   if (localVoiceState.api && localVoiceState.processLocally && localVoiceState.availability === "available") {
     dictationResult = JSON.stringify({ button: true, error: "", listening: false, skipped: true });

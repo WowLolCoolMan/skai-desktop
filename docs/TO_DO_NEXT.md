@@ -99,11 +99,15 @@ and to any detailed plan rather than copying their full contents here.
 - **Status:** Blocked
 - **Priority:** High
 - **Owner:** Unclaimed
-- **Context:** Windows native speech output is present and verified. The local
-  voice smoke created a valid PCM fixture and confirmed the OS voice runtime,
-  but the en-US on-device recognition pack is unavailable. Installing that
-  Windows capability requires elevation, which is not available in this
-  session; no real microphone transcription has been claimed.
+- **Context:** Windows native speech output is present and verified. On
+  2026-11-22, Kokoro and Piper generated valid WAV audio through the Agent Host,
+  and Whisper large-v3 transcribed Piper's local audio fixture. The packaged
+  Electron smoke also transcribed a local audio file with Whisper and confirmed
+  dictation reports the unavailable en-US recognition pack without remote
+  fallback. Windows System.Speech output is available, but the en-US on-device
+  recognition pack is unavailable. Installing that Windows capability requires
+  elevation, which is not available in this session; no real microphone
+  transcription or live hands-free microphone turn has been claimed.
 - **Agreed approach:** Test on a supported Windows profile with the required
   speech pack installed. Record a short local fixture and exercise one-shot
   dictation, hands-free turn completion, cancellation, unavailable-language,
@@ -111,8 +115,10 @@ and to any detailed plan rather than copying their full contents here.
   recordings as test evidence.
 - **Acceptance:** Still open: install the speech capability from an elevated
   Windows session, then verify transcription with a real microphone and audio
-  fixture. The packaged app already fails closed with a clear unavailable-pack
-  message and does not send audio to a remote service.
+  fixture, plus one-shot and hands-free cancellation/recovery. Local TTS/ASR
+  adapters and packaged audio-file transcription pass. The packaged composer
+  fails closed with a clear unavailable-pack message and does not send audio to
+  a remote service.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [voice architecture](ELECTRON_CSHARP_VOICE_ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
