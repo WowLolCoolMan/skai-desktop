@@ -110,6 +110,9 @@ that users touch as each slice is moved.
 - Moved the stable protocol method-to-handler table into
   `AgentHostLoop.Dispatch.cs`, leaving process I/O and lifecycle in the main
   loop and request validation in its own module.
+- Moved user profile and app settings protocol handlers into
+  `AgentHostLoop.Settings.cs`; response fields, validation, persistence, and the
+  local endpoint restriction are unchanged.
 - Moved update IPC registration and its sender/URL checks into
   `update-ipc.cjs`; the existing updater manager remains responsible for update
   lifecycle and download state.
