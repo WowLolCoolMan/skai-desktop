@@ -63,6 +63,11 @@ async function run() {
   for (const model of search.result.models) {
     if (typeof model.id !== "string" || typeof model.repository !== "string" || typeof model.source !== "string" || typeof model.installable !== "boolean") throw new Error("marketplace.models.search returned an incomplete model record.");
   }
+  const gemma = await request("marketplace.models.search", { query: "gemma 4 31b", uncensored: true });
+  const reviewedGemma = gemma.result?.models?.find(model => model.repository === "Kooten/gemma-4-31b-abliterated-v1.1-GGUF");
+  if (!gemma.ok || !reviewedGemma || reviewedGemma.installRoute !== "lm-studio" || reviewedGemma.installable !== true || !reviewedGemma.tags?.includes("dense") || !reviewedGemma.tags?.includes("abliterated")) {
+    throw new Error(`The reviewed Gemma 4 31B dense abliterated entry is missing or incomplete: ${JSON.stringify(gemma)}`);
+  }
   console.log(`Marketplace host smoke passed (${providers.length} providers, ${search.result.models.length} model results).`);
 }
 

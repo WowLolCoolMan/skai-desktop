@@ -800,6 +800,29 @@ public static class AgentHostLoop
             });
             ollamaCandidatesAdded = true;
         }
+        if (uncensored && (string.IsNullOrWhiteSpace(query) || query.Contains("gemma", StringComparison.OrdinalIgnoreCase) || query.Contains("31b", StringComparison.OrdinalIgnoreCase)))
+        {
+            // Reviewed GGUF build of the dense Gemma 4 31B abliterated model.
+            // Keep this in the uncensored lane and route installation through
+            // LM Studio, which can import the repository and expose it through
+            // Skai's existing loopback OpenAI-compatible provider.
+            models.Insert(0, new
+            {
+                id = "huggingface:Kooten/gemma-4-31b-abliterated-v1.1-GGUF",
+                repository = "Kooten/gemma-4-31b-abliterated-v1.1-GGUF",
+                source = "Hugging Face",
+                kind = "llm",
+                downloads = 261L,
+                likes = 0L,
+                uncensored = true,
+                tags = new[] { "text-generation", "gemma4", "31b", "dense", "abliterated", "gguf" },
+                sizeBytes = (long)(18.7 * 1024 * 1024 * 1024),
+                contextLength = 131072,
+                installRoute = "lm-studio",
+                installable = true,
+                requiresAirLlm = false,
+            });
+        }
         if (string.IsNullOrWhiteSpace(query) || query.Contains("qwen", StringComparison.OrdinalIgnoreCase) || query.Contains("1m", StringComparison.OrdinalIgnoreCase))
             AddOllamaModel("org/qwen2.5-1m:7b", 4_111, 4.7, 986_000, ["text-generation", "qwen2", "1m-context", "ollama"]);
         if (string.IsNullOrWhiteSpace(query) || query.Contains("code", StringComparison.OrdinalIgnoreCase) || query.Contains("coder", StringComparison.OrdinalIgnoreCase))
