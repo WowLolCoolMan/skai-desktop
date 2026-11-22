@@ -45,7 +45,7 @@ The packaged artifact includes the self-contained Agent Host under
 checkout or a separate .NET installation.
 
 Built-in and custom pet profiles are managed in the renderer's Pet Workshop.
-See [Pets and companions](PETS_AND_COMPANIONS.md) for the strip format, behavior
+See [Pets and companions](../guides/PETS_AND_COMPANIONS.md) for the strip format, behavior
 defaults, and local generation flow.
 
 ## Validation

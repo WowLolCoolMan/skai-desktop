@@ -51,7 +51,7 @@ The project is ready to publish only when every P0 item has attached evidence, a
 
 Authoritative detail and historical evidence:
 
-- [Architecture](ARCHITECTURE.md)
-- [Capability matrix](CAPABILITY_MATRIX.md)
-- [UI reference progress](SKAI_PREMIUM_UI_PROGRESS.md)
+- [Architecture](../engineering/ARCHITECTURE.md)
+- [Capability matrix](../planning/CAPABILITY_MATRIX.md)
+- [UI reference progress](../planning/SKAI_PREMIUM_UI_PROGRESS.md)
 - [Rolling updates](ROLLING_UPDATES.md)

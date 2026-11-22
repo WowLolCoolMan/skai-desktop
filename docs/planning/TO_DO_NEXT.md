@@ -7,7 +7,7 @@ contributor can continue without rediscovering the plan.
 
 This file is a working queue, not a replacement for the full [capability
 matrix](CAPABILITY_MATRIX.md), [future feature backlog](FUTURE_FEATURES.md), or
-[production readiness gaps](PRODUCTION_READINESS_GAPS.md). Link to those docs
+[production readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md). Link to those docs
 and to any detailed plan rather than copying their full contents here.
 
 ## How contributors should use this file
@@ -49,7 +49,7 @@ and to any detailed plan rather than copying their full contents here.
   while their content and actions become more useful. After each pass, run
   renderer typecheck/build, inspect the live UI at supported widths and themes,
   fix clipping or confusing states, and record evidence in
-  `docs/SKAI_PREMIUM_UI_PROGRESS.md`. Repeat with the next page until the full
+  [UI evidence and progress](SKAI_PREMIUM_UI_PROGRESS.md). Repeat with the next page until the full
   route list is accepted.
 - **Latest implementation:** Marketplace now includes a Voices destination and
   local voice runtime entries. Its Tools destination groups MCP servers,
@@ -68,7 +68,7 @@ and to any detailed plan rather than copying their full contents here.
   animations and verify the lunge and flame align with the cursor target. Do
   not mark the goal complete based on compilation alone.
 - **References:** [UI evidence and progress](SKAI_PREMIUM_UI_PROGRESS.md),
-  [UI reference guide](UI_REFERENCE_GUIDE.md), and [design contract](../DESIGN.md).
+  [UI reference guide](UI_REFERENCE_GUIDE.md), and [design contract](../../DESIGN.md).
 - **Blockers / decisions:** Live visual review remains open; preserve the
   existing product shell and local-first behavior. The packaged matrix now
   passes all 17 routes across five window sizes and four theme/sidebar
@@ -120,8 +120,8 @@ and to any detailed plan rather than copying their full contents here.
   fails closed with a clear unavailable-pack message and does not send audio to
   a remote service.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
-  [voice architecture](ELECTRON_CSHARP_VOICE_ARCHITECTURE.md),
-  [production readiness](PRODUCTION_READINESS_GAPS.md).
+  [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md),
+  [production readiness](../operations/PRODUCTION_READINESS_GAPS.md).
 
 ### 3. Strengthen OS isolation for Coding Agent commands
 
@@ -155,8 +155,8 @@ and to any detailed plan rather than copying their full contents here.
   unavailable rather than implying it is active. A filesystem/network sandbox
   remains required before unattended or parallel execution.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
-  [architecture and trust boundaries](ARCHITECTURE.md),
-  [production readiness](PRODUCTION_READINESS_GAPS.md).
+  [architecture and trust boundaries](../engineering/ARCHITECTURE.md),
+  [production readiness](../operations/PRODUCTION_READINESS_GAPS.md).
 
 ### 4. Finish image generation progress and cancellation
 
@@ -199,7 +199,7 @@ and to any detailed plan rather than copying their full contents here.
   and validate additional hardware. Progress must continue to reflect runtime
   evidence.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
-  [local image generation](LOCAL_IMAGE_GENERATION.md).
+  [local image generation](../guides/LOCAL_IMAGE_GENERATION.md).
 
 ### 5. Close release signing and upgrade acceptance
 
@@ -229,9 +229,9 @@ and to any detailed plan rather than copying their full contents here.
   signed metadata, production signing, and Linux acceptance remain open; all
   release blockers in the readiness doc must be resolved or clearly documented
   as unsupported.
-- **References:** [Release readiness](RELEASE_READINESS.md),
-  [release guide](RELEASING.md),
-  [production readiness gaps](PRODUCTION_READINESS_GAPS.md).
+- **References:** [Release readiness](../operations/RELEASE_READINESS.md),
+  [release guide](../operations/RELEASING.md),
+  [production readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md).
 
 ### 6. Finish evidence-grounded Persona dialogue research and chat
 
@@ -295,9 +295,9 @@ and to any detailed plan rather than copying their full contents here.
   limit, and record source and workflow results. Then rerun Core checks, Agent
   Host build, desktop typecheck/build, and focused workflow smoke tests.
 - **References:** [Smart Personas plan](implementation-plans/smart-personas.md),
-  [dialogue attribution and memory guard](../native/SkaiDesktop.Core/Services/PersonaDialogueEvidence.cs),
-  [web research and PDF fetching](../native/SkaiDesktop.Core/Services/WebSearchProvider.cs),
-  [Persona research workflow](../services/agent-host/Protocol/AgentHostLoop.cs).
+  [dialogue attribution and memory guard](../../native/SkaiDesktop.Core/Services/PersonaDialogueEvidence.cs),
+  [web research and PDF fetching](../../native/SkaiDesktop.Core/Services/WebSearchProvider.cs),
+  [Persona research workflow](../../services/agent-host/Protocol/AgentHostLoop.cs).
 - **Blockers / decisions:** Name-only transcript discovery remains incomplete.
   Do not treat the goal as complete until the
   real-source and local-model acceptance evidence above is recorded.
@@ -334,7 +334,7 @@ and to any detailed plan rather than copying their full contents here.
   all remote calls. Replace the blanket local-only audit only after these
   policy checks and regression tests pass.
 - **References:** [Provider gateway plan](implementation-plans/provider-gateway.md),
-  [reference implementation registry](research/REFERENCE_IMPLEMENTATION_REGISTRY.md),
+  [reference implementation registry](../research/REFERENCE_IMPLEMENTATION_REGISTRY.md),
   [capability matrix](CAPABILITY_MATRIX.md).
 - **Blockers / decisions:** None. Remote provider connections are not
   implemented until the credential and consent gates are complete.

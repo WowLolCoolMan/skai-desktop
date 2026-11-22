@@ -21,7 +21,7 @@ Make text, image, document, audio, and video input feel like one coherent Skai c
 | `apps/desktop/src/features/chat/ChatPage.tsx` | Composer wiring | Pass the transcript attachment action into the composer. |
 | `apps/desktop/src/features/chat/useChatWorkspace.ts` | Draft attachment state | Add bounded transcript attachment state update. |
 | `apps/desktop/src/features/chat/AttachmentList.tsx` | Attachment presentation | Label transcript attachments clearly. |
-| `docs/FUTURE_FEATURES.md` | Backlog status | Record the unified attachment behavior and remaining speech-pack acceptance gap. |
+| `docs/planning/FUTURE_FEATURES.md` | Backlog status | Record the unified attachment behavior and remaining speech-pack acceptance gap. |
 
 ## Acceptance criteria
 

@@ -16,7 +16,7 @@ Make the optional Ollama context-window setting actionable and predictable. When
 | `apps/desktop/src/features/settings/SettingsPage.tsx` | Models & Providers settings | Show a clear warning for a known incompatible configured window. |
 | `native/SkaiDesktop.Core.Tests/ModelContextCompatibilityTests.cs` | Core unit coverage | Cover Ollama mismatch, compatible, unknown, and non-Ollama cases. |
 | `native/SkaiDesktop.Core.Tests/Program.cs` | Native test entrypoint | Register the new test class. |
-| `docs/FUTURE_FEATURES.md` | Feature status | Record that known incompatibilities are guarded; compatible 1M execution remains environment-dependent. |
+| `docs/planning/FUTURE_FEATURES.md` | Feature status | Record that known incompatibilities are guarded; compatible 1M execution remains environment-dependent. |
 
 ### Dependencies and reference patterns
 

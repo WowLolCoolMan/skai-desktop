@@ -2,8 +2,8 @@
 
 These documents preserve historical implementation detail and audit evidence.
 They are not current product status or delivery plans. Use the
-[capability matrix](../CAPABILITY_MATRIX.md), [To Do Next](../TO_DO_NEXT.md),
-and [future features](../FUTURE_FEATURES.md) for current work.
+[capability matrix](../planning/CAPABILITY_MATRIX.md), [To Do Next](../planning/TO_DO_NEXT.md),
+and [future features](../planning/FUTURE_FEATURES.md) for current work.
 
 - [Asset de-bloat history](asset-debloat-history.md) — 2026 asset audit and
   optimization log.
@@ -13,7 +13,7 @@ and [future features](../FUTURE_FEATURES.md) for current work.
   coding, Marketplace, and capacity requirements; its implementation snapshot
   is superseded by current status documents.
 - [Theme implementation log](theme-implementation-log.md) — historical theme
-  work; use the current [theming guide](../THEMING.md) for user-facing details.
+  work; use the current [theming guide](../guides/THEMING.md) for user-facing details.
 - [UI prototypes](ui-prototypes/README.md) — standalone layout experiments
   retained for historical reference only.
 The old root `TODO.md` was removed because it duplicated the shared queue and

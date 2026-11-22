@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const file = path.join(root, "docs", "FUTURE_FEATURES.md");
+const file = path.join(root, "docs", "planning", "FUTURE_FEATURES.md");
 const text = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n");
 const sectionPattern = /^## (.+)$/gm;
 const itemPattern = /^- \[([ xX])\] (.+)$/gm;
@@ -14,7 +14,7 @@ const items = [...text.matchAll(itemPattern)].map((match) => ({
 }));
 
 const errors = [];
-if (!fs.existsSync(file)) errors.push("docs/FUTURE_FEATURES.md is missing");
+if (!fs.existsSync(file)) errors.push("docs/planning/FUTURE_FEATURES.md is missing");
 if (items.length === 0) errors.push("the future-features document has no checkbox items");
 const seen = new Map();
 for (const item of items) {

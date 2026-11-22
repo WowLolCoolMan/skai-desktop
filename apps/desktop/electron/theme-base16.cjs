@@ -4,7 +4,7 @@
 // must be 6-digit hex colors; everything else is ignored. The result still
 // goes through validateThemeFamily before it is written anywhere.
 //
-// Mapping (documented in docs/THEMING.md):
+// Mapping (documented in docs/guides/THEMING.md):
 //   base00 canvas, terminal surface, ANSI black      base08 danger, ANSI red, syntax variable
 //   base01 surface, sidebar, code surface            base09 syntax number
 //   base02 raised surface, hover, borders, bubble    base0A warning, ANSI yellow, syntax type

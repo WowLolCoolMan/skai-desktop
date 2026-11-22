@@ -13,7 +13,7 @@
 
 Skai Desktop is an Electron + React desktop application with a persistent .NET Agent Host. It brings local model chat, project files, guarded terminal work, task review, GitHub workflows, settings, memory, and creative tools into one focused workspace—not a hosted chat wrapper or a collection of disconnected mock screens.
 
-> **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe this project snapshot; unfinished ideas remain in the [future feature backlog](docs/FUTURE_FEATURES.md). See the [Skai Desktop project site](https://wowlolcoolman.github.io/skai-desktop/) for the public overview and documentation index.
+> **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe this project snapshot; unfinished ideas remain in the [future feature backlog](docs/planning/FUTURE_FEATURES.md). See the [Skai Desktop project site](https://wowlolcoolman.github.io/skai-desktop/) for the public overview and documentation index.
 
 ## Local-first by design
 
@@ -48,7 +48,7 @@ own supported provider accounts and credentials.
 | **Pets and companions** | Seven built-in pets in Pet Workshop, eleven-frame looping sprites, adjustable blinks, per-pet idle/walk actions, Blaze's animated pounce and fire-breath fight scene, and guided pet concept generation through local Diffusers or ComfyUI. |
 | **Local integrations** | Guarded GitHub repository workflows, local ComfyUI-compatible image workflows, optional Diffusers image generation, and local attachments. |
 
-The [capability matrix](docs/CAPABILITY_MATRIX.md) is the source of truth for working, partial, unverified, and planned areas. The project favors small, tested vertical slices over static mock screens, with screenshots and interaction evidence recorded in [`docs/SKAI_PREMIUM_UI_PROGRESS.md`](docs/SKAI_PREMIUM_UI_PROGRESS.md).
+The [capability matrix](docs/planning/CAPABILITY_MATRIX.md) is the source of truth for working, partial, unverified, and planned areas. The project favors small, tested vertical slices over static mock screens, with screenshots and interaction evidence recorded in [UI progress](docs/planning/SKAI_PREMIUM_UI_PROGRESS.md).
 
 ## Why Skai
 
@@ -137,19 +137,19 @@ docs/                      Product guides, plans, release evidence, and archived
 
 ## Documentation
 
-Use the [documentation index](docs/INDEX.md) for the organized guides, plans,
+Use the [documentation index](docs/README.md) for the organized guides, plans,
 engineering references, release evidence, and research archive. The
-[capability matrix](docs/CAPABILITY_MATRIX.md) is the source of truth for
-current feature status; [To Do Next](docs/TO_DO_NEXT.md) records active work;
-the [future feature backlog](docs/FUTURE_FEATURES.md) holds longer-term ideas.
+[capability matrix](docs/planning/CAPABILITY_MATRIX.md) is the source of truth for
+current feature status; [To Do Next](docs/planning/TO_DO_NEXT.md) records active work;
+the [future feature backlog](docs/planning/FUTURE_FEATURES.md) holds longer-term ideas.
 The [project site](https://wowlolcoolman.github.io/skai-desktop/) provides a
 short public overview.
 
 ## What is next
 
-Pick up active work from [To Do Next](docs/TO_DO_NEXT.md). The [capability
-matrix](docs/CAPABILITY_MATRIX.md) records current evidence and boundaries; the
-[future feature backlog](docs/FUTURE_FEATURES.md) holds longer-term work.
+Pick up active work from [To Do Next](docs/planning/TO_DO_NEXT.md). The [capability
+matrix](docs/planning/CAPABILITY_MATRIX.md) records current evidence and boundaries; the
+[future feature backlog](docs/planning/FUTURE_FEATURES.md) holds longer-term work.
 
 ## Contributing
 

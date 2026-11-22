@@ -4,7 +4,7 @@ Describe the user-visible outcome.
 
 ## Plan and scope
 
-- Related issue or [To Do Next](../docs/TO_DO_NEXT.md) item:
+- Related issue or [To Do Next](../docs/planning/TO_DO_NEXT.md) item:
 - Agreed approach:
 - Out of scope:
 

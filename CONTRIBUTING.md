@@ -5,8 +5,8 @@ issue or pull request.
 
 ## Before you start
 
-- Check [To Do Next](docs/TO_DO_NEXT.md), the [capability
-  matrix](docs/CAPABILITY_MATRIX.md), and [future features](docs/FUTURE_FEATURES.md)
+- Check [To Do Next](docs/planning/TO_DO_NEXT.md), the [capability
+  matrix](docs/planning/CAPABILITY_MATRIX.md), and [future features](docs/planning/FUTURE_FEATURES.md)
   to see current plans and avoid duplicate work.
 - For substantial changes, open an issue first to agree on scope and approach.
 - Keep Skai local-first. Current releases use local model inference. The
