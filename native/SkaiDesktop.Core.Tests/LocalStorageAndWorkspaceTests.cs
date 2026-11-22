@@ -340,114 +340,127 @@ internal static class LocalStorageAndWorkspaceTests
             {
                 Check(true, "project command rejects sub-second timeouts");
             }
-            const string secretEnvironmentName = "SKAI_DESKTOP_TEST_SECRET";
-            var previousSecretEnvironment = Environment.GetEnvironmentVariable(secretEnvironmentName);
-            Environment.SetEnvironmentVariable(secretEnvironmentName, "must-not-leak");
-            try
+            var linuxSandboxProbe = OperatingSystem.IsLinux()
+                ? await commandRunner.RunAsync(workspacePath, ".", "printf skai-sandbox-probe", TimeSpan.FromSeconds(15))
+                : null;
+            var linuxSandboxUnavailable = linuxSandboxProbe?.IsolationStatus.Contains("could not establish the required sandbox", StringComparison.Ordinal) == true;
+            if (linuxSandboxUnavailable)
             {
-                var environmentResult = await commandRunner.RunAsync(workspacePath, ".",
-                    OperatingSystem.IsWindows() ? $"Write-Output $env:{secretEnvironmentName}" : $"printf \"${secretEnvironmentName}\"",
-                    TimeSpan.FromSeconds(10));
-                Check(!environmentResult.Output.Contains("must-not-leak", StringComparison.Ordinal), "project commands do not inherit secret-shaped environment variables");
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable(secretEnvironmentName, previousSecretEnvironment);
-            }
-            const string unlistedEnvironmentName = "SKAI_DESKTOP_TEST_UNLISTED";
-            var previousUnlistedEnvironment = Environment.GetEnvironmentVariable(unlistedEnvironmentName);
-            Environment.SetEnvironmentVariable(unlistedEnvironmentName, "must-not-cross-command-boundary");
-            try
-            {
-                var allowlistProbe = await commandRunner.RunAsync(workspacePath, ".",
-                    OperatingSystem.IsWindows()
-                        ? $"Write-Output \"$env:{unlistedEnvironmentName}|$env:PATH\""
-                        : $"printf '%s|%s' \"${unlistedEnvironmentName}\" \"$PATH\"",
-                    TimeSpan.FromSeconds(10));
-                var allowlistOutputParts = allowlistProbe.Output.Split('|');
-                var allowlistPathPresent = allowlistOutputParts.Length > 1 && allowlistOutputParts[^1].Trim().Length > 0;
-                var allowlistFailure = allowlistProbe.ExitCode == 0
-                    ? string.Empty
-                    : $", failure={allowlistProbe.Output.Trim()[..Math.Min(240, allowlistProbe.Output.Trim().Length)]}";
-                Check(allowlistProbe.ExitCode == 0 &&
-                      !allowlistProbe.Output.Contains("must-not-cross-command-boundary", StringComparison.Ordinal) &&
-                      allowlistOutputParts.Length > 1 && allowlistPathPresent,
-                    $"project commands inherit required runtime paths but not arbitrary application environment variables (exit={allowlistProbe.ExitCode}, separator={allowlistOutputParts.Length > 1}, pathPresent={allowlistPathPresent}{allowlistFailure}, isolation={allowlistProbe.IsolationStatus})");
-                Check(allowlistProbe.IsolationStatus.Contains("explicit runtime allowlist", StringComparison.Ordinal),
-                    "project command evidence reports environment allowlist enforcement");
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable(unlistedEnvironmentName, previousUnlistedEnvironment);
-            }
-            var coloredCommand = await commandRunner.RunAsync(workspacePath, ".",
-                OperatingSystem.IsWindows() ? "Write-Output ([char]27 + '[31mcheck-output[0m')" : "printf '\\033[31mcheck-output\\033[0m'",
-                TimeSpan.FromSeconds(10));
-            Check(coloredCommand.Output.Contains("check-output", StringComparison.Ordinal) && !coloredCommand.Output.Contains('\u001b'),
-                "project command output strips terminal control sequences before it is saved as verification evidence");
-            var commandResult = await commandRunner.RunAsync(workspacePath, "src",
-                OperatingSystem.IsWindows() ? "Write-Output skai-command-ok" : "printf skai-command-ok",
-                TimeSpan.FromSeconds(10));
-            Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
-            Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
-            Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
-            if (OperatingSystem.IsWindows())
-                Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal), "Windows Coding Agent process containment reports its enforced job memory cap");
-            if (OperatingSystem.IsLinux())
-            {
-                Check(commandResult.IsolationStatus.Contains("network disabled", StringComparison.Ordinal), "Linux command evidence confirms network namespace isolation");
-                var insideProjectPath = Path.Combine(workspacePath, "sandbox-write-probe.txt");
-                var insideWrite = await commandRunner.RunAsync(workspacePath, ".", "printf sandbox-write > sandbox-write-probe.txt", TimeSpan.FromSeconds(10));
-                Check(insideWrite.ExitCode == 0 && File.ReadAllText(insideProjectPath) == "sandbox-write", "Linux sandbox permits writes inside the selected project");
-                File.Delete(insideProjectPath);
-
-                var outsideProbePath = Path.Combine(settingsDirectory, "outside-project-sentinel.txt");
-                const string outsideSentinel = "host-outside-project-must-stay-hidden";
-                File.WriteAllText(outsideProbePath, outsideSentinel);
-                var outsideRead = await commandRunner.RunAsync(workspacePath, ".", $"cat '{outsideProbePath}'", TimeSpan.FromSeconds(10));
-                Check(outsideRead.ExitCode != 0 && !outsideRead.Output.Contains(outsideSentinel, StringComparison.Ordinal), "Linux sandbox cannot read a host file beside the selected project");
-                var outsideWrite = await commandRunner.RunAsync(workspacePath, ".", $"printf sandbox-write > '{outsideProbePath}'", TimeSpan.FromSeconds(10));
-                Check(outsideWrite.ExitCode == 0 && File.ReadAllText(outsideProbePath) == outsideSentinel, "Linux sandbox cannot modify the host file beside the selected project");
-
-                var networkProbe = await commandRunner.RunAsync(workspacePath, ".",
-                    "python3 -c \"import socket; socket.create_connection(('1.1.1.1', 443), 2); print('network-connected')\"",
-                    TimeSpan.FromSeconds(10));
-                Check(!networkProbe.Output.Contains("not found", StringComparison.OrdinalIgnoreCase), "Linux sandbox network probe has its Python runtime available");
-                Check(networkProbe.ExitCode != 0 && !networkProbe.Output.Contains("network-connected", StringComparison.Ordinal), "Linux sandbox cannot reach an external network address");
+                Check(linuxSandboxProbe!.ExitCode != 0 && !linuxSandboxProbe.Output.Contains("skai-sandbox-probe", StringComparison.Ordinal),
+                    "Linux command runner fails closed without executing when the host denies required namespaces");
+                Console.WriteLine("SKIP Linux sandbox boundary probes: this host denies Bubblewrap namespace creation.");
             }
             else
-                Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "unsupported process boundaries clearly report that filesystem and network are not sandboxed");
-            if (OperatingSystem.IsWindows() && GC.GetGCMemoryInfo().TotalAvailableMemoryBytes >= 2L * 1024 * 1024 * 1024)
             {
-                const string memoryProbe = "try { $probe = New-Object 'byte[]' 335544320; $probe[0] = 1; $probe[$probe.Length - 1] = 1; exit 99 } catch { [Console]::Error.WriteLine($_.Exception.GetType().FullName); exit 73 }";
-                var memoryControl = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, 1024UL * 1024 * 1024);
-                Check(memoryControl.ExitCode == 99 && memoryControl.IsolationStatus.Contains("job memory cap 1.0 GiB", StringComparison.Ordinal),
-                    "Windows memory-limit acceptance control can allocate 320 MiB under a 1 GiB Job Object cap");
-                var memoryLimited = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, CommandResourceLimits.MinimumJobMemoryBytes);
-                Check(memoryLimited.ExitCode != 99 && memoryLimited.IsolationStatus.Contains("job memory cap 0.3 GiB", StringComparison.Ordinal),
-                    "Windows Job Object prevents a 320 MiB allocation from succeeding under its 256 MiB cap");
-            }
-            else if (OperatingSystem.IsWindows())
-                Console.WriteLine("SKIP Windows Job Object over-limit probe: less than 2 GiB is available to the test runtime.");
-            var timedCommand = await commandRunner.RunAsync(workspacePath, ".",
-                OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",
-                TimeSpan.FromSeconds(1));
-            Check(timedCommand.TimedOut, "project command timeout stops the process instead of leaving a task running");
-            using (var commandCancellation = new CancellationTokenSource())
-            {
-                var cancellableCommand = commandRunner.RunAsync(workspacePath, ".",
-                    OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",
-                    TimeSpan.FromSeconds(30), commandCancellation.Token);
-                await Task.Delay(TimeSpan.FromMilliseconds(200));
-                commandCancellation.Cancel();
+                const string secretEnvironmentName = "SKAI_DESKTOP_TEST_SECRET";
+                var previousSecretEnvironment = Environment.GetEnvironmentVariable(secretEnvironmentName);
+                Environment.SetEnvironmentVariable(secretEnvironmentName, "must-not-leak");
                 try
                 {
-                    await cancellableCommand;
-                    throw new Exception("Expected a cancelled project command to stop with OperationCanceledException.");
+                    var environmentResult = await commandRunner.RunAsync(workspacePath, ".",
+                        OperatingSystem.IsWindows() ? $"Write-Output $env:{secretEnvironmentName}" : $"printf \"${secretEnvironmentName}\"",
+                        TimeSpan.FromSeconds(30));
+                    Check(!environmentResult.Output.Contains("must-not-leak", StringComparison.Ordinal), "project commands do not inherit secret-shaped environment variables");
                 }
-                catch (OperationCanceledException)
+                finally
                 {
-                    Check(true, "project command cancellation kills the process tree and propagates cancellation");
+                    Environment.SetEnvironmentVariable(secretEnvironmentName, previousSecretEnvironment);
+                }
+                const string unlistedEnvironmentName = "SKAI_DESKTOP_TEST_UNLISTED";
+                var previousUnlistedEnvironment = Environment.GetEnvironmentVariable(unlistedEnvironmentName);
+                Environment.SetEnvironmentVariable(unlistedEnvironmentName, "must-not-cross-command-boundary");
+                try
+                {
+                    var allowlistProbe = await commandRunner.RunAsync(workspacePath, ".",
+                        OperatingSystem.IsWindows()
+                            ? $"Write-Output \"$env:{unlistedEnvironmentName}|$env:PATH\""
+                            : $"printf '%s|%s' \"${unlistedEnvironmentName}\" \"$PATH\"",
+                        TimeSpan.FromSeconds(30));
+                    var allowlistOutputParts = allowlistProbe.Output.Split('|');
+                    var allowlistPathPresent = allowlistOutputParts.Length > 1 && allowlistOutputParts[^1].Trim().Length > 0;
+                    var allowlistFailure = allowlistProbe.ExitCode == 0
+                        ? string.Empty
+                        : $", timedOut={allowlistProbe.TimedOut}, failure={allowlistProbe.Output.Trim()[..Math.Min(240, allowlistProbe.Output.Trim().Length)]}";
+                    Check(allowlistProbe.ExitCode == 0 &&
+                          !allowlistProbe.Output.Contains("must-not-cross-command-boundary", StringComparison.Ordinal) &&
+                          allowlistOutputParts.Length > 1 && allowlistPathPresent,
+                        $"project commands inherit required runtime paths but not arbitrary application environment variables (exit={allowlistProbe.ExitCode}, separator={allowlistOutputParts.Length > 1}, pathPresent={allowlistPathPresent}{allowlistFailure}, isolation={allowlistProbe.IsolationStatus})");
+                    Check(allowlistProbe.IsolationStatus.Contains("explicit runtime allowlist", StringComparison.Ordinal),
+                        "project command evidence reports environment allowlist enforcement");
+                }
+                finally
+                {
+                    Environment.SetEnvironmentVariable(unlistedEnvironmentName, previousUnlistedEnvironment);
+                }
+                var coloredCommand = await commandRunner.RunAsync(workspacePath, ".",
+                    OperatingSystem.IsWindows() ? "Write-Output ([char]27 + '[31mcheck-output[0m')" : "printf '\\033[31mcheck-output\\033[0m'",
+                    TimeSpan.FromSeconds(10));
+                Check(coloredCommand.Output.Contains("check-output", StringComparison.Ordinal) && !coloredCommand.Output.Contains('\u001b'),
+                    "project command output strips terminal control sequences before it is saved as verification evidence");
+                var commandResult = await commandRunner.RunAsync(workspacePath, "src",
+                    OperatingSystem.IsWindows() ? "Write-Output skai-command-ok" : "printf skai-command-ok",
+                    TimeSpan.FromSeconds(10));
+                Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
+                Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
+                Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
+                if (OperatingSystem.IsWindows())
+                    Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal), "Windows Coding Agent process containment reports its enforced job memory cap");
+                if (OperatingSystem.IsLinux())
+                {
+                    Check(commandResult.IsolationStatus.Contains("network disabled", StringComparison.Ordinal), "Linux command evidence confirms network namespace isolation");
+                    var insideProjectPath = Path.Combine(workspacePath, "sandbox-write-probe.txt");
+                    var insideWrite = await commandRunner.RunAsync(workspacePath, ".", "printf sandbox-write > sandbox-write-probe.txt", TimeSpan.FromSeconds(10));
+                    Check(insideWrite.ExitCode == 0 && File.ReadAllText(insideProjectPath) == "sandbox-write", "Linux sandbox permits writes inside the selected project");
+                    File.Delete(insideProjectPath);
+
+                    var outsideProbePath = Path.Combine(settingsDirectory, "outside-project-sentinel.txt");
+                    const string outsideSentinel = "host-outside-project-must-stay-hidden";
+                    File.WriteAllText(outsideProbePath, outsideSentinel);
+                    var outsideRead = await commandRunner.RunAsync(workspacePath, ".", $"cat '{outsideProbePath}'", TimeSpan.FromSeconds(10));
+                    Check(outsideRead.ExitCode != 0 && !outsideRead.Output.Contains(outsideSentinel, StringComparison.Ordinal), "Linux sandbox cannot read a host file beside the selected project");
+                    var outsideWrite = await commandRunner.RunAsync(workspacePath, ".", $"printf sandbox-write > '{outsideProbePath}'", TimeSpan.FromSeconds(10));
+                    Check(outsideWrite.ExitCode == 0 && File.ReadAllText(outsideProbePath) == outsideSentinel, "Linux sandbox cannot modify the host file beside the selected project");
+
+                    var networkProbe = await commandRunner.RunAsync(workspacePath, ".",
+                        "python3 -c \"import socket; socket.create_connection(('1.1.1.1', 443), 2); print('network-connected')\"",
+                        TimeSpan.FromSeconds(10));
+                    Check(!networkProbe.Output.Contains("not found", StringComparison.OrdinalIgnoreCase), "Linux sandbox network probe has its Python runtime available");
+                    Check(networkProbe.ExitCode != 0 && !networkProbe.Output.Contains("network-connected", StringComparison.Ordinal), "Linux sandbox cannot reach an external network address");
+                }
+                else
+                    Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "unsupported process boundaries clearly report that filesystem and network are not sandboxed");
+                if (OperatingSystem.IsWindows() && GC.GetGCMemoryInfo().TotalAvailableMemoryBytes >= 2L * 1024 * 1024 * 1024)
+                {
+                    const string memoryProbe = "try { $probe = New-Object 'byte[]' 335544320; $probe[0] = 1; $probe[$probe.Length - 1] = 1; exit 99 } catch { [Console]::Error.WriteLine($_.Exception.GetType().FullName); exit 73 }";
+                    var memoryControl = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, 1024UL * 1024 * 1024);
+                    Check(memoryControl.ExitCode == 99 && memoryControl.IsolationStatus.Contains("job memory cap 1.0 GiB", StringComparison.Ordinal),
+                        "Windows memory-limit acceptance control can allocate 320 MiB under a 1 GiB Job Object cap");
+                    var memoryLimited = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, CommandResourceLimits.MinimumJobMemoryBytes);
+                    Check(memoryLimited.ExitCode != 99 && memoryLimited.IsolationStatus.Contains("job memory cap 0.3 GiB", StringComparison.Ordinal),
+                        "Windows Job Object prevents a 320 MiB allocation from succeeding under its 256 MiB cap");
+                }
+                else if (OperatingSystem.IsWindows())
+                    Console.WriteLine("SKIP Windows Job Object over-limit probe: less than 2 GiB is available to the test runtime.");
+                var timedCommand = await commandRunner.RunAsync(workspacePath, ".",
+                    OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",
+                    TimeSpan.FromSeconds(1));
+                Check(timedCommand.TimedOut, "project command timeout stops the process instead of leaving a task running");
+                using (var commandCancellation = new CancellationTokenSource())
+                {
+                    var cancellableCommand = commandRunner.RunAsync(workspacePath, ".",
+                        OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",
+                        TimeSpan.FromSeconds(30), commandCancellation.Token);
+                    await Task.Delay(TimeSpan.FromMilliseconds(200));
+                    commandCancellation.Cancel();
+                    try
+                    {
+                        await cancellableCommand;
+                        throw new Exception("Expected a cancelled project command to stop with OperationCanceledException.");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Check(true, "project command cancellation kills the process tree and propagates cancellation");
+                    }
                 }
             }
             await using (var terminalSession = new WorkspaceTerminalSession())

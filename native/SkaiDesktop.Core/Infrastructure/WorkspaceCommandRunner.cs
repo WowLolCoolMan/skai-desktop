@@ -109,13 +109,28 @@ public sealed class WorkspaceCommandRunner
         await Task.WhenAll(standardOutput, standardError).ConfigureAwait(false);
         var capturedOutput = TerminalControlSequence.Replace(output.ToString(), string.Empty);
         capturedOutput = new string(capturedOutput.Where(character => !char.IsControl(character) || character is '\r' or '\n' or '\t').ToArray());
+        var isolationStatus = OperatingSystem.IsLinux()
+            ? LinuxCommandSandbox.Status
+            : OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes);
+        if (OperatingSystem.IsLinux())
+        {
+            if (!capturedOutput.StartsWith(LinuxCommandSandbox.ExecutionStartedMarker, StringComparison.Ordinal))
+            {
+                isolationStatus = "Linux Bubblewrap could not establish the required sandbox; the project command was not executed. " +
+                    "Check Bubblewrap and user, PID, and network namespace availability.";
+            }
+            else
+            {
+                capturedOutput = capturedOutput[LinuxCommandSandbox.ExecutionStartedMarker.Length..];
+            }
+        }
         return new WorkspaceCommandResult(
             process.ExitCode,
             capturedOutput,
             timedOut,
             truncated != 0,
             workingDirectory,
-            $"{(OperatingSystem.IsLinux() ? LinuxCommandSandbox.Status : OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes))} Command environment is restricted to an explicit runtime allowlist.");
+            $"{isolationStatus} Command environment is restricted to an explicit runtime allowlist.");
     }
 
     public static string ResolveWorkingDirectory(string selectedRoot, string relativeWorkingDirectory)

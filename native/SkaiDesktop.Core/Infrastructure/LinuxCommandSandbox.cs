@@ -5,6 +5,7 @@ namespace SkaiDesktop.Core.Infrastructure;
 /// <summary>Builds a fail-closed Bubblewrap command boundary for approved Linux workspace commands.</summary>
 internal static class LinuxCommandSandbox
 {
+    public const string ExecutionStartedMarker = "__SKAI_LINUX_SANDBOX_READY_6C0F5147__";
     private static readonly string[] ReadOnlySystemMounts = ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc"];
 
     public static ProcessStartInfo CreateStartInfo(
@@ -98,6 +99,9 @@ internal static class LinuxCommandSandbox
         startInfo.ArgumentList.Add("--");
         startInfo.ArgumentList.Add("/bin/sh");
         startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("printf '%s' \"$1\"; exec /bin/sh -c \"$2\"");
+        startInfo.ArgumentList.Add("skai-linux-sandbox");
+        startInfo.ArgumentList.Add(ExecutionStartedMarker);
         startInfo.ArgumentList.Add(command);
         return startInfo;
     }
