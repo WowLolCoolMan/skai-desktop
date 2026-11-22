@@ -36,12 +36,19 @@ function install(installer, label) {
 }
 
 function signature(file) {
-  const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "$s=Get-AuthenticodeSignature -LiteralPath $env:SKAI_SIGNATURE_TARGET; [pscustomobject]@{status=[string]($s.Status);subject=$s.SignerCertificate.Subject;issuer=$s.SignerCertificate.Issuer}|ConvertTo-Json -Compress"], {
-    env: { ...env, SKAI_SIGNATURE_TARGET: file }, encoding: "utf8", windowsHide: true, timeout: 20_000,
+  const command = [
+    "$module=Join-Path $PSHOME 'Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1'",
+    "Import-Module $module -ErrorAction Stop",
+    "$s=Get-AuthenticodeSignature -LiteralPath $env:SKAI_SIGNATURE_TARGET",
+    "[pscustomobject]@{status=[string]($s.Status);subject=$s.SignerCertificate.Subject;issuer=$s.SignerCertificate.Issuer}|ConvertTo-Json -Compress",
+  ].join("; ");
+  const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command], {
+    env: { ...process.env, SKAI_SIGNATURE_TARGET: file }, encoding: "utf8", windowsHide: true, timeout: 20_000,
   });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`Unable to verify Authenticode signature for ${file}: ${result.stderr}`);
+  if (result.status !== 0 || result.stderr.trim()) throw new Error(`Unable to verify Authenticode signature for ${file}: ${result.stderr || `PowerShell exited with ${result.status}`}`);
   const parsed = JSON.parse(result.stdout.trim());
+  if (!parsed.status) throw new Error(`PowerShell returned no Authenticode status for ${file}.`);
   const evidence = { name: path.basename(file), status: parsed.status, subject: parsed.subject || null, issuer: parsed.issuer || null, sha256: sha256(file) };
   if (process.env.SKAI_REQUIRE_SIGNED_INSTALLER === "true" && evidence.status !== "Valid") throw new Error(`Expected a valid Authenticode signature for ${file}; found ${evidence.status}.`);
   return evidence;

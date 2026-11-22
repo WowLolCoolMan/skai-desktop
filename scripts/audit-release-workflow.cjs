@@ -3,6 +3,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const workflowPath = path.join(root, ".github", "workflows", "release.yml");
+const installerSmokePath = path.join(root, "scripts", "smoke-windows-installer.cjs");
 const errors = [];
 
 let workflow = "";
@@ -52,6 +53,19 @@ requireContract("non-empty signature evidence check", /if \[ ! -s "\$signature" 
 requireContract("every-artifact signature evidence check", /required_signatures=\([\s\S]*SIGNATURES-electron-linux-x64\.txt[\s\S]*if \[ ! -s "\$signature" \]/);
 requireContract("release contents write permission", /contents:\s*write/);
 requireContract("checksum generation", /sha256sum/);
+
+let installerSmoke = "";
+try {
+  installerSmoke = fs.readFileSync(installerSmokePath, "utf8");
+} catch (error) {
+  errors.push(`Unable to read scripts/smoke-windows-installer.cjs: ${error.message}`);
+}
+if (installerSmoke && !/Import-Module \$module -ErrorAction Stop[\s\S]*Get-AuthenticodeSignature/.test(installerSmoke)) {
+  errors.push("Missing installer contract: Authenticode module is imported explicitly for signature evidence.");
+}
+if (installerSmoke && !/if \(!parsed\.status\) throw new Error\(/.test(installerSmoke)) {
+  errors.push("Missing installer contract: absent Authenticode status fails the lifecycle smoke.");
+}
 
 if (errors.length > 0) {
   console.error("Release workflow audit failed:");

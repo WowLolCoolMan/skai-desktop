@@ -203,9 +203,13 @@ and to any detailed plan rather than copying their full contents here.
 - **Context:** The 0.1.4 Windows NSIS installer and `latest.yml` were built and
   metadata-verified unsigned on 2026-11-22. The owner has chosen to defer
   certificates; local unsigned validation can proceed. On 2026-11-22, the
-  unsigned 0.1.4 installer installed into a disposable profile, launched the
-  packaged app, passed its smoke checks, and silently uninstalled. A published
-  0.1.3 installer is unavailable, so upgrade/data-retention/rollback remain
+  previous installer was built from the actual `v0.1.3` tag in a detached
+  temporary worktree. The unsigned 0.1.3 → 0.1.4 lifecycle smoke passed both
+  packaged app checks, verified data retention across upgrade and uninstall,
+  and confirmed application files were removed. Installer and uninstaller
+  signature evidence correctly reports `NotSigned`; the lifecycle harness now
+  imports the Authenticode module explicitly and fails if a signature status is
+  missing. The real updater download/install and rollback path remain
   unverified. Linux acceptance still requires a Linux runner.
 - **Agreed approach:** Use the release checklist against exact packaged
   artifacts. Verify checksums, clean install and uninstall (now accepted for
@@ -214,8 +218,11 @@ and to any detailed plan rather than copying their full contents here.
   mark a platform ready based on development builds alone.
 - **Acceptance:** Attach artifact identifiers and test evidence for each target;
   signing and update verification fail closed; upgrade and rollback preserve
-  user data; all release blockers in the readiness doc are resolved or clearly
-  documented as unsupported.
+  user data. Windows install/upgrade/uninstall evidence is now available for
+  unsigned local artifacts. A published update-feed download/install, rollback,
+  signed metadata, production signing, and Linux acceptance remain open; all
+  release blockers in the readiness doc must be resolved or clearly documented
+  as unsupported.
 - **References:** [Release readiness](RELEASE_READINESS.md),
   [release guide](RELEASING.md),
   [production readiness gaps](PRODUCTION_READINESS_GAPS.md).

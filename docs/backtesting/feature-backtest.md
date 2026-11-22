@@ -30,7 +30,7 @@ worktree.
 | Pets, Linux windowing, update policy, bridge/runtime/tray/local-only audits | Corresponding `test:*` and `audit:*` scripts |
 | Repository hygiene and release configuration | `check:hygiene`, `check:release-config`, `audit:future-features` |
 | Windows 0.1.4 unsigned installer packaging and update metadata | `SKAI_ALLOW_UNSIGNED_INSTALLER=true node scripts/package-windows-installer.cjs` — NSIS artifact and `latest.yml` verified locally |
-| Windows 0.1.4 clean install and uninstall | Unsigned installer installed into a disposable profile, launched the packaged app, passed the packaged smoke, then silently uninstalled; completed 2026-11-22. This does not cover upgrade/data retention or rollback. |
+| Windows 0.1.3 → 0.1.4 installer lifecycle | Built the prior installer from the actual `v0.1.3` source tag in an isolated worktree. Both unsigned installers passed packaged app smoke; upgrade preserved a user-data marker; uninstall removed app files and retained user data. All installer/uninstaller signatures reported `NotSigned`. |
 | Real local Diffusers image generation and editing | Installed SD-Turbo runtime returned valid 512×512 CPU JPEGs for text-to-image (4/4 scheduler steps) and image-to-image with a 512×512 local PNG source (2/2 effective scheduler steps). The edit source was a disposable fixture. |
 | Diffusers progress accuracy | Worker progress now uses Diffusers' actual effective timestep count; a real text run reported 1/4 through 4/4 and an edit run 1/2 through 2/2. Agent Host forwards step progress and cancellation to the image operation. |
 
@@ -41,13 +41,12 @@ worktree.
 | AirLLM inference | AirLLM and Torch import successfully from `%LOCALAPPDATA%\\Skai\\AirLLM\\venv`; the worker’s CUDA preflight and malformed-input paths return structured errors. A real model run still requires an NVIDIA GPU and CUDA-capable PyTorch, plus a compatible Hugging Face model and enough disk/RAM/VRAM. |
 | Microphone dictation | Packaged Electron reports the `en-US` on-device speech pack unavailable and correctly refuses remote recognition. Requires an installed speech pack or approved local STT fixture. |
 | Packaged Marketplace workflow | `smoke:electron:artifact` passes Models search/review and explicitly verifies Tools → Installed inventory in the packaged app. |
-| Persona model quality | Research succeeds with installed `qwen3:14b`; one character draft returned a partial card. Core deterministic voice-card and source-boundary tests pass, but more model-specific quality evaluation is needed. |
+| Persona model quality | The David Lynch smoke passed identity, death-date, research, attributed-turn, draft, and chat checks with Qwen3 14B (3 sources, 60 attributed turns, 8 drafted fields). Existing one-subject Sam Hyde coverage also passes. These checks do not establish semantic fidelity or cutoff truthfulness across multiple turns and subjects. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |
-| Release signing and lifecycle | Release audit confirms the gates exist. Cryptographic signing and clean-machine upgrade/rollback still require configured CI secrets and Windows/Ubuntu runners. |
-| Local Windows upgrade lifecycle | Disposable clean install/launch/uninstall passed for unsigned 0.1.4. The 0.1.3 → 0.1.4 upgrade smoke still needs a real 0.1.3 installer artifact; upgrade data retention and rollback remain unverified. |
+| Release signing and lifecycle | Release audit and metadata checks pass. Local unsigned 0.1.3 → 0.1.4 install/upgrade/uninstall passed on Windows. Production signing, signed updater metadata, rollback, and Linux acceptance remain open. |
 | WebM video sampling | H.264 MP4 sampling passes. The smoke harness's data-URL WebM probe is rejected by Chromium's URL safety policy on this host, so the run reports this and leaves actual packaged WebM decoding unverified. |
-| Diffusers cancellation and renderer-to-host editing | Worker text-to-image and image-to-image paths are accepted directly, but live cancellation during inference and the complete packaged UI → Agent Host → history/reopen workflow remain unverified. |
-| Linux AppImage packaging | The packager correctly refuses to run on Windows; build and acceptance require an Ubuntu/Linux runner. |
+| Diffusers GPU and ComfyUI acceptance | The packaged CPU path passes live cancellation, text-to-image, image-to-image, and history restoration after reload. This host has an AMD RX 7900 XTX, but the installed worker used CPU; GPU acceleration and a live ComfyUI server remain unverified. |
+| Real `electron-updater` install and Linux AppImage | Update policy/manager unit checks pass, but a real feed download/install/rollback needs an available release channel. AppImage packaging and acceptance require an Ubuntu/Linux runner. |
 
 ## Test-harness notes
 
