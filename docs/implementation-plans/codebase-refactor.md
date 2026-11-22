@@ -202,6 +202,9 @@ checked per slice.
 - Split progressive persona research and its saved-card enrichment from
   initial persona research orchestration into
   `AgentHostLoop.PersonaProgressiveResearch.cs`.
+- Moved persona candidate discovery and name matching into
+  `AgentHostLoop.PersonaDiscovery.cs`; selected-identity resolution and source
+  research remain in `AgentHostLoop.PersonaResearch.cs`.
 - Moved system-tray menu state, recent-chat items, refresh sequencing, and tray
   creation into `tray-controller.cjs`; Electron startup still supplies the
   existing window, pet, and Agent Host callbacks.

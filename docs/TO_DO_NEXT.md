@@ -84,8 +84,9 @@ and to any detailed plan rather than copying their full contents here.
   tab persistence have now been extracted. Remaining high-value candidates
   include pet movement/behavior orchestration, Agent Host research sequencing,
   workspace state coordination, Marketplace/Plugins composition, and remaining
-  model/workflow services. Web search now separates search-result handling from
-  bounded public-page and transcript fetching.
+  model/workflow services. Persona candidate discovery is now separate from
+  identity resolution and source research; Core web search separates
+  search-result handling from bounded public-page and transcript fetching.
 - **Agreed approach:** Refactor incrementally by cohesive responsibility,
   preserve bridge/storage/runtime behavior, sync with `main` before each
   commit, and verify the layer being changed. Do not split files mechanically
