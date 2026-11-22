@@ -5,7 +5,7 @@ const { shouldDownloadAvailableUpdate } = require("./update-policy.cjs");
 const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
-function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, getMainWindow, now = () => new Date(), setIntervalFn = setInterval, clearIntervalFn = clearInterval }) {
+function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, getMainWindow, prepareForUpdateInstall = () => {}, forceExitAfterUpdateLaunch = () => {}, now = () => new Date(), setIntervalFn = setInterval, clearIntervalFn = clearInterval }) {
   let updateCheckTimer;
   let updateSnapshot = { status: "idle", available: false, message: "Updates have not been checked yet." };
   let updateChecksEnabled = true;
@@ -110,6 +110,12 @@ function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, ge
     updateCheckTimer = setIntervalFn(() => { void checkForUpdates(); }, UPDATE_CHECK_INTERVAL_MS);
   }
 
+  function dispose() {
+    if (updateCheckTimer) clearIntervalFn(updateCheckTimer);
+    updateCheckTimer = undefined;
+    if (updateDownloadToken && !updateDownloadToken.cancelled) updateDownloadToken.cancel();
+  }
+
   function cancelUpdateDownload() {
     if (updateSnapshot.status !== "downloading" || !updateDownloadToken) return false;
     updateDownloadToken.cancel();
@@ -118,7 +124,11 @@ function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, ge
 
   function installDownloadedUpdate() {
     if (updateSnapshot.status !== "downloaded") return false;
-    autoUpdater.quitAndInstall(false, true);
+    // Reaching this method requires an explicit in-app install action. Apply
+    // the already-verified NSIS update without launching a second setup wizard.
+    prepareForUpdateInstall();
+    autoUpdater.quitAndInstall(true, true);
+    forceExitAfterUpdateLaunch();
     return true;
   }
 
@@ -127,6 +137,7 @@ function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, ge
     cancelUpdateDownload,
     checkForUpdates,
     configureAutoUpdater,
+    dispose,
     getCurrentSnapshot: () => ({ ...updateSnapshot, currentVersion: app.getVersion() }),
     getEnabled: () => updateChecksEnabled,
     getSnapshot: () => ({ ...updateSnapshot }),

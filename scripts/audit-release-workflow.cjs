@@ -31,6 +31,7 @@ requireContract("Signed per-user NSIS installer is built", /package:windows:inst
 requireContract("Installer and uninstaller signatures are verified", /SKAI_REQUIRE_SIGNED_INSTALLER:\s*'true'[\s\S]*Get-AuthenticodeSignature/);
 requireContract("Previous release installer is used for upgrade smoke", /ref:\s+v0\.1\.3[\s\S]*smoke-windows-installer\.cjs/);
 requireContract("Clean install, upgrade, uninstall evidence is published", /windows-install-lifecycle-evidence\.json/);
+requireContract("Updater-enabled previous-version fixture exercises the local feed and installer", /smoke-windows-update-feed\.cjs/);
 requireContract("Linux signing material", /RELEASE_GPG_PRIVATE_KEY/);
 requireContract("Linux detached signature", /--detach-sign/);
 requireContract("Electron release packaging job", /\n  electron:\s*\n\s+name:\s+Package Electron/);

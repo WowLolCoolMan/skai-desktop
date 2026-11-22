@@ -229,6 +229,15 @@ jobs:
           $currentInstaller = Join-Path $env:GITHUB_WORKSPACE 'dist/installer/win-x64/Skai-Desktop-0.1.4-Setup-x64.exe'
           node scripts/smoke-windows-installer.cjs $previousInstaller $currentInstaller .tmp/release-v0.1.3/scripts/smoke-electron-artifact.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Windows install/upgrade/uninstall lifecycle smoke failed.' }
+      - name: Verify the real in-app update feed and install path
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packagedApp = Join-Path $env:GITHUB_WORKSPACE 'dist/electron/win-x64'
+          $currentInstaller = Join-Path $env:GITHUB_WORKSPACE 'dist/installer/win-x64/Skai-Desktop-0.1.4-Setup-x64.exe'
+          node scripts/smoke-windows-update-feed.cjs $packagedApp $currentInstaller
+          if ($LASTEXITCODE -ne 0) { throw 'Windows in-app update feed/download/install smoke failed.' }
       - name: Sign Linux Electron archive
         if: runner.os == 'Linux' && env.RELEASE_SIGNING_READY == 'true'
         shell: bash

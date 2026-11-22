@@ -33,12 +33,16 @@ async function run() {
     const sent = [];
     let intervalCallback;
     let clearedInterval = false;
+    let preparedForInstall = false;
+    let forceExitScheduled = false;
     const manager = createUpdateManager({
       app,
       autoUpdater: updater,
       CancellationToken: FakeCancellationToken,
       fs,
       path,
+      prepareForUpdateInstall: () => { preparedForInstall = true; },
+      forceExitAfterUpdateLaunch: () => { forceExitScheduled = true; },
       getMainWindow: () => ({ isDestroyed: () => false, webContents: { send: (...event) => sent.push(event) } }),
       now: () => new Date("2026-11-22T12:00:00.000Z"),
       setIntervalFn: (callback, delay) => { intervalCallback = callback; assert.equal(delay, 6 * 60 * 60 * 1000); return "timer"; },
@@ -71,11 +75,17 @@ async function run() {
     updater.emit("update-downloaded", { version: "0.1.5" });
     assert.equal(manager.getSnapshot().status, "downloaded");
     assert.equal(manager.installDownloadedUpdate(), true, "a verified download can be installed");
-    assert.deepEqual(updater.installArgs, [false, true]);
+    assert.deepEqual(updater.installArgs, [true, true]);
     assert.equal(updater.installCalls, 1);
+    assert.equal(preparedForInstall, true, "app close-to-tray is bypassed before the updater closes the window");
+    assert.equal(forceExitScheduled, true, "a fallback process exit is scheduled after the installer is launched");
 
     await manager.writeUpdatePreference(false);
     assert.equal(clearedInterval, true, "disabling checks clears the recurring timer");
+    await manager.writeUpdatePreference(true);
+    clearedInterval = false;
+    manager.dispose();
+    assert.equal(clearedInterval, true, "disposing the app clears the updater's interval so shutdown can finish");
     assert.equal(sent.every(([, state]) => state.currentVersion === "0.1.4"), true, "published update states include the running app version");
     console.log("Update manager checks passed.");
   } finally {

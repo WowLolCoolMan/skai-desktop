@@ -116,7 +116,22 @@ const PET_WINDOW_HEIGHT = 190;
 const PET_WINDOW_MARGIN = 16;
 const attachmentTextExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".json", ".xml", ".yaml", ".yml", ".toml", ".html", ".htm", ".css", ".js", ".ts", ".jsx", ".tsx", ".cs", ".py", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".log"]);
 const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets"]);
-const updateManager = createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, getMainWindow: () => mainWindow });
+const updateManager = createUpdateManager({
+  app,
+  autoUpdater,
+  CancellationToken,
+  fs,
+  path,
+  getMainWindow: () => mainWindow,
+  prepareForUpdateInstall: () => { isQuitting = true; },
+  forceExitAfterUpdateLaunch: () => {
+    // Some tray/background handles keep Electron alive after every window has
+    // closed. The updater has already been spawned; force the old process down
+    // if Electron's normal quit sequence has not completed promptly.
+    const fallbackExit = setTimeout(() => app.exit(0), 2_000);
+    fallbackExit.unref?.();
+  },
+});
 
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
@@ -1312,6 +1327,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  updateManager.dispose();
   globalShortcut.unregister(globalLauncherAccelerator);
   stopPetWander();
   stopPetBehavior(false);

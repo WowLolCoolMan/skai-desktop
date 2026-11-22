@@ -215,8 +215,13 @@ and to any detailed plan rather than copying their full contents here.
   and confirmed application files were removed. Installer and uninstaller
   signature evidence correctly reports `NotSigned`; the lifecycle harness now
   imports the Authenticode module explicitly and fails if a signature status is
-  missing. The real updater download/install and rollback path remain
-  unverified. Linux acceptance still requires a Linux runner.
+  missing. The Windows `electron-updater` loopback-feed smoke now stages the
+  real 0.1.4 installer, verifies its SHA-512 download, invokes the app's install
+  action, confirms the old process exits, checks the installed version changes
+  to 0.1.4, and verifies the profile marker survives. Its 0.1.3 baseline is a
+  synthetic lower-version package built from the current updater-enabled app;
+  the historical v0.1.3 tag predates the updater bridge. Linux acceptance still
+  requires a Linux runner.
 - **Agreed approach:** Use the release checklist against exact packaged
   artifacts. Verify checksums, clean install and uninstall (now accepted for
   unsigned Windows 0.1.4), then upgrade with data retention and rollback on
@@ -224,9 +229,9 @@ and to any detailed plan rather than copying their full contents here.
   mark a platform ready based on development builds alone.
 - **Acceptance:** Attach artifact identifiers and test evidence for each target;
   signing and update verification fail closed; upgrade and rollback preserve
-  user data. Windows install/upgrade/uninstall evidence is now available for
-  unsigned local artifacts. A published update-feed download/install, rollback,
-  signed metadata, production signing, and Linux acceptance remain open; all
+  user data. Windows install/upgrade/uninstall and local-feed updater evidence
+  are now available for unsigned local artifacts. A published-channel update,
+  rollback, signed metadata, production signing, and Linux acceptance remain open; all
   release blockers in the readiness doc must be resolved or clearly documented
   as unsupported.
 - **References:** [Release readiness](RELEASE_READINESS.md),
