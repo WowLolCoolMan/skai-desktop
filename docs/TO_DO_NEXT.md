@@ -83,7 +83,9 @@ and to any detailed plan rather than copying their full contents here.
   remain large. Persona matching and HTML parsing are now in focused Core
   helpers, and bounded public-source requests are isolated in an injectable
   client; speaker-labelled turns and quote evidence now have a dedicated
-  extraction helper, while the broader research orchestration still remains.
+  extraction helper, while broader research orchestration remains. Model
+  runtime discovery/management and remote search/download operations now live
+  in separate partials of the same service.
   Agent Host request validation and method dispatch are also separated from
   the main loop. Update and local-media IPC registration now live outside
   Electron's shell entry point, and desktop pet state persistence has its own

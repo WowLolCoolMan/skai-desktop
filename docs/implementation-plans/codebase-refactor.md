@@ -100,6 +100,10 @@ that users touch as each slice is moved.
 - Moved transcript-turn cleanup, speaker alias selection, and quote-line
   filtering into `PersonaQuoteEvidence`, retaining the old public speaker-label
   facade while keeping citation and evidence policy unchanged.
+- Split `ModelLibraryService` into local runtime discovery/management and
+  remote catalog search/download partials. The public service and serialized
+  model records remain unchanged; catalog validation and download behavior
+  stay with the remote catalog operations.
 - Moved Agent Host request-parameter validation, bounds, and local endpoint
   checks into `AgentHostLoop.RequestValidation.cs`; the public protocol and
   guard behavior are unchanged.
