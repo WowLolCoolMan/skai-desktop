@@ -22,6 +22,7 @@ const { registerPetIpc } = require("./pet-ipc.cjs");
 const { createThemeService } = require("./theme-service.cjs");
 const { createAgentHostClient } = require("./agent-host-client.cjs");
 const { createPetStateStore } = require("./pet-state-store.cjs");
+const { createTrayController } = require("./tray-controller.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
@@ -54,8 +55,6 @@ const globalLauncherAccelerator = "CommandOrControl+Alt+Space";
 let isQuitting = false;
 let mainWindow;
 let petWindow;
-let tray;
-let trayRefreshSequence = 0;
 let petReady = false;
 let petDragOffset = null;
 let petEntranceTimer;
@@ -1051,54 +1050,8 @@ function resolveAppIconPath() {
     return null;
   }
 }
-
-function recentConversationMenuItems(conversations) {
-  if (!conversations.length) return [{ label: "No recent chats", enabled: false }];
-  return conversations.slice(0, 8).map((conversation) => {
-    const title = String(conversation.title || "Untitled chat").replace(/\s+/g, " ").trim().slice(0, 72) || "Untitled chat";
-    const project = conversation.projectName ? ` · ${String(conversation.projectName).slice(0, 28)}` : "";
-    return { label: `${title}${project}`, click: () => sendTrayEvent("tray:open-conversation", String(conversation.id)) };
-  });
-}
-
-function setTrayMenu(conversations = []) {
-  if (!tray || tray.isDestroyed()) return;
-  const petVisible = Boolean(petWindow && !petWindow.isDestroyed() && petWindow.isVisible());
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "Show Skai Desktop", click: showMainWindow },
-    { label: "New chat", click: () => sendTrayEvent("tray:new-chat") },
-    { type: "separator" },
-    { label: "Recent chats", submenu: recentConversationMenuItems(conversations) },
-    { type: "separator" },
-    { label: petVisible ? "Hide all pets" : "Show all pets", click: () => setPetVisible(!petVisible) },
-    { type: "separator" },
-    { label: "Quit Skai Desktop", click: () => app.quit() },
-  ]));
-}
-
-async function refreshTrayMenu(popUp = false) {
-  if (!tray || tray.isDestroyed()) return;
-  const sequence = ++trayRefreshSequence;
-  const response = await requestAgent("conversations.list", { includeArchived: false });
-  if (sequence !== trayRefreshSequence || !tray || tray.isDestroyed()) return;
-  const conversations = response.ok && Array.isArray(response.result) ? response.result : [];
-  setTrayMenu(conversations);
-  if (popUp && !isQuitting) tray.popUpContextMenu();
-}
-
-function createTray() {
-  if (tray && !tray.isDestroyed()) return tray;
-  const iconPath = resolveTrayIconPath();
-  const source = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
-  tray = new Tray(process.platform === "win32" ? source.resize({ width: 16, height: 16 }) : source);
-  tray.setToolTip("Skai Desktop");
-  setTrayMenu();
-  tray.on("click", showMainWindow);
-  tray.on("right-click", () => { void refreshTrayMenu(true); });
-  tray.on("double-click", showMainWindow);
-  void refreshTrayMenu();
-  return tray;
-}
+function refreshTrayMenu(popUp = false) { return trayController.refreshTrayMenu(popUp); }
+function createTray() { return trayController.createTray(); }
 
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "tasks.list",
@@ -1136,6 +1089,20 @@ const agentHostClient = createAgentHostClient({
 const startAgentHost = () => agentHostClient.start();
 const stopAgentHost = (onStopped) => agentHostClient.stop(onStopped);
 const requestAgent = (method, params) => agentHostClient.request(method, params);
+const trayController = createTrayController({
+  app,
+  Tray,
+  Menu,
+  nativeImage,
+  process,
+  requestAgent,
+  getPetWindow: () => petWindow,
+  setPetVisible,
+  showMainWindow,
+  sendTrayEvent,
+  resolveTrayIconPath,
+  isQuitting: () => isQuitting,
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
