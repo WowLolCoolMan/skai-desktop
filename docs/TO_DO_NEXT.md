@@ -221,6 +221,10 @@ and to any detailed plan rather than copying their full contents here.
   Sparrow turns; no guest lines or stage directions leaked into those excerpts.
   A separate Joe PDF transcript yielded 9 attributed turns. Mixed-speaker
   archives without labels remain excluded.
+  A bounded compact-evidence retry now recovers empty structured profile drafts.
+  On 2026-11-22, the end-to-end Sam Hyde research-and-draft smoke passed with
+  Qwen3 14B: 3 sources, 7 attributed turns, and all 9 profile fields. This run
+  did not include persona chat.
   Core checks and Agent Host build passed. A 14B local-model workflow completed
   profile and chat turns, and explicit childhood / backstory questions were
   safely blocked. The Joe answer still sounded generic and invented a
@@ -230,6 +234,9 @@ and to any detailed plan rather than copying their full contents here.
   drafting prompt before drawing a product-level conclusion.
 - **Agreed approach:** Keep attribution strict: count only lines confidently
   tied to the requested speaker; prefer an explicit evidence gap over guessing.
+  If a structured drafting pass returns no usable fields, retry it once with a
+  compact evidence window and concise field instructions; do not invent values
+  to fill gaps.
   Improve name-only discovery so it finds dialogue sources without user-supplied
   URLs, and diversify sources before claiming a researched profile is ready.
   Continue rejecting promotional or irrelevant material. Exercise unsupported
@@ -293,6 +300,13 @@ and to any detailed plan rather than copying their full contents here.
 ## Recently completed
 
 Move finished entries here with their commit/PR and verification evidence.
+
+- **2026-11-22 — Persona profile drafting recovery.** Empty structured draft
+  passes now receive one bounded retry with compact evidence and concise
+  instructions. Core tests and Agent Host build pass; the live Sam Hyde
+  research-and-draft smoke with Qwen3 14B passed with 3 sources, 7 attributed
+  turns, and all 9 profile fields. Persona chat and broader subject coverage
+  remain open; implementation and evidence are recorded in Git history.
 
 - **2026-11-22 — Completed the planned cross-layer refactor cycle.** Added
   focused boundaries for Percy native window lifecycle, public web-page and

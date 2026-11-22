@@ -170,6 +170,23 @@ public static class PersonaProfileDrafting
         return [identity, character];
     }
 
+    /// <summary>Builds one bounded retry for a draft pass that returned no usable fields.</summary>
+    public static PersonaDraftPass BuildCompactRetry(PersonaDraftPass pass)
+    {
+        const int maxEvidenceCharacters = 2_400;
+        var marker = pass.UserPrompt.IndexOf("\n\nEvidence:\n", StringComparison.Ordinal);
+        var compactPrompt = marker < 0
+            ? pass.UserPrompt[..Math.Min(pass.UserPrompt.Length, maxEvidenceCharacters)]
+            : pass.UserPrompt[..marker] + "\n\nEvidence:\n" + pass.UserPrompt[(marker + "\n\nEvidence:\n".Length)..Math.Min(pass.UserPrompt.Length, marker + "\n\nEvidence:\n".Length + maxEvidenceCharacters)];
+        compactPrompt += "\n\nRetry: fill every required field with one concise evidence-based sentence. Use an empty string only when the sources provide no support. Return the required JSON object only.";
+        return pass with
+        {
+            Name = pass.Name + "-compact-retry",
+            SystemPrompt = pass.SystemPrompt + " Keep each required value to one concise sentence and include every required JSON key.",
+            UserPrompt = compactPrompt,
+        };
+    }
+
     /// <summary>
     /// Reads a model reply as field text. Strings pass through; arrays and objects (which small models
     /// emit despite instructions) are flattened into readable text instead of failing the draft.

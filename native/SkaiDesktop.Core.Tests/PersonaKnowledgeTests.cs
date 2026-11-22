@@ -161,6 +161,12 @@ internal static class PersonaKnowledgeTests
             "draft schemas require every field as a string");
         var passes = PersonaProfileDrafting.BuildPasses("Boog", "character", "Grizzly bear", [new SavedPersonaSource { Title = "Wiki", Url = "https://x", Type = "Canon reference", Excerpt = new string('a', 20_000) }], new PersonaVoiceCard(0, string.Empty, []));
         Check(passes.Count == 2 && passes.All(pass => pass.UserPrompt.Length < 9_000), "each draft pass keeps its evidence window small for local models");
+        var retry = PersonaProfileDrafting.BuildCompactRetry(passes[0]);
+        using var retrySchema = JsonDocument.Parse(retry.Schema);
+        Check(retry.Name.EndsWith("-compact-retry", StringComparison.Ordinal) && retry.UserPrompt.Length < 3_000 && retry.UserPrompt.Contains("roles", StringComparison.Ordinal) && retry.UserPrompt.Contains("Retry:", StringComparison.Ordinal),
+            "empty persona draft passes receive one compact retry that preserves field instructions and bounds evidence");
+        Check(retrySchema.RootElement.GetProperty("required").GetArrayLength() == passes[0].Fields.Count,
+            "compact persona draft retry preserves required structured fields");
     }
 
     private static void PersonaPromptUsesCharacterFramingAndCoreEvidence()

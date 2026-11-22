@@ -65,9 +65,34 @@ public static partial class AgentHostLoop
             }, JsonOptions);
             var response = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"{request.Id}-{pass.Name}", "chat.complete", parameters)).ConfigureAwait(false);
             var content = response.Result is null ? null : JsonSerializer.SerializeToElement(response.Result, JsonOptions) is var result && result.TryGetProperty("content", out var text) && text.ValueKind == JsonValueKind.String ? text.GetString() : null;
-            if (!response.Ok || content is null) { failures.Add($"{pass.Name}: {response.Error?.Message ?? "the model returned no text"}"); continue; }
-            var coerced = PersonaProfileDrafting.CoerceFields(content, pass.Fields);
-            if (coerced.Values.All(string.IsNullOrWhiteSpace)) failures.Add($"{pass.Name}: the model reply had no usable fields");
+            // A structured response can be empty when a local model spends its budget or
+            // struggles with a large evidence window. Retry that pass once with bounded evidence.
+            var coerced = response.Ok && content is not null
+                ? PersonaProfileDrafting.CoerceFields(content, pass.Fields)
+                : pass.Fields.ToDictionary(field => field, _ => string.Empty, StringComparer.Ordinal);
+            if (coerced.Values.All(string.IsNullOrWhiteSpace))
+            {
+                var retryPass = PersonaProfileDrafting.BuildCompactRetry(pass);
+                using var retrySchema = JsonDocument.Parse(retryPass.Schema);
+                var retryParameters = JsonSerializer.SerializeToElement(new
+                {
+                    endpoint, model, provider,
+                    timeoutSeconds = 180,
+                    maxTokens = 1_600,
+                    temperature = 0.2,
+                    responseMode = ChatResponseModes.Think,
+                    responseSchema = retrySchema.RootElement,
+                    suppressProgressiveResearch = true,
+                    suppressPersonaContinuity = true,
+                    messages = new[] { new ChatMessage("system", retryPass.SystemPrompt), new ChatMessage("user", retryPass.UserPrompt) },
+                }, JsonOptions);
+                var retry = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"{request.Id}-{retryPass.Name}", "chat.complete", retryParameters)).ConfigureAwait(false);
+                var retryContent = retry.Result is null ? null : JsonSerializer.SerializeToElement(retry.Result, JsonOptions) is var retryResult && retryResult.TryGetProperty("content", out var retryText) && retryText.ValueKind == JsonValueKind.String ? retryText.GetString() : null;
+                if (retry.Ok && retryContent is not null)
+                    coerced = PersonaProfileDrafting.CoerceFields(retryContent, pass.Fields);
+                if (coerced.Values.All(string.IsNullOrWhiteSpace))
+                    failures.Add($"{pass.Name}: compact retry returned no usable fields ({response.Error?.Message ?? "invalid or empty structured reply"})");
+            }
             foreach (var (key, value) in coerced) fields[key] = value;
         }
         if (voiceCard.IsUsable)
