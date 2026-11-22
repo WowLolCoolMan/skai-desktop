@@ -4,6 +4,18 @@ const path = require("node:path");
 const standardRequestTimeoutMs = 30_000;
 const imageGenerationRequestTimeoutMs = 60 * 60_000;
 
+function handleConsolePipeError(error) {
+  if (error?.code !== "EPIPE") throw error;
+}
+
+function logSafely(logError, ...args) {
+  try {
+    logError(...args);
+  } catch (error) {
+    handleConsolePipeError(error);
+  }
+}
+
 function createAgentHostClient(options) {
   const {
     app,
@@ -28,6 +40,13 @@ function createAgentHostClient(options) {
   let hostReader;
   let nextRequestId = 1;
   const pending = new Map();
+
+  // The Electron launcher can close its inherited console pipe before the
+  // app or a child process exits. Node treats an unhandled stream EPIPE as a
+  // main-process exception, so absorb only that expected shutdown error.
+  for (const stream of [processObject.stdout, processObject.stderr]) {
+    stream?.on?.("error", handleConsolePipeError);
+  }
 
   function settlePending(response, { notifyPet = true } = {}) {
     for (const entry of pending.values()) {
@@ -74,7 +93,7 @@ function createAgentHostClient(options) {
       entry.resolve(message);
     });
 
-    host.stderr.on("data", (chunk) => logError(`[agent-host] ${chunk.toString().trimEnd()}`));
+    host.stderr.on("data", (chunk) => logSafely(logError, `[agent-host] ${chunk.toString().trimEnd()}`));
     host.on("exit", (code, signal) => {
       const error = { v: 1, ok: false, error: { code: "HOST_EXITED", message: `Agent host exited (${code ?? signal}).` } };
       hostReader?.close();

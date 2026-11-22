@@ -6,6 +6,10 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), 
 const desktopPackage = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "package.json"), "utf8"));
 const main = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "main.cjs"), "utf8");
 const agentHostClient = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "agent-host-client.cjs"), "utf8");
+const localMediaIpc = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "local-media-ipc.cjs"), "utf8");
+const workspaceIpc = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "workspace-ipc.cjs"), "utf8");
+const trayController = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "tray-controller.cjs"), "utf8");
+const petWindowController = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "pet-window.cjs"), "utf8");
 const preload = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "preload.cjs"), "utf8");
 const petWindow = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "overlays", "PetWindow.tsx"), "utf8");
 const modelPicker = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "ui", "ModelPicker.tsx"), "utf8");
@@ -48,14 +52,14 @@ expect(main.includes("nodeIntegration: false"), "Node integration must remain di
 expect(agentHostClient.includes('host.stdin.on("error"') && agentHostClient.includes('code: "HOST_WRITE_FAILED"'), "Electron must handle asynchronous Agent Host pipe errors without crashing the main process");
 expect(main.includes("sandbox: true"), "renderer sandbox must remain enabled");
 expect(main.includes("media-src 'self' file:"), "local video decoding must permit only local file media sources");
-expect(main.includes('path.join(app.getPath("userData"), "media-samples")'), "local media samples must be written only to the private app data folder");
-expect(main.includes('ipcMain.handle("media:create-local-url"') && main.includes('"audio/mpeg"') && main.includes('"audio/wav"'), "audio input must be signature-checked and staged in private local media storage");
+expect(localMediaIpc.includes('path.join(app.getPath("userData"), "media-samples")'), "local media samples must be written only to the private app data folder");
+expect(localMediaIpc.includes('ipcMain.handle("media:create-local-url"') && localMediaIpc.includes('"audio/mpeg"') && localMediaIpc.includes('"audio/wav"') && localMediaIpc.includes("isAudioSignature"), "audio input must be signature-checked and staged in private local media storage");
 expect(preload.includes("contextBridge.exposeInMainWorld"), "renderer communication must use preload");
 expect(preload.includes('"media:create-local-url"') && preload.includes('"media:revoke-local-url"'), "audio and video media access must use the scoped preload bridge");
 expect(!preload.includes("require(\"node:fs\")"), "preload must not expose filesystem access");
 expect(main.includes('"tasks.plan"'), "Electron bridge must expose the review-first local task planning method");
 expect(main.includes('"project.git.status"'), "Electron bridge must expose the read-only local Git status method");
-expect(main.includes('"workspace.importDroppedFiles"') && main.includes("decodeDroppedAttachment"), "Electron bridge must validate dropped chat files at the local boundary");
+expect(workspaceIpc.includes('"workspace.importDroppedFiles"') && workspaceIpc.includes("decodeDroppedAttachment"), "Electron bridge must validate dropped chat files at the local boundary");
 expect(chatComposer.includes("onDrop={handleDrop}") && chatComposer.includes("Drop files to attach"), "Chat composer must expose a visible drag-and-drop attachment state");
 expect(chatComposer.includes("SpeechRecognition") && chatComposer.includes("aria-pressed={voiceListening}"), "Chat composer must expose explicit system voice input with a visible listening state");
 expect(chatComposer.includes("transcribeLocalAudioFile") && chatComposer.includes("Transcribe MP3, M4A, OGG, or WAV locally"), "Chat composer must provide local audio transcription with an explicit user action");
@@ -72,21 +76,18 @@ for (const method of ["scheduled.create", "scheduled.pause", "scheduled.resume",
   expect(main.includes(`"${method}"`), `Electron bridge must expose the local scheduled method ${method}`);
 }
 expect(agentHostClient.includes("HOST_TIMEOUT"), "Electron bridge must bound pending host requests");
-expect(main.includes("new Tray") && main.includes("event.preventDefault()") && main.includes("mainWindow.hide()"), "Closing the main Electron window must hide it to the system tray instead of quitting");
+expect(trayController.includes("new Tray") && main.includes("event.preventDefault()") && main.includes("mainWindow.hide()"), "Closing the main Electron window must hide it to the system tray instead of quitting");
 expect(main.includes("requestSingleInstanceLock") && main.includes('app.on("second-instance"'), "Electron must reopen the resident instance instead of creating duplicate desktop processes");
 expect(main.includes("globalShortcut.register") && main.includes("CommandOrControl+Alt+Space") && main.includes("globalShortcut.unregister"), "Electron must expose and clean up the system-wide launcher shortcut");
-expect(main.includes("Recent chats") && main.includes("tray:open-conversation") && main.includes("Quit Skai Desktop"), "The system tray menu must expose recent chats, reopen, and explicit quit actions");
-expect(main.includes("Hide all pets") && main.includes("Show all pets"), "The system tray menu must expose companion visibility control");
+expect(trayController.includes("Recent chats") && trayController.includes("tray:open-conversation") && trayController.includes("Quit Skai Desktop"), "The system tray menu must expose recent chats, reopen, and explicit quit actions");
+expect(trayController.includes("Hide all pets") && trayController.includes("Show all pets"), "The system tray menu must expose companion visibility control");
 expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "The preload bridge must expose typed tray navigation events");
 expect(agentHostClient.includes("taskkill") && agentHostClient.includes("/T"), "Electron shutdown must terminate the full Windows host process tree");
 expect(agentHostClient.includes("restart()") && agentHostClient.includes("resolve(response)"), "Electron must restart a timed-out host after resolving pending requests");
 expect(agentHostClient.includes("timeoutSeconds: chatHostDeadlineSeconds"), "Electron must give chat requests a host-side deadline before the renderer deadline");
 expect(main.includes("function clampPetPosition") && main.includes("petWindow.setPosition(position.x, position.y)"), "Percy drag movement must remain inside the active monitor work area");
 expect(main.includes("function movePetWithCursor") && main.includes("setInterval(movePetWithCursor, 16)"), "Percy desktop dragging must continue while the pointer leaves the companion window");
-// Percy stays transparent everywhere except X11 sessions where the probe confirms no compositor
-// (transparency would render black there), which get the opaque card fallback.
-const percyTransparent = main.includes("transparent: true") || (main.includes("transparent: !petOpaque") && main.includes("petOpaque = composited === false"));
-expect(main.includes("setVisibleOnAllWorkspaces(true") && percyTransparent && main.includes("alwaysOnTop: true"), "Percy must remain a transparent always-on-top desktop companion across workspaces");
+expect(petWindowController.includes("setVisibleOnAllWorkspaces(true") && (petWindowController.includes("transparent: true") || petWindowController.includes("transparent: !opaque")) && petWindowController.includes("alwaysOnTop: true"), "Percy must remain a transparent always-on-top desktop companion across workspaces");
 expect(main.includes('"tasks.retry": "Retried the local task."'), "Percy must summarize successful task retries");
 expect(main.includes('kind = "success"') && main.includes('kind: "error"'), "Percy completion events must distinguish successful and failed local work");
 expect(main.includes("if (!task) return null"), "Percy completion bubbles must stay scoped to tracked agent work");

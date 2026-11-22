@@ -8,7 +8,9 @@ const requests = [];
 const messages = [];
 const launches = [];
 let host;
-const fakeProcess = { env: { PATH: "original" }, platform: "linux" };
+const fakeProcess = { env: { PATH: "original" }, platform: "linux", stdout: new EventEmitter(), stderr: new EventEmitter() };
+const logErrors = [];
+let loggerThrowsBrokenPipe = false;
 
 function fakeSpawn(command, args, options) {
   if (command === "taskkill") throw new Error("unexpected taskkill");
@@ -41,6 +43,10 @@ const client = createAgentHostClient({
   process: fakeProcess,
   repoRoot: "repo",
   sendPetMessage: (...args) => messages.push(args),
+  logError: (...args) => {
+    if (loggerThrowsBrokenPipe) throw Object.assign(new Error("simulated closed logger pipe"), { code: "EPIPE" });
+    logErrors.push(args);
+  },
   spawn: fakeSpawn,
   isQuitting: () => false,
 });
@@ -66,6 +72,14 @@ async function run() {
   host.stdout.write(`${JSON.stringify({ v: 1, id: request.id, ok: true, result: "hi" })}\n`);
   const response = await responsePromise;
   assert.equal(response.result, "hi");
+
+  host.stderr.emit("data", Buffer.from("agent host diagnostic\n"));
+  assert.deepEqual(logErrors.at(-1), ["[agent-host] agent host diagnostic"]);
+  loggerThrowsBrokenPipe = true;
+  assert.doesNotThrow(() => host.stderr.emit("data", Buffer.from("late shutdown diagnostic\n")));
+  loggerThrowsBrokenPipe = false;
+  assert.doesNotThrow(() => fakeProcess.stderr.emit("error", Object.assign(new Error("closed stderr"), { code: "EPIPE" })));
+  assert.throws(() => fakeProcess.stdout.emit("error", new Error("unexpected console stream failure")), /unexpected console stream failure/);
 
   const failedPipeRequest = client.request("settings.get", {});
   host.stdin.emit("error", new Error("simulated broken pipe"));
