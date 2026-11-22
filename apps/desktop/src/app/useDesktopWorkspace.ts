@@ -11,6 +11,7 @@ import { removeChatDraft } from "../features/chat/chatDraftStore";
 import { useCodingWorkspace } from "../features/coding/useCodingWorkspace";
 import { loadImageHistory, saveImageHistory, type ImageHistoryEntry } from "../features/catalog/imageHistory";
 import { useThemeEngine } from "../theme/useThemeEngine";
+import { createWorkspaceTabId, hasStoredWorkspaceTabs as readHasStoredWorkspaceTabs, readActiveWorkspaceTabId, readClosedWorkspaceTabs, readWorkspaceTabs, saveClosedWorkspaceTabs, saveWorkspaceTabs, type WorkspaceSessionTab } from "./workspaceTabStore";
 
 function readPetInteractionDemoPreference(): boolean {
   const preferenceKey = "skai.pet.interactionDemo";
@@ -67,7 +68,7 @@ export type DesktopWorkspace = {
   setPetWander: (value: boolean) => void;
 };
 
-export type WorkspaceSessionTab = { id: string; title: string; route: "chat" | "coding"; conversationId: string | null; projectId: string | null };
+export type { WorkspaceSessionTab } from "./workspaceTabStore";
 
 function readPreferredChatModel(): { model: string; provider: string; endpoint?: string | null } | null {
   try {
@@ -84,28 +85,6 @@ const SIDEBAR_WIDTH_KEY = "skai.sidebar.width";
 const DEFAULT_SIDEBAR_WIDTH = 276;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 360;
-const WORKSPACE_TABS_KEY = "skai.workspace.tabs.v1";
-const ACTIVE_WORKSPACE_TAB_KEY = "skai.workspace.activeTab.v1";
-const CLOSED_WORKSPACE_TABS_KEY = "skai.workspace.closedTabs.v1";
-
-function readWorkspaceTabs(): WorkspaceSessionTab[] {
-  try {
-    const stored = JSON.parse(localStorage.getItem(WORKSPACE_TABS_KEY) ?? "[]");
-    if (!Array.isArray(stored)) return [{ id: "workspace-home", title: "New chat", route: "chat", conversationId: null, projectId: null }];
-    const tabs = stored.filter((item): item is WorkspaceSessionTab => item && typeof item.id === "string" && typeof item.title === "string" && (item.route === "chat" || item.route === "coding") && (item.conversationId === null || typeof item.conversationId === "string") && (item.projectId === null || typeof item.projectId === "string")).slice(0, 16);
-    return tabs.length ? tabs : [{ id: "workspace-home", title: "New chat", route: "chat", conversationId: null, projectId: null }];
-  } catch { return [{ id: "workspace-home", title: "New chat", route: "chat", conversationId: null, projectId: null }]; }
-}
-
-function readClosedWorkspaceTabs(): WorkspaceSessionTab[] {
-  try {
-    const stored = JSON.parse(localStorage.getItem(CLOSED_WORKSPACE_TABS_KEY) ?? "[]");
-    return Array.isArray(stored) ? stored.filter((item): item is WorkspaceSessionTab => item && typeof item.id === "string" && typeof item.title === "string" && (item.route === "chat" || item.route === "coding") && (item.conversationId === null || typeof item.conversationId === "string") && (item.projectId === null || typeof item.projectId === "string")).slice(0, 10) : [];
-  } catch { return []; }
-}
-
-function newTabId() { return globalThis.crypto?.randomUUID?.() ?? `workspace-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
-
 function readAgentMode(): "ChatBot" | "Coding Agent" {
   return localStorage.getItem("skai.agentMode") === "Coding Agent" ? "Coding Agent" : "ChatBot";
 }
@@ -137,10 +116,10 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [route, setRoute] = useState<Route>(routeFromLocation);
   const [settingsReturnRoute, setSettingsReturnRoute] = useState<Route>(() => routeFromLocation() === "settings" ? "chat" : routeFromLocation());
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readWorkspaceTabs);
-  const [hasStoredWorkspaceTabs] = useState(() => localStorage.getItem(WORKSPACE_TABS_KEY) !== null);
+  const [hasStoredWorkspaceTabs] = useState(readHasStoredWorkspaceTabs);
   const [workspaceSessionRestored, setWorkspaceSessionRestored] = useState(false);
   const [closedWorkspaceTabs, setClosedWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readClosedWorkspaceTabs);
-  const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState(() => localStorage.getItem(ACTIVE_WORKSPACE_TAB_KEY) ?? readWorkspaceTabs()[0].id);
+  const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState(readActiveWorkspaceTabId);
   const workspaceSessionRestoreStartedRef = useRef(false);
   const [navigation, setNavigation] = useState<NavigationState>(() => readNavigationState(routeFromLocation()));
   const [commandOpen, setCommandOpen] = useState(false);
@@ -267,7 +246,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       const existing = workspaceTabs.find((tab) => tab.conversationId === id);
       if (existing) setActiveWorkspaceTabId(existing.id);
       else {
-        const tab: WorkspaceSessionTab = { id: newTabId(), title: conversation.title, route: destination, conversationId: id, projectId: project?.id ?? null };
+        const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: conversation.title, route: destination, conversationId: id, projectId: project?.id ?? null };
         setWorkspaceTabs((current) => [...current, tab].slice(-16));
         setActiveWorkspaceTabId(tab.id);
       }
@@ -276,7 +255,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     onNavigate(destination);
   }, [chat, coding, onNavigate, workspaceTabs]);
   const openNewWorkspaceTab = useCallback(() => {
-    const tab: WorkspaceSessionTab = { id: newTabId(), title: agentMode === "Coding Agent" ? "New coding thread" : "New chat", route: "chat", conversationId: null, projectId: null };
+    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: agentMode === "Coding Agent" ? "New coding thread" : "New chat", route: "chat", conversationId: null, projectId: null };
     setWorkspaceTabs((current) => [...current, tab].slice(-16));
     setActiveWorkspaceTabId(tab.id);
     chat.startNewChat();
@@ -305,7 +284,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       setClosedWorkspaceTabs(next.slice(0, 10));
     }
     if (workspaceTabs.length <= 1) {
-      const replacement: WorkspaceSessionTab = { id: newTabId(), title: "New chat", route: "chat", conversationId: null, projectId: null };
+      const replacement: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: "New chat", route: "chat", conversationId: null, projectId: null };
       setWorkspaceTabs([replacement]); setActiveWorkspaceTabId(replacement.id); chat.startNewChat(); onNavigate("chat"); return;
     }
     const index = workspaceTabs.findIndex((item) => item.id === tabId);
@@ -337,7 +316,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     localStorage.setItem("skai.agentMode", "Coding Agent");
     const projectThread = chat.conversations.find((conversation) => conversation.projectId === project.id && (conversation.mode ?? "ChatBot") === "Coding Agent");
     if (projectThread) chat.selectConversation(projectThread.id); else chat.startNewChat();
-    const tab: WorkspaceSessionTab = { id: newTabId(), title: project.name, route: "coding", conversationId: projectThread?.id ?? null, projectId: project.id };
+    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: project.name, route: "coding", conversationId: projectThread?.id ?? null, projectId: project.id };
     setWorkspaceTabs((current) => [...current, tab].slice(-16));
     setActiveWorkspaceTabId(tab.id);
     void coding.selectProject(project);
@@ -389,10 +368,9 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     setWorkspaceSessionRestored(true);
   }, [activeWorkspaceTabId, chat.conversationId, chat.conversations, chat.conversationsLoaded, chat.selectConversation, chat.setResponseMode, chat.startNewChat, coding.projects, coding.projectsLoaded, coding.selectProject, connection, hasStoredWorkspaceTabs, onNavigate, route, workspaceSessionRestored, workspaceTabs]);
   useEffect(() => {
-    localStorage.setItem(WORKSPACE_TABS_KEY, JSON.stringify(workspaceTabs));
-    localStorage.setItem(ACTIVE_WORKSPACE_TAB_KEY, activeWorkspaceTabId);
+    saveWorkspaceTabs(workspaceTabs, activeWorkspaceTabId);
   }, [activeWorkspaceTabId, workspaceTabs]);
-  useEffect(() => { localStorage.setItem(CLOSED_WORKSPACE_TABS_KEY, JSON.stringify(closedWorkspaceTabs)); }, [closedWorkspaceTabs]);
+  useEffect(() => { saveClosedWorkspaceTabs(closedWorkspaceTabs); }, [closedWorkspaceTabs]);
   useEffect(() => {
     if (!workspaceSessionRestored || (route !== "chat" && route !== "coding")) return;
     setWorkspaceTabs((current) => current.map((tab) => tab.id !== activeWorkspaceTabId ? tab : {

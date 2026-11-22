@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { DesktopTask } from "../../../shared/contracts";
-import type { WorkspaceSessionTab } from "../../app/useDesktopWorkspace";
+import type { WorkspaceSessionTab } from "../../app/workspaceTabStore";
 import { NavIcon } from "../ui/NavIcon";
 
 function tabRunStatus(tab: WorkspaceSessionTab, tasks: DesktopTask[]) {

@@ -195,6 +195,19 @@ checked per slice.
   parsing, and bounded process/credential handling partials. Git invocation,
   credential isolation, safe-path filtering, and public method signatures are
   preserved.
+- Split Agent Host Marketplace model discovery/install handlers away from MCP
+  connection and skill handlers in `AgentHostLoop.MarketplaceModels.cs`.
+- Moved task-operation journal creation, transitions, and activity reads into
+  `AgentHostLoop.TaskJournal.cs`, separate from task planning and execution.
+- Split progressive persona research and its saved-card enrichment from
+  initial persona research orchestration into
+  `AgentHostLoop.PersonaProgressiveResearch.cs`.
+- Moved system-tray menu state, recent-chat items, refresh sequencing, and tray
+  creation into `tray-controller.cjs`; Electron startup still supplies the
+  existing window, pet, and Agent Host callbacks.
+- Moved workspace tab schema validation, local persistence, recovery limits,
+  and ID creation into `workspaceTabStore.ts`. Existing storage keys and the
+  16-open/10-closed tab limits remain unchanged.
 - Re-ran renderer typecheck/build, Agent Host/Core Release build, Electron
   syntax checks and packaging, bridge-method audit, and local-only audit after
   the final slices. The packaged renderer still reports the existing large
@@ -215,9 +228,9 @@ checked per slice.
 ## Follow-on maintenance and product acceptance
 
 - Continue with small, independently reviewable slices when these areas are
-  next touched: Electron pet-window orchestration in `main.cjs`, persona
-  research orchestration in Agent Host, workspace coordination in
-  `useDesktopWorkspace.ts`, Marketplace/Plugins page composition, model and
+  next touched: Electron pet-window orchestration in `main.cjs`, remaining
+  persona research orchestration in Agent Host, workspace coordination in
+  `useDesktopWorkspace.ts`, Marketplace/Plugins page composition, and model or
   workflow Core services. Their size alone is not a reason for mechanical
   splitting; extract only cohesive behavior with a clear owner.
 - Keep the protocol entry point responsible for process I/O and lifecycle,

@@ -78,10 +78,12 @@ and to any detailed plan rather than copying their full contents here.
 - **Priority:** High, maintainability and workflow quality
 - **Owner:** Codex
 - **Context:** The first all-layer pass is pushed, and follow-on slices are
-  underway. Persona evidence handling and GitHub workspace status/process
-  boundaries have now been extracted. Remaining high-value candidates include
-  Electron pet orchestration, Agent Host research sequencing, workspace state
-  coordination, Marketplace/Plugins composition, and model/workflow services.
+  underway. Persona evidence and progressive research, GitHub workspace
+  status/process boundaries, Agent Host Marketplace model handlers and task
+  journal, Electron tray behavior, and workspace tab persistence have now been
+  extracted. Remaining high-value candidates include Electron pet orchestration,
+  Agent Host research sequencing, workspace state coordination, Marketplace/
+  Plugins composition, and model/workflow services.
 - **Agreed approach:** Refactor incrementally by cohesive responsibility,
   preserve bridge/storage/runtime behavior, sync with `main` before each
   commit, and verify the layer being changed. Do not split files mechanically
@@ -228,6 +230,12 @@ Move finished entries here with their commit/PR and verification evidence.
   audit pass. Follow-on candidates and unfinished product acceptance are
   listed separately in the [refactor plan](implementation-plans/codebase-refactor.md).
   Implementation commit: `b4b46cf1`.
+- **2026-11-22 — Continued the all-layer refactor.** Separated persona evidence
+  and progressive research, Git workspace process/status responsibilities,
+  Agent Host Marketplace model handling and task-journal operations, Electron
+  tray behavior, and workspace tab persistence. Agent Host/Core Release builds,
+  renderer typecheck/build, and Electron syntax/package checks pass. Commits:
+  `c96877f2`, `f39456f5`, `709343fa`, `8cb058ce`, `6c39cee5`, `c95fb359`.
 
 - **2026-11-22 — Selected project checks with durable task evidence.** The
   Coding Agent already supports explicit detected-check selection, bounded
