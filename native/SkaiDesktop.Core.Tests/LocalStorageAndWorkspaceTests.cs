@@ -364,9 +364,12 @@ internal static class LocalStorageAndWorkspaceTests
                         ? $"Write-Output \"$env:{unlistedEnvironmentName}|$env:PATH\""
                         : $"printf '%s|%s' \"${unlistedEnvironmentName}\" \"$PATH\"",
                     TimeSpan.FromSeconds(10));
-                Check(!allowlistProbe.Output.Contains("must-not-cross-command-boundary", StringComparison.Ordinal) &&
-                      allowlistProbe.Output.Contains('|') && allowlistProbe.Output.Split('|').Last().Trim().Length > 0,
-                    "project commands inherit required runtime paths but not arbitrary application environment variables");
+                var allowlistOutputParts = allowlistProbe.Output.Split('|');
+                var allowlistPathPresent = allowlistOutputParts.Length > 1 && allowlistOutputParts[^1].Trim().Length > 0;
+                Check(allowlistProbe.ExitCode == 0 &&
+                      !allowlistProbe.Output.Contains("must-not-cross-command-boundary", StringComparison.Ordinal) &&
+                      allowlistOutputParts.Length > 1 && allowlistPathPresent,
+                    $"project commands inherit required runtime paths but not arbitrary application environment variables (exit={allowlistProbe.ExitCode}, separator={allowlistOutputParts.Length > 1}, pathPresent={allowlistPathPresent}, isolation={allowlistProbe.IsolationStatus})");
                 Check(allowlistProbe.IsolationStatus.Contains("explicit runtime allowlist", StringComparison.Ordinal),
                     "project command evidence reports environment allowlist enforcement");
             }

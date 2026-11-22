@@ -11,7 +11,9 @@ const readline = require("node:readline");
 const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
 const root = path.resolve(__dirname, "..");
-const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-marketplace-smoke-"));
+// Filesystem MCP canonicalizes its allowed roots; resolve Windows 8.3 temp
+// paths once so the request and server compare the same path representation.
+const profileRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "skai-marketplace-smoke-")));
 const env = {
   ...process.env,
   SRAI_SETTINGS_PATH: path.join(profileRoot, "settings.json"),
