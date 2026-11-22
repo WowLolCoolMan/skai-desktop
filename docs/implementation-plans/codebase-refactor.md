@@ -131,6 +131,9 @@ that users touch as each slice is moved.
   install/connect REA, disconnect, and revoke) into the focused
   `useMarketplaceMcp` hook. UI rendering and the existing confirmation and
   bridge behavior remain in the Marketplace page.
+- Extracted the Marketplace MCP connection form, connection list, health state,
+  and tool-manifest review into `McpConnectionsPanel`; the page supplies the
+  same state and callbacks without changing the in-app review flow.
 - Moved local media URL IPC registration, ownership checks, validation, and
   revocation into `local-media-ipc.cjs`; the renderer-visible channel names and
   local media behavior are unchanged.
