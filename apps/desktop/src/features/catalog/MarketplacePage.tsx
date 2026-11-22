@@ -42,6 +42,17 @@ function marketplacePreference<T>(key: string, fallback: T): T {
 // Embedded in the unified Marketplace catalog (PluginsPage) for the hub sections that catalog
 // does not cover itself: remote model search/install, Diffusers LoRAs and the local inventory.
 const EMBEDDED_SECTIONS: Section[] = ["Models", "Voices", "Installed"];
+const sectionIcons: Record<Section, NavIconName> = {
+  Discover: "sparkle",
+  Models: "model",
+  "Image models": "image",
+  Voices: "activity",
+  "Image workflows": "image",
+  Skills: "sparkle",
+  Tools: "terminal",
+  Installed: "memory",
+  Updates: "arrow-up-right",
+};
 
 export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSection = "Discover", onBack, initialQuery }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; initialSection?: Section; onBack?: () => void; initialQuery?: string }) {
   const [section, setSection] = useState<Section>(initialSection);
@@ -378,16 +389,21 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   return (
     <div className="feature-page marketplace-page">
       <header className="marketplace-header">
-        <div><p className="eyebrow">MARKETPLACE</p><h2>{sectionHeading[section]}</h2><p className="page-description">{sectionDescription[section]}</p></div>
-        <div className="marketplace-header-actions">{onBack && <Button variant="ghost" type="button" onClick={onBack}><NavIcon name="chevron-left" />Marketplace</Button>}{!onBack && section !== "Installed" && <Button variant="ghost" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}>View installed tools</Button>}</div>
+        <div className="marketplace-heading-lockup"><span className="marketplace-heading-mark"><NavIcon name="marketplace" /></span><div><p className="eyebrow">LOCAL-FIRST MARKETPLACE</p><h2>{sectionHeading[section]}</h2><p className="page-description">{sectionDescription[section]}</p></div></div>
+        <div className="marketplace-header-actions"><StatusBadge tone={modelError ? "warning" : "success"}>{modelError ? "Catalog needs attention" : "Local catalog ready"}</StatusBadge>{onBack && <Button variant="ghost" type="button" onClick={onBack}><NavIcon name="chevron-left" />Marketplace</Button>}{!onBack && section !== "Installed" && <Button variant="secondary" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}><NavIcon name="memory" />Installed</Button>}</div>
       </header>
-      <div className="marketplace-browser">
-        <nav className="marketplace-sections" aria-label="Marketplace sections">
+      <div className="marketplace-frame">
+        <aside className="marketplace-nav-panel">
+          <div className="marketplace-nav-heading"><span>Browse</span><small>{onBack ? "Embedded" : "Skai catalog"}</small></div>
+          <nav className="marketplace-sections" aria-label="Marketplace sections">
           {(onBack ? EMBEDDED_SECTIONS : ["Discover", "Models", "Image models", "Voices", "Image workflows", "Skills", "Tools", "Updates"] as Section[]).map((item) => (
-            <button key={item} className={(section === item || (item === "Tools" && section === "Installed")) ? "is-active" : ""} type="button" aria-current={(section === item || (item === "Tools" && section === "Installed")) ? "page" : undefined} onClick={() => { setSection(item); setQuery(""); }}>{item}</button>
+            <button key={item} className={(section === item || (item === "Tools" && section === "Installed")) ? "is-active" : ""} type="button" aria-current={(section === item || (item === "Tools" && section === "Installed")) ? "page" : undefined} onClick={() => { setSection(item); setQuery(""); }}><NavIcon name={sectionIcons[item]} /><span>{item}</span>{item === "Models" && <small>Live</small>}{item === "Installed" && <small>{installedModels.length + installedConnections.length}</small>}</button>
           ))}
           {!onBack && (section === "Tools" || section === "Installed") && <div className="marketplace-tools-subnav" role="tablist" aria-label="Tools views"><button type="button" role="tab" aria-selected={section === "Tools"} className={section === "Tools" ? "is-active" : ""} onClick={() => { setSection("Tools"); setQuery(""); }}>Catalog</button><button type="button" role="tab" aria-selected={section === "Installed"} className={section === "Installed" ? "is-active" : ""} onClick={() => { setSection("Installed"); setQuery(""); }}>Installed</button></div>}
-        </nav>
+          </nav>
+          <div className="marketplace-nav-note"><span className="marketplace-nav-note-dot" /><div><strong>Everything stays local</strong><small>Review source, runtime, and permissions before installing.</small></div></div>
+        </aside>
+        <div className="marketplace-browser">
 
         {section === "Discover" ? (
           <div className="marketplace-discover">
@@ -472,6 +488,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
             )}
           </>
         )}
+        </div>
       </div>
       <p className="marketplace-footer-note">{sectionDescription[section]}</p>
     </div>

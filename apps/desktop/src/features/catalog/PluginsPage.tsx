@@ -133,7 +133,14 @@ export function PluginsPage({
         className="plugins-customize-nav"
         aria-label="Marketplace sections"
       >
-        <p className="plugins-customize-title">Marketplace</p>
+        <div className="plugins-nav-brand">
+          <span className="plugins-nav-brand-mark" aria-hidden="true"><NavIcon name="sparkle" /></span>
+          <div>
+            <strong>Marketplace</strong>
+            <small>Local capability catalog</small>
+          </div>
+        </div>
+        <p className="plugins-customize-label">BROWSE</p>
         {([
           ["Discover", "sparkle"],
           ["Staff Picks", "sparkle"],
@@ -143,7 +150,11 @@ export function PluginsPage({
           ["Skills", "sparkle"],
           ["Plugins", "project"],
           ["Installed", "memory"],
-        ] as const).map(([item, icon]) => <button key={item} type="button" className={catalogSection === item ? "is-active" : ""} aria-current={catalogSection === item ? "page" : undefined} onClick={() => changeCatalogSection(item)}><NavIcon name={icon} />{item}</button>)}
+        ] as const).map(([item, icon]) => <button key={item} type="button" className={catalogSection === item ? "is-active" : ""} aria-current={catalogSection === item ? "page" : undefined} onClick={() => changeCatalogSection(item)}><NavIcon name={icon} /><span>{item}</span>{item === "Models" && <small>Live</small>}{item === "Installed" && <small>{tools.length + skills.length}</small>}</button>)}
+        <div className="plugins-nav-note">
+          <span className="plugins-nav-note-dot" aria-hidden="true" />
+          <div><strong>Stays on this device</strong><small>Review source, runtime, and permissions before connecting.</small></div>
+        </div>
       </aside>
       <div className="plugins-main">
         {view === "models" || view === "voices" || view === "installed" ? (
@@ -159,10 +170,11 @@ export function PluginsPage({
         ) : (
           <>
             <header className="plugins-topbar">
-              <h2>
-                {catalogSection}
-                <span className="plugins-count">{sectionEntries.length} {catalogSection === "Discover" ? "available in Skai" : catalogSection.toLowerCase()}</span>
-              </h2>
+              <div className="plugins-heading-lockup">
+                <span className="plugins-heading-mark" aria-hidden="true"><NavIcon name={catalogSection === "Discover" ? "sparkle" : catalogSection === "MCP Servers" ? "terminal" : catalogSection === "Skills" ? "sparkle" : "project"} /></span>
+                <div><p className="plugins-eyebrow">SKAI MARKETPLACE</p><h2>{catalogSection}</h2><p className="plugins-heading-description">{catalogSection === "Discover" ? "Find the next local capability for the work in front of you." : `Browse ${catalogSection.toLowerCase()} that are ready to review and connect.`}</p></div>
+              </div>
+              <div className="plugins-heading-meta"><StatusBadge tone="success">Local catalog</StatusBadge><span className="plugins-count">{sectionEntries.length} {catalogSection === "Discover" ? "available" : catalogSection.toLowerCase()}</span></div>
               <div className="plugins-topbar-actions">
                 <label className="plugins-search">
                   <span className="sr-only">Search marketplace</span>
