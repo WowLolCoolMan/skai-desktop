@@ -56,8 +56,7 @@ public sealed record PersonaKnowledgeDocument(
 
 public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
 {
-    private static readonly HttpClient Shared = new() { Timeout = Timeout.InfiniteTimeSpan };
-    private readonly HttpClient _http = httpClient ?? Shared;
+    private readonly PersonaWikiClient _wiki = new(httpClient);
 
     // Public compatibility surface retained while matching rules live in their own focused helper.
     public static PersonaQuery ParseQuery(string input) => PersonaIdentityMatcher.ParseQuery(input);
@@ -80,13 +79,13 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         var hint = subjectHint is "person" or "character" ? subjectHint : null;
         var franchiseSuffix = query.Franchise is null ? string.Empty : " " + query.Franchise;
 
-        var wikipediaTask = Quietly(() => WikipediaSearchAsync(query.Name + franchiseSuffix, 6, cancellationToken));
+        var wikipediaTask = _wiki.Quietly(() => _wiki.WikipediaSearchAsync(query.Name + franchiseSuffix, 6, cancellationToken));
         var wikipediaCharacterTask = hint == "person"
             ? Task.FromResult<IReadOnlyList<WikipediaHit>>([])
-            : Quietly(() => WikipediaSearchAsync($"{query.Name}{franchiseSuffix} character", 4, cancellationToken));
+            : _wiki.Quietly(() => _wiki.WikipediaSearchAsync($"{query.Name}{franchiseSuffix} character", 4, cancellationToken));
         var fandomTask = hint == "person"
             ? Task.FromResult<IReadOnlyList<FandomHit>>([])
-            : Quietly(() => FandomPageSearchAsync(query.Name + franchiseSuffix, 10, cancellationToken));
+            : _wiki.Quietly(() => _wiki.FandomPageSearchAsync(query.Name + franchiseSuffix, 10, cancellationToken));
         await Task.WhenAll(wikipediaTask, wikipediaCharacterTask, fandomTask).ConfigureAwait(false);
 
         var wikipediaHits = wikipediaTask.Result.Concat(wikipediaCharacterTask.Result)
@@ -114,7 +113,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         {
             foreach (var franchise in franchiseCandidates)
             {
-                var communities = await Quietly(() => CommunitySearchAsync(franchise, 4, cancellationToken)).ConfigureAwait(false);
+                var communities = await _wiki.Quietly(() => _wiki.CommunitySearchAsync(franchise, 4, cancellationToken)).ConfigureAwait(false);
                 foreach (var community in communities.Where(community => !PersonaIdentityMatcher.IsAggregatorWiki(community.Host)).Take(2))
                 {
                     if (dedicatedHosts.Contains(community.Host)) continue;
@@ -125,7 +124,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
                     var searchNames = new[] { query.Name, $"{query.Name} character" }
                         .Concat(fandomHits.Where(hit => PersonaIdentityMatcher.NameSimilarity(query.Name, hit.Title) >= 0.75).Select(hit => Regex.Replace(hit.Title, @"\s*\([^)]*\)\s*$", string.Empty)))
                         .Distinct(StringComparer.OrdinalIgnoreCase).Take(3).ToArray();
-                    var titleBatches = await Task.WhenAll(searchNames.Select(name => Quietly(() => WikiSearchTitlesAsync(community.Host, name, 6, cancellationToken)))).ConfigureAwait(false);
+                    var titleBatches = await Task.WhenAll(searchNames.Select(name => _wiki.Quietly(() => _wiki.WikiSearchTitlesAsync(community.Host, name, 6, cancellationToken)))).ConfigureAwait(false);
                     var titles = titleBatches.SelectMany(batch => batch).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     var best = titles.Select(title => (title, score: PersonaIdentityMatcher.NameSimilarity(query.Name, title) + TitleShapeBonus(title)))
                         .OrderByDescending(item => item.score).FirstOrDefault();
@@ -160,7 +159,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         // Trevor on the GTA wiki) beats a stub on a company or aggregator wiki.
         var contenders = scored.Where(identity => identity.FandomHost is not null && identity.WikipediaTitle is null)
             .OrderByDescending(identity => identity.Score).Take(5).ToList();
-        var lengths = await Task.WhenAll(contenders.Select(identity => Quietly(() => PageLengthAsync(identity.FandomHost!, identity.FandomTitle!, cancellationToken), 0))).ConfigureAwait(false);
+        var lengths = await Task.WhenAll(contenders.Select(identity => _wiki.Quietly(() => _wiki.PageLengthAsync(identity.FandomHost!, identity.FandomTitle!, cancellationToken), 0))).ConfigureAwait(false);
         for (var index = 0; index < contenders.Count; index++)
         {
             if (lengths[index] <= 0) continue;
@@ -294,13 +293,13 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     public async Task<IReadOnlyList<PersonaKnowledgeDocument>> GatherAsync(PersonaIdentity identity, CancellationToken cancellationToken = default)
     {
         if (identity.SubjectType != "person" && identity.FandomHost is null)
-            identity = await Quietly(() => AttachFranchiseWikiAsync(identity, cancellationToken), identity).ConfigureAwait(false);
+            identity = await _wiki.Quietly(() => AttachFranchiseWikiAsync(identity, cancellationToken), identity).ConfigureAwait(false);
         var tasks = new List<Task<IReadOnlyList<PersonaKnowledgeDocument>>>
         {
-            Quietly(() => WikipediaDocumentsAsync(identity, cancellationToken)),
-            Quietly(() => FandomDocumentsAsync(identity, cancellationToken)),
-            Quietly(() => FandomTranscriptDocumentsAsync(identity, cancellationToken)),
-            Quietly(() => WikiquoteDocumentsAsync(identity, cancellationToken)),
+            _wiki.Quietly(() => WikipediaDocumentsAsync(identity, cancellationToken)),
+            _wiki.Quietly(() => FandomDocumentsAsync(identity, cancellationToken)),
+            _wiki.Quietly(() => FandomTranscriptDocumentsAsync(identity, cancellationToken)),
+            _wiki.Quietly(() => WikiquoteDocumentsAsync(identity, cancellationToken)),
         };
         await Task.WhenAll(tasks).ConfigureAwait(false);
         return tasks.SelectMany(task => task.Result)
@@ -317,14 +316,14 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     public async Task<PersonaIdentity> AddLifeDatesAsync(PersonaIdentity identity, CancellationToken cancellationToken = default)
     {
         if (identity.WikipediaTitle is null || identity.SubjectType == "character") return identity;
-        return await Quietly(async () =>
+        return await _wiki.Quietly(async () =>
         {
-            using var page = await GetJsonAsync($"https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&redirects=1&prop=pageprops&ppprop=wikibase_item&titles={Uri.EscapeDataString(identity.WikipediaTitle)}", cancellationToken).ConfigureAwait(false);
+            using var page = await _wiki.GetJsonAsync($"https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&redirects=1&prop=pageprops&ppprop=wikibase_item&titles={Uri.EscapeDataString(identity.WikipediaTitle)}", cancellationToken).ConfigureAwait(false);
             var item = page.RootElement.TryGetProperty("query", out var query) && query.TryGetProperty("pages", out var pages)
                 ? pages.EnumerateArray().Select(entry => entry.TryGetProperty("pageprops", out var props) && props.TryGetProperty("wikibase_item", out var id) ? id.GetString() : null).FirstOrDefault()
                 : null;
             if (item is null || !Regex.IsMatch(item, @"^Q\d{1,12}$")) return identity;
-            using var entity = await GetJsonAsync($"https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids={item}", cancellationToken).ConfigureAwait(false);
+            using var entity = await _wiki.GetJsonAsync($"https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids={item}", cancellationToken).ConfigureAwait(false);
             if (!entity.RootElement.TryGetProperty("entities", out var entities) || !entities.TryGetProperty(item, out var record) || !record.TryGetProperty("claims", out var claims)) return identity;
             return identity with { BirthDate = WikidataDate(claims, "P569"), DeathDate = WikidataDate(claims, "P570") };
         }, identity).ConfigureAwait(false);
@@ -350,10 +349,10 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     public async Task<PersonaIdentity> AttachFranchiseWikiAsync(PersonaIdentity identity, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(identity.Franchise)) return identity;
-        var wikis = await CommunitySearchAsync(identity.Franchise, 4, cancellationToken).ConfigureAwait(false);
+        var wikis = await _wiki.CommunitySearchAsync(identity.Franchise, 4, cancellationToken).ConfigureAwait(false);
         foreach (var wiki in wikis.Where(wiki => !PersonaIdentityMatcher.IsAggregatorWiki(wiki.Host)))
         {
-            var titles = await WikiSearchTitlesAsync(wiki.Host, identity.CanonicalName, 5, cancellationToken).ConfigureAwait(false);
+            var titles = await _wiki.WikiSearchTitlesAsync(wiki.Host, identity.CanonicalName, 5, cancellationToken).ConfigureAwait(false);
             var title = titles.OrderByDescending(candidate => PersonaIdentityMatcher.NameSimilarity(identity.CanonicalName, candidate)).FirstOrDefault();
             if (title is not null && PersonaIdentityMatcher.NameSimilarity(identity.CanonicalName, title) >= 0.75)
                 return identity with { FandomHost = wiki.Host, FandomTitle = title, FandomSiteName = wiki.Name };
@@ -364,7 +363,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     private async Task<IReadOnlyList<PersonaKnowledgeDocument>> WikipediaDocumentsAsync(PersonaIdentity identity, CancellationToken cancellationToken)
     {
         if (identity.WikipediaTitle is null) return [];
-        var html = await ParseHtmlAsync("en.wikipedia.org", "/w/api.php", identity.WikipediaTitle, cancellationToken).ConfigureAwait(false);
+        var html = await _wiki.ParseHtmlAsync("en.wikipedia.org", "/w/api.php", identity.WikipediaTitle, cancellationToken).ConfigureAwait(false);
         if (html is null) return [];
         var sections = HtmlToSections(html);
         var url = identity.WikipediaUrl!;
@@ -383,7 +382,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     private async Task<IReadOnlyList<PersonaKnowledgeDocument>> FandomDocumentsAsync(PersonaIdentity identity, CancellationToken cancellationToken)
     {
         if (identity.FandomHost is null || identity.FandomTitle is null) return [];
-        var html = await ParseHtmlAsync(identity.FandomHost, "/api.php", identity.FandomTitle, cancellationToken).ConfigureAwait(false);
+        var html = await _wiki.ParseHtmlAsync(identity.FandomHost, "/api.php", identity.FandomTitle, cancellationToken).ConfigureAwait(false);
         if (html is null) return [];
         var sections = HtmlToSections(html);
         var site = identity.FandomSiteName ?? identity.FandomHost;
@@ -409,12 +408,12 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
     {
         if (identity.SubjectType == "person" || identity.FandomHost is null) return [];
         var shortName = identity.Aliases.LastOrDefault(alias => !alias.Contains(' ')) ?? identity.CanonicalName;
-        var titles = await WikiSearchTitlesAsync(identity.FandomHost, $"{shortName} transcript", 10, cancellationToken).ConfigureAwait(false);
+        var titles = await _wiki.WikiSearchTitlesAsync(identity.FandomHost, $"{shortName} transcript", 10, cancellationToken).ConfigureAwait(false);
         var transcriptTitles = titles.Where(title => title.Contains("transcript", StringComparison.OrdinalIgnoreCase) && !title.StartsWith("List of", StringComparison.OrdinalIgnoreCase)).Take(4).ToArray();
         var documents = new List<PersonaKnowledgeDocument>();
         foreach (var title in transcriptTitles)
         {
-            var html = await Quietly(() => ParseHtmlAsync(identity.FandomHost, "/api.php", title, cancellationToken), null).ConfigureAwait(false);
+            var html = await _wiki.Quietly(() => _wiki.ParseHtmlAsync(identity.FandomHost, "/api.php", title, cancellationToken), null).ConfigureAwait(false);
             if (html is null) continue;
             var text = string.Join('\n', HtmlToSections(html).SelectMany(section => section.Lines));
             var attribution = PersonaDialogueEvidence.DetectSpeaker(SpeakerLabels(identity), text);
@@ -434,7 +433,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         // by name. Work pages are kept only if they contain the character's labelled lines.
         var searches = new[] { identity.SubjectType == "character" ? identity.Franchise : null, identity.CanonicalName }
             .Where(text => !string.IsNullOrWhiteSpace(text)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var batches = await Task.WhenAll(searches.Select(text => Quietly(() => WikiSearchTitlesAsync("en.wikiquote.org", text!, 5, cancellationToken, "/w/api.php")))).ConfigureAwait(false);
+        var batches = await Task.WhenAll(searches.Select(text => _wiki.Quietly(() => _wiki.WikiSearchTitlesAsync("en.wikiquote.org", text!, 5, cancellationToken, "/w/api.php")))).ConfigureAwait(false);
         var titles = batches.SelectMany(batch => batch).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var nameTitles = batches.Length > 0 ? batches[^1] : [];
         var documents = new List<PersonaKnowledgeDocument>();
@@ -448,7 +447,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
             .Where(title => title != personPage).Distinct(StringComparer.OrdinalIgnoreCase).Take(4).ToArray();
         if (personPage is not null)
         {
-            var html = await ParseHtmlAsync("en.wikiquote.org", "/w/api.php", personPage, cancellationToken).ConfigureAwait(false);
+            var html = await _wiki.ParseHtmlAsync("en.wikiquote.org", "/w/api.php", personPage, cancellationToken).ConfigureAwait(false);
             if (html is not null && !html.Contains("disambiguation", StringComparison.OrdinalIgnoreCase))
             {
                 var sections = HtmlToSections(html);
@@ -461,7 +460,7 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
         }
         foreach (var title in workPages)
         {
-            var html = await Quietly(() => ParseHtmlAsync("en.wikiquote.org", "/w/api.php", title, cancellationToken), null).ConfigureAwait(false);
+            var html = await _wiki.Quietly(() => _wiki.ParseHtmlAsync("en.wikiquote.org", "/w/api.php", title, cancellationToken), null).ConfigureAwait(false);
             if (html is null) continue;
             var text = string.Join('\n', HtmlToSections(html).SelectMany(section => section.Lines));
             var attribution = PersonaDialogueEvidence.DetectSpeaker(SpeakerLabels(identity), text);
@@ -514,125 +513,13 @@ public sealed class PersonaKnowledgeSources(HttpClient? httpClient = null)
 
     // ---------------------------------------------------------------- API calls
 
-    private sealed record WikipediaHit(string Title, string Description);
-    private sealed record FandomHit(string Title, string Host, string SiteName, string Snippet, string? FranchiseHint = null)
+    internal sealed record WikipediaHit(string Title, string Description);
+    internal sealed record FandomHit(string Title, string Host, string SiteName, string Snippet, string? FranchiseHint = null)
     {
         public string? Franchise => FranchiseHint ?? (Regex.Replace(SiteName, @"\s+(?:Wiki|Wikia|Fandom)$", string.Empty, RegexOptions.IgnoreCase).Trim() is { Length: > 1 } name ? name : null);
     }
-    private sealed record FandomCommunity(string Name, string Host);
+    internal sealed record FandomCommunity(string Name, string Host);
     public sealed record HtmlSection(string Heading, IReadOnlyList<string> Lines);
-
-    private async Task<IReadOnlyList<WikipediaHit>> WikipediaSearchAsync(string query, int limit, CancellationToken cancellationToken)
-    {
-        var url = $"https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&redirects=1&generator=search&gsrlimit={limit}&gsrsearch={Uri.EscapeDataString(query)}&prop=description";
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
-        if (!document.RootElement.TryGetProperty("query", out var queryElement) || !queryElement.TryGetProperty("pages", out var pages)) return [];
-        return pages.EnumerateArray()
-            .OrderBy(page => page.TryGetProperty("index", out var index) ? index.GetInt32() : 99)
-            .Select(page => new WikipediaHit(page.GetProperty("title").GetString() ?? string.Empty, page.TryGetProperty("description", out var description) ? description.GetString() ?? string.Empty : string.Empty))
-            .Where(hit => hit.Title.Length > 0)
-            .ToList();
-    }
-
-    private async Task<IReadOnlyList<FandomHit>> FandomPageSearchAsync(string query, int limit, CancellationToken cancellationToken)
-    {
-        var url = $"https://services.fandom.com/unified-search/page-search?query={Uri.EscapeDataString(query)}&lang=en&limit={limit}&namespace=0";
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
-        if (!document.RootElement.TryGetProperty("results", out var results)) return [];
-        var hits = new List<FandomHit>();
-        foreach (var result in results.EnumerateArray())
-        {
-            var title = result.TryGetProperty("title", out var titleElement) ? titleElement.GetString() ?? string.Empty : string.Empty;
-            var pageUrl = result.TryGetProperty("url", out var urlElement) ? urlElement.GetString() ?? string.Empty : string.Empty;
-            if (title.Length == 0 || !Uri.TryCreate(pageUrl, UriKind.Absolute, out var uri) || !uri.Host.EndsWith(".fandom.com", StringComparison.OrdinalIgnoreCase)) continue;
-            var siteName = result.TryGetProperty("sitename", out var site) ? site.GetString() ?? uri.Host : uri.Host;
-            var snippet = result.TryGetProperty("content", out var content) ? Clean(content.GetString() ?? string.Empty) : string.Empty;
-            hits.Add(new(title, uri.Host.ToLowerInvariant(), siteName, snippet.Length > 300 ? snippet[..300] : snippet));
-        }
-        return hits;
-    }
-
-    private async Task<IReadOnlyList<FandomCommunity>> CommunitySearchAsync(string query, int limit, CancellationToken cancellationToken)
-    {
-        var url = $"https://services.fandom.com/unified-search/community-search?query={Uri.EscapeDataString(query)}&lang=en&limit={limit}";
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
-        if (!document.RootElement.TryGetProperty("results", out var results)) return [];
-        return results.EnumerateArray()
-            .Select(result => (Name: result.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty, Url: result.TryGetProperty("url", out var link) ? link.GetString() ?? string.Empty : string.Empty))
-            .Where(item => Uri.TryCreate(item.Url, UriKind.Absolute, out var uri) && uri.Host.EndsWith(".fandom.com", StringComparison.OrdinalIgnoreCase))
-            .Select(item => new FandomCommunity(item.Name, new Uri(item.Url).Host.ToLowerInvariant()))
-            .ToList();
-    }
-
-    private async Task<IReadOnlyList<string>> WikiSearchTitlesAsync(string host, string query, int limit, CancellationToken cancellationToken, string apiPath = "/api.php")
-    {
-        var url = $"https://{host}{apiPath}?action=query&format=json&list=search&srlimit={limit}&srsearch={Uri.EscapeDataString(query)}";
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
-        if (!document.RootElement.TryGetProperty("query", out var queryElement) || !queryElement.TryGetProperty("search", out var search)) return [];
-        return search.EnumerateArray().Select(item => item.GetProperty("title").GetString() ?? string.Empty).Where(title => title.Length > 0).ToList();
-    }
-
-    private async Task<int> PageLengthAsync(string host, string title, CancellationToken cancellationToken)
-    {
-        var url = $"https://{host}/api.php?action=query&format=json&formatversion=2&redirects=1&prop=info&titles={Uri.EscapeDataString(title)}";
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
-        if (!document.RootElement.TryGetProperty("query", out var queryElement) || !queryElement.TryGetProperty("pages", out var pages)) return 0;
-        return pages.EnumerateArray().Select(page => page.TryGetProperty("length", out var length) ? length.GetInt32() : 0).FirstOrDefault();
-    }
-
-    private async Task<string?> ParseHtmlAsync(string host, string apiPath, string title, CancellationToken cancellationToken)
-    {
-        var url = $"https://{host}{apiPath}?action=parse&format=json&prop=text&redirects=1&disablelimitreport=1&disableeditsection=1&page={Uri.EscapeDataString(title)}";
-        using var document = await GetJsonAsync(url, cancellationToken).ConfigureAwait(false);
-        if (!document.RootElement.TryGetProperty("parse", out var parse) || !parse.TryGetProperty("text", out var text)) return null;
-        return text.ValueKind == JsonValueKind.Object && text.TryGetProperty("*", out var body) ? body.GetString() : text.GetString();
-    }
-
-    // Wikimedia asks API clients to identify themselves with a contact URL and to keep request
-    // rates low; anonymous-looking agents are throttled hard (HTTP 429). Fandom has no such rule
-    // but gets the same courtesy.
-    private const string ResearchUserAgent = "SkaiDesktop/1.0 (+https://github.com/WowLolCoolMan/skai-desktop; persona research)";
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> HostGates = new(StringComparer.OrdinalIgnoreCase);
-
-    private async Task<JsonDocument> GetJsonAsync(string url, CancellationToken cancellationToken)
-    {
-        var host = new Uri(url).Host;
-        var gate = HostGates.GetOrAdd(host.EndsWith(".fandom.com", StringComparison.OrdinalIgnoreCase) ? "fandom" : host, _ => new SemaphoreSlim(2, 2));
-        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            for (var attempt = 0; ; attempt++)
-            {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(TimeSpan.FromSeconds(12));
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.UserAgent.ParseAdd(ResearchUserAgent);
-                request.Headers.TryAddWithoutValidation("Api-User-Agent", ResearchUserAgent);
-                using var response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
-                if ((int)response.StatusCode == 429 && attempt == 0)
-                {
-                    var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(1.5);
-                    await Task.Delay(wait > TimeSpan.FromSeconds(4) ? TimeSpan.FromSeconds(4) : wait, cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-                response.EnsureSuccessStatusCode();
-                return await BoundedHttpContent.ReadJsonAsync(response.Content, timeout.Token, "Persona knowledge source").ConfigureAwait(false);
-            }
-        }
-        finally { gate.Release(); }
-    }
-
-    private static async Task<IReadOnlyList<T>> Quietly<T>(Func<Task<IReadOnlyList<T>>> action)
-    {
-        try { return await action().ConfigureAwait(false); }
-        catch (Exception error) when (error is HttpRequestException or OperationCanceledException or InvalidDataException or JsonException or KeyNotFoundException or InvalidOperationException) { return []; }
-    }
-
-    private static async Task<T> Quietly<T>(Func<Task<T>> action, T fallback)
-    {
-        try { return await action().ConfigureAwait(false); }
-        catch (Exception error) when (error is HttpRequestException or OperationCanceledException or InvalidDataException or JsonException or KeyNotFoundException or InvalidOperationException) { return fallback; }
-    }
 
     // HTML parsing remains exposed through the existing facade for compatibility.
     public static IReadOnlyList<HtmlSection> HtmlToSections(string html) => PersonaHtmlParser.HtmlToSections(html);
