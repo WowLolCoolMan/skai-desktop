@@ -100,6 +100,9 @@ that users touch as each slice is moved.
 - Moved Agent Host request-parameter validation, bounds, and local endpoint
   checks into `AgentHostLoop.RequestValidation.cs`; the public protocol and
   guard behavior are unchanged.
+- Moved the stable protocol method-to-handler table into
+  `AgentHostLoop.Dispatch.cs`, leaving process I/O and lifecycle in the main
+  loop and request validation in its own module.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent
