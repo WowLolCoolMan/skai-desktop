@@ -91,7 +91,7 @@ public sealed class WorkspaceCommandRunner
             timedOut,
             truncated != 0,
             workingDirectory,
-            OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached));
+            OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes));
     }
 
     public static string ResolveWorkingDirectory(string selectedRoot, string relativeWorkingDirectory)

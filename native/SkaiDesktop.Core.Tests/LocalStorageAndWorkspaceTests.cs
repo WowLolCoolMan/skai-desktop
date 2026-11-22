@@ -12,6 +12,13 @@ internal static class LocalStorageAndWorkspaceTests
 {
     public static async Task RunAsync()
     {
+        Check(CommandResourceLimits.EstimateJobMemoryLimitBytes(2UL * 1024 * 1024 * 1024) == 1024UL * 1024 * 1024,
+            "Coding Agent job memory budget uses half of available RAM for a typical host");
+        Check(CommandResourceLimits.EstimateJobMemoryLimitBytes(64UL * 1024 * 1024 * 1024) == CommandResourceLimits.MaximumJobMemoryBytes,
+            "Coding Agent job memory budget is capped on high-memory hosts");
+        Check(CommandResourceLimits.EstimateJobMemoryLimitBytes(0) == CommandResourceLimits.MinimumJobMemoryBytes,
+            "Coding Agent job memory budget keeps a documented floor when telemetry is unavailable");
+
         // Same fixture file that ConversationArchiveTests reads.
         var electronExportPath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "electron-localstorage-export.json");
         var settingsDirectory = Path.Combine(Path.GetTempPath(), "skai-core-check-" + Guid.NewGuid().ToString("N"));
@@ -353,6 +360,8 @@ internal static class LocalStorageAndWorkspaceTests
             Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
             Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
             Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
+            if (OperatingSystem.IsWindows())
+                Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal), "Windows Coding Agent process containment reports its enforced job memory cap");
             Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "project command clearly reports that filesystem and network are not sandboxed");
             var timedCommand = await commandRunner.RunAsync(workspacePath, ".",
                 OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",

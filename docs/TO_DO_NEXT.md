@@ -127,8 +127,11 @@ and to any detailed plan rather than copying their full contents here.
   process trees on cancellation. Windows also attaches a kill-on-close Job
   Object when available. This does not sandbox filesystem or network access;
   Windows now limits a command tree to 128 processes and reports whether its
-  Job Object attached. The Coding workspace displays that isolation status
-  alongside output. Linux still has no OS containment boundary. Unattended/
+  Job Object attached. The Windows Job Object now also limits aggregate job
+  memory to half of currently available physical RAM, bounded between 256 MiB
+  and 8 GiB, with a 2 GiB estimate if Windows cannot report available memory.
+  The actual cap is shown in the Coding workspace alongside output. Linux still
+  has no OS containment boundary. Unattended/
   parallel commands remain gated on a real OS sandbox.
 - **Agreed approach:** Define the supported platform boundary first. Prototype
   a per-run restricted process with a project-root working directory, explicit
@@ -136,10 +139,14 @@ and to any detailed plan rather than copying their full contents here.
   Fail closed when isolation is unavailable; keep approvals and operation
   evidence visible. Do not expand unattended or parallel execution until the
   sandbox behavior is verified.
-- **Acceptance:** Tests prove access outside the project is denied where the
-  platform supports it, environment secrets are excluded, time/resource limits
-  apply, child processes are handled on cancellation, and unsupported systems
-  report that isolation is unavailable rather than implying it is active.
+- **Acceptance:** Tests verify the adaptive memory budget and actual Windows Job
+  Object attachment/status; an over-limit runtime probe is still needed to
+  demonstrate enforcement under memory pressure. Access outside the project
+  remains unrestricted. Environment secrets are excluded, the wall timeout
+  applies, child processes are handled on cancellation, and unsupported systems
+  report that process containment is unavailable rather than implying it is
+  active. A filesystem/network sandbox remains required before unattended or
+  parallel execution.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [architecture and trust boundaries](ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
@@ -309,6 +316,13 @@ and to any detailed plan rather than copying their full contents here.
 ## Recently completed
 
 Move finished entries here with their commit/PR and verification evidence.
+
+- **2026-11-22 — Windows Coding Agent job memory budget.** Windows Job Object
+  containment now applies a dynamic aggregate memory cap (half of available RAM,
+  bounded to 256 MiB–8 GiB) and reports the applied value beside command output.
+  Budget boundary tests, the native Core suite, and Agent Host build pass. A
+  controlled over-limit runtime probe and filesystem/network sandbox remain
+  outstanding.
 
 - **2026-11-22 — Persona profile drafting recovery.** Empty structured draft
   passes now receive one bounded retry with compact evidence and concise
