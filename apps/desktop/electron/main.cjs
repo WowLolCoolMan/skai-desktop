@@ -15,7 +15,7 @@ const { CHASE_LIMITS, chaseDecision, strikeDecision, facingToward } = require(".
 const { createPetMotionEngine } = require("./pet-motion-engine.cjs");
 const { resolveDisplayBackend, canPositionWindows, hasStatusNotifierHost, isTrayLikelyVisible, isWaylandSession, x11HasCompositor } = require("./linux-windowing.cjs");
 const { augmentUserPath } = require("./user-path.cjs");
-const { shouldDownloadAvailableUpdate } = require("./update-policy.cjs");
+const { createUpdateManager } = require("./update-manager.cjs");
 const { createThemeService } = require("./theme-service.cjs");
 
 // Chromium fixes its display backend before any of this file runs, and
@@ -122,13 +122,7 @@ const PET_WINDOW_HEIGHT = 190;
 const PET_WINDOW_MARGIN = 16;
 const attachmentTextExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".json", ".xml", ".yaml", ".yml", ".toml", ".html", ".htm", ".css", ".js", ".ts", ".jsx", ".tsx", ".cs", ".py", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".log"]);
 const blockedAttachmentNames = new Set([".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets"]);
-const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
-const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-let updateCheckTimer;
-let updateSnapshot = { status: "idle", available: false, message: "Updates have not been checked yet." };
-let updateChecksEnabled = true;
-let updateDownloadToken = null;
-let updateCheckInFlight = false;
+const updateManager = createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, getMainWindow: () => mainWindow });
 
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
@@ -1136,94 +1130,6 @@ function createTray() {
   return tray;
 }
 
-function updatePreferencesPath() { return path.join(app.getPath("userData"), "update-preferences.json"); }
-async function readUpdatePreference() {
-  try {
-    const preferences = JSON.parse(await fs.readFile(updatePreferencesPath(), "utf8"));
-    updateChecksEnabled = preferences?.enabled !== false;
-  } catch { updateChecksEnabled = true; }
-  return updateChecksEnabled;
-}
-async function writeUpdatePreference(enabled) {
-  updateChecksEnabled = Boolean(enabled);
-  await fs.mkdir(app.getPath("userData"), { recursive: true });
-  const target = updatePreferencesPath();
-  const temporary = `${target}.${process.pid}.tmp`;
-  await fs.writeFile(temporary, JSON.stringify({ enabled: updateChecksEnabled }, null, 2), { mode: 0o600 });
-  await fs.rename(temporary, target);
-  if (!updateChecksEnabled && updateDownloadToken && !updateDownloadToken.cancelled) updateDownloadToken.cancel();
-  if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = undefined; }
-  if (updateChecksEnabled) scheduleUpdateCheck();
-  return updateChecksEnabled;
-}
-function publishUpdateState(status, details = {}) {
-  updateSnapshot = { status, available: ["available", "downloading", "downloaded"].includes(status), currentVersion: app.getVersion(), checkedAt: new Date().toISOString(), ...details };
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:state", updateSnapshot);
-  if (status === "available" && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("updates:available", updateSnapshot);
-}
-function beginUpdateDownload() {
-  if (!app.isPackaged || process.platform === "darwin" || updateSnapshot.status !== "available") return false;
-  if (updateDownloadToken && !updateDownloadToken.cancelled) return false;
-  const token = new CancellationToken();
-  updateDownloadToken = token;
-  publishUpdateState("downloading", { available: true, version: updateSnapshot.version ?? autoUpdater.updateInfo?.version, percent: 0, message: "Downloading the verified update." });
-  void autoUpdater.downloadUpdate(token).catch((error) => {
-    if (token.cancelled) return;
-    if (updateDownloadToken === token) updateDownloadToken = null;
-    publishUpdateState("error", { version: updateSnapshot.version, error: error instanceof Error ? error.message : String(error), message: "The update download failed. You can retry from Settings." });
-  });
-  return true;
-}
-function configureAutoUpdater() {
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.allowPrerelease = false;
-  autoUpdater.on("checking-for-update", () => publishUpdateState("checking", { message: "Checking the stable release channel…" }));
-  autoUpdater.on("update-available", (info) => {
-    if (!shouldDownloadAvailableUpdate({ enabled: updateChecksEnabled })) {
-      publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Select Download update when you are ready.` });
-      return;
-    }
-    publishUpdateState("available", { available: true, version: info.version, message: `Skai Desktop ${info.version} is available. Starting a background download…` });
-    beginUpdateDownload();
-  });
-  autoUpdater.on("update-not-available", () => publishUpdateState("current", { available: false, message: "You are running the latest stable version." }));
-  autoUpdater.on("download-progress", (progress) => publishUpdateState("downloading", { available: true, version: autoUpdater.updateInfo?.version, percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total, message: `Downloading update… ${Math.round(progress.percent)}%` }));
-  autoUpdater.on("update-downloaded", (info) => {
-    updateDownloadToken = null;
-    publishUpdateState("downloaded", { available: true, version: info.version, message: `Version ${info.version} is verified and ready to install. Restart Skai to finish.` });
-  });
-  autoUpdater.on("update-cancelled", (info) => {
-    updateDownloadToken = null;
-    publishUpdateState("available", { available: true, version: info.version, message: "The update download was cancelled. You can check again to retry." });
-  });
-  autoUpdater.on("error", (error) => {
-    if (updateDownloadToken?.cancelled) return;
-    publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "Update check or download failed. You can retry from Settings." });
-  });
-}
-async function checkForUpdates(force = false) {
-  const currentVersion = app.getVersion();
-  const releaseUrl = `https://github.com/${UPDATE_REPOSITORY}/releases/latest`;
-  if (!updateChecksEnabled && !force) return { ...updateSnapshot, available: false, currentVersion, releaseUrl, message: "Automatic update checks are turned off." };
-  if (!app.isPackaged || process.platform === "darwin") return { ...updateSnapshot, available: false, currentVersion, releaseUrl, message: "Updates are available in packaged Windows and Linux builds." };
-  if (updateCheckInFlight || ["downloading", "downloaded"].includes(updateSnapshot.status)) return { ...updateSnapshot, currentVersion, releaseUrl };
-  updateCheckInFlight = true;
-  try {
-    await autoUpdater.checkForUpdates();
-    return { ...updateSnapshot, currentVersion, releaseUrl };
-  } catch (error) {
-    publishUpdateState("error", { error: error instanceof Error ? error.message : String(error), message: "Update check failed. You can retry from Settings." });
-    return { ...updateSnapshot, currentVersion, releaseUrl };
-  } finally { updateCheckInFlight = false; }
-}
-function scheduleUpdateCheck() {
-  if (updateCheckTimer) clearInterval(updateCheckTimer);
-  if (!updateChecksEnabled || !app.isPackaged || process.platform === "darwin") return;
-  void checkForUpdates();
-  updateCheckTimer = setInterval(() => { void checkForUpdates(); }, UPDATE_CHECK_INTERVAL_MS);
-}
-
 const allowedMethods = new Set([
   "runtime.health", "models.list", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files", "project.file.read", "project.preview.read", "tasks.list",
   "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow", "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "image.generate.start", "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status", "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save", "conversation.metadata.save", "conversations.export", "conversation.fork", "memory.list", "memory.search", "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.research.force", "persona.draft", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add", "persona.source.remove",
@@ -1630,34 +1536,32 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("updates:check", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return { available: false, message: "Update checks are unavailable." };
-    return checkForUpdates(true);
+    return updateManager.checkForUpdates(true);
   });
-  ipcMain.handle("updates:get-state", (event) => BrowserWindow.fromWebContents(event.sender) ? { ...updateSnapshot, currentVersion: app.getVersion() } : null);
+  ipcMain.handle("updates:get-state", (event) => BrowserWindow.fromWebContents(event.sender) ? updateManager.getCurrentSnapshot() : null);
   ipcMain.handle("updates:enabled", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;
-    return updateChecksEnabled;
+    return updateManager.getEnabled();
   });
   ipcMain.handle("updates:set-enabled", async (event, enabled) => {
-    if (!BrowserWindow.fromWebContents(event.sender) || typeof enabled !== "boolean") return updateChecksEnabled;
-    return writeUpdatePreference(enabled);
+    if (!BrowserWindow.fromWebContents(event.sender) || typeof enabled !== "boolean") return updateManager.getEnabled();
+    return updateManager.writeUpdatePreference(enabled);
   });
   ipcMain.handle("updates:install", (event) => {
-    if (!BrowserWindow.fromWebContents(event.sender) || updateSnapshot.status !== "downloaded") return false;
-    autoUpdater.quitAndInstall(false, true);
-    return true;
+    if (!BrowserWindow.fromWebContents(event.sender)) return false;
+    return updateManager.installDownloadedUpdate();
   });
   ipcMain.handle("updates:cancel-download", (event) => {
-    if (!BrowserWindow.fromWebContents(event.sender) || updateSnapshot.status !== "downloading" || !updateDownloadToken) return false;
-    updateDownloadToken.cancel();
-    return true;
+    if (!BrowserWindow.fromWebContents(event.sender)) return false;
+    return updateManager.cancelUpdateDownload();
   });
   ipcMain.handle("updates:download", (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;
-    return beginUpdateDownload();
+    return updateManager.beginUpdateDownload();
   });
   ipcMain.handle("updates:retry", async (event) => {
-    if (!BrowserWindow.fromWebContents(event.sender)) return updateSnapshot;
-    return checkForUpdates(true);
+    if (!BrowserWindow.fromWebContents(event.sender)) return updateManager.getSnapshot();
+    return updateManager.checkForUpdates(true);
   });
   ipcMain.handle("updates:open", async (event, url) => {
     if (!BrowserWindow.fromWebContents(event.sender) || typeof url !== "string") return false;
@@ -1739,8 +1643,8 @@ app.whenReady().then(() => {
   registerGlobalLauncher();
   void resolvePetSurface().finally(createPetWindow);
   createTray();
-  configureAutoUpdater();
-  void readUpdatePreference().then(scheduleUpdateCheck);
+  updateManager.configureAutoUpdater();
+  void updateManager.readUpdatePreference().then(() => updateManager.scheduleUpdateCheck());
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
