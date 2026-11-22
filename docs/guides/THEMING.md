@@ -1,13 +1,12 @@
 # Theming Skai Desktop
 
-Skai Desktop's look comes from theme files: plain JSON you can open, copy and edit.
-The schema is `docs/theme.schema.json`; most editors use it for completion when the file's
-`$schema` points at a copy of it (Export puts one next to your themes).
+Skai Desktop's look comes from theme files: plain JSON you can open, copy, and
+edit. The machine-readable [theme schema](../theme.schema.json) defines the
+format; export places a copy beside your themes for editor completion.
 
-> Status: theme files, light/dark picks, the themes folder, live reload, Edit, Duplicate,
-> Import Base16/Base24, Export and Reset all work (theme work, Phase 3). Fonts work: theme
-> fonts, the font picker, your overrides and a custom fonts folder (Phase 4). Gradients are
-> applied too, with a gradient editor and four gradient presets (Phase 5).
+Appearance supports theme selection, live reload, editing and duplicating user
+themes, Base16/Base24 import, export, fonts, gradients, and reset. Built-in
+themes remain read-only; duplicate one before editing.
 
 ## Using a theme
 

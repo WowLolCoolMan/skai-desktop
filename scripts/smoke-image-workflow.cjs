@@ -88,6 +88,48 @@ async function main() {
     } finally { socket.close(); }
   }
 
+  async function callFunction(target, functionDeclaration, args, timeout = 30_000) {
+    const socket = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    });
+    let nextId = 1;
+    const pending = new Map();
+    socket.addEventListener("message", (event) => {
+      let message;
+      try { message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data)); }
+      catch { return; }
+      const request = pending.get(message.id);
+      if (!request) return;
+      pending.delete(message.id);
+      clearTimeout(request.timer);
+      if (message.error) request.reject(new Error(message.error.message));
+      else request.resolve(message);
+    });
+
+    const send = (method, params) => new Promise((resolve, reject) => {
+      const id = nextId++;
+      const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Packaged image workflow ${method} timed out.`)); }, timeout);
+      pending.set(id, { resolve, reject, timer });
+      socket.send(JSON.stringify({ id, method, params }));
+    });
+
+    try {
+      const globalObject = await send("Runtime.evaluate", { expression: "window", returnByValue: false });
+      const objectId = globalObject.result?.result?.objectId;
+      if (!objectId) throw new Error("Packaged image workflow could not access its page context.");
+      const response = await send("Runtime.callFunctionOn", {
+        objectId,
+        functionDeclaration,
+        arguments: args.map((value) => ({ value })),
+        returnByValue: true,
+        awaitPromise: true,
+      });
+      return response.result?.result?.value;
+    } finally { socket.close(); }
+  }
+
   async function waitFor(target, expression, description, timeout = 240_000) {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
@@ -106,7 +148,7 @@ async function main() {
     await waitFor(target, "Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]'))", "app navigation");
     await evaluate(target, "location.hash = '#/images'; 'navigated'");
     await waitFor(target, "Boolean(document.querySelector('.image-studio-page textarea[aria-describedby=\\\"image-prompt-help\\\"]'))", "Images page");
-    const setPrompt = async (value) => evaluate(target, `(() => { const field = document.querySelector('.image-studio-page textarea[aria-describedby="image-prompt-help"]'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, ${JSON.stringify(value)}); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()`);
+    const setPrompt = async (value) => callFunction(target, "function(value) { const field = document.querySelector('.image-studio-page textarea[aria-describedby=\\\"image-prompt-help\\\"]'); if (!field) return null; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, String(value)); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; }", [value]);
 
     if (verifyMissingRuntime) {
       await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('dependencies-missing')", "missing-runtime state");

@@ -27,7 +27,7 @@
 ## MCP and tool integrations
 
 - Core supports bounded stdio/HTTP-style MCP clients, OpenAPI descriptors, conservative tool classification, manifests, permissions, and audit concepts.
-- Process supervision, notifications/resources, authenticated retrieval, and full UI lifecycle/health coverage remain incomplete according to `docs/CAPABILITY_MATRIX.md`.
+- Process supervision, notifications/resources, authenticated retrieval, and full UI lifecycle/health coverage remain incomplete according to the [capability matrix](../planning/CAPABILITY_MATRIX.md).
 
 ## Persistence and secrets
 
@@ -43,9 +43,9 @@
 ## Evidence
 
 - `README.md`
-- `docs/CAPABILITY_MATRIX.md`
-- `docs/MODEL_LIBRARY.md`
-- `docs/LOCAL_IMAGE_GENERATION.md`
+- `docs/planning/CAPABILITY_MATRIX.md`
+- `docs/guides/MODEL_LIBRARY.md`
+- `docs/guides/LOCAL_IMAGE_GENERATION.md`
 - `apps/desktop/src/features/catalog/MarketplacePage.tsx`
 - `native/SkaiDesktop.Core/Services/ModelLibraryService.cs`
 - `native/SkaiDesktop.Core/Services/SkillPackageInstaller.cs`

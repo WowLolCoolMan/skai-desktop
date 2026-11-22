@@ -59,7 +59,7 @@ reviewed on 2026-11-22.
 
 Update this file when a reference materially changes, a new project is adopted,
 an integration decision changes, or a dependency is proposed. Add concrete
-implementation evidence to the [capability matrix](../CAPABILITY_MATRIX.md)
-and release or user-visible work to [To Do Next](../TO_DO_NEXT.md). Treat
+implementation evidence to the [capability matrix](../planning/CAPABILITY_MATRIX.md)
+and release or user-visible work to [To Do Next](../planning/TO_DO_NEXT.md). Treat
 repository popularity as discovery input, not proof of security, quality, or
 compatibility.

@@ -6,7 +6,7 @@
 
 > Historical comparison based on the 2026-11-16 product snapshot. Treat feature
 > status and gap descriptions below as historical; use the
-> [capability matrix](../CAPABILITY_MATRIX.md) and [To Do Next](../TO_DO_NEXT.md)
+> [capability matrix](../../planning/CAPABILITY_MATRIX.md) and [To Do Next](../../planning/TO_DO_NEXT.md)
 > for current Skai status and priorities.
 
 ## Scope and reading guide
@@ -17,7 +17,7 @@ This register compares Skai's current Electron application with the current Chat
 
 ## Executive summary
 
-**Implementation note (2026-11-16):** The current working tree adds persisted workspace tabs, a Chat/Coding mode switch, an Extras flyout, a Settings overlay, project-linked coding conversations with in-thread task cards, project details editing, and persistent Marketplace model filters. The remaining planned gaps are tracked in [WORKFLOW_OVERHAUL_PLAN.md](../archive/workflow-overhaul-plan.md). Several lower sections still describe the baseline captured on 2026-11-15; consult the plan's implementation snapshot for the current changed paths until each comparison section is refreshed.
+**Implementation note (2026-11-16):** The current working tree adds persisted workspace tabs, a Chat/Coding mode switch, an Extras flyout, a Settings overlay, project-linked coding conversations with in-thread task cards, project details editing, and persistent Marketplace model filters. The remaining planned gaps are tracked in [WORKFLOW_OVERHAUL_PLAN.md](../workflow-overhaul-plan.md). Several lower sections still describe the baseline captured on 2026-11-15; consult the plan's implementation snapshot for the current changed paths until each comparison section is refreshed.
 
 The largest difference is the **work loop**:
 
@@ -50,7 +50,7 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 
 **Visible screenshot differences:** Skai's supplied Usage screenshot shows the route name twice (in the top toolbar and the page heading), a global “local repository folder no longer exists” error while Usage is open, and recent-chat entries named “Filler conversation number …”. Those are screenshot observations, not assumptions about the current user's data or a claim that every launch shows them. They make Skai look less coherent than Codex's project-and-thread presentation and suggest the error is not scoped to the page that caused it. The Help-menu comparison is also limited to the supplied screenshots; it does not assert that every Skai build lacks every help action.
 
-**Skai evidence:** [App.tsx](../../apps/desktop/src/App.tsx), [GlobalRail.tsx](../../apps/desktop/src/components/layout/GlobalRail.tsx), [Sidebar.tsx](../../apps/desktop/src/components/layout/Sidebar.tsx), [navigation.ts](../../apps/desktop/src/app/navigation.ts), [Toolbar.tsx](../../apps/desktop/src/components/layout/Toolbar.tsx).
+**Skai evidence:** [App.tsx](../../../apps/desktop/src/App.tsx), [GlobalRail.tsx](../../../apps/desktop/src/components/layout/GlobalRail.tsx), [Sidebar.tsx](../../../apps/desktop/src/components/layout/Sidebar.tsx), [navigation.ts](../../../apps/desktop/src/app/navigation.ts), [Toolbar.tsx](../../../apps/desktop/src/components/layout/Toolbar.tsx).
 
 ### 2. Projects and project context
 
@@ -61,7 +61,7 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 | Projects are available in ChatGPT's desktop UI and can participate in ChatGPT's account and cross-device workflows, subject to feature availability. | Skai project state and file access are local to the desktop installation. Selecting a project is a local UI state; it is not a shared team project. |
 | The supplied Projects screenshot shows a clean searchable list with Create and row actions. | Skai now has a searchable Projects directory, and also repeats a short recent-project list in the sidebar. A stale folder only becomes apparent when project files are requested; the app then needs a clear repair path. |
 
-**Sources:** OpenAI [Projects in ChatGPT](https://help.openai.com/en/articles/10169521-projects-in-chatgpt). Skai: [DesktopProject contract](../../apps/desktop/shared/contracts.ts), [CodingPage.tsx](../../apps/desktop/src/features/coding/CodingPage.tsx), [useCodingWorkspace.ts](../../apps/desktop/src/features/coding/useCodingWorkspace.ts).
+**Sources:** OpenAI [Projects in ChatGPT](https://help.openai.com/en/articles/10169521-projects-in-chatgpt). Skai: [DesktopProject contract](../../../apps/desktop/shared/contracts.ts), [CodingPage.tsx](../../../apps/desktop/src/features/coding/CodingPage.tsx), [useCodingWorkspace.ts](../../../apps/desktop/src/features/coding/useCodingWorkspace.ts).
 
 ### 3. Conversations, history, and search
 
@@ -71,7 +71,7 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 | ChatGPT search can span supported chats, projects, images, and documents; archived chats remain searchable. | Skai's visible sidebar search filters recent conversation titles. Chat supports search within the current conversation; project search searches project names and folder paths. These are separate searches, not one global search over all content. |
 | Recents can be sorted, filtered, and pinned; a compact sidebar does not imply older history was deleted. | The sidebar currently displays a bounded number of recent chats and projects; the full project list is a separate page. Chat actions include pin/archive/rename/fork, but there is no single unified Chat/Work/Codex history. |
 
-**Sources:** OpenAI [Finding your chats, projects, and files](https://help.openai.com/en/articles/10056348-how-do-i-search-my-chat-history-in-chatgpt), [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex). Skai: [Sidebar.tsx](../../apps/desktop/src/components/layout/Sidebar.tsx), [ChatPage.tsx](../../apps/desktop/src/features/chat/ChatPage.tsx), [README.md](../../README.md).
+**Sources:** OpenAI [Finding your chats, projects, and files](https://help.openai.com/en/articles/10056348-how-do-i-search-my-chat-history-in-chatgpt), [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex). Skai: [Sidebar.tsx](../../../apps/desktop/src/components/layout/Sidebar.tsx), [ChatPage.tsx](../../../apps/desktop/src/features/chat/ChatPage.tsx), [README.md](../../../README.md).
 
 ### 4. Coding conversation and agent execution
 
@@ -83,7 +83,7 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 
 **This is the most consequential product-flow gap.** Skai has the surrounding workspace tools, but users cannot yet make the Codex loop—ask for a project change, watch the agent perform it, inspect the diff, and continue in that same project conversation—as one continuous path.
 
-**Sources:** OpenAI [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/). Skai: [CodingPage.tsx](../../apps/desktop/src/features/coding/CodingPage.tsx), [CodingSessionView.tsx](../../apps/desktop/src/features/coding/CodingSessionView.tsx), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md), [FUTURE_FEATURES.md](../FUTURE_FEATURES.md).
+**Sources:** OpenAI [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/). Skai: [CodingPage.tsx](../../../apps/desktop/src/features/coding/CodingPage.tsx), [CodingSessionView.tsx](../../../apps/desktop/src/features/coding/CodingSessionView.tsx), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md), [FUTURE_FEATURES.md](../../planning/FUTURE_FEATURES.md).
 
 ### 5. Files, editor, terminal, and change review
 
@@ -93,7 +93,7 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 | The project task can touch repository files using Codex's environment and approval controls. | Skai explicitly limits project access to selected folders and bounded operations. The complete nested file-tree and some richer mutation paths remain partial. Terminal and task execution have different safeguards and acceptance status. |
 | Codex presents task outputs, sources, and agent activity in a task-specific inspector. | Skai's Git review is repository-wide status/diff UI, now paired with a project-scoped inspector that shows task status, summaries, and changed-file review beside the thread. It still lacks a full Codex-style inspector for outputs, sources, and agents. |
 
-**Sources:** Skai: [CodingSessionView.tsx](../../apps/desktop/src/features/coding/CodingSessionView.tsx), [TerminalPage.tsx](../../apps/desktop/src/features/terminal/TerminalPage.tsx), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md). OpenAI [ChatGPT release notes](https://help.openai.com/en/articles/6825453-chatgpt-release-notes) (desktop/Codex updates).
+**Sources:** Skai: [CodingSessionView.tsx](../../../apps/desktop/src/features/coding/CodingSessionView.tsx), [TerminalPage.tsx](../../../apps/desktop/src/features/terminal/TerminalPage.tsx), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md). OpenAI [ChatGPT release notes](https://help.openai.com/en/articles/6825453-chatgpt-release-notes) (desktop/Codex updates).
 
 ### 6. Models, sign-in, and usage
 
@@ -103,7 +103,7 @@ Skai's core distinction is deliberate: **local-first execution and explicit loca
 | ChatGPT/Codex can show plan or model usage information, with availability varying by account and feature rollout. | Skai's Usage page explicitly says no telemetry and no verified token, latency, GPU-memory, or cost measurements are currently exposed. It records local task/operation provenance. |
 | Cloud Work or Codex Cloud can run work on OpenAI-managed infrastructure; local desktop work can use local files with permission, but messages/context may still be cloud-stored for cloud features. | Skai sends prompts to the local runtime the user selected and does not silently switch to a hosted provider or cloud fallback. GitHub is a separate explicit integration, not an AI model provider. |
 
-**Sources:** OpenAI [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex), [Codex app introduction](https://openai.com/index/introducing-the-codex-app/). Skai: [README.md](../../README.md), [UsagePage.tsx](../../apps/desktop/src/features/usage/UsagePage.tsx), [FUTURE_FEATURES.md](../FUTURE_FEATURES.md).
+**Sources:** OpenAI [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex), [Codex app introduction](https://openai.com/index/introducing-the-codex-app/). Skai: [README.md](../../../README.md), [UsagePage.tsx](../../../apps/desktop/src/features/usage/UsagePage.tsx), [FUTURE_FEATURES.md](../../planning/FUTURE_FEATURES.md).
 
 OpenAI has also announced Codex usage profiles for eligible users as a gradual rollout; the document does not treat that as universal account availability. See [ChatGPT Business release notes](https://help.openai.com/en/articles/11391654-chatgpt-business-release-notes).
 
@@ -114,7 +114,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | The current Plugin Directory can package reusable skills, connected apps, app templates, and extensions. Apps may connect external services and require account authorization or workspace permissions. Plugins can be invoked in supported ChatGPT or Codex task surfaces. | Skai Marketplace is a local capabilities/catalog surface for model providers, image/voice tools, skills, and integrations. Skai has local skill install review and MCP stdio/HTTP discovery with grants and revocation; the full ChatGPT plugin/app catalog and its account integrations are not automatically available in Skai. |
 | Availability, sign-in, and capabilities depend on plan, region, workspace policy, and product surface. Workspace administrators can manage plugin availability and import supported marketplaces. | Skai's marketplace/MCP area is partial: richer lifecycle UI, authenticated retrieval, notifications, and resources remain gaps. A visible catalog entry does not imply a connected account or permission. |
 
-**Sources:** OpenAI [Plugins in ChatGPT and Codex](https://help.openai.com/en/articles/20001256-plugins-in-codex/), [Skills in ChatGPT](https://help.openai.com/en/articles/20001066-skills-in-chatgpt). Skai: [PluginsPage.tsx](../../apps/desktop/src/features/catalog/PluginsPage.tsx), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md).
+**Sources:** OpenAI [Plugins in ChatGPT and Codex](https://help.openai.com/en/articles/20001256-plugins-in-codex/), [Skills in ChatGPT](https://help.openai.com/en/articles/20001066-skills-in-chatgpt). Skai: [PluginsPage.tsx](../../../apps/desktop/src/features/catalog/PluginsPage.tsx), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md).
 
 ### 8. External integrations and data sources
 
@@ -123,7 +123,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | Supported connected apps can retrieve from or act on external services under the user's or workspace's authorization. Projects can include supported app links as sources. | Skai integrations are explicit local or project-level connections, including MCP servers and a GitHub repository workflow. They do not make Skai a general ChatGPT app connector, and GitHub credentials are not used for model inference. |
 | A connected app may need provider authentication, workspace enablement, and action-specific permissions. | Skai uses local MCP grants, GitHub device sign-in for repository workflows, and local provider endpoints. Authenticated retrieval through MCP remains incomplete according to the capability matrix. |
 
-**Sources:** OpenAI [Projects in ChatGPT](https://help.openai.com/en/articles/10169521-projects-in-chatgpt), [Plugins in ChatGPT and Codex](https://help.openai.com/en/articles/20001256-plugins-in-codex/). Skai: [GITHUB_INTEGRATION.md](../GITHUB_INTEGRATION.md), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md).
+**Sources:** OpenAI [Projects in ChatGPT](https://help.openai.com/en/articles/10169521-projects-in-chatgpt), [Plugins in ChatGPT and Codex](https://help.openai.com/en/articles/20001256-plugins-in-codex/). Skai: [GITHUB_INTEGRATION.md](../../guides/GITHUB_INTEGRATION.md), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md).
 
 ### 9. Memory and knowledge
 
@@ -132,7 +132,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | ChatGPT memory and project context can use account/project conversations and files, subject to memory settings and workspace policy. Shared projects let collaborators reuse project knowledge. | Skai Memory is an explicit local editor for saved notes, scopes, tags, provenance, and enable/disable state. Its document corpus is manually imported or entered; Skai does not crawl arbitrary files implicitly. |
 | Project sources can be reused by project chats and can include uploaded or supported connected-app content. | Skai documents can be searched locally with bounded snippets; original-source freshness and broader retrieval remain limited. Memory does not substitute for a project chat history. |
 
-**Sources:** OpenAI [Projects in ChatGPT](https://help.openai.com/en/articles/10169521-projects-in-chatgpt). Skai: [MemoryPage.tsx](../../apps/desktop/src/features/memory/MemoryPage.tsx), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md).
+**Sources:** OpenAI [Projects in ChatGPT](https://help.openai.com/en/articles/10169521-projects-in-chatgpt). Skai: [MemoryPage.tsx](../../../apps/desktop/src/features/memory/MemoryPage.tsx), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md).
 
 ### 10. Voice, images, and media
 
@@ -142,7 +142,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | Hosted model and service availability can make these features accessible without installing local inference runtimes. | Skai requires compatible local runtimes/models. Voice success, live ComfyUI, image editing, and broader media acceptance are still partial/unverified per its capability matrix. |
 | Codex desktop's primary reference flow is coding and agent supervision; media/voice is not the center of the supplied coding screenshots. | Skai makes Image Studio, the built-in pet and companion system, voice, local model management, and memory first-class app routes. These are Skai-specific capabilities, not Codex navigation equivalents. |
 
-**Sources:** OpenAI [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex). Skai: [ImagesPage.tsx](../../apps/desktop/src/features/catalog/ImagesPage.tsx), [ChatPage.tsx](../../apps/desktop/src/features/chat/ChatPage.tsx), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md).
+**Sources:** OpenAI [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex). Skai: [ImagesPage.tsx](../../../apps/desktop/src/features/catalog/ImagesPage.tsx), [ChatPage.tsx](../../../apps/desktop/src/features/chat/ChatPage.tsx), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md).
 
 ### 11. Scheduled work, goals, and background execution
 
@@ -151,7 +151,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | ChatGPT Work supports scheduled or trigger-based work where available; Codex supports long-running coding tasks and agent supervision. Cloud tasks can continue on OpenAI-managed machines. | Skai has local scheduled task records with pause, resume, cancel, and reviewed Run now actions. It does not imply unattended hosted inference; autonomous dispatch and background task execution remain incomplete. |
 | Codex can isolate parallel agent tasks using worktrees; current OpenAI material also describes goals, side chats, queued/steering prompts, and remote task review. | Skai Workbench tracks local plans, dependencies, approvals, and artifacts. Parallel agents, project-isolated worktrees as an end-user workflow, goals tied to chats, and phone-to-desktop task control are not implemented in the current capability matrix. |
 
-**Sources:** OpenAI [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex), [Codex app introduction](https://openai.com/index/introducing-the-codex-app/), [Codex remote workflow guide](https://developers.openai.com/blog/mastering-codex-remote-for-engineering). Skai: [FUTURE_FEATURES.md](../FUTURE_FEATURES.md), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md).
+**Sources:** OpenAI [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex), [Codex app introduction](https://openai.com/index/introducing-the-codex-app/), [Codex remote workflow guide](https://developers.openai.com/blog/mastering-codex-remote-for-engineering). Skai: [FUTURE_FEATURES.md](../../planning/FUTURE_FEATURES.md), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md).
 
 ### 12. Screen context, computer use, browser, and remote control
 
@@ -160,7 +160,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | Current OpenAI desktop workflows include app/window capture (Appshots), Codex computer use on Windows for eligible accounts, in-app browser workflows, and remote steering/review of supported host tasks from mobile. Availability and regional/workspace restrictions apply. | Skai has no computer-use control path, built-in browser panel, screen/app context capture, or phone-to-desktop task control in the current product. Its backlog lists computer use, built-in browser, screen capture, and remote device access as future work. Skai does have web search with citations and a system-wide launcher, which are narrower functions. |
 | A user can attach app context to a Codex thread or steer a running task remotely, keeping it connected to the original agent task. | Skai's launcher opens the local app; it does not transfer screen context or control an agent running elsewhere. |
 
-**Sources:** OpenAI [ChatGPT Business release notes](https://help.openai.com/en/articles/11391654-chatgpt-business-release-notes), [Codex remote workflow guide](https://developers.openai.com/blog/mastering-codex-remote-for-engineering). Skai: [FUTURE_FEATURES.md](../FUTURE_FEATURES.md), [README.md](../../README.md).
+**Sources:** OpenAI [ChatGPT Business release notes](https://help.openai.com/en/articles/11391654-chatgpt-business-release-notes), [Codex remote workflow guide](https://developers.openai.com/blog/mastering-codex-remote-for-engineering). Skai: [FUTURE_FEATURES.md](../../planning/FUTURE_FEATURES.md), [README.md](../../../README.md).
 
 ### 13. Permissions, safety, and trust boundary
 
@@ -170,7 +170,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | The user can choose local or cloud surfaces where enabled, with plan/workspace controls affecting the available paths. | Skai's model path is local-only. File access is bound to explicitly selected folders, protected names and bounded operations are enforced, and no hosted fallback is offered. |
 | An account-based workflow allows cloud sync and remote access, but can involve cloud storage of conversation/task context. | Locality reduces cloud dependence and supports offline/local-runtime workflows, but users manage local model installation, hardware fit, and local backups themselves. |
 
-**Sources:** OpenAI [Codex app security overview](https://openai.com/index/introducing-the-codex-app/), [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex). Skai: [ARCHITECTURE.md](../ARCHITECTURE.md), [README.md](../../README.md).
+**Sources:** OpenAI [Codex app security overview](https://openai.com/index/introducing-the-codex-app/), [ChatGPT Work and Codex](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex). Skai: [ARCHITECTURE.md](../../engineering/ARCHITECTURE.md), [README.md](../../../README.md).
 
 ### 14. Extensibility and customization
 
@@ -179,7 +179,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | Skills and plugins can package instructions, resources, scripts, and connected apps; availability and syncing vary by product surface and account. Codex also interoperates with its CLI/IDE configuration. | Skai supports local personas, prompt presets, local skills/MCP, model/provider configuration, appearance settings, and configurable pets. It does not inherit ChatGPT account skills, GPTs, app connections, or Codex CLI history. |
 | The plugin directory and workspace administration provide a managed distribution and permission surface. | Skai's local marketplace and MCP UI have their own install/grant flow. They are independent catalogs, not a mirror of the OpenAI directory. |
 
-**Sources:** OpenAI [Skills in ChatGPT](https://help.openai.com/en/articles/20001066-skills-in-chatgpt), [Plugins in ChatGPT and Codex](https://help.openai.com/en/articles/20001256-plugins-in-codex/), [Codex app introduction](https://openai.com/index/introducing-the-codex-app/). Skai: [PluginsPage.tsx](../../apps/desktop/src/features/catalog/PluginsPage.tsx), [SettingsPage.tsx](../../apps/desktop/src/features/settings/SettingsPage.tsx), [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md).
+**Sources:** OpenAI [Skills in ChatGPT](https://help.openai.com/en/articles/20001066-skills-in-chatgpt), [Plugins in ChatGPT and Codex](https://help.openai.com/en/articles/20001256-plugins-in-codex/), [Codex app introduction](https://openai.com/index/introducing-the-codex-app/). Skai: [PluginsPage.tsx](../../../apps/desktop/src/features/catalog/PluginsPage.tsx), [SettingsPage.tsx](../../../apps/desktop/src/features/settings/SettingsPage.tsx), [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md).
 
 ### 15. Platform and lifecycle
 
@@ -189,7 +189,7 @@ OpenAI has also announced Codex usage profiles for eligible users as a gradual r
 | Account-based cloud work can continue across eligible devices; Codex has local and cloud environments. | Skai runs an Electron shell plus a persistent local .NET Agent Host and optional separate companion window. Closing the main window may leave the host/tray/pet resident, depending on platform. |
 | OpenAI manages desktop updates and service/model availability. | Skai packages and updates its own application from its repository/release pipeline; local model runtimes and model files have separate install/update lifecycles. |
 
-**Sources:** OpenAI [Moving to the new ChatGPT desktop app](https://help.openai.com/en/articles/20001276-moving-to-the-new-chatgpt-desktop-app). Skai: [README.md](../../README.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [RELEASE_READINESS.md](../RELEASE_READINESS.md).
+**Sources:** OpenAI [Moving to the new ChatGPT desktop app](https://help.openai.com/en/articles/20001276-moving-to-the-new-chatgpt-desktop-app). Skai: [README.md](../../../README.md), [ARCHITECTURE.md](../../engineering/ARCHITECTURE.md), [RELEASE_READINESS.md](../../operations/RELEASE_READINESS.md).
 
 ### 16. Visual language and density
 
@@ -231,21 +231,21 @@ The matrix below uses Skai's current repository capability classifications; thes
 | Scheduled work | Partial | Local schedule controls exist; autonomous/unattended execution is not implied. |
 | Platform | Windows/Linux documented | No supported macOS release is documented; Linux is a Skai-specific advantage over the current official ChatGPT desktop availability statement. |
 
-The full evidence-backed status is maintained in [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md).
+The full evidence-backed status is maintained in [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md).
 
 ## Evidence and references
 
 ### Skai source and product documentation
 
-- [README.md](../../README.md) — product boundary, local-first positioning, current product surfaces, supported installation notes.
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — Electron/renderer/preload/Agent Host/Core boundaries.
-- [CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md) — current working/partial/planned status and remaining gaps.
-- [FUTURE_FEATURES.md](../FUTURE_FEATURES.md) — explicit product boundary, unfinished coding-agent and workspace features.
-- [UI_REFERENCE_GUIDE.md](../UI_REFERENCE_GUIDE.md) — screenshot references and product interaction goals.
-- [AppRouteView.tsx](../../apps/desktop/src/app/AppRouteView.tsx) — route-to-page map.
-- [CodingPage.tsx](../../apps/desktop/src/features/coding/CodingPage.tsx), [CodingSessionView.tsx](../../apps/desktop/src/features/coding/CodingSessionView.tsx) — project and coding flow.
-- [ChatPage.tsx](../../apps/desktop/src/features/chat/ChatPage.tsx), [CodingPage.tsx](../../apps/desktop/src/features/coding/CodingPage.tsx) — conversation-linked project and task flows.
-- [UsagePage.tsx](../../apps/desktop/src/features/usage/UsagePage.tsx), [PluginsPage.tsx](../../apps/desktop/src/features/catalog/PluginsPage.tsx), [MemoryPage.tsx](../../apps/desktop/src/features/memory/MemoryPage.tsx) — usage, integration catalog, and memory behavior.
+- [README.md](../../../README.md) — product boundary, local-first positioning, current product surfaces, supported installation notes.
+- [ARCHITECTURE.md](../../engineering/ARCHITECTURE.md) — Electron/renderer/preload/Agent Host/Core boundaries.
+- [CAPABILITY_MATRIX.md](../../planning/CAPABILITY_MATRIX.md) — current working/partial/planned status and remaining gaps.
+- [FUTURE_FEATURES.md](../../planning/FUTURE_FEATURES.md) — explicit product boundary, unfinished coding-agent and workspace features.
+- [UI_REFERENCE_GUIDE.md](../../planning/UI_REFERENCE_GUIDE.md) — screenshot references and product interaction goals.
+- [AppRouteView.tsx](../../../apps/desktop/src/app/AppRouteView.tsx) — route-to-page map.
+- [CodingPage.tsx](../../../apps/desktop/src/features/coding/CodingPage.tsx), [CodingSessionView.tsx](../../../apps/desktop/src/features/coding/CodingSessionView.tsx) — project and coding flow.
+- [ChatPage.tsx](../../../apps/desktop/src/features/chat/ChatPage.tsx), [CodingPage.tsx](../../../apps/desktop/src/features/coding/CodingPage.tsx) — conversation-linked project and task flows.
+- [UsagePage.tsx](../../../apps/desktop/src/features/usage/UsagePage.tsx), [PluginsPage.tsx](../../../apps/desktop/src/features/catalog/PluginsPage.tsx), [MemoryPage.tsx](../../../apps/desktop/src/features/memory/MemoryPage.tsx) — usage, integration catalog, and memory behavior.
 
 ### OpenAI primary references
 
@@ -268,4 +268,4 @@ The full evidence-backed status is maintained in [CAPABILITY_MATRIX.md](../CAPAB
 
 The workflow redesign is underway. Skai now has persisted chat/project session tabs, an Extras flyout in place of Quick Actions, and a Settings overlay that leaves the selected workspace underneath. Coding Agent Send starts a local task directly, task records retain their project/conversation IDs, and the conversation plus project inspector can show task status, results, file labels, Stop/Retry, and Review changes. The task executor can read/write project files with the existing hash checks and undo journal, and can run bounded project commands. Old Workbench links are redirected into the conversation/coding surface.
 
-These changes narrow the original page-handoff gap, but do not yet complete the intended Codex-like experience. The project workspace still needs its final file-tree/center-thread/right-inspector layout and responsive drawers; queued follow-ups and scheduled runs are not yet scoped to a project conversation; Marketplace still needs its remaining catalog navigation consolidation; live capacity-aware scheduling and AirLLM queue handoff are not complete; and the current-tree legacy-name/data migration is still outstanding. See [Workflow Overhaul Plan](../archive/workflow-overhaul-plan.md) for the accepted requirements, sequence, and acceptance criteria.
+These changes narrow the original page-handoff gap, but do not yet complete the intended Codex-like experience. The project workspace still needs its final file-tree/center-thread/right-inspector layout and responsive drawers; queued follow-ups and scheduled runs are not yet scoped to a project conversation; Marketplace still needs its remaining catalog navigation consolidation; live capacity-aware scheduling and AirLLM queue handoff are not complete; and the current-tree legacy-name/data migration is still outstanding. See [Workflow Overhaul Plan](../workflow-overhaul-plan.md) for the accepted requirements, sequence, and acceptance criteria.

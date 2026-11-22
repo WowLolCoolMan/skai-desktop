@@ -57,7 +57,7 @@ automatically become an animation sheet.
 
 Custom animation sheets are stored locally. Legacy six- and ten-cell custom
 strips remain readable until the user replaces them. See
-[`assets/pets/README.md`](../assets/pets/README.md) for rebuilding and validating
+[`assets/pets/README.md`](../../assets/pets/README.md) for rebuilding and validating
 the built-in artwork.
 
 ## Validation and remaining acceptance
@@ -67,8 +67,8 @@ visible motion, blink bounds, and Blaze's effects. `npm run test:pet` checks
 wander placement and attack sequencing. `npm run smoke:windows` checks the
 packaged companion surface as part of the Electron artifact smoke.
 
-The full packaged UI matrix passes across fourteen routes, five supported
+The full packaged UI matrix passes across seventeen routes, five supported
 window sizes, and four theme/sidebar variants. Those checks do not replace live
 visual acceptance of attack timing, cursor tracking, multi-monitor placement,
 reduced-motion behavior, or Linux compositor differences. See
-[release readiness](RELEASE_READINESS.md) for the remaining release gates.
+[release readiness](../operations/RELEASE_READINESS.md) for the remaining release gates.

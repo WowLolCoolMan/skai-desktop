@@ -17,7 +17,7 @@ Close the user-facing gap between generated image history and image editing. A s
 | File | Purpose | Change |
 |---|---|---|
 | `apps/desktop/src/features/catalog/ImagesPage.tsx` | Image studio and inspector | Add bounded local output-to-source conversion and edit action. |
-| `docs/FUTURE_FEATURES.md` | Backlog status | Record the reusable history-to-edit workflow. |
+| `docs/planning/FUTURE_FEATURES.md` | Backlog status | Record the reusable history-to-edit workflow. |
 
 ## Acceptance criteria
 

@@ -8,7 +8,7 @@ feature; the project does not claim that every flow has completed live assistive
 technology testing.
 
 Known work and evidence are tracked in the [capability
-matrix](docs/CAPABILITY_MATRIX.md) and [To Do Next](docs/TO_DO_NEXT.md). If you
+matrix](docs/planning/CAPABILITY_MATRIX.md) and [To Do Next](docs/planning/TO_DO_NEXT.md). If you
 encounter an accessibility barrier, open an issue using the Accessibility
 Barrier template and include:
 

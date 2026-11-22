@@ -47,7 +47,7 @@ For each page or closely related page group, repeat this loop:
    1280, 960, and 640 px in dark, light, and system themes; fix overflow,
    clipped controls, poor contrast, and confusing states.
 4. Record evidence and remaining gaps here, then pick the next page from the
-   active task in `docs/TO_DO_NEXT.md`.
+   active task in [`TO_DO_NEXT.md`](TO_DO_NEXT.md).
 
 The goal is complete after every listed route has been reviewed in the live
 app and representative screenshots and interaction evidence are recorded.
@@ -107,7 +107,9 @@ Run `npm run smoke:windows` from the repository root. It currently runs:
 4. Agent Host, Marketplace, and task-replan protocol smoke.
 5. Packaged Electron shell and separate companion surface smoke.
 6. Dark/light/system theme acceptance.
-7. Ten packaged routes across 1920, 1440, 1280, 960, and 640 pixel widths.
+7. Packaged route, viewport, and theme/sidebar acceptance. The latest recorded
+   matrix covers 17 routes × 5 widths × 4 variants; manual visual review remains
+   open.
 
 Additional evidence commands:
 
@@ -120,17 +122,21 @@ Additional evidence commands:
 
 ## Known boundaries
 
-Hosted model routing is not implemented in the current release. The approved provider-gateway direction is tracked in
-`docs/implementation-plans/provider-gateway.md`. Signed installer lifecycle evidence, background model
-dispatch, resumable downloads, and Worktree task execution remain explicitly
-partial or planned in `docs/CAPABILITY_MATRIX.md` and
-`docs/PRODUCTION_READINESS_GAPS.md`. They must not be represented as working
+Hosted model routing is not implemented in the current release. The approved
+provider-gateway direction is tracked in
+[`implementation-plans/provider-gateway.md`](implementation-plans/provider-gateway.md).
+Signed installer lifecycle evidence, background model dispatch, resumable
+downloads, and Worktree task execution remain explicitly partial or planned in
+[`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md) and
+[`PRODUCTION_READINESS_GAPS.md`](../operations/PRODUCTION_READINESS_GAPS.md).
+They must not be represented as working
 controls until their host contracts and packaged acceptance evidence exist.
 
 The full `smoke:windows` run passed on 2026-11-16. Pet asset and behavior checks
-passed as well. The packaged UI matrix also passed across fourteen routes, five
-supported sizes, and four theme/sidebar variants. Live accessibility and
-cross-platform visual acceptance remain open.
+passed as well. The latest packaged UI matrix passed on 2026-11-22 across 17
+routes, five supported sizes, and four theme/sidebar variants. Automated
+coverage does not replace the open live visual, keyboard, assistive-technology,
+and cross-platform acceptance.
 
 ### Marketplace focused rebuild — 2026-11-22
 

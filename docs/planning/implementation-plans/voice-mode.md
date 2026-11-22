@@ -19,7 +19,7 @@ Turn Skai’s existing hands-free dictation/reply loop into an explicit Voice Mo
 |---|---|---|
 | `apps/desktop/src/features/chat/ChatComposer.tsx` | Voice controls and hands-free loop | Present explicit Voice Mode state and end-session action. |
 | `apps/desktop/src/styles.css` | Composer visual language | Add compact voice-session panel styling using existing tokens. |
-| `docs/FUTURE_FEATURES.md` | Backlog status | Document the Voice Mode UX milestone and remaining runtime gaps. |
+| `docs/planning/FUTURE_FEATURES.md` | Backlog status | Document the Voice Mode UX milestone and remaining runtime gaps. |
 
 ## Acceptance criteria
 

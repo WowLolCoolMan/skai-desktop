@@ -19,14 +19,12 @@ and acceptance evidence.
 
 ## Priority order
 
-The near-term roadmap is maintained in [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
-The append-only Coding Agent task timeline, no-replay crash reconciliation,
-and read-only project preflight are implemented and verified. The next
-highest-value sequence is: (1) add user-selected verification command execution
-and evidence beside the diff, (2) complete installed-pack voice acceptance,
-(3) add stronger OS isolation before expanding unattended or parallel
-execution, and (4) finish image generation/edit progress and cancellation.
-Other proposals below remain future work.
+The active near-term queue is [To Do Next](TO_DO_NEXT.md); the
+[capability matrix](CAPABILITY_MATRIX.md) records current implementation and
+acceptance boundaries. Keep this file focused on longer-term proposals rather
+than duplicating the active queue. Packaged image generation, editing,
+cancellation, history restoration, and missing-runtime recovery now pass on
+Windows; live ComfyUI and broader hardware acceptance remain open.
 
 Optional user-connected cloud model execution is an approved product direction
 and is tracked as active implementation work in
@@ -64,7 +62,7 @@ under this boundary and the active provider-gateway acceptance plan.
 - [x] Search within the current chat and jump to a matching message.
 - [x] Fork a chat from any message.
 - [ ] Voice input/output, hands-free calls, and advanced voice mode. (OS-native speech output, one-shot dictation, and an explicit Voice Mode panel with listening/waiting/end controls are implemented; the turn loop speaks each reply and pauses listening until speech finishes. MP3/M4A/OGG/WAV files produce local transcript attachments. The packaged Windows smoke confirms Electron exposes local recognition and its installer API, but this machine reports the en-US pack unavailable and verifies fail-closed behavior; successful microphone/audio transcription and acoustic barge-in/streaming voice remain open.)
-  - [ ] Image generation and editing. (Managed Diffusers setup, the 5.2 GB SD-Turbo download, and local CPU generation were exercised in Skai on 2026-11-15. Recent outputs now persist in bounded local IndexedDB history (up to 24 records / 32 MiB of URL data) with prompt and provider metadata; Diffusers image bytes are retained locally, while ComfyUI history stores local output URLs. The built-in Diffusers path now accepts a validated local PNG/JPEG and runs image-to-image inference; the same source picker works with ComfyUI. Saved local outputs can now be reopened from the inspector into the edit source flow, but runtime-specific visual gallery-reopen and built-in edit live acceptance remain open. ComfyUI live acceptance, model library, and inference progress/cancel also remain open.)
+  - [ ] Image generation and editing. (Packaged Windows acceptance with cached SD-Turbo weights now covers text-to-image, image-to-image, active cancellation, history restoration after reload, and missing-runtime/model recovery. Outputs are stored in bounded local IndexedDB history. Live ComfyUI, GPU/additional hardware, resumable work, and broader model controls remain open; see the [image-generation guide](../guides/LOCAL_IMAGE_GENERATION.md).)
 - [x] Context compaction. (Oversized histories now use a bounded summary from the selected local model before falling back to deterministic omission; recent turns and system instructions are retained, and generated summaries are marked as untrusted reference. Summary quality and runtime acceptance across model sizes remain open.)
 - [ ] 1M+ token context support. (Opt-in Ollama context windows up to 1M tokens, bounded request payloads, model-context discovery, and known-incompatible model preflight are implemented; this computer's installed models currently advertise up to 262,144 tokens, so 1M execution with a compatible local model remains unverified.)
 - [ ] Omni-modal input for text, images, audio, and video. (The composer now has one Add menu for files/folders, local audio transcription, one-shot voice input, and hands-free Voice Mode. Images and text attachments are supported; MP4 and WebM can be selected or dropped, with four timestamped frames sampled locally and attached as images under a 20 MB/15-minute limit. Packaged Windows smoke verifies WebM and H.264 MP4 decoding. MP3/M4A/OGG/WAV transcription uses on-device speech recognition and produces a reviewable local audio-transcript attachment; the required speech pack is unavailable on the acceptance machine, so successful audio transcription remains unverified.)

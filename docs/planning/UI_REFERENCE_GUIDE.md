@@ -6,7 +6,7 @@ This guide records the product direction supplied by the project owner and keeps
 
 Skai Desktop is an independent desktop AI app. It is not connected to hosted
 Skai web services; it uses the local Electron bridge, persistent Agent Host,
-and headless Core library described in `docs/ARCHITECTURE.md`. GitHub is a
+and headless Core library described in [`ARCHITECTURE.md`](../engineering/ARCHITECTURE.md). GitHub is a
 user-authorized workspace connection for browsing repositories, opening a
 repository as a project, and reviewing/committing/pushing project changes.
 
@@ -27,7 +27,7 @@ The app should feel approachable for everyday chat while giving advanced users d
 
 ## Screenshot index
 
-The numbered files in [`ui-references/`](ui-references/) are the original user-provided images, preserved unmodified.
+The numbered files in [`ui-references/`](../ui-references) are the original user-provided images, preserved unmodified.
 
 | File | What it demonstrates | Product guidance |
 |---|---|---|

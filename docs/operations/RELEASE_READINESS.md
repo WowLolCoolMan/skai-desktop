@@ -13,7 +13,7 @@ Target release: **0.1.4**. Status: **not ready to publish**.
 - The packaged voice smoke verifies that Electron exposes on-device recognition APIs and reports the expected privacy-preserving error when the en-US pack is unavailable; microphone acceptance still requires an installed pack.
 - `npm run smoke:voice:acceptance` now creates and validates a real PCM audio fixture, probes the native speech runtime, and records the explicit cancellation, unavailable-language, and microphone acceptance boundaries. Use `--require-installed-pack` on a release-validation host with the speech pack installed.
 - The Windows smoke gate passed all 19 staged checks on 2026-11-16, including core tests, Electron-only architecture/release audits, packaged companion/AirLLM verification, themes, task replanning, and responsive overflow coverage.
-- The full packaged UI matrix passed on 2026-11-16: 14 routes × 5 supported window sizes × 4 theme/sidebar variants.
+- The latest packaged UI matrix passed on 2026-11-22: 17 routes × 5 supported window sizes × 4 theme/sidebar variants. Live visual, keyboard, and cross-platform acceptance remain open.
 - `npm run check:pet-assets` passed for all 56 eleven-frame strips, exact rest-pose seams, visible motion, eleven-frame blinks, and Blaze's effects; `npm run test:pet` passed wander and attack behavior checks.
 - Additional project, conversation, queue, memory, and PDF protocol smokes passed against the isolated Agent Host build.
 - The portable Electron artifact now bundles the renderer, Electron runtime, and a self-contained Agent Host; its startup smoke verifies the rendered settings and pet surfaces.
