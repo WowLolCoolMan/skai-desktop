@@ -84,7 +84,8 @@ and to any detailed plan rather than copying their full contents here.
   helpers, and bounded public-source requests are isolated in an injectable
   client; research orchestration and evidence selection remain to be separated.
   Agent Host request validation and method dispatch are also separated from
-  the main loop.
+  the main loop, and update IPC registration is separated from Electron's
+  shell entry point.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
   bridge and storage contracts, keep current behavior, and integrate one
   reviewable slice at a time after syncing with main.
@@ -245,6 +246,9 @@ Move finished entries here with their commit/PR and verification evidence.
 - **2026-11-22 — Agent Host dispatch boundary.** Moved the stable protocol
   method table into its own module without changing method names or handlers.
   Agent Host Release build passes with zero warnings. Commit `0150d89e`.
+- **2026-11-22 — Electron updater IPC boundary.** Moved updater channel
+  registration into its own module while preserving sender checks and the
+  external URL allow list. Electron packaging succeeded. Commit `0537223b`.
 
 - **2026-11-18 — Coding Agent task journal, approval controls, and read-only
   project preflight.** Added task activity and restart reconciliation, approval

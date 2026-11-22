@@ -103,6 +103,9 @@ that users touch as each slice is moved.
 - Moved the stable protocol method-to-handler table into
   `AgentHostLoop.Dispatch.cs`, leaving process I/O and lifecycle in the main
   loop and request validation in its own module.
+- Moved update IPC registration and its sender/URL checks into
+  `update-ipc.cjs`; the existing updater manager remains responsible for update
+  lifecycle and download state.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent
