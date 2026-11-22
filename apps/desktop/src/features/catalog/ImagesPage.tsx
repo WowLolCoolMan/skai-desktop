@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
-import type { AgentResponse } from "../../../shared/contracts";
-import type { ChatAttachment } from "../../../shared/contracts";
+import type { AgentResponse, ChatAttachment } from "../../../shared/contracts";
 
 type ImageResult = { url: string; fileName: string; provider?: ImageProvider; prompt?: string; createdAt?: string };
 type Workflow = { name: string; workflow: string };
