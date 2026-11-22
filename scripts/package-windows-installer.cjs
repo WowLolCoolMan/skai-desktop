@@ -18,7 +18,7 @@ if (!fs.existsSync(path.join(prepackaged, "Skai Desktop.exe")) || !fs.existsSync
 fs.mkdirSync(output, { recursive: true });
 const version = JSON.parse(fs.readFileSync(path.join(prepackaged, "resources", "app", "package.json"), "utf8")).version;
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error(`Invalid packaged app version: ${version}`);
-const args = [cli, "--win", "nsis", "--x64", "--prepackaged", prepackaged, "--config", config, `--config.directories.output=${output}`, `--config.extraMetadata.version=${version}`];
+const args = [cli, "--win", "nsis", "--x64", "--publish", "never", "--prepackaged", prepackaged, "--config", config, `--config.directories.output=${output}`, `--config.extraMetadata.version=${version}`];
 if (process.env.SKAI_ALLOW_UNSIGNED_INSTALLER === "true") {
   args.push("--config.win.forceCodeSigning=false", "--config.win.signExecutable=false");
   console.warn("Building an unsigned installer for local lifecycle validation only.");
