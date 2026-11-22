@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { Model, Route, ThemeMode } from "../../app/types";
 import type { AgentResponse, CloseBehavior, UpdateCheckResult } from "../../../shared/contracts";
 import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
-import { listPetSpriteProfiles, petStripFrameCount, savePetSpriteProfile, validatePetStrip, type PetSpriteProfile, type PetStrip } from "./petSprites";
+import { listPetSpriteProfiles, savePetSpriteProfile, validatePetStrip, type PetSpriteProfile } from "./petSprites";
 import { Button, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 import { ThemeSettings } from "../../theme/ThemeSettings";
@@ -13,17 +13,6 @@ const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice
 type Category = typeof categories[number];
 type AirLlmRuntimeStatus = { workerAvailable: boolean; dependenciesAvailable: boolean; pythonCommand: string; status: string; message: string };
 type AirLlmInstallSession = { id: string; status: string; progress: string[]; error?: string | null };
-function petStripPreviewStyle(strip: PetStrip): CSSProperties {
-  const scale = Math.min(64 / strip.frameWidth, 64 / strip.frameHeight);
-  const frameWidth = strip.frameWidth * scale;
-  const frameHeight = strip.frameHeight * scale;
-  return {
-    backgroundImage: `url(${strip.dataUrl})`,
-    backgroundSize: `${frameWidth * petStripFrameCount(strip)}px ${frameHeight}px`,
-    "--pet-preview-strip-end": `${-frameWidth * (petStripFrameCount(strip) - 1)}px`,
-    "--pet-preview-steps": petStripFrameCount(strip) - 1,
-  } as CSSProperties;
-}
 const categoryIcons: Record<Category, NavIconName> = {
   General: "settings",
   Appearance: "sparkle",
