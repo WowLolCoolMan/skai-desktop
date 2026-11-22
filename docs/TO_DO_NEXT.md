@@ -84,7 +84,8 @@ and to any detailed plan rather than copying their full contents here.
   helpers, and bounded public-source requests are isolated in an injectable
   client; speaker-labelled turns and quote evidence now have a dedicated
   extraction helper. Persona identity resolution and research orchestration
-  now have dedicated partials; source-specific retrieval remains. Model
+  now have dedicated partials, with provider-specific source gathering split
+  into its own module. Model
   runtime discovery/management and remote search/download operations now live
   in separate partials of the same service.
   Agent Host request validation and method dispatch are also separated from

@@ -104,6 +104,10 @@ that users touch as each slice is moved.
   `PersonaKnowledgeSources` declaration into focused partials. The public
   service, candidate scoring, research ordering, and evidence selection remain
   unchanged; source retrieval remains behind `PersonaWikiClient`.
+- Separated Wikipedia, Fandom, transcript, and Wikiquote document gathering
+  into `PersonaKnowledgeSources.Sources.cs`; orchestration still calls the
+  same bounded, best-effort provider operations and returns the same evidence
+  records.
 - Split `ModelLibraryService` into local runtime discovery/management and
   remote catalog search/download partials. The public service and serialized
   model records remain unchanged; catalog validation and download behavior
@@ -154,8 +158,9 @@ that users touch as each slice is moved.
 ## Remaining work
 
 - Continue the renderer and Electron shell extraction. `PluginsPage.tsx` and
-  Electron `main.cjs` remain large mixed-responsibility modules, and source-
-  specific persona retrieval still resides in `PersonaKnowledgeSources.cs`.
+  Electron `main.cjs` remain large mixed-responsibility modules. Continue
+  reducing their responsibilities while reviewing remaining large Core and
+  workspace coordination modules.
 - Complete installed speech-pack and real audio acceptance for local voice.
 - Keep OS isolation, image-runtime acceptance, and release/platform gaps in
   their existing capability entries; these are product completion work, not
