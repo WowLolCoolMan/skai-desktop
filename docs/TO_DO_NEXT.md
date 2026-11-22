@@ -72,7 +72,26 @@ and to any detailed plan rather than copying their full contents here.
   variants. Continue manual interaction and pet-animation review before
   considering the UI goal complete.
 
-### 1. Complete local voice acceptance
+### 1. Continue the cross-layer codebase refactor
+
+- **Status:** In progress
+- **Priority:** High, maintainability and workflow quality
+- **Owner:** Codex
+- **Context:** The first all-layer pass is pushed, and follow-on slices are
+  underway. Persona evidence handling and GitHub workspace status/process
+  boundaries have now been extracted. Remaining high-value candidates include
+  Electron pet orchestration, Agent Host research sequencing, workspace state
+  coordination, Marketplace/Plugins composition, and model/workflow services.
+- **Agreed approach:** Refactor incrementally by cohesive responsibility,
+  preserve bridge/storage/runtime behavior, sync with `main` before each
+  commit, and verify the layer being changed. Do not split files mechanically
+  just to reduce line counts.
+- **Acceptance:** The remaining candidates are reviewed and either separated
+  with focused builds/checks or documented as intentional orchestration
+  boundaries. Product acceptance gaps remain tracked separately. See the
+  [incremental codebase refactor](implementation-plans/codebase-refactor.md).
+
+### 2. Complete local voice acceptance
 
 - **Status:** Ready
 - **Priority:** High
@@ -91,7 +110,7 @@ and to any detailed plan rather than copying their full contents here.
   [voice architecture](ELECTRON_CSHARP_VOICE_ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
 
-### 2. Strengthen OS isolation for Coding Agent commands
+### 3. Strengthen OS isolation for Coding Agent commands
 
 - **Status:** Ready
 - **Priority:** High, before unattended or parallel execution
@@ -113,7 +132,7 @@ and to any detailed plan rather than copying their full contents here.
   [architecture and trust boundaries](ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
 
-### 3. Finish image generation progress and cancellation
+### 4. Finish image generation progress and cancellation
 
 - **Status:** Ready
 - **Priority:** High
@@ -130,7 +149,7 @@ and to any detailed plan rather than copying their full contents here.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [local image generation](LOCAL_IMAGE_GENERATION.md).
 
-### 4. Close release signing and upgrade acceptance
+### 5. Close release signing and upgrade acceptance
 
 - **Status:** Ready
 - **Priority:** Release gate
@@ -149,7 +168,7 @@ and to any detailed plan rather than copying their full contents here.
   [release guide](RELEASING.md),
   [production readiness gaps](PRODUCTION_READINESS_GAPS.md).
 
-### 5. Finish evidence-grounded Persona dialogue research and chat
+### 6. Finish evidence-grounded Persona dialogue research and chat
 
 - **Status:** In progress
 - **Priority:** High

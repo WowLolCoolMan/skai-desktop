@@ -187,6 +187,14 @@ checked per slice.
 - Moved pet IPC channel registration and sender/point validation into
   `pet-ipc.cjs`. Pet movement, behavior, activity, and persistence callbacks
   remain in the Electron shell, with the same channel names and validation.
+- Split Agent Host persona source/evidence classification, transcript cleanup,
+  evidence excerpt selection, and evidence-boundary helpers into
+  `AgentHostLoop.PersonaEvidence.cs`; research ordering and retrieval remain in
+  `AgentHostLoop.PersonaResearch.cs`.
+- Split `GitHubWorkspaceService` into local Git operations, status/security
+  parsing, and bounded process/credential handling partials. Git invocation,
+  credential isolation, safe-path filtering, and public method signatures are
+  preserved.
 - Re-ran renderer typecheck/build, Agent Host/Core Release build, Electron
   syntax checks and packaging, bridge-method audit, and local-only audit after
   the final slices. The packaged renderer still reports the existing large
@@ -208,10 +216,10 @@ checked per slice.
 
 - Continue with small, independently reviewable slices when these areas are
   next touched: Electron pet-window orchestration in `main.cjs`, persona
-  research orchestration/evidence in Agent Host, workspace coordination in
-  `useDesktopWorkspace.ts`, Marketplace/Plugins page composition, and the
-  GitHub/model/workflow Core services. Their size alone is not a reason for
-  mechanical splitting; extract only cohesive behavior with a clear owner.
+  research orchestration in Agent Host, workspace coordination in
+  `useDesktopWorkspace.ts`, Marketplace/Plugins page composition, model and
+  workflow Core services. Their size alone is not a reason for mechanical
+  splitting; extract only cohesive behavior with a clear owner.
 - Keep the protocol entry point responsible for process I/O and lifecycle,
   Electron `main.cjs` responsible for app startup/orchestration, and feature
   pages responsible for composition. Continue moving domain behavior behind
