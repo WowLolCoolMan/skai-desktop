@@ -384,10 +384,33 @@ internal static class LocalStorageAndWorkspaceTests
                 TimeSpan.FromSeconds(10));
             Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
             Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
-            Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
+            Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
             if (OperatingSystem.IsWindows())
                 Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal), "Windows Coding Agent process containment reports its enforced job memory cap");
-            Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "project command clearly reports that filesystem and network are not sandboxed");
+            if (OperatingSystem.IsLinux())
+            {
+                Check(commandResult.IsolationStatus.Contains("network disabled", StringComparison.Ordinal), "Linux command evidence confirms network namespace isolation");
+                var insideProjectPath = Path.Combine(workspacePath, "sandbox-write-probe.txt");
+                var insideWrite = await commandRunner.RunAsync(workspacePath, ".", "printf sandbox-write > sandbox-write-probe.txt", TimeSpan.FromSeconds(10));
+                Check(insideWrite.ExitCode == 0 && File.ReadAllText(insideProjectPath) == "sandbox-write", "Linux sandbox permits writes inside the selected project");
+                File.Delete(insideProjectPath);
+
+                var outsideProbePath = Path.Combine(settingsDirectory, "outside-project-sentinel.txt");
+                const string outsideSentinel = "host-outside-project-must-stay-hidden";
+                File.WriteAllText(outsideProbePath, outsideSentinel);
+                var outsideRead = await commandRunner.RunAsync(workspacePath, ".", $"cat '{outsideProbePath}'", TimeSpan.FromSeconds(10));
+                Check(outsideRead.ExitCode != 0 && !outsideRead.Output.Contains(outsideSentinel, StringComparison.Ordinal), "Linux sandbox cannot read a host file beside the selected project");
+                var outsideWrite = await commandRunner.RunAsync(workspacePath, ".", $"printf sandbox-write > '{outsideProbePath}'", TimeSpan.FromSeconds(10));
+                Check(outsideWrite.ExitCode == 0 && File.ReadAllText(outsideProbePath) == outsideSentinel, "Linux sandbox cannot modify the host file beside the selected project");
+
+                var networkProbe = await commandRunner.RunAsync(workspacePath, ".",
+                    "python3 -c \"import socket; socket.create_connection(('1.1.1.1', 443), 2); print('network-connected')\"",
+                    TimeSpan.FromSeconds(10));
+                Check(!networkProbe.Output.Contains("not found", StringComparison.OrdinalIgnoreCase), "Linux sandbox network probe has its Python runtime available");
+                Check(networkProbe.ExitCode != 0 && !networkProbe.Output.Contains("network-connected", StringComparison.Ordinal), "Linux sandbox cannot reach an external network address");
+            }
+            else
+                Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "unsupported process boundaries clearly report that filesystem and network are not sandboxed");
             if (OperatingSystem.IsWindows() && GC.GetGCMemoryInfo().TotalAvailableMemoryBytes >= 2L * 1024 * 1024 * 1024)
             {
                 const string memoryProbe = "try { $probe = New-Object 'byte[]' 335544320; $probe[0] = 1; $probe[$probe.Length - 1] = 1; exit 99 } catch { [Console]::Error.WriteLine($_.Exception.GetType().FullName); exit 73 }";

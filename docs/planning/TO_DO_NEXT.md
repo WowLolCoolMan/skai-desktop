@@ -133,15 +133,18 @@ and to any detailed plan rather than copying their full contents here.
   search paths and temporary-directory settings), checks the working
   directory, and kills process trees on cancellation. It excludes arbitrary
   application environment values as well as secret-shaped variables. Windows
-  also attaches a kill-on-close Job
-  Object when available. This does not sandbox filesystem or network access;
-  Windows now limits a command tree to 128 processes and reports whether its
-  Job Object attached. The Windows Job Object now also limits aggregate job
+  also attaches a kill-on-close Job Object when available. Windows limits a
+  command tree to 128 processes and aggregate job memory, but it does not
+  sandbox filesystem or network access. Linux approved commands now run inside
+  Bubblewrap: system/runtime paths are read-only, the selected project is the
+  writable host mount, temporary files use an isolated tmpfs, and PID, network,
+  IPC, and UTS namespaces are separated. Linux refuses execution if Bubblewrap or
+  required namespaces cannot be enabled. The Windows Job Object now limits aggregate job
   memory to half of currently available physical RAM, bounded between 256 MiB
   and 8 GiB, with a 2 GiB estimate if Windows cannot report available memory.
-  The actual cap is shown in the Coding workspace alongside output. Linux still
-  has no OS containment boundary. Unattended/
-  parallel commands remain gated on a real OS sandbox.
+  The actual cap is shown in the Coding workspace alongside output. Linux does
+  not yet have a memory/resource cap. Unattended/parallel commands remain gated
+  on a verified sandbox on each supported platform.
 - **Agreed approach:** Define the supported platform boundary first. Prototype
   a per-run restricted process with a project-root working directory, explicit
   environment allowlist, resource/time limits, and a clear cancellation path.
@@ -149,16 +152,19 @@ and to any detailed plan rather than copying their full contents here.
   evidence visible. Do not expand unattended or parallel execution until the
   sandbox behavior is verified.
 - **Acceptance:** Tests verify arbitrary app environment variables do not cross
-  the command boundary while required runtime paths remain available, along
-  with the adaptive memory budget and actual Windows Job
+  the command boundary while required runtime paths remain available. Linux
+  runtime tests verify project writes succeed, sibling host files cannot be
+  read or changed, and an external network connection cannot be made. Windows
+  tests verify the adaptive memory budget and actual Job
   Object attachment/status. A Windows runtime acceptance probe now confirms a
   320 MiB allocation succeeds under a 1 GiB Job Object cap and is prevented
   under the 256 MiB cap; it skips only when the test host has under 2 GiB
-  available. Access outside the project remains unrestricted. Environment
-  secrets are excluded, the wall timeout applies, child processes are handled
-  on cancellation, and unsupported systems report that process containment is
-  unavailable rather than implying it is active. A filesystem/network sandbox
-  remains required before unattended or parallel execution.
+  available. Windows still permits filesystem/network access outside the
+  project. Environment secrets are excluded, the wall timeout applies, child
+  processes are handled on cancellation, and unsupported systems report that
+  process containment is unavailable rather than implying it is active. A
+  verified Windows filesystem/network sandbox remains required before
+  unattended or parallel execution.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [architecture and trust boundaries](../engineering/ARCHITECTURE.md),
   [production readiness](../operations/PRODUCTION_READINESS_GAPS.md).
@@ -352,12 +358,19 @@ and to any detailed plan rather than copying their full contents here.
 
 Move finished entries here with their commit/PR and verification evidence.
 
+- **2026-11-22 — Add Linux isolation for Coding Agent commands.** Linux
+  approved commands now fail closed unless Bubblewrap can create the process,
+  network, IPC, and UTS namespaces. They receive a read-only view of required system
+  and runtime paths, one writable host mount for the selected project, isolated
+  temporary storage, and the explicit runtime environment allowlist. Core
+  coverage probes project writes, a sibling host file, external connectivity,
+  cancellation, and timeouts. Windows still has process/memory containment but
+  no filesystem/network sandbox; that platform gap remains open.
+
 - **2026-11-22 — Restrict Coding Agent command environments.** Approved
   commands now receive only a small cross-platform runtime allowlist instead of
   inheriting arbitrary application variables. Focused Core coverage verifies
   an arbitrary parent-process variable is absent while PATH remains available.
-  This reduces accidental environment leakage; filesystem and network access
-  are still unrestricted, so OS sandboxing and the broader item remain open.
 
 - **2026-11-22 — Windows Coding Agent memory enforcement probe.** Added a bounded
   per-run memory-cap override for the isolated command runner and a Windows

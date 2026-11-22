@@ -41,7 +41,7 @@ public sealed class WorkspaceCommandRunner
 
         var workingDirectory = ResolveWorkingDirectory(selectedRoot, relativeWorkingDirectory);
         var isWindows = OperatingSystem.IsWindows();
-        var startInfo = new ProcessStartInfo
+        ProcessStartInfo startInfo = new()
         {
             FileName = isWindows ? "powershell.exe" : "/bin/sh",
             WorkingDirectory = workingDirectory,
@@ -67,6 +67,10 @@ public sealed class WorkspaceCommandRunner
             startInfo.ArgumentList.Add("-NonInteractive");
             startInfo.ArgumentList.Add("-Command");
             startInfo.ArgumentList.Add(command);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            startInfo = LinuxCommandSandbox.CreateStartInfo(Path.GetFullPath(selectedRoot), workingDirectory, command, startInfo.Environment.ToArray());
         }
         else
         {
@@ -111,7 +115,7 @@ public sealed class WorkspaceCommandRunner
             timedOut,
             truncated != 0,
             workingDirectory,
-            $"{OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes)} Command environment is restricted to an explicit runtime allowlist.");
+            $"{(OperatingSystem.IsLinux() ? LinuxCommandSandbox.Status : OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes))} Command environment is restricted to an explicit runtime allowlist.");
     }
 
     public static string ResolveWorkingDirectory(string selectedRoot, string relativeWorkingDirectory)

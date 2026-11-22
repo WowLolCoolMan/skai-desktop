@@ -77,7 +77,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install --yes xvfb
+          sudo apt-get install --yes bubblewrap python3 xvfb
 
       - name: Smoke packaged Electron artifact
         run: xvfb-run -a npm run smoke:electron:artifact

@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Install Linux Coding Agent sandbox
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap python3
       - run: npm ci
       - run: npm run check:syntax
       - run: npm run check:hygiene
