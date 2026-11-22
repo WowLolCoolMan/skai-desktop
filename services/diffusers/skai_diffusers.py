@@ -40,7 +40,12 @@ def main(request):
             arguments.update({"image": source, "strength": 0.55})
         else:
             arguments.update({"height": 512, "width": 512})
-        result = pipe(**arguments)
+        total_steps = arguments["num_inference_steps"]
+        def report_step(_pipeline, step, _timestep, callback_kwargs):
+            print(json.dumps({"type": "progress", "step": step + 1, "total": total_steps}), flush=True)
+            return callback_kwargs
+
+        result = pipe(**arguments, callback_on_step_end=report_step)
         image = result.images[0]
         output = io.BytesIO()
         image.save(output, format="JPEG", quality=88, optimize=True)

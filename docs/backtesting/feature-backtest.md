@@ -1,6 +1,6 @@
 # Skai Desktop feature backtest
 
-Updated: 2026-11-21
+Updated: 2026-11-22
 
 This is the living acceptance matrix for the feature backtest goal. “Pass” means
 the current repository check or packaged smoke test produced evidence for the
@@ -30,6 +30,7 @@ worktree.
 | Pets, Linux windowing, update policy, bridge/runtime/tray/local-only audits | Corresponding `test:*` and `audit:*` scripts |
 | Repository hygiene and release configuration | `check:hygiene`, `check:release-config`, `audit:future-features` |
 | Windows 0.1.4 unsigned installer packaging and update metadata | `SKAI_ALLOW_UNSIGNED_INSTALLER=true node scripts/package-windows-installer.cjs` — NSIS artifact and `latest.yml` verified locally |
+| Real local Diffusers generation progress | Installed SD-Turbo runtime generated a 512×512 CPU image; worker reported actual 1/4 through 4/4 inference steps. Agent Host now forwards step progress and cancellation to the image operation. |
 
 ## Conditional or incomplete coverage
 
@@ -37,6 +38,7 @@ worktree.
 | --- | --- |
 | AirLLM inference | AirLLM and Torch import successfully from `%LOCALAPPDATA%\\Skai\\AirLLM\\venv`; the worker’s CUDA preflight and malformed-input paths return structured errors. A real model run still requires an NVIDIA GPU and CUDA-capable PyTorch, plus a compatible Hugging Face model and enough disk/RAM/VRAM. |
 | Microphone dictation | Packaged Electron reports the `en-US` on-device speech pack unavailable and correctly refuses remote recognition. Requires an installed speech pack or approved local STT fixture. |
+| Packaged Marketplace workflow | `smoke:electron:artifact` opens the packaged app but fails its Marketplace DOM acceptance: the expected Marketplace heading and Models navigation entry are not detected. Reconcile the smoke with the current in-app navigation and verify the Installed destination under Tools. |
 | Persona model quality | Research succeeds with installed `qwen3:14b`; one character draft returned a partial card. Core deterministic voice-card and source-boundary tests pass, but more model-specific quality evaluation is needed. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |
 | Release signing and lifecycle | Release audit confirms the gates exist. Cryptographic signing and clean-machine upgrade/rollback still require configured CI secrets and Windows/Ubuntu runners. |

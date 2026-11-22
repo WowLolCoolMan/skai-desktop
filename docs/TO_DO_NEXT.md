@@ -93,19 +93,23 @@ and to any detailed plan rather than copying their full contents here.
 
 ### 2. Complete local voice acceptance
 
-- **Status:** Ready
+- **Status:** Blocked
 - **Priority:** High
 - **Owner:** Unclaimed
-- **Context:** Voice input and output paths exist, but a successful installed
-  speech-pack and real microphone/audio acceptance run is still missing.
+- **Context:** Windows native speech output is present and verified. The local
+  voice smoke created a valid PCM fixture and confirmed the OS voice runtime,
+  but the en-US on-device recognition pack is unavailable. Installing that
+  Windows capability requires elevation, which is not available in this
+  session; no real microphone transcription has been claimed.
 - **Agreed approach:** Test on a supported Windows profile with the required
   speech pack installed. Record a short local fixture and exercise one-shot
   dictation, hands-free turn completion, cancellation, unavailable-language,
   and device-error recovery. Keep audio processing local and do not upload
   recordings as test evidence.
-- **Acceptance:** The pack installation outcome and actual transcription are
-  verified; cancellation and missing-pack failures are actionable; no audio or
-  transcript leaves the device; evidence identifies OS/runtime versions.
+- **Acceptance:** Still open: install the speech capability from an elevated
+  Windows session, then verify transcription with a real microphone and audio
+  fixture. The packaged app already fails closed with a clear unavailable-pack
+  message and does not send audio to a remote service.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [voice architecture](ELECTRON_CSHARP_VOICE_ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
@@ -115,9 +119,12 @@ and to any detailed plan rather than copying their full contents here.
 - **Status:** Ready
 - **Priority:** High, before unattended or parallel execution
 - **Owner:** Unclaimed
-- **Context:** The Agent Host has bounded local file and command tools, user
-  approval, and an operation journal. These controls are not a substitute for
-  OS-level isolation.
+- **Context:** The command runner bounds duration/output, removes
+  secret-shaped environment variables, checks the working directory, and kills
+  process trees on cancellation. Windows also attaches a kill-on-close Job
+  Object when available. This does not sandbox filesystem or network access;
+  Linux has no equivalent boundary yet. Unattended/parallel commands remain
+  gated on a real OS sandbox.
 - **Agreed approach:** Define the supported platform boundary first. Prototype
   a per-run restricted process with a project-root working directory, explicit
   environment allowlist, resource/time limits, and a clear cancellation path.
@@ -134,11 +141,14 @@ and to any detailed plan rather than copying their full contents here.
 
 ### 4. Finish image generation progress and cancellation
 
-- **Status:** Ready
+- **Status:** In progress
 - **Priority:** High
 - **Owner:** Unclaimed
-- **Context:** Local Diffusers and ComfyUI generation/edit flows exist; live
-  runtime acceptance and robust progress/cancel behavior remain incomplete.
+- **Context:** The installed SD-Turbo runtime generated a real 512×512 CPU
+  image and reported actual inference-step progress. Diffusers now receives
+  the Agent Host cancellation token. Image-to-image was not verified in this
+  run; renderer-to-host edit/history acceptance and live cancellation during
+  inference are still open.
 - **Agreed approach:** Exercise the supported local runtimes and expose real
   stage/progress state when the runtime provides it. Cancellation must stop the
   active operation, preserve completed outputs, and return the UI to a usable
@@ -151,11 +161,14 @@ and to any detailed plan rather than copying their full contents here.
 
 ### 5. Close release signing and upgrade acceptance
 
-- **Status:** Ready
+- **Status:** In progress
 - **Priority:** Release gate
 - **Owner:** Unclaimed
-- **Context:** Packaging and signed-manifest checks exist, but trusted signing,
-  upgrade/rollback, and packaged cross-platform acceptance remain open.
+- **Context:** The 0.1.4 Windows NSIS installer and `latest.yml` were built and
+  metadata-verified unsigned on 2026-11-22. The owner has chosen to defer
+  certificates; local unsigned validation can proceed. A published 0.1.3
+  installer is unavailable, so the documented upgrade smoke has not run.
+  Linux acceptance still requires a Linux runner.
 - **Agreed approach:** Use the release checklist against exact packaged
   artifacts. Verify signatures, checksums, clean install, upgrade with data
   retention, uninstall, and rollback on each supported target. Do not mark a

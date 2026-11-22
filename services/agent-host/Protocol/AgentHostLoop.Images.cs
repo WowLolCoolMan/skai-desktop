@@ -71,7 +71,7 @@ public static partial class AgentHostLoop
             }
             cancellationToken.ThrowIfCancellationRequested();
             reportProgress?.Invoke("Running Stable Diffusion Turbo locally…");
-            var generated = await new DiffusersImageProvider().GenerateAsync(prompt, diffusersSourceImage, diffusersSourceMediaType).ConfigureAwait(false);
+            var generated = await new DiffusersImageProvider().GenerateAsync(prompt, diffusersSourceImage, diffusersSourceMediaType, reportProgress, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             return new(ProtocolVersion, request.Id, true, new { prompt, progress = "Generated locally with Stable Diffusion Turbo.", images = new[] { new { url = generated.DataUrl, fileName = generated.FileName } } });
         }

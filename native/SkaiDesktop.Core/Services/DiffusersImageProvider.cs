@@ -50,7 +50,7 @@ public sealed class DiffusersImageProvider
         await RunSetupProcessAsync(venvPython, ["-c", "import diffusers, torch; print('Diffusers and PyTorch are ready')"], root, reportProgress, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<LocalGeneratedImage> GenerateAsync(string prompt, string? sourceImageBase64 = null, string? sourceImageMediaType = null, CancellationToken cancellationToken = default)
+    public async Task<LocalGeneratedImage> GenerateAsync(string prompt, string? sourceImageBase64 = null, string? sourceImageMediaType = null, Action<string>? reportProgress = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(prompt) || prompt.Length > MaxPromptCharacters)
             throw new ArgumentException($"Enter an image prompt up to {MaxPromptCharacters:N0} characters.", nameof(prompt));
@@ -99,6 +99,9 @@ public sealed class DiffusersImageProvider
                 using var item = JsonDocument.Parse(line);
                 var root = item.RootElement;
                 var type = root.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : null;
+                if (type == "progress" && root.TryGetProperty("step", out var step) && step.TryGetInt32(out var completed)
+                    && root.TryGetProperty("total", out var total) && total.TryGetInt32(out var count) && count > 0 && completed >= 0 && completed <= count)
+                    reportProgress?.Invoke($"Generating locally… step {completed} of {count}.");
                 if (type == "error") throw new InvalidOperationException(root.TryGetProperty("message", out var message) ? message.GetString() : "Local image generation failed.");
                 if (type == "result")
                 {

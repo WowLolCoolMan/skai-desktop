@@ -1,6 +1,6 @@
 # Skai Desktop capability matrix
 
-Snapshot: repository audit, 2026-11-16.
+Snapshot: repository audit, 2026-11-22.
 
 This is the current product-facing capability map for the Electron desktop
 application. It is intentionally conservative: `working` means an implemented
@@ -22,7 +22,7 @@ means it is not yet implemented. A build alone never upgrades a feature to
 | Terminal and tools | partial | Host-backed terminal sessions, cancellation, secret-shaped environment filtering | Stronger OS sandboxing and cross-platform PTY acceptance |
 | Settings and appearance | working | Persisted settings, themes, density, reduced motion, model/voice/host controls | Broader live accessibility matrix |
 | Pets and companions | partial | Seven built-ins exposed in Workshop; eleven-cell 256×256 strips with exact rest-pose seams; adjustable bounded blink timing; per-pet idle/walk behaviors; Blaze approach, pounce, large fire plume and impact effects; local Stable Diffusion Turbo/ComfyUI concept generation; asset/behavior checks; packaged Windows smoke and full 14-route × 5-size × 4-variant UI matrix | Live attack/pointer visual acceptance, Linux compositor behavior, multi-monitor collision and accessibility acceptance |
-| Images and media | partial | Optional managed Diffusers runtime; SD-Turbo weights downloaded and a local CPU image generated in Skai on 2026-11-15; bounded IndexedDB output history with prompt/provider metadata and gallery restore after restart; ComfyUI queue/poll flow, checkpoint discovery, built-in text-to-image and image-edit workflow templates, workflow import/save, local vision attachment paths, packaged MP4/WebM sampling smoke, and explicit start/status/progress/cancel image operations | Live ComfyUI acceptance, resumable jobs, broader model controls, and capability gating |
+| Images and media | partial | Optional managed Diffusers runtime; local CPU SD-Turbo generation and image-to-image editing accepted on 2026-11-22; Diffusers reports actual inference-step progress and receives cancellation; ComfyUI queue/poll and scoped cancellation; bounded IndexedDB history and packaged MP4/WebM sampling smoke | Full renderer-to-host edit/history acceptance, live cancellation during inference, live ComfyUI acceptance, resumable jobs, broader model controls, and capability gating |
 | Memory and retrieval | partial | Local memory editor, approval/provenance, bounded injection and export; imported corpus documents show recent, aging, or stale status from their saved update time; persona research accepts any requested name with explicit weak/ambiguous identity evidence rather than silently claiming a match | More retrieval sources and evaluation against changes to the original source |
 | Skills, MCP, integrations | partial | Local skill catalog/install review, stdio/HTTP discovery, GitHub connection, MCP live health refresh with last-reported time and sanitized errors | Authenticated retrieval, notifications/resources |
 | Updates and release | partial | RSA manifest verification, monotonic channel checks, artifact hashes, Electron packaging, signed-artifact/lifecycle gates in the release workflow, and release-readiness validation | Configured signing secrets, clean-machine installer/upgrade/rollback execution, and Linux runner evidence |
