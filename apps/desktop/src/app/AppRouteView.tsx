@@ -1,6 +1,5 @@
-import type { ChatAttachment, DesktopConversation, DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreflight, DesktopProjectPreview, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, ScheduledTaskDraft, TaskEnvironment } from "../../shared/contracts";
+import type { ChatAttachment, DesktopConversation, DesktopGitDiff, DesktopGitStatus, DesktopPersona, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreflight, DesktopProjectPreview, DesktopQueuedMessage, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot, ScheduledTaskDraft, TaskEnvironment } from "../../shared/contracts";
 import type { ChatResponseMode } from "../features/chat/useChatWorkspace";
-import type { DesktopPersona } from "../../shared/contracts";
 import type { CorpusDocument, MemoryEntry, Message, Model, Route, ThemeMode } from "./types";
 import { ChatPage } from "../features/chat/ChatPage";
 import { CodingPage } from "../features/coding/CodingPage";
