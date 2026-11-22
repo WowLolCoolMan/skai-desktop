@@ -18,24 +18,8 @@ import {
   type Skill,
   type Tool,
 } from "./marketplaceEntries";
+import { useMarketplaceMcp, type McpConnection } from "./useMarketplaceMcp";
 export { VoiceWorkbench } from "./VoiceWorkbench";
-
-type McpConnection = {
-  connectionId: string;
-  serverId: string;
-  transport: string;
-  state: string;
-  manifestDigest?: string;
-  lastError: string;
-  updatedAtUtc: string;
-};
-type McpTool = {
-  serverId: string;
-  toolName: string;
-  description: string;
-  isMutating: boolean;
-  requiredCapabilities: string[];
-};
 
 type MarketplaceHubSection = MarketplaceCatalogSection;
 type StaffPickKind = "Model" | "MCP server" | "Skill" | "Plugin" | "Voice pack" | "Persona" | "Highlight";
@@ -77,19 +61,28 @@ export function PluginsPage({
   const [query, setQuery] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
-  const [connections, setConnections] = useState<McpConnection[]>([]);
-  const [mcpTools, setMcpTools] = useState<Record<string, McpTool[]>>({});
-  const [selectedConnectionId, setSelectedConnectionId] = useState<
-    string | null
-  >(null);
-  const [serverId, setServerId] = useState("");
-  const [endpoint, setEndpoint] = useState("");
-  const [mcpBusy, setMcpBusy] = useState(false);
-  const [mcpError, setMcpError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const mcp = useMarketplaceMcp(setNotice);
+  const {
+    connections,
+    tools: mcpTools,
+    selectedConnectionId,
+    setSelectedConnectionId,
+    serverId,
+    setServerId,
+    endpoint,
+    setEndpoint,
+    busy: mcpBusy,
+    error: mcpError,
+    connect: connectMcp,
+    refreshHealth: refreshMcpHealth,
+    downloadRea,
+    connectRea,
+    changeState: changeMcpState,
+  } = mcp;
 
   const changeCatalogSection = (next: MarketplaceHubSection, nextQuery?: string) => {
     setCatalogSection(next);
@@ -127,15 +120,7 @@ export function PluginsPage({
         const nextConnections =
           (connectionsResponse.result as { connections?: McpConnection[] })
             .connections ?? [];
-        setConnections(nextConnections);
-        setSelectedConnectionId((current) =>
-          current &&
-          nextConnections.some(
-            (connection) => connection.connectionId === current,
-          )
-            ? current
-            : (nextConnections[0]?.connectionId ?? null),
-        );
+        mcp.loadConnections(nextConnections);
       } else
         setNotice((current) =>
           current
@@ -168,190 +153,6 @@ export function PluginsPage({
   const sectionEntries = filterMarketplaceEntries(entries, catalogSection);
   const selected = sectionEntries.find((entry) => entry.id === selectedId) ?? null;
   const groupedEntries = groupMarketplaceEntries(sectionEntries);
-  const connectMcp = async () => {
-    if (!serverId.trim() || !endpoint.trim()) return;
-    setMcpBusy(true);
-    setMcpError(null);
-    try {
-      const response = await request("mcp.connection.connect", {
-        serverId: serverId.trim(),
-        endpoint: endpoint.trim(),
-        transport: "streamable-http",
-      });
-      if (!response.ok)
-        throw new Error(response.error?.message ?? "MCP connection failed.");
-      const result = response.result as {
-        connection: McpConnection;
-        tools?: McpTool[];
-      };
-      setConnections((current) => [
-        result.connection,
-        ...current.filter(
-          (item) => item.connectionId !== result.connection.connectionId,
-        ),
-      ]);
-      setMcpTools((current) => ({
-        ...current,
-        [result.connection.connectionId]: result.tools ?? [],
-      }));
-      setSelectedConnectionId(result.connection.connectionId);
-      setServerId("");
-      setEndpoint("");
-    } catch (connectError) {
-      setMcpError(
-        connectError instanceof Error
-          ? connectError.message
-          : "MCP connection failed.",
-      );
-    } finally {
-      setMcpBusy(false);
-    }
-  };
-  const refreshMcpHealth = async (connection: McpConnection) => {
-    setMcpBusy(true);
-    setMcpError(null);
-    try {
-      const response = await request("mcp.tools.list", {
-        connectionId: connection.connectionId,
-      });
-      if (!response.ok)
-        throw new Error(
-          response.error?.message ?? "The MCP health check failed.",
-        );
-      const result = response.result as {
-        connected: boolean;
-        tools?: McpTool[];
-        connection?: McpConnection;
-      };
-      if (result.connection)
-        setConnections((current) =>
-          current.map((item) =>
-            item.connectionId === connection.connectionId
-              ? result.connection!
-              : item,
-          ),
-        );
-      setMcpTools((current) => ({
-        ...current,
-        [connection.connectionId]: result.tools ?? [],
-      }));
-      setNotice(
-        result.connected
-          ? `${connection.serverId} responded. The tool manifest and connection health are current.`
-          : `${connection.serverId} did not respond; its last known health is shown.`,
-      );
-    } catch (healthError) {
-      setMcpError(
-        healthError instanceof Error
-          ? healthError.message
-          : "The MCP health check failed.",
-      );
-    } finally {
-      setMcpBusy(false);
-    }
-  };
-  const downloadRea = async () => {
-    setMcpBusy(true);
-    setMcpError(null);
-    try {
-      const response = await request("mcp.marketplace.download", { id: "rea" });
-      if (!response.ok)
-        throw new Error(
-          response.error?.message ?? "REA package download failed.",
-        );
-      const result = response.result as {
-        name: string;
-        version: string;
-        fileName: string;
-        filePath: string;
-        sizeBytes: number;
-        sha256: string;
-        integrity: string;
-      };
-      setNotice(
-        `${result.name} ${result.version} downloaded to ${result.filePath}. npm SHA-512 integrity verified.`,
-      );
-    } catch (downloadError) {
-      setMcpError(
-        downloadError instanceof Error
-          ? downloadError.message
-          : "REA package download failed.",
-      );
-    } finally {
-      setMcpBusy(false);
-    }
-  };
-  const connectRea = async () => {
-    setMcpBusy(true);
-    setMcpError(null);
-    try {
-      const response = await request("mcp.connection.connect", {
-        serverId: "rea",
-        transport: "stdio",
-        profileId: "rea",
-      });
-      if (!response.ok)
-        throw new Error(response.error?.message ?? "REA could not be started.");
-      const result = response.result as {
-        connection: McpConnection;
-        tools?: McpTool[];
-      };
-      setConnections((current) => [
-        result.connection,
-        ...current.filter(
-          (item) => item.connectionId !== result.connection.connectionId,
-        ),
-      ]);
-      setMcpTools((current) => ({
-        ...current,
-        [result.connection.connectionId]: result.tools ?? [],
-      }));
-      setSelectedConnectionId(result.connection.connectionId);
-      setNotice(
-        `REA connected locally with ${result.tools?.length ?? 0} tools. Review each tool permission before use.`,
-      );
-    } catch (connectError) {
-      setMcpError(
-        connectError instanceof Error
-          ? connectError.message
-          : "REA could not be started.",
-      );
-    } finally {
-      setMcpBusy(false);
-    }
-  };
-  const changeMcpState = async (
-    connection: McpConnection,
-    method: "mcp.connection.disconnect" | "mcp.connection.revoke",
-  ) => {
-    setMcpBusy(true);
-    setMcpError(null);
-    try {
-      const response = await request(method, {
-        connectionId: connection.connectionId,
-      });
-      if (!response.ok)
-        throw new Error(
-          response.error?.message ?? "MCP connection update failed.",
-        );
-      const updated = response.result as McpConnection;
-      setConnections((current) =>
-        current.map((item) =>
-          item.connectionId === updated.connectionId ? updated : item,
-        ),
-      );
-      setMcpTools((current) => ({ ...current, [updated.connectionId]: [] }));
-    } catch (stateError) {
-      setMcpError(
-        stateError instanceof Error
-          ? stateError.message
-          : "MCP connection update failed.",
-      );
-    } finally {
-      setMcpBusy(false);
-    }
-  };
-
   return (
     <div className="feature-page plugins-page">
       <aside

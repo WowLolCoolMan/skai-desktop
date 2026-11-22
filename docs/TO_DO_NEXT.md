@@ -85,8 +85,8 @@ and to any detailed plan rather than copying their full contents here.
   client; research orchestration and evidence selection remain to be separated.
   Agent Host request validation and method dispatch are also separated from
   the main loop. Update and local-media IPC registration now live outside
-  Electron's shell entry point, and Marketplace catalog shaping is separated
-  from the React page.
+  Electron's shell entry point. Marketplace catalog shaping and MCP connection
+  lifecycle state are separated from the React page.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
   bridge and storage contracts, keep current behavior, and integrate one
   reviewable slice at a time after syncing with main.

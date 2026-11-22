@@ -109,6 +109,10 @@ that users touch as each slice is moved.
 - Moved Marketplace catalog normalization, section filtering, and category
   grouping into `marketplaceEntries.ts`, keeping the React page focused on UI
   state and MCP operations.
+- Moved MCP connection state and lifecycle actions (connect, inspect health,
+  install/connect REA, disconnect, and revoke) into the focused
+  `useMarketplaceMcp` hook. UI rendering and the existing confirmation and
+  bridge behavior remain in the Marketplace page.
 - Moved local media URL IPC registration, ownership checks, validation, and
   revocation into `local-media-ipc.cjs`; the renderer-visible channel names and
   local media behavior are unchanged.
