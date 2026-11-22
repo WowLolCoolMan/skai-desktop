@@ -1,11 +1,14 @@
 "use strict";
 
+const crypto = require("node:crypto");
+const fsSync = require("node:fs");
+const { spawn } = require("node:child_process");
 const { shouldDownloadAvailableUpdate } = require("./update-policy.cjs");
 
 const UPDATE_REPOSITORY = "WowLolCoolMan/skai-desktop";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
-function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, getMainWindow, prepareForUpdateInstall = () => {}, forceExitAfterUpdateLaunch = () => {}, now = () => new Date(), setIntervalFn = setInterval, clearIntervalFn = clearInterval }) {
+function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, getMainWindow, prepareForUpdateInstall = () => {}, forceExitAfterUpdateLaunch = () => {}, now = () => new Date(), setIntervalFn = setInterval, clearIntervalFn = clearInterval, platform = process.platform, environment = process.env, spawnProcess = spawn }) {
   let updateCheckTimer;
   let updateSnapshot = { status: "idle", available: false, message: "Updates have not been checked yet." };
   let updateChecksEnabled = true;
@@ -14,6 +17,70 @@ function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, ge
 
   function updatePreferencesPath() {
     return path.join(app.getPath("userData"), "update-preferences.json");
+  }
+
+  function rollbackManifestPath() {
+    return path.join(app.getPath("userData"), "appimage-rollback.json");
+  }
+
+  function readRollbackRecord() {
+    if (platform !== "linux") return null;
+    try {
+      const record = JSON.parse(fsSync.readFileSync(rollbackManifestPath(), "utf8"));
+      if (typeof record.previousVersion !== "string" || typeof record.installedVersion !== "string" ||
+          !path.isAbsolute(record.originalPath) || !path.isAbsolute(record.backupPath)) return null;
+      const expectedBackup = path.join(path.dirname(record.originalPath), `.skai-desktop-rollback-${record.previousVersion}.AppImage`);
+      if (record.backupPath !== expectedBackup || record.installedVersion !== app.getVersion() || !fsSync.statSync(record.backupPath).isFile()) return null;
+      return record;
+    } catch { return null; }
+  }
+
+  function rollbackState() {
+    const record = readRollbackRecord();
+    return record ? { rollbackAvailable: true, rollbackVersion: record.previousVersion } : { rollbackAvailable: false, rollbackVersion: undefined };
+  }
+
+  function writeRollbackManifest(record) {
+    const target = rollbackManifestPath();
+    fsSync.mkdirSync(path.dirname(target), { recursive: true });
+    const temporary = `${target}.${process.pid}.${crypto.randomUUID()}.tmp`;
+    try {
+      fsSync.writeFileSync(temporary, JSON.stringify(record, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+      fsSync.renameSync(temporary, target);
+    } finally {
+      try { fsSync.rmSync(temporary, { force: true }); } catch { /* The atomic rename already consumed it. */ }
+    }
+  }
+
+  function linkOrCopy(source, destination) {
+    try { fsSync.linkSync(source, destination); }
+    catch (error) {
+      if (!new Set(["EXDEV", "EPERM", "EACCES", "ENOTSUP", "EMLINK"]).has(error.code)) throw error;
+      fsSync.copyFileSync(source, destination, fsSync.constants.COPYFILE_EXCL);
+      fsSync.chmodSync(destination, fsSync.statSync(source).mode & 0o777);
+    }
+  }
+
+  function preservePreviousAppImage() {
+    if (platform !== "linux") return;
+    const originalPath = environment.APPIMAGE;
+    if (typeof originalPath !== "string" || !path.isAbsolute(originalPath) || !fsSync.statSync(originalPath).isFile()) {
+      throw new Error("Skai could not locate the running AppImage, so the update was not installed. Launch the downloaded AppImage directly and retry.");
+    }
+    const previousVersion = app.getVersion();
+    const installedVersion = updateSnapshot.version ?? autoUpdater.updateInfo?.version;
+    if (typeof installedVersion !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(installedVersion)) {
+      throw new Error("The downloaded update version is unavailable, so Skai could not prepare rollback.");
+    }
+    const backupPath = path.join(path.dirname(originalPath), `.skai-desktop-rollback-${previousVersion}.AppImage`);
+    const temporaryBackup = `${backupPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+    try {
+      linkOrCopy(originalPath, temporaryBackup);
+      fsSync.renameSync(temporaryBackup, backupPath);
+      writeRollbackManifest({ previousVersion, installedVersion, originalPath, backupPath, createdAt: now().toISOString() });
+    } finally {
+      try { fsSync.rmSync(temporaryBackup, { force: true }); } catch { /* Best-effort cleanup of the staging link. */ }
+    }
   }
 
   async function readUpdatePreference() {
@@ -38,7 +105,7 @@ function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, ge
   }
 
   function publishUpdateState(status, details = {}) {
-    updateSnapshot = { status, available: ["available", "downloading", "downloaded"].includes(status), currentVersion: app.getVersion(), checkedAt: now().toISOString(), ...details };
+    updateSnapshot = { status, available: ["available", "downloading", "downloaded"].includes(status), currentVersion: app.getVersion(), checkedAt: now().toISOString(), ...rollbackState(), ...details };
     const window = getMainWindow();
     if (window && !window.isDestroyed()) window.webContents.send("updates:state", updateSnapshot);
     if (status === "available" && window && !window.isDestroyed()) window.webContents.send("updates:available", updateSnapshot);
@@ -124,12 +191,45 @@ function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, ge
 
   function installDownloadedUpdate() {
     if (updateSnapshot.status !== "downloaded") return false;
-    // Reaching this method requires an explicit in-app install action. Apply
-    // the already-verified NSIS update without launching a second setup wizard.
+    // electron-updater deletes the running AppImage before it moves the new
+    // artifact into place. Preserve a same-filesystem recovery copy first.
+    try { preservePreviousAppImage(); }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      publishUpdateState("downloaded", { error: message, message: "The update is ready, but Skai could not create its rollback copy. The current version is still running." });
+      return false;
+    }
     prepareForUpdateInstall();
     autoUpdater.quitAndInstall(true, true);
     forceExitAfterUpdateLaunch();
     return true;
+  }
+
+  function rollbackPreviousAppImage() {
+    const record = readRollbackRecord();
+    if (!record) return false;
+    let temporary;
+    try {
+      if (fsSync.existsSync(record.originalPath) && path.resolve(environment.APPIMAGE ?? "") !== record.originalPath)
+        throw new Error("The previous AppImage launch path is occupied by another file; Skai left it untouched.");
+      temporary = `${record.originalPath}.${process.pid}.${crypto.randomUUID()}.rollback.tmp`;
+      linkOrCopy(record.backupPath, temporary);
+      fsSync.renameSync(temporary, record.originalPath);
+      const childEnvironment = { ...environment, APPIMAGE: record.originalPath };
+      delete childEnvironment.APPIMAGE_EXIT_AFTER_INSTALL;
+      delete childEnvironment.APPIMAGE_SILENT_INSTALL;
+      const launcher = spawnProcess("/bin/sh", ["-c", "sleep 3; exec \"$1\"", "skai-desktop-rollback", record.originalPath], {
+        detached: true, stdio: "ignore", env: childEnvironment,
+      });
+      launcher.unref();
+      prepareForUpdateInstall();
+      forceExitAfterUpdateLaunch();
+      return true;
+    } catch (error) {
+      if (temporary) try { fsSync.rmSync(temporary, { force: true }); } catch { /* Best-effort temporary link cleanup. */ }
+      publishUpdateState(updateSnapshot.status, { error: error instanceof Error ? error.message : String(error), message: "Skai could not restore the previous AppImage. The current version is still running." });
+      return false;
+    }
   }
 
   return {
@@ -138,10 +238,11 @@ function createUpdateManager({ app, autoUpdater, CancellationToken, fs, path, ge
     checkForUpdates,
     configureAutoUpdater,
     dispose,
-    getCurrentSnapshot: () => ({ ...updateSnapshot, currentVersion: app.getVersion() }),
+    getCurrentSnapshot: () => ({ ...updateSnapshot, currentVersion: app.getVersion(), ...rollbackState() }),
     getEnabled: () => updateChecksEnabled,
-    getSnapshot: () => ({ ...updateSnapshot }),
+    getSnapshot: () => ({ ...updateSnapshot, ...rollbackState() }),
     installDownloadedUpdate,
+    rollbackPreviousAppImage,
     readUpdatePreference,
     scheduleUpdateCheck,
     writeUpdatePreference,

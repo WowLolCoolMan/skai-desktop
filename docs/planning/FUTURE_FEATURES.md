@@ -311,7 +311,7 @@ source of truth when a proposal overlaps a broader planned capability.
   transitions, and settings changes.
 - [ ] Workspace storage manager for reviewing cached models, old snapshots,
   and generated media before cleanup.
-- [ ] Update rollback support that preserves the previous local app version
+- [x] Linux AppImage rollback support that preserves and restores the previous local app version; Windows installer rollback remains governed by NSIS lifecycle policy
   and provides a recovery path if an update fails.
 - [ ] Scheduled maintenance controls for choosing when local indexing,
   backups, and cache cleanup may run.

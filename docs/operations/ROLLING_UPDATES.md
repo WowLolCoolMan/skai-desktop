@@ -17,6 +17,16 @@ signing in the release workflow. Linux release artifacts are accompanied by
 detached GPG signatures and checksums; the app's updater does not currently
 verify those detached signatures itself.
 
+On Linux AppImage installs, Skai preserves one local copy of the currently
+running image before installing a downloaded update. **Settings → Updates**
+offers **Revert to previous version** while that copy matches the running
+version and the saved update record. Reverting restores the prior image at its
+original launch path and starts it; the newer image remains available. The
+rollback copy and manifest stay in the local install/profile locations and are
+not uploaded. If Skai cannot find or preserve the running AppImage, it fails
+closed and leaves the current version running. This recovery action is
+AppImage-specific; Windows NSIS rollback remains governed by installer policy.
+
 Updates are disabled for development runs and unsupported platforms. See the
 [release guide](RELEASING.md) for artifact names, workflow gates, and acceptance
 requirements. Keep published tags and their update metadata immutable.

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
+const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
@@ -87,6 +88,65 @@ async function run() {
     manager.dispose();
     assert.equal(clearedInterval, true, "disposing the app clears the updater's interval so shutdown can finish");
     assert.equal(sent.every(([, state]) => state.currentVersion === "0.1.4"), true, "published update states include the running app version");
+
+    const appImageDirectory = path.join(userData, "appimages");
+    await fs.mkdir(appImageDirectory);
+    const previousAppImage = path.join(appImageDirectory, "Skai-Desktop-0.1.4-x64.AppImage");
+    const nextAppImage = path.join(appImageDirectory, "Skai-Desktop-0.1.5-x64.AppImage");
+    await fs.writeFile(previousAppImage, "previous-appimage-bytes");
+    const linuxUpdater = createUpdater();
+    linuxUpdater.quitAndInstall = () => {
+      fsSync.unlinkSync(previousAppImage);
+      fsSync.writeFileSync(nextAppImage, "updated-appimage-bytes");
+    };
+    linuxUpdater.updateInfo.version = "0.1.5";
+    const appImageApp = { isPackaged: true, getPath: () => userData, getVersion: () => "0.1.4" };
+    const rollbackLaunches = [];
+    const appImageManager = createUpdateManager({
+      app: appImageApp, autoUpdater: linuxUpdater, CancellationToken: FakeCancellationToken, fs, path,
+      platform: "linux", environment: { APPIMAGE: previousAppImage }, spawnProcess: (...args) => { rollbackLaunches.push(args); return { unref() {} }; },
+      getMainWindow: () => null,
+    });
+    appImageManager.configureAutoUpdater();
+    linuxUpdater.emit("update-available", { version: "0.1.5" });
+    linuxUpdater.emit("update-downloaded", { version: "0.1.5" });
+    assert.equal(appImageManager.installDownloadedUpdate(), true, "a Linux AppImage update starts after preserving its previous version");
+    const rollbackPath = path.join(appImageDirectory, ".skai-desktop-rollback-0.1.4.AppImage");
+    assert.equal(await fs.readFile(rollbackPath, "utf8"), "previous-appimage-bytes", "rollback artifact survives electron-updater deleting the old image");
+    assert.equal(JSON.parse(await fs.readFile(path.join(userData, "appimage-rollback.json"), "utf8")).installedVersion, "0.1.5", "rollback manifest identifies the verified target version");
+
+    const upgradedAppImageManager = createUpdateManager({
+      app: { isPackaged: true, getPath: () => userData, getVersion: () => "0.1.5" },
+      autoUpdater: createUpdater(), CancellationToken: FakeCancellationToken, fs, path,
+      platform: "linux", environment: { APPIMAGE: nextAppImage }, spawnProcess: (...args) => { rollbackLaunches.push(args); return { unref() {} }; },
+      getMainWindow: () => null,
+    });
+    assert.equal(await upgradedAppImageManager.readUpdatePreference(), true);
+    assert.equal(upgradedAppImageManager.getCurrentSnapshot().rollbackAvailable, true, "the new AppImage exposes recovery only for its matching installed version");
+    assert.equal(upgradedAppImageManager.rollbackPreviousAppImage(), true, "the user can launch the preserved previous AppImage");
+    assert.equal(await fs.readFile(previousAppImage, "utf8"), "previous-appimage-bytes", "rollback restores the prior version to its original launch path");
+    assert.equal(fsSync.existsSync(nextAppImage), true, "rollback leaves the failed newer image available for manual recovery");
+    assert.equal(rollbackLaunches.length, 1, "rollback schedules one detached relaunch");
+    assert.equal(rollbackLaunches[0][1][3], previousAppImage, "rollback uses a shell positional argument for the previous AppImage path");
+    assert.equal(rollbackLaunches[0][2].env.APPIMAGE, previousAppImage, "the restored version receives the correct APPIMAGE path");
+    assert.equal(upgradedAppImageManager.getCurrentSnapshot().rollbackAvailable, true, "the running upgraded app still has its recovery action until it exits");
+    const restoredAppImageManager = createUpdateManager({
+      app: appImageApp, autoUpdater: createUpdater(), CancellationToken: FakeCancellationToken, fs, path,
+      platform: "linux", environment: { APPIMAGE: previousAppImage }, getMainWindow: () => null,
+    });
+    assert.equal(restoredAppImageManager.getCurrentSnapshot().rollbackAvailable, false, "the restored previous version does not offer rollback to itself");
+
+    const unbackedUpdater = createUpdater();
+    const noRollbackManager = createUpdateManager({
+      app: { isPackaged: true, getPath: () => userData, getVersion: () => "0.1.4" }, autoUpdater: unbackedUpdater,
+      CancellationToken: FakeCancellationToken, fs, path, platform: "linux", environment: {}, getMainWindow: () => null,
+    });
+    noRollbackManager.configureAutoUpdater();
+    await noRollbackManager.checkForUpdates(true);
+    unbackedUpdater.emit("update-downloaded", { version: "0.1.5" });
+    assert.equal(noRollbackManager.installDownloadedUpdate(), false, "Linux update installation fails closed when APPIMAGE is unavailable");
+    assert.equal(unbackedUpdater.installCalls, 0, "the updater is not allowed to replace the current image without a recovery copy");
+    assert.match(noRollbackManager.getSnapshot().message, /rollback copy/i, "the unavailable rollback condition is explained");
     console.log("Update manager checks passed.");
   } finally {
     await fs.rm(userData, { recursive: true, force: true });

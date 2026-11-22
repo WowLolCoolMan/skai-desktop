@@ -334,6 +334,8 @@ export type UpdateCheckResult = {
   total?: number;
   message: string;
   error?: string;
+  rollbackAvailable?: boolean;
+  rollbackVersion?: string;
 };
 
 export interface UpdatesBridge {
@@ -343,6 +345,7 @@ export interface UpdatesBridge {
   enabled(): Promise<boolean>;
   setEnabled(enabled: boolean): Promise<boolean>;
   install(): Promise<boolean>;
+  rollback(): Promise<boolean>;
   cancelDownload(): Promise<boolean>;
   download(): Promise<boolean>;
   retry(): Promise<UpdateCheckResult>;

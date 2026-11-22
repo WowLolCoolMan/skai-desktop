@@ -16,6 +16,10 @@ function registerUpdateIpc({ ipcMain, BrowserWindow, updateManager, shell }) {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;
     return updateManager.installDownloadedUpdate();
   });
+  ipcMain.handle("updates:rollback", (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) return false;
+    return updateManager.rollbackPreviousAppImage();
+  });
   ipcMain.handle("updates:cancel-download", (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;
     return updateManager.cancelUpdateDownload();

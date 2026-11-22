@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld("skaiAgent", {
     enabled: () => ipcRenderer.invoke("updates:enabled"),
     setEnabled: (enabled) => ipcRenderer.invoke("updates:set-enabled", Boolean(enabled)),
     install: () => ipcRenderer.invoke("updates:install"),
+    rollback: () => ipcRenderer.invoke("updates:rollback"),
     cancelDownload: () => ipcRenderer.invoke("updates:cancel-download"),
     download: () => ipcRenderer.invoke("updates:download"),
     retry: () => ipcRenderer.invoke("updates:retry"),

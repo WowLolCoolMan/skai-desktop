@@ -28,6 +28,7 @@ const previousVersion = "0.1.3";
 let server;
 let serverRequests = 0;
 let appProcess;
+let installedAppImage;
 let processOutput = "";
 let mainTarget;
 let stage = "initializing";
@@ -122,6 +123,36 @@ async function readUpdateState() {
   return JSON.parse(raw || "null");
 }
 
+async function closeCurrentPage() {
+  const socket = new WebSocket(mainTarget.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    socket.addEventListener("open", resolve, { once: true });
+    socket.addEventListener("error", () => reject(new Error("DevTools websocket unavailable while closing the rollback smoke app.")), { once: true });
+  });
+  socket.send(JSON.stringify({ id: 1, method: "Page.close" }));
+  await new Promise(resolve => { socket.addEventListener("message", resolve, { once: true }); setTimeout(resolve, 1_000); });
+  socket.close();
+}
+
+function processesUsingAppImage(appImage) {
+  const matches = [];
+  if (!fs.existsSync("/proc")) return;
+  for (const entry of fs.readdirSync("/proc")) {
+    if (!/^\d+$/.test(entry) || Number(entry) === process.pid) continue;
+    try {
+      const environment = fs.readFileSync(path.join("/proc", entry, "environ"));
+      if (environment.toString("utf8").split("\0").includes(`APPIMAGE=${appImage}`)) matches.push(Number(entry));
+    } catch { /* The process exited or procfs restricts inspection. */ }
+  }
+  return matches;
+}
+
+function stopProcessesUsingAppImage(appImage) {
+  for (const processId of processesUsingAppImage(appImage) ?? []) {
+    try { process.kill(processId, "SIGTERM"); } catch { /* The process exited during cleanup. */ }
+  }
+}
+
 function linkPackageDirectory(source, destination, feedUrl) {
   fs.mkdirSync(destination, { recursive: true });
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
@@ -206,7 +237,7 @@ async function main() {
   if (buildBaseline.status !== 0) throw new Error(`The disposable ${previousVersion} AppImage build failed (exit ${buildBaseline.status}).`);
   const baselineAppImage = path.join(baselineImageDirectory, `Skai-Desktop-${previousVersion}-x64.AppImage`);
   if (!fs.existsSync(baselineAppImage)) throw new Error(`The ${previousVersion} AppImage baseline is missing: ${baselineAppImage}`);
-  const installedAppImage = path.join(installed, path.basename(baselineAppImage));
+  installedAppImage = path.join(installed, path.basename(baselineAppImage));
   fs.copyFileSync(baselineAppImage, installedAppImage);
   fs.chmodSync(installedAppImage, 0o755);
   const baselineExecutable = extractAppImage(installedAppImage, path.join(scratch, "baseline-extracted"), "Extract the synthetic baseline AppImage");
@@ -230,7 +261,7 @@ async function main() {
     XDG_CONFIG_HOME: configHome,
     XDG_DATA_HOME: path.join(scratch, "profile", "data"),
   };
-  appProcess = spawn(baselineExecutable, ["--ozone-platform=x11", `--remote-debugging-port=${devtoolsPort}`, `--user-data-dir=${userDataDir}`], {
+  appProcess = spawn(baselineExecutable, [...(process.getuid?.() === 0 ? ["--no-sandbox"] : []), "--ozone-platform=x11", `--remote-debugging-port=${devtoolsPort}`, `--user-data-dir=${userDataDir}`], {
     cwd: installed,
     env,
     detached: true,
@@ -274,7 +305,7 @@ async function main() {
 
   stage = `reopen ${currentVersion} AppImage`;
   const upgradedExecutable = extractAppImage(upgradedAppImage, path.join(scratch, "updated-extracted"), `Extract the installed ${currentVersion} AppImage`);
-  const updatedProcess = spawn(upgradedExecutable, ["--ozone-platform=x11", `--remote-debugging-port=${devtoolsPort}`, `--user-data-dir=${userDataDir}`], {
+  const updatedProcess = spawn(upgradedExecutable, [...(process.getuid?.() === 0 ? ["--no-sandbox"] : []), "--ozone-platform=x11", `--remote-debugging-port=${devtoolsPort}`, `--user-data-dir=${userDataDir}`], {
     cwd: installed,
     env: { ...env, APPIMAGE: upgradedAppImage },
     detached: true,
@@ -289,6 +320,28 @@ async function main() {
   const updatedVersion = reopenedState?.currentVersion;
   if (updatedVersion !== currentVersion) throw new Error(`The installed AppImage opened as version ${updatedVersion}, expected ${currentVersion}.`);
   if (!fs.existsSync(marker)) throw new Error("The update marker was lost when reopening the new AppImage.");
+  const rollbackImage = path.join(installed, `.skai-desktop-rollback-${previousVersion}.AppImage`);
+  if (!fs.existsSync(rollbackImage)) throw new Error("The update did not preserve the previous AppImage for rollback.");
+  if (!reopenedState.rollbackAvailable || reopenedState.rollbackVersion !== previousVersion) throw new Error(`The updated app did not advertise the matching rollback image: ${JSON.stringify(reopenedState)}.`);
+
+  stage = `restore and reopen ${previousVersion} AppImage`;
+  await evaluate("window.skaiAgent.updates.setEnabled(false).then(value => String(value))");
+  const rollbackCall = await evaluate("window.skaiAgent.updates.rollback().then(value => String(value))");
+  if (rollbackCall !== "true") throw new Error(`The in-app rollback action was rejected: ${rollbackCall}`);
+  await waitForDevtoolsClosed();
+  appProcess = undefined;
+  const restoredExecutable = extractAppImage(installedAppImage, path.join(scratch, "rollback-extracted"), `Extract the restored ${previousVersion} AppImage`);
+  const restoredMetadata = JSON.parse(fs.readFileSync(path.join(path.dirname(restoredExecutable), "resources", "app", "package.json"), "utf8"));
+  if (restoredMetadata.version !== previousVersion) throw new Error(`The restored AppImage contains version ${restoredMetadata.version}, expected ${previousVersion}.`);
+  const restoredLaunchDeadline = Date.now() + 30_000;
+  let restoredProcesses = [];
+  while (Date.now() < restoredLaunchDeadline) {
+    restoredProcesses = processesUsingAppImage(installedAppImage) ?? [];
+    if (restoredProcesses.length) break;
+    await sleep(250);
+  }
+  if (!restoredProcesses.length) throw new Error(`The rollback restored ${previousVersion} but did not relaunch its AppImage. ${processOutput.slice(-2_000)}`);
+  if (!fs.existsSync(marker)) throw new Error("The rollback changed or removed the user profile marker.");
 
   console.log(JSON.stringify({
     result: "passed",
@@ -298,7 +351,7 @@ async function main() {
     stagedUpdateStatus: state.status,
     userDataMarkerRetained: true,
     updatedAppImageReopened: true,
-    rollback: "not supported by electron-updater AppImage replacement; previous image is removed during install",
+    rollback: { previousVersion, restoredToOriginalPath: true, restoredPackageVersion: restoredMetadata.version, relaunchProcessIds: restoredProcesses, previousAppImageReopened: true },
   }, null, 2));
 }
 
@@ -307,6 +360,7 @@ main().catch(error => { console.error(`Linux updater smoke failed during '${stag
     try { process.kill(-appProcess.pid, "SIGTERM"); } catch { /* The AppImage process group may already be gone. */ }
     if (appProcess.exitCode === null && appProcess.signalCode === null) appProcess.kill("SIGTERM");
   }
+  stopProcessesUsingAppImage(installedAppImage);
   if (server) await new Promise(resolve => server.close(resolve));
   const resolved = path.resolve(scratch);
   if (!resolved.startsWith(path.resolve(os.tmpdir()) + path.sep)) throw new Error(`Refusing to remove a path outside the temporary directory: ${resolved}`);

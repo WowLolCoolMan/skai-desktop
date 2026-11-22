@@ -23,7 +23,7 @@ keep this queue focused on unfinished work.
 | Local voice acceptance | Blocked · Unclaimed | On a Windows profile with the on-device speech pack installed, verify microphone dictation and a hands-free turn. | Keep processing local; cover cancellation and unavailable-device recovery. Never imply unavailable recognition is active. | [Voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Coding Agent isolation | In progress · Codex | Verify Windows PSEC on additional supported Windows profiles and add Linux memory/resource limits. | Approved Windows commands now use a PSEC specification granting the selected project read/write and runtime paths read-only; a capability-free AppContainer denies networking. PSEC and Job Object setup fail closed. Native acceptance on this Windows 11 host proves project writes, neighboring-file denial, loopback denial, unchanged project ACLs, process/memory limits, and cancellation. No unattended or parallel commands without broader acceptance. | [Architecture](../engineering/ARCHITECTURE.md), [readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md) |
 | Image runtime coverage | In progress · Unclaimed | Exercise a live ComfyUI server and validate GPU or additional hardware. | Show only runtime-reported progress; cancellation must stop the job and leave the page usable. | [Image guide](../guides/LOCAL_IMAGE_GENERATION.md), [capability matrix](CAPABILITY_MATRIX.md) |
-| Release validation | In progress · Unclaimed | Design AppImage rollback/recovery and complete published-feed plus native desktop acceptance. | Headless Ubuntu 24.04/WSL2 AppImage build, metadata validation, extracted-package smoke, and isolated local-feed upgrade/install/reopen now pass. Current AppImage replacement removes the prior image, so rollback is not yet available. Preserve user data through upgrades and fail closed on invalid signatures. Production signing is deferred by the owner. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
+| Release validation | In progress · Unclaimed | Complete published-feed and native desktop updater acceptance. | Headless Ubuntu 24.04/WSL2 acceptance now covers AppImage update and in-app rollback from synthetic 0.1.3 to 0.1.4 and back, preserving user data. Published feed, signed metadata, and native Linux desktop acceptance remain open. Production signing is deferred by the owner. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
 | Persona research and chat | In progress · Unclaimed | Improve name-only transcript discovery and evaluate multi-turn factual boundaries with a local model. | Dated source filtering now applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. Continue conservative attribution and evidence removal. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Local, cloud, and hybrid gateway | In progress · Codex | Continue the provider and secret-store contracts; add a supported provider only after consent and credential handling are ready. | Require explicit routing, OS-protected secrets, clear data-destination disclosure, and a working offline-only mode. No silent fallback. | [Provider gateway plan](implementation-plans/provider-gateway.md) |
 
@@ -58,9 +58,10 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 - **2026-11-22:** Linux x64 0.1.4 AppImage and updater metadata built and validated
   in Ubuntu 24.04/WSL2. The staged Electron app and extracted AppImage passed the
   unprivileged Xvfb UI smoke. A local-feed 0.1.3 → 0.1.4 update smoke verified
-  download, digest, installation, user-data retention, and reopening. Native
-  desktop/published-feed acceptance remains open; current AppImage replacement
-  does not support rollback. The runtime had no local en-US speech pack.
+  download, digest, installation, user-data retention, reopening, and in-app
+  rollback to 0.1.3 with the profile marker retained. Native desktop and
+  published-feed acceptance remain open. The runtime had no local en-US speech
+  pack.
 - **2026-11-22:** Approved commands now receive an explicit runtime environment
   allowlist instead of arbitrary application variables.
 - **2026-11-22:** Windows memory-limit and explicit project-check evidence;
