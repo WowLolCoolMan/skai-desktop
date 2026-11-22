@@ -38,11 +38,12 @@ worktree.
 | --- | --- |
 | AirLLM inference | AirLLM and Torch import successfully from `%LOCALAPPDATA%\\Skai\\AirLLM\\venv`; the worker’s CUDA preflight and malformed-input paths return structured errors. A real model run still requires an NVIDIA GPU and CUDA-capable PyTorch, plus a compatible Hugging Face model and enough disk/RAM/VRAM. |
 | Microphone dictation | Packaged Electron reports the `en-US` on-device speech pack unavailable and correctly refuses remote recognition. Requires an installed speech pack or approved local STT fixture. |
-| Packaged Marketplace workflow | `smoke:electron:artifact` opens the packaged app but fails its Marketplace DOM acceptance: the expected Marketplace heading and Models navigation entry are not detected. Reconcile the smoke with the current in-app navigation and verify the Installed destination under Tools. |
+| Packaged Marketplace workflow | `smoke:electron:artifact` passes Models search/review and explicitly verifies Tools → Installed inventory in the packaged app. |
 | Persona model quality | Research succeeds with installed `qwen3:14b`; one character draft returned a partial card. Core deterministic voice-card and source-boundary tests pass, but more model-specific quality evaluation is needed. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |
 | Release signing and lifecycle | Release audit confirms the gates exist. Cryptographic signing and clean-machine upgrade/rollback still require configured CI secrets and Windows/Ubuntu runners. |
 | Local Windows upgrade lifecycle | A current 0.1.4 installer can be built and metadata-verified locally, but the disposable 0.1.3 → 0.1.4 upgrade smoke needs a real 0.1.3 installer artifact. The unsigned local artifact is not release evidence. |
+| WebM video sampling | H.264 MP4 sampling passes. The smoke harness's data-URL WebM probe is rejected by Chromium's URL safety policy on this host, so the run reports this and leaves actual packaged WebM decoding unverified. |
 | Linux AppImage packaging | The packager correctly refuses to run on Windows; build and acceptance require an Ubuntu/Linux runner. |
 
 ## Test-harness notes

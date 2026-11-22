@@ -18,7 +18,7 @@ export type Tool = {
   status: string;
 };
 
-export type MarketplaceCatalogSection = "Discover" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed" | "Updates";
+export type MarketplaceCatalogSection = "Discover" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed" | "Updates" | "Skai built-ins" | "Compatible plugins";
 
 export type MarketplaceEntry = {
   id: string;
@@ -113,6 +113,8 @@ export function filterMarketplaceEntries(
   return entries.filter((entry) => {
     if (section === "Skills") return entry.kind === "Skills";
     if (section === "MCP Servers") return (entry.kind === "Tools" && (entry.id === "tool:rea" || /mcp/i.test(entry.category))) || (entry.kind === "Catalog" && entry.category === "MCP Servers");
+    if (section === "Skai built-ins") return entry.kind === "Tools" && entry.category === "Skai built-ins";
+    if (section === "Compatible plugins") return (entry.kind === "Skills" || entry.kind === "Tools") && entry.category === "Compatible plugins";
     if (section === "Plugins") return entry.kind === "Tools" && entry.id !== "tool:rea" && !/mcp/i.test(entry.category);
     return true;
   });

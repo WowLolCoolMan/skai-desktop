@@ -147,10 +147,17 @@ export function PluginsPage({
           ["Discover", "sparkle"],
           ["Models", "model"],
           ["Voices", "activity"],
-          ["MCP Servers", "terminal"],
-          ["Installed", "memory"],
+          ["Tools", "terminal"],
           ["Updates", "arrow-up-right"],
-        ] as const).map(([item, icon]) => <button key={item} type="button" className={catalogSection === item ? "is-active" : ""} aria-current={catalogSection === item ? "page" : undefined} onClick={() => changeCatalogSection(item)}><NavIcon name={icon} /><span>{item}</span>{item === "Models" && <small>Live</small>}{item === "Installed" && <small>{tools.length + skills.length}</small>}</button>)}
+        ] as const).map(([item, icon]) => {
+          const active = item === "Tools"
+            ? ["MCP Servers", "Skai built-ins", "Compatible plugins", "Installed"].includes(catalogSection)
+            : catalogSection === item;
+          return <button key={item} type="button" className={active ? "is-active" : ""} aria-current={active ? "page" : undefined} onClick={() => changeCatalogSection(item === "Tools" ? "MCP Servers" : item)}><NavIcon name={icon} /><span>{item}</span>{item === "Models" && <small>Live</small>}{item === "Tools" && <small>{tools.length + skills.length}</small>}</button>;
+        })}
+        {["MCP Servers", "Skai built-ins", "Compatible plugins", "Installed"].includes(catalogSection) && <div className="plugins-tool-subnav" role="tablist" aria-label="Tools categories">
+          {(["MCP Servers", "Skai built-ins", "Compatible plugins", "Installed"] as const).map((item) => <button key={item} type="button" role="tab" aria-selected={catalogSection === item} className={catalogSection === item ? "is-active" : ""} onClick={() => changeCatalogSection(item)}>{item === "MCP Servers" ? "MCP servers" : item}</button>)}
+        </div>}
         <div className="plugins-nav-note">
           <span className="plugins-nav-note-dot" aria-hidden="true" />
           <div><strong>Stays on this device</strong><small>Review source, runtime, and permissions before connecting.</small></div>
@@ -169,8 +176,8 @@ export function PluginsPage({
           <>
             <header className="plugins-topbar">
               <div className="plugins-heading-lockup">
-                <span className="plugins-heading-mark" aria-hidden="true"><NavIcon name={catalogSection === "Discover" ? "sparkle" : catalogSection === "MCP Servers" ? "terminal" : catalogSection === "Skills" ? "sparkle" : "project"} /></span>
-                <div><p className="plugins-eyebrow">SKAI MARKETPLACE</p><h2>{catalogSection === "MCP Servers" ? "MCP" : catalogSection}</h2><p className="plugins-heading-description">{catalogSection === "Discover" ? "Search local models and inspect what can be installed on this device." : catalogSection === "MCP Servers" ? "Connect a local MCP server or review the available package." : `Browse ${catalogSection.toLowerCase()} available on this device.`}</p></div>
+                <span className="plugins-heading-mark" aria-hidden="true"><NavIcon name={catalogSection === "Discover" ? "sparkle" : catalogSection === "MCP Servers" || catalogSection === "Skai built-ins" || catalogSection === "Compatible plugins" ? "terminal" : "project"} /></span>
+                <div><p className="plugins-eyebrow">SKAI MARKETPLACE</p><h2>{catalogSection === "MCP Servers" ? "MCP servers" : catalogSection}</h2><p className="plugins-heading-description">{catalogSection === "Discover" ? "Search local models and inspect what can be installed on this device." : catalogSection === "MCP Servers" ? "Connect a local MCP server or review the available package." : catalogSection === "Skai built-ins" ? "Hand-picked capabilities already built into Skai." : catalogSection === "Compatible plugins" ? "Plugins and skills that work inside Skai Desktop." : `Browse ${catalogSection.toLowerCase()} available on this device.`}</p></div>
               </div>
               <div className="plugins-heading-meta"><StatusBadge tone="success">Local catalog</StatusBadge><span className="plugins-count">{sectionEntries.length} {catalogSection === "Discover" ? "available" : catalogSection.toLowerCase()}</span></div>
               <div className="plugins-topbar-actions">

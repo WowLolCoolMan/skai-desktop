@@ -52,9 +52,12 @@ and to any detailed plan rather than copying their full contents here.
   `docs/SKAI_PREMIUM_UI_PROGRESS.md`. Repeat with the next page until the full
   route list is accepted.
 - **Latest implementation:** Marketplace now includes a Voices destination and
-  local voice runtime entries. General settings includes per-job preferred model
-  assignments for chat, coding, prompt rewriting, vision, and voice; the Chat
-  assignment is restored as the workspace default.
+  local voice runtime entries. Its Tools destination groups MCP servers,
+  Skai built-ins, compatible plugins, and Installed inventory. The packaged
+  artifact smoke confirms Models and Tools → Installed. General settings
+  includes per-job preferred model assignments for chat, coding, prompt
+  rewriting, vision, and voice; the Chat assignment is restored as the
+  workspace default.
 - **Acceptance:** Chat and Coding Agent, Projects, Models, Images, Marketplace,
   Plugins, Memory, Personas, Pet Workshop, Voice Workbench, Terminal, Usage,
   and Settings are reviewed in the running app. Each has readable hierarchy,
