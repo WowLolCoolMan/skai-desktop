@@ -6,6 +6,10 @@ bounded work. They are supporting plans, not a second priority queue: use
 [capability matrix](../CAPABILITY_MATRIX.md) for current status. Update or
 archive a plan when scope or implementation changes.
 
+## Architecture and maintenance
+
+- [Incremental codebase refactor](codebase-refactor.md)
+
 ## Agent and conversation workflows
 
 - [Conversation model context](conversation-model-context.md)

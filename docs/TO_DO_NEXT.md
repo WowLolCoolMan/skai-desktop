@@ -67,34 +67,26 @@ and to any detailed plan rather than copying their full contents here.
 - **References:** [UI evidence and progress](SKAI_PREMIUM_UI_PROGRESS.md),
   [UI reference guide](UI_REFERENCE_GUIDE.md), and [design contract](../DESIGN.md).
 - **Blockers / decisions:** Live visual review remains open; preserve the
-  existing product shell and local-first behavior. The packaged UI matrix is
-  currently blocked: `npm run package:electron` could not fetch
-  `universalify@2.0.1` from `registry.npmjs.org`, and the partial package did
-  not expose its renderer to the smoke runner. Retry packaging and the matrix
-  when registry access is available; do not count the build as visual proof.
+  existing product shell and local-first behavior. The packaged matrix now
+  passes all 17 routes across five window sizes and four theme/sidebar
+  variants. Continue manual interaction and pet-animation review before
+  considering the UI goal complete.
 
-### 1. Run selected project checks and keep their evidence with the task
+### 1. Incrementally refactor the codebase across layers
 
-- **Status:** Ready
-- **Priority:** Highest capability gap
-- **Owner:** Unclaimed
-- **Context:** The Coding Agent now has a read-only project preflight that finds
-  manifests, checks local runtimes, and suggests checks. It intentionally does
-  not execute them. The task journal already records approval and operation
-  outcomes.
-- **Agreed approach:** Let the user select one of the detected safe checks,
-  review the exact command and working directory, and explicitly approve its
-  execution. Capture exit status and bounded output in the task timeline and
-  show the result beside the diff. Keep preflight read-only; never auto-run
-  checks. Preserve existing command guardrails and do not record secrets or
-  unrestricted command output.
-- **Acceptance:** Preflight still runs no commands; the user can review and
-  approve a selected check; success, failure, timeout, and cancellation are
-  visible with exit information; task evidence survives host restart; tests
-  cover redaction and no-replay behavior.
-- **References:** [Capability matrix](CAPABILITY_MATRIX.md#highest-priority-remaining-work),
-  [Coding task timeline and approval](../native/SkaiDesktop.Core/Infrastructure/OperationJournal.cs),
-  [project preflight](../native/SkaiDesktop.Core/Services/ProjectPreflightService.cs).
+- **Status:** In progress
+- **Priority:** High, maintainability and workflow quality
+- **Owner:** Codex
+- **Context:** Several large modules still combine unrelated responsibilities.
+  Agent Host handlers and the Voice Workbench have been separated, while
+  Marketplace, persona research, model library, and workspace orchestration
+  remain large.
+- **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
+  bridge and storage contracts, keep current behavior, and integrate one
+  reviewable slice at a time after syncing with main.
+- **Acceptance:** Each slice has a clear responsibility boundary, passes the
+  appropriate checks for its layer, and is committed to main with upstream
+  work preserved. See [incremental codebase refactor](implementation-plans/codebase-refactor.md).
 
 ### 2. Complete local voice acceptance
 
@@ -222,6 +214,20 @@ and to any detailed plan rather than copying their full contents here.
 ## Recently completed
 
 Move finished entries here with their commit/PR and verification evidence.
+
+- **2026-11-22 — Selected project checks with durable task evidence.** The
+  Coding Agent already supports explicit detected-check selection, bounded
+  output and exit-status evidence beside task diffs, and read-only preflight.
+  Core verification evidence is covered in `ProjectVerificationTests`; the
+  feature is recorded in the [capability matrix](CAPABILITY_MATRIX.md). See
+  commit `746c9171`.
+- **2026-11-22 — Refactor and Settings reliability slices.** Extracted the
+  Voice Workbench from Marketplace, restored the Electron child-process
+  launcher, and kept Settings Save controls visible above independently
+  scrolling content. Verified with desktop typecheck/build, packaged app, and
+  the 17-route UI matrix across five window sizes and four theme/sidebar
+  variants, plus bridge and local-only audits. Commits `f223075d`, `81edaec4`,
+  and `c4dc3575`.
 
 - **2026-11-18 — Coding Agent task journal, approval controls, and read-only
   project preflight.** Added task activity and restart reconciliation, approval
