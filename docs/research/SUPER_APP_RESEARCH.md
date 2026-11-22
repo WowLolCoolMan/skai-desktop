@@ -1,8 +1,9 @@
 # Skai Desktop super-app research
 
 > Historical product research, not a statement of current Skai capabilities or
-> roadmap commitments. Skai currently keeps model execution local-only; hosted
-> provider examples below are background research and remain out of scope.
+> roadmap commitments. Shipped Skai releases currently keep model execution
+> local-only; user-connected cloud routes are an approved future direction
+> tracked by the provider-gateway plan.
 
 Research date: 2026-11-03
 
@@ -34,8 +35,8 @@ The model catalog and picker are a router-facing surface. A provider adapter adv
 
 - Host discovery includes Ollama, GPT4All, LM Studio, Jan, LocalAI, llama.cpp, vLLM, KoboldCpp, and text-generation-webui compatible endpoints.
 - The UI has ChatBot and Coding Agent modes, local project folders, a searchable model selector, and local image/voice workflows.
-- ChatGPT account authorization is not currently exposed by the Electron client. Other providers use configured API endpoints; hosted-provider credential flows remain gated until OS-backed storage and recovery UX are complete.
-- No telemetry or analytics are included. Model discovery, downloads, and hosted inference only contact their configured services when the user invokes them.
+- ChatGPT account authorization is not currently exposed by the Electron client. Hosted-provider connections are not yet implemented; they remain gated until OS-backed storage, explicit routing, disclosure, and recovery UX are complete.
+- No telemetry or analytics are included. Public catalog and model-download requests contact their configured services when invoked; future hosted inference must be explicitly selected by the user.
 
 ## Upstream references
 

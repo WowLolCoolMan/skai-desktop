@@ -9,9 +9,11 @@ issue or pull request.
   matrix](docs/CAPABILITY_MATRIX.md), and [future features](docs/FUTURE_FEATURES.md)
   to see current plans and avoid duplicate work.
 - For substantial changes, open an issue first to agree on scope and approach.
-- Keep Skai's local-first boundary: model inference and app data stay local.
-  Do not add hosted model routing, silent cloud fallback, or unreviewed data
-  collection.
+- Keep Skai local-first. Current releases use local model inference. The
+  approved provider-gateway plan adds optional user-connected remote routes;
+  any implementation must disclose remote data, protect credentials with the
+  OS, honor offline-only mode, and never silently switch providers. Do not add
+  unreviewed data collection.
 - Keep the Electron + React UI, isolated preload bridge, .NET Agent Host, and
   headless Core architecture. Do not introduce a second desktop UI stack.
 - Do not submit copied code, assets, model weights, or documentation unless you

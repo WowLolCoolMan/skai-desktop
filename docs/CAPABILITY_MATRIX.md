@@ -37,10 +37,13 @@ supported project surfaces.
 
 ## Product boundary
 
-Skai is local-only for model execution. It does not route prompts to hosted
-providers or fall back to cloud inference. GitHub and public model catalogs are
-separate, explicit integrations and do not receive chat prompts as model
-providers.
+Current releases support local model execution only. Optional user-connected
+cloud and hybrid model routes are an approved product direction, but are not
+implemented or available in the shipped app yet. GitHub and public model
+catalogs remain separate integrations and do not currently receive chat prompts
+as model providers. The provider-gateway plan requires explicit routing,
+OS-protected credentials, remote-data disclosure, no silent fallback, and an
+offline-only mode before hosted inference can be advertised as working.
 
 ## Evidence commands
 

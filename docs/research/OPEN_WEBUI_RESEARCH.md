@@ -1,8 +1,9 @@
 # Open-source research and design inspiration
 
 > Historical product research, not a statement of current Skai capabilities or
-> roadmap commitments. Skai currently keeps model execution local-only; hosted
-> provider examples below are background research and remain out of scope.
+> roadmap commitments. Shipped Skai releases currently keep model execution
+> local-only; optional user-connected cloud routes are an approved future
+> direction tracked by the provider-gateway plan.
 
 Research date: 2026-11-03
 
@@ -12,7 +13,7 @@ The project is a large self-hosted assistant platform. Its README highlights a p
 
 ## What Skai Desktop adopts
 
-- A unified model picker across local runtimes and compatible hosted endpoints, with searchable models and measured local performance.
+- A unified model picker across local runtimes and, after secure provider connections are implemented, user-selected hosted endpoints, with searchable models and measured local performance.
 - Separate ChatBot and Coding Agent modes, with selected project folders as the code agent's workspace.
 - A conversation-first desktop shell with navigation, recents, model controls, slash commands, and focused image and activity views.
 - Offline Markdown rendering and copyable fenced code, using the separately licensed `marked` and `dompurify` packages (see `THIRD_PARTY_NOTICES.md`).

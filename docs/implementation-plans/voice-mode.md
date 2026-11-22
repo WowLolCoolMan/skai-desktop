@@ -10,7 +10,7 @@ Turn Skai’s existing hands-free dictation/reply loop into an explicit Voice Mo
 2. Add an in-composer Voice Mode panel with live state (listening, waiting for the local reply, or ready to listen again).
 3. Provide a direct End voice mode control in that panel.
 4. Preserve one-shot Voice dictation as a separate control and preserve Documents-only requirements.
-5. Keep all existing speech-pack and local-only failure messages, installation action, cleanup, and reply playback behavior.
+5. Keep existing speech-pack setup, native fallback, cleanup, and reply playback behavior. The current implementation stays on-device; a future explicit cloud voice provider must be separately selected and disclosed.
 6. Update the backlog to record the improved session UX while leaving true streaming/barge-in acceptance open.
 
 ## Context map

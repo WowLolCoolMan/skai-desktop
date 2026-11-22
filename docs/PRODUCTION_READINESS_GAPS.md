@@ -17,7 +17,11 @@ remain unchanged across the product rename.
 
 ## P1 — platform parity and reliability
 
-- Keep the local-only model boundary explicit; hosted-provider routing is out of product scope, not a release blocker.
+- Keep current local inference behavior stable while implementing the approved
+  local, cloud, and hybrid provider direction. Hosted routing is not enabled in
+  the current release; the provider gateway must add explicit user consent,
+  OS-protected credentials, clear data-destination disclosure, no silent
+  fallback, and a verified offline-only mode before it is advertised as ready.
 - Finish coverage for scanned-PDF OCR, audio input, spreadsheet/data analysis, and model capability/vision compatibility discovery.
 - Verify Linux keyring setup and provide actionable installation guidance when Secret Service is unavailable.
 - Exercise GitHub empty-permission, permission-denied, network-failure, clone-conflict, cancellation, and retry states in isolated profiles with real credentials.

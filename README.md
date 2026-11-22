@@ -15,14 +15,25 @@ Skai Desktop is an Electron + React desktop application with a persistent .NET A
 
 > **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe this project snapshot; unfinished ideas remain in the [future feature backlog](docs/FUTURE_FEATURES.md). See the [Skai Desktop project site](https://wowlolcoolman.github.io/skai-desktop/) for the public overview and documentation index.
 
-## The product boundary
+## Local-first by design
 
-Skai Desktop is **local-only** for AI runtime and application data:
+The current `0.1.x` release supports local model inference only. The planned
+product direction also supports optional user-connected cloud models and
+workflows that combine local and cloud providers; those model routes are not
+available yet. Skai will not supply or resell cloud models. Users bring their
+own supported provider accounts and credentials.
 
-- No cloud model execution, hosted provider routing, cloud sync, or remote fallback.
-- Prompts and attachments stay on this computer and are sent only to a local runtime selected by the user.
-- GitHub is an explicit project integration for repository context and guarded Git workflows; it is not an AI model provider.
-- Local services such as Ollama, LM Studio, LocalAI, llama.cpp, vLLM, OpenAI-compatible loopback servers, and ComfyUI can be connected by the user. An optional managed Diffusers runtime can generate Stable Diffusion Turbo images locally.
+- Current prompts and attachments go only to the local runtime selected by the
+  user. Skai does not silently fall back to a hosted model.
+- Future remote routes must disclose what leaves the device, use credentials
+  stored by the operating system, be selected by the user, and preserve a real
+  offline/local-only mode.
+- GitHub remains an explicit project integration for repository context and
+  guarded Git workflows; it is not currently an AI model provider.
+- Local services such as Ollama, LM Studio, LocalAI, llama.cpp, vLLM,
+  OpenAI-compatible loopback servers, and ComfyUI can be connected by the user.
+  An optional managed Diffusers runtime can generate Stable Diffusion Turbo
+  images locally.
 
 ## What Skai is today
 
@@ -109,7 +120,10 @@ npm run desktop:typecheck
 npm run desktop:build
 ```
 
-The local-only audit is intentional: it rejects hosted/cloud model routes from the shipped Electron and Agent Host runtime.
+The current-release audit is intentional: it prevents unreviewed hosted model
+routes from entering the shipped runtime. The planned provider gateway will
+replace this broad prohibition with checks for explicit user routing, secure
+credential storage, remote-data disclosure, redaction, and offline-only mode.
 
 ## Repository map
 
@@ -139,6 +153,6 @@ matrix](docs/CAPABILITY_MATRIX.md) records current evidence and boundaries; the
 
 ## Contributing
 
-Keep changes incremental, local-first, and testable. Preserve the Electron → isolated IPC → .NET Agent Host boundary, avoid exposing secrets to the renderer, do not add cloud model routes, and include validation evidence for user-facing changes.
+Keep changes incremental, local-first, and testable. Preserve the Electron → isolated IPC → .NET Agent Host boundary, never expose provider secrets to the renderer, and include validation evidence for user-facing changes. Cloud routes remain unavailable until the provider-gateway plan's privacy and credential checks pass.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor guide, development checks, and pull request process. The repository is source-available for reference; reuse rights are limited by the [Skai Desktop Source Reference License](LICENSE). Existing snapshots published under MIT remain under their original terms. Third-party components retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Read the [Code of Conduct](CODE_OF_CONDUCT.md), [Security Policy](SECURITY.md), and [Accessibility statement](ACCESSIBILITY.md) before contributing.

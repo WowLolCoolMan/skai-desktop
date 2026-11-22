@@ -23,9 +23,9 @@ and to any detailed plan rather than copying their full contents here.
 - When work is done, add the commit/PR and verification evidence, then move the
   entry to **Recently completed**. Remove stale completed entries in a later
   cleanup pass; the changelog and Git history retain the permanent record.
-- When proposing work that changes the local-only boundary, permissions, or
-  persisted data, link the decision record or request that product decision
-  before implementation.
+- When proposing work that changes provider routing, permissions, or persisted
+  data, link the decision record and update the implementation plan before
+  changing the product boundary.
 
 ## Active and next-up work
 
@@ -241,8 +241,40 @@ and to any detailed plan rather than copying their full contents here.
   [dialogue attribution and memory guard](../native/SkaiDesktop.Core/Services/PersonaDialogueEvidence.cs),
   [web research and PDF fetching](../native/SkaiDesktop.Core/Services/WebSearchProvider.cs),
   [Persona research workflow](../services/agent-host/Protocol/AgentHostLoop.cs).
-- **Blockers / decisions:** Name-only transcript discovery remains incomplete.`r`n  Do not treat the goal as complete until the
+- **Blockers / decisions:** Name-only transcript discovery remains incomplete.
+  Do not treat the goal as complete until the
   real-source and local-model acceptance evidence above is recorded.
+
+### 7. Add the user-controlled local, cloud, and hybrid model gateway
+
+- **Status:** Ready
+- **Priority:** High
+- **Owner:** Codex
+- **Context:** Shipped model execution is currently local-only. The product
+  direction now includes optional providers configured and paid for by users,
+  plus intentional local/cloud combinations. Current settings normalization,
+  route validation, and `audit:local-only` enforce the old local-only product
+  boundary. API keys must never be persisted in `settings.json` or exposed to
+  renderer code.
+- **Agreed approach:** Follow the
+  [provider gateway plan](implementation-plans/provider-gateway.md). Preserve
+  the Electron + React + .NET architecture and local behavior; add typed
+  provider connections and narrow adapters, store credentials through an OS
+  credential facility, disclose remote data at route selection, and preserve
+  offline-only mode. Never silently change provider or send data to a remote
+  endpoint without the user's selected connection.
+- **Acceptance:** Users can add, verify, select, and remove supported local and
+  remote connections; secrets are stored by the OS and do not appear in
+  renderer state, logs, settings files, or diagnostics; chat streams and
+  cancels through the selected provider; provider/model capabilities and errors
+  are truthful; hybrid routing is explicit per task; offline-only mode rejects
+  all remote calls. Replace the blanket local-only audit only after these
+  policy checks and regression tests pass.
+- **References:** [Provider gateway plan](implementation-plans/provider-gateway.md),
+  [reference implementation registry](research/REFERENCE_IMPLEMENTATION_REGISTRY.md),
+  [capability matrix](CAPABILITY_MATRIX.md).
+- **Blockers / decisions:** None. Remote provider connections are not
+  implemented until the credential and consent gates are complete.
 ## Recently completed
 
 Move finished entries here with their commit/PR and verification evidence.

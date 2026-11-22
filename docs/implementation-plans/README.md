@@ -9,6 +9,7 @@ archive a plan when scope or implementation changes.
 ## Architecture and maintenance
 
 - [Incremental codebase refactor](codebase-refactor.md)
+- [Local/cloud/hybrid provider gateway](provider-gateway.md)
 
 ## Agent and conversation workflows
 

@@ -64,6 +64,9 @@ provides a shorter introduction.
   status lives in the capability matrix.
 - [Super-app research](research/SUPER_APP_RESEARCH.md) — product and
   architecture research, not a roadmap commitment.
+- [Reference implementation registry](research/REFERENCE_IMPLEMENTATION_REGISTRY.md)
+  — patterns, Skai integration choices, and license boundaries for the eight
+  engineering references.
 - [Open WebUI research](research/OPEN_WEBUI_RESEARCH.md) — design inspiration
   and license review, not a source reuse grant.
 - [Archived notes](archive/README.md) — completed work logs and superseded

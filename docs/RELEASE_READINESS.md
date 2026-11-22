@@ -24,7 +24,7 @@ Target release: **0.1.4**. Status: **not ready to publish**.
 - Packaged artifacts include a versioned executable/Agent Host/AirLLM SHA-256 manifest; the Windows release workflow refreshes and verifies the executable hash after Authenticode signing.
 - Electron Settings now has a usable surface for general routing, appearance, model discovery, local voice, local image workflows, agent controls, privacy, storage, updates, and advanced controls.
 - The optional companion window supports the built-in and custom pet profiles, position persistence, pointer dragging, keyboard movement, wandering, per-pet idle/walk actions, reduced motion, and hide controls. Blaze has a tested attack sequence and separate fire/impact sprite effects; visual timing and pointer behavior still need live acceptance.
-- Model execution remains local-only; external model providers and cloud fallback are outside product scope.
+- The current release executes models locally. User-connected remote model routes are an approved direction but remain unavailable until the provider-gateway security and release acceptance plan is complete. Silent cloud fallback is not allowed.
 
 ## Hosted evidence
 

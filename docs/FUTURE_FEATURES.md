@@ -28,26 +28,28 @@ and evidence beside the diff, (2) complete installed-pack voice acceptance,
 execution, and (4) finish image generation/edit progress and cancellation.
 Other proposals below remain future work.
 
-Remote device control, cloud model execution/sync, team administration, and
-unattended computer use need separate product, privacy, and security decisions;
-they are not assumed commitments. Full 1M-token context execution requires a
-compatible model and sufficient runtime hardware; a request-size contract is
-not evidence of full-context execution.
+Optional user-connected cloud model execution is an approved product direction
+and is tracked as active implementation work in
+[To Do Next](TO_DO_NEXT.md). Skai will not sell provider access. Remote device
+control, cloud sync, team administration, and unattended computer use still
+need separate product, privacy, and security decisions; they are not assumed
+commitments. Full 1M-token context execution requires a compatible model and
+sufficient runtime hardware; a request-size contract is not evidence of
+full-context execution.
 
 ## Current product boundary
 
-Skai Desktop is local-only. The application does not use hosted model
-providers, cloud model execution, cloud sync, remote model routing, or cloud
-fallbacks. The local path may use a model server already running on this
-computer or AirLLM running locally. Prompts, attachments, credentials, and
-application state stay on this computer unless the user explicitly starts a
-separate external integration workflow such as GitHub.
+Shipped releases currently use local model inference and do not route prompts
+to hosted models. The planned gateway adds optional user-connected cloud models
+and intentional local/cloud combinations. Users bring their own supported
+provider accounts and keys; Skai does not resell access. Prompts and
+attachments remain local unless the user selects a remote connection and
+reviews what that route will send. A complete offline/local-only mode remains a
+requirement. No route may silently fall back to a different provider.
 
-Any older backlog item that mentions cloud execution, cloud compute, hosted
-accounts, cloud sync, or remote device control is retained as historical
-product research only and is not a commitment for Skai Desktop. New features
-must preserve the local-only boundary and provide explicit provider selection,
-cancellation, permission review, and local credential handling.
+Cloud sync and remote device control remain separate product decisions, not
+implied by model-provider support. Earlier backlog entries must be interpreted
+under this boundary and the active provider-gateway acceptance plan.
 
 ## Core chat
 
@@ -92,9 +94,9 @@ cancellation, permission review, and local credential handling.
 - [ ] Containerized parallel agents with Docker and IDE synchronization.
 - [ ] Background computer use while the user works elsewhere.
 - [ ] Autonomous open-weight model agent.
-- [ ] Headless/daemon mode for local CI integration (cloud deployment remains outside the local-only product boundary).
+- [ ] Headless/daemon mode for local CI integration. (Cloud deployment needs a separate security and operations review.)
 - [ ] Portable local harness with orchestrator, models, tools, and queue.
-- [ ] Hybrid cloud/local compute split (outside the current local-only product boundary; retained as historical research only).
+- [ ] Hybrid local/cloud compute split. (Approved direction; provider routing and per-task disclosure must be implemented first.)
 - [ ] Fully offline local-first agent mode.
 - [ ] Remote device access for controlling a desktop elsewhere.
 
@@ -138,7 +140,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Detachable chats in their own windows.
 - [ ] Drag-and-drop pane layouts.
 - [x] Custom themes. (Light/dark palettes plus persisted Deep Sea and Deep Space ambient presets with reduced-motion support.)
-- [ ] Cloud sync across devices (outside the current local-only product boundary; requires a future product/privacy decision).
+- [ ] Cloud sync across devices (requires a separate product/privacy decision; model-provider support does not imply sync).
 - [x] Built-in translator. (Review-first translation through the selected model with explicit composer insertion.)
 - [x] Text snippets with AI expansion. (Bounded local save/insert plus review-first model expansion.)
 - [ ] Window management.
@@ -160,13 +162,13 @@ cancellation, permission review, and local credential handling.
 - [x] Lazy-loaded Markdown instruction-pack skills with `$` mentions. (Built-in and enabled local Markdown skills resolve only when explicitly mentioned in a chat request; instructions are bounded and never grant permissions.)
 - [x] Local model runner support for Ollama and LM Studio. (Loopback discovery, selection, model-library inventory, and bounded install/load paths are implemented.)
 - [ ] Offline-capable operation.
-- [x] OpenAI-compatible API for local servers. (Loopback-compatible local endpoints are supported; cloud endpoints and hosted API keys are intentionally unsupported.)
+- [x] OpenAI-compatible API for local servers. (Loopback-compatible local endpoints are supported. Cloud endpoints and hosted API keys remain unavailable until the provider gateway is implemented.)
 - [ ] Plugin and pipeline framework.
 - [ ] Community tool library.
 - [ ] Third-party extensions that provide their own AI models.
 - [ ] NPU/GPU/CPU auto-routing through Windows AI Foundry.
 - [ ] On-device LoRA fine-tuning.
-- [ ] Bring-your-own-key with credit-based pricing (hosted execution is outside the current product boundary).
+- [ ] User-managed provider connections and credentials. (Approved direction; tracked in the provider-gateway plan. No Skai credit resale.)
 - [ ] React/TypeScript extension SDK.
 - [ ] Team-shared commands, snippets, and private extension store.
 - [ ] One-time purchase/no-subscription option.
@@ -178,7 +180,7 @@ cancellation, permission review, and local credential handling.
 - [ ] Continuous batching and parallel requests.
 - [ ] KV-cache checkpointing for agentic workflows.
 - [ ] Specialized inference engines such as Splash.
-- [ ] Per-token cloud pricing and usage visibility (hosted execution is outside the current product boundary).
+- [ ] Verified remote-provider usage details when supplied by the provider. (Never infer or fabricate token/cost metrics.)
 - [ ] Open-weight Decisions API for classification and routing.
 
 ## Administration and teams

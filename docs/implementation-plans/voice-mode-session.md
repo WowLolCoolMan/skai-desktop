@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make hands-free voice interaction feel like a deliberate ChatGPT-style session rather than a small inline toggle, while keeping Skai's local-only speech boundary explicit.
+Make hands-free voice interaction feel like a deliberate ChatGPT-style session rather than a small inline toggle. The current voice loop is local; optional user-connected cloud voice engines remain separate planned work and must be selected explicitly.
 
 ## Integration plan
 
