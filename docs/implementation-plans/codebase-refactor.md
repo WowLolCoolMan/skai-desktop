@@ -142,6 +142,8 @@ that users touch as each slice is moved.
 - Moved desktop pet JSON persistence into `pet-state-store.cjs`; the existing
   file location, tolerant read behavior, and serialized state shape remain the
   same, while window positioning and pet lifecycle stay in the Electron shell.
+- Moved close-choice, close-behavior, and native titlebar-theme IPC handlers
+  into `window-ipc.cjs`; sender checks and return behavior are unchanged.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent

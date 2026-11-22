@@ -17,6 +17,7 @@ const { augmentUserPath } = require("./user-path.cjs");
 const { createUpdateManager } = require("./update-manager.cjs");
 const { registerUpdateIpc } = require("./update-ipc.cjs");
 const { registerLocalMediaIpc } = require("./local-media-ipc.cjs");
+const { registerWindowIpc } = require("./window-ipc.cjs");
 const { createThemeService } = require("./theme-service.cjs");
 const { createAgentHostClient } = require("./agent-host-client.cjs");
 const { createPetStateStore } = require("./pet-state-store.cjs");
@@ -1347,27 +1348,14 @@ app.whenReady().then(() => {
     }
     return requestAgent(method, params);
   });
-  ipcMain.on("window:close-choice", (event, response) => {
-    if (!mainWindow || event.sender !== mainWindow.webContents || !closePromptOpen) return;
-    const choice = response?.choice;
-    applyCloseChoice(choice === "background" || choice === "quit" ? choice : "cancel", Boolean(response?.remember));
-  });
-  ipcMain.handle("window:get-close-behavior", (event) => {
-    if (!mainWindow || event.sender !== mainWindow.webContents) return "background";
-    return readCloseBehavior();
-  });
-  ipcMain.handle("window:set-close-behavior", (event, behavior) => {
-    if (!mainWindow || event.sender !== mainWindow.webContents) return readCloseBehavior();
-    return writeCloseBehavior(behavior);
-  });
-  ipcMain.handle("window:set-titlebar-theme", (event, background, foreground) => {
-    if (process.platform !== "win32" || !mainWindow || event.sender !== mainWindow.webContents || typeof mainWindow.setTitleBarOverlay !== "function") return false;
-    const isHexColor = (value) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-    if (!isHexColor(background) || !isHexColor(foreground)) return false;
-    mainWindow.setTitleBarOverlay({ color: background, symbolColor: foreground, height: 48 });
-    return true;
-  });
-  registerUpdateIpc({ ipcMain, BrowserWindow, updateManager, shell });
+  registerWindowIpc({
+    ipcMain,
+    getMainWindow: () => mainWindow,
+    isClosePromptOpen: () => closePromptOpen,
+    applyCloseChoice,
+    readCloseBehavior,
+    writeCloseBehavior,
+  });  registerUpdateIpc({ ipcMain, BrowserWindow, updateManager, shell });
   ipcMain.handle("plugins:open-downloads", async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return false;
     const downloadsPath = path.join(app.getPath("downloads"), "Skai Plugins");

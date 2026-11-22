@@ -91,8 +91,9 @@ and to any detailed plan rather than copying their full contents here.
   Agent Host request validation and method dispatch are also separated from
   the main loop. Update and local-media IPC registration now live outside
   Electron's shell entry point, and desktop pet state persistence has its own
-  store. Marketplace catalog shaping and MCP connection lifecycle state are
-  separated from the React page; MCP connection review and Staff Picks each
+  store. Window close/theme IPC is also extracted. Marketplace catalog shaping
+  and MCP connection lifecycle state are separated from the React page; MCP
+  connection review and Staff Picks each
   have their own focused panel.
   Agent Host user-profile and settings handlers now have a dedicated protocol
   module.
