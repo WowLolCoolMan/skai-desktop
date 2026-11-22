@@ -88,7 +88,8 @@ and to any detailed plan rather than copying their full contents here.
   identity resolution and source research; Core web search separates
   search-result handling from bounded public-page and transcript fetching.
   Marketplace model facets and compatibility rules now live in a focused
-  catalog helper rather than the page component.
+  catalog helper; the tool/skill grid and inspector are now a separate
+  presentation component.
 - **Agreed approach:** Refactor incrementally by cohesive responsibility,
   preserve bridge/storage/runtime behavior, sync with `main` before each
   commit, and verify the layer being changed. Do not split files mechanically

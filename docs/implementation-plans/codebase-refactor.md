@@ -165,6 +165,9 @@ checked per slice.
 - Moved Marketplace model tag facets, combined filtering, active-filter counts,
   and runtime compatibility checks into `marketplaceModelFilters.ts`; model
   results, install prompts, and Marketplace navigation keep the same behavior.
+- Extracted the tool/skill result grid and detail inspector into
+  `MarketplaceCatalogBrowser.tsx`; `PluginsPage` retains section navigation,
+  catalog loading, MCP state, and its existing Marketplace routes.
 - Moved local media URL IPC registration, ownership checks, validation, and
   revocation into `local-media-ipc.cjs`; the renderer-visible channel names and
   local media behavior are unchanged.
