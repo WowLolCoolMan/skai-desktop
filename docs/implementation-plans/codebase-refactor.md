@@ -91,6 +91,9 @@ that users touch as each slice is moved.
 - Extracted Electron update management and Agent Host process control.
 - Extracted Voice Workbench from the mixed Marketplace page and moved its
   bridge request fallback into a small shared helper.
+- Extracted persona identity matching into a deterministic helper and moved
+  MediaWiki HTML-to-text parsing behind its own parser, while retaining the
+  existing `PersonaKnowledgeSources` public facade.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent
@@ -113,7 +116,9 @@ that users touch as each slice is moved.
 
 - Continue the renderer extraction; `PluginsPage.tsx`, `AgentHostLoop.cs`,
   `PersonaKnowledgeSources.cs`, and `ModelLibraryService.cs` are among the
-  largest current mixed-responsibility files.
+  largest current mixed-responsibility files. Persona matching and HTML parsing
+  are now separate, but research orchestration, source fetching, and evidence
+  selection remain in `PersonaKnowledgeSources.cs`.
 - Complete installed speech-pack and real audio acceptance for local voice.
 - Keep OS isolation, image-runtime acceptance, and release/platform gaps in
   their existing capability entries; these are product completion work, not

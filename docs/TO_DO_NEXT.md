@@ -80,7 +80,8 @@ and to any detailed plan rather than copying their full contents here.
 - **Context:** Several large modules still combine unrelated responsibilities.
   Agent Host handlers and the Voice Workbench have been separated, while
   Marketplace, persona research, model library, and workspace orchestration
-  remain large.
+  remain large. Persona matching and HTML parsing are now in focused Core
+  helpers; source fetching and research orchestration remain to be separated.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
   bridge and storage contracts, keep current behavior, and integrate one
   reviewable slice at a time after syncing with main.
@@ -228,6 +229,10 @@ Move finished entries here with their commit/PR and verification evidence.
   the 17-route UI matrix across five window sizes and four theme/sidebar
   variants, plus bridge and local-only audits. Commits `f223075d`, `81edaec4`,
   and `c4dc3575`.
+- **2026-11-22 — Persona research Core boundaries.** Moved deterministic
+  identity matching and MediaWiki HTML parsing into focused helpers while
+  preserving the existing public research facade. Core and Agent Host Release
+  builds pass with zero warnings. Commits `a2a6d4e5` and `d2c0222f`.
 
 - **2026-11-18 — Coding Agent task journal, approval controls, and read-only
   project preflight.** Added task activity and restart reconciliation, approval
