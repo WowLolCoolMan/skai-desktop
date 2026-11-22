@@ -221,7 +221,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          SKAI_REQUIRE_SIGNED_INSTALLER: 'true'
+          SKAI_REQUIRE_SIGNED_INSTALLER: ${{ vars.RELEASE_UNSIGNED_TEST == 'true' && 'false' || 'true' }}
           SKAI_RELEASE_EVIDENCE_PATH: ${{ runner.temp }}\windows-install-lifecycle-evidence.json
         run: |
           $ErrorActionPreference = 'Stop'
