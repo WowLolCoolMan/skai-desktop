@@ -354,6 +354,26 @@ internal static class LocalStorageAndWorkspaceTests
             {
                 Environment.SetEnvironmentVariable(secretEnvironmentName, previousSecretEnvironment);
             }
+            const string unlistedEnvironmentName = "SKAI_DESKTOP_TEST_UNLISTED";
+            var previousUnlistedEnvironment = Environment.GetEnvironmentVariable(unlistedEnvironmentName);
+            Environment.SetEnvironmentVariable(unlistedEnvironmentName, "must-not-cross-command-boundary");
+            try
+            {
+                var allowlistProbe = await commandRunner.RunAsync(workspacePath, ".",
+                    OperatingSystem.IsWindows()
+                        ? $"Write-Output \"$env:{unlistedEnvironmentName}|$env:PATH\""
+                        : $"printf '%s|%s' \"${unlistedEnvironmentName}\" \"$PATH\"",
+                    TimeSpan.FromSeconds(10));
+                Check(!allowlistProbe.Output.Contains("must-not-cross-command-boundary", StringComparison.Ordinal) &&
+                      allowlistProbe.Output.Contains('|') && allowlistProbe.Output.Split('|').Last().Trim().Length > 0,
+                    "project commands inherit required runtime paths but not arbitrary application environment variables");
+                Check(allowlistProbe.IsolationStatus.Contains("explicit runtime allowlist", StringComparison.Ordinal),
+                    "project command evidence reports environment allowlist enforcement");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(unlistedEnvironmentName, previousUnlistedEnvironment);
+            }
             var coloredCommand = await commandRunner.RunAsync(workspacePath, ".",
                 OperatingSystem.IsWindows() ? "Write-Output ([char]27 + '[31mcheck-output[0m')" : "printf '\\033[31mcheck-output\\033[0m'",
                 TimeSpan.FromSeconds(10));

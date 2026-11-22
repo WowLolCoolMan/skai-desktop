@@ -1,5 +1,5 @@
 // Runs one user-approved command in a project folder, with time and output limits
-// and secret-shaped environment variables removed.
+// and a small, explicit runtime environment allowlist.
 // Used by the Agent Host Coding Agent command review; WorkspaceTerminalSession reuses its folder checks.
 
 using System.Diagnostics;
@@ -15,6 +15,13 @@ public sealed class WorkspaceCommandRunner
     public const int MaxOutputCharacters = 30_000;
     public static readonly TimeSpan MaxTimeout = TimeSpan.FromMinutes(2);
     private static readonly Regex TerminalControlSequence = new("\\x1b(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\x07]*(?:\\x07|\\x1b\\\\))", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly HashSet<string> AllowedCommandEnvironmentNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TERM", "CI",
+        "SystemRoot", "WINDIR", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA",
+        "LOCALAPPDATA", "ProgramData", "ComSpec", "PATHEXT", "DOTNET_ROOT",
+        "DOTNET_ROOT_X64", "NUGET_PACKAGES"
+    };
 
     public async Task<WorkspaceCommandResult> RunAsync(
         string selectedRoot,
@@ -46,8 +53,13 @@ public sealed class WorkspaceCommandRunner
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
         };
-        foreach (var name in startInfo.Environment.Keys.Where(IsSensitiveEnvironmentName).ToArray())
-            startInfo.Environment.Remove(name);
+        var inheritedEnvironment = startInfo.Environment.ToArray();
+        startInfo.Environment.Clear();
+        foreach (var (name, value) in inheritedEnvironment)
+        {
+            if (AllowedCommandEnvironmentNames.Contains(name) && !IsSensitiveEnvironmentName(name))
+                startInfo.Environment[name] = value;
+        }
         if (isWindows)
         {
             startInfo.ArgumentList.Add("-NoLogo");
@@ -99,7 +111,7 @@ public sealed class WorkspaceCommandRunner
             timedOut,
             truncated != 0,
             workingDirectory,
-            OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes));
+            $"{OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes)} Command environment is restricted to an explicit runtime allowlist.");
     }
 
     public static string ResolveWorkingDirectory(string selectedRoot, string relativeWorkingDirectory)

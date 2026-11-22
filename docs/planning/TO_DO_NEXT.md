@@ -128,9 +128,12 @@ and to any detailed plan rather than copying their full contents here.
 - **Status:** In progress
 - **Priority:** High, before unattended or parallel execution
 - **Owner:** Unclaimed
-- **Context:** The command runner bounds duration/output, removes
-  secret-shaped environment variables, checks the working directory, and kills
-  process trees on cancellation. Windows also attaches a kill-on-close Job
+- **Context:** The command runner bounds duration/output, now passes only an
+  explicit cross-platform runtime environment allowlist (including executable
+  search paths and temporary-directory settings), checks the working
+  directory, and kills process trees on cancellation. It excludes arbitrary
+  application environment values as well as secret-shaped variables. Windows
+  also attaches a kill-on-close Job
   Object when available. This does not sandbox filesystem or network access;
   Windows now limits a command tree to 128 processes and reports whether its
   Job Object attached. The Windows Job Object now also limits aggregate job
@@ -145,7 +148,9 @@ and to any detailed plan rather than copying their full contents here.
   Fail closed when isolation is unavailable; keep approvals and operation
   evidence visible. Do not expand unattended or parallel execution until the
   sandbox behavior is verified.
-- **Acceptance:** Tests verify the adaptive memory budget and actual Windows Job
+- **Acceptance:** Tests verify arbitrary app environment variables do not cross
+  the command boundary while required runtime paths remain available, along
+  with the adaptive memory budget and actual Windows Job
   Object attachment/status. A Windows runtime acceptance probe now confirms a
   320 MiB allocation succeeds under a 1 GiB Job Object cap and is prevented
   under the 256 MiB cap; it skips only when the test host has under 2 GiB
@@ -346,6 +351,13 @@ and to any detailed plan rather than copying their full contents here.
 ## Recently completed
 
 Move finished entries here with their commit/PR and verification evidence.
+
+- **2026-11-22 — Restrict Coding Agent command environments.** Approved
+  commands now receive only a small cross-platform runtime allowlist instead of
+  inheriting arbitrary application variables. Focused Core coverage verifies
+  an arbitrary parent-process variable is absent while PATH remains available.
+  This reduces accidental environment leakage; filesystem and network access
+  are still unrestricted, so OS sandboxing and the broader item remain open.
 
 - **2026-11-22 — Windows Coding Agent memory enforcement probe.** Added a bounded
   per-run memory-cap override for the isolated command runner and a Windows
