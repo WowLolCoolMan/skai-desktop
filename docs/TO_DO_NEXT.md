@@ -140,13 +140,14 @@ and to any detailed plan rather than copying their full contents here.
   evidence visible. Do not expand unattended or parallel execution until the
   sandbox behavior is verified.
 - **Acceptance:** Tests verify the adaptive memory budget and actual Windows Job
-  Object attachment/status; an over-limit runtime probe is still needed to
-  demonstrate enforcement under memory pressure. Access outside the project
-  remains unrestricted. Environment secrets are excluded, the wall timeout
-  applies, child processes are handled on cancellation, and unsupported systems
-  report that process containment is unavailable rather than implying it is
-  active. A filesystem/network sandbox remains required before unattended or
-  parallel execution.
+  Object attachment/status. A Windows runtime acceptance probe now confirms a
+  320 MiB allocation succeeds under a 1 GiB Job Object cap and is prevented
+  under the 256 MiB cap; it skips only when the test host has under 2 GiB
+  available. Access outside the project remains unrestricted. Environment
+  secrets are excluded, the wall timeout applies, child processes are handled
+  on cancellation, and unsupported systems report that process containment is
+  unavailable rather than implying it is active. A filesystem/network sandbox
+  remains required before unattended or parallel execution.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [architecture and trust boundaries](ARCHITECTURE.md),
   [production readiness](PRODUCTION_READINESS_GAPS.md).
@@ -317,12 +318,11 @@ and to any detailed plan rather than copying their full contents here.
 
 Move finished entries here with their commit/PR and verification evidence.
 
-- **2026-11-22 — Windows Coding Agent job memory budget.** Windows Job Object
-  containment now applies a dynamic aggregate memory cap (half of available RAM,
-  bounded to 256 MiB–8 GiB) and reports the applied value beside command output.
-  Budget boundary tests, the native Core suite, and Agent Host build pass. A
-  controlled over-limit runtime probe and filesystem/network sandbox remain
-  outstanding.
+- **2026-11-22 — Windows Coding Agent memory enforcement probe.** Added a bounded
+  per-run memory-cap override for the isolated command runner and a Windows
+  runtime control proving a 320 MiB allocation succeeds under a 1 GiB Job Object
+  cap but not under 256 MiB. The full native Core suite and Agent Host build
+  pass. Filesystem/network sandboxing and Linux containment remain outstanding.
 
 - **2026-11-22 — Persona profile drafting recovery.** Empty structured draft
   passes now receive one bounded retry with compact evidence and concise

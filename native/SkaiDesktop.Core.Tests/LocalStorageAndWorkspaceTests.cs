@@ -363,6 +363,18 @@ internal static class LocalStorageAndWorkspaceTests
             if (OperatingSystem.IsWindows())
                 Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal), "Windows Coding Agent process containment reports its enforced job memory cap");
             Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "project command clearly reports that filesystem and network are not sandboxed");
+            if (OperatingSystem.IsWindows() && GC.GetGCMemoryInfo().TotalAvailableMemoryBytes >= 2L * 1024 * 1024 * 1024)
+            {
+                const string memoryProbe = "try { $probe = New-Object 'byte[]' 335544320; $probe[0] = 1; $probe[$probe.Length - 1] = 1; exit 99 } catch { [Console]::Error.WriteLine($_.Exception.GetType().FullName); exit 73 }";
+                var memoryControl = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, 1024UL * 1024 * 1024);
+                Check(memoryControl.ExitCode == 99 && memoryControl.IsolationStatus.Contains("job memory cap 1.0 GiB", StringComparison.Ordinal),
+                    "Windows memory-limit acceptance control can allocate 320 MiB under a 1 GiB Job Object cap");
+                var memoryLimited = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, CommandResourceLimits.MinimumJobMemoryBytes);
+                Check(memoryLimited.ExitCode != 99 && memoryLimited.IsolationStatus.Contains("job memory cap 0.3 GiB", StringComparison.Ordinal),
+                    "Windows Job Object prevents a 320 MiB allocation from succeeding under its 256 MiB cap");
+            }
+            else if (OperatingSystem.IsWindows())
+                Console.WriteLine("SKIP Windows Job Object over-limit probe: less than 2 GiB is available to the test runtime.");
             var timedCommand = await commandRunner.RunAsync(workspacePath, ".",
                 OperatingSystem.IsWindows() ? "Start-Sleep -Seconds 5" : "sleep 5",
                 TimeSpan.FromSeconds(1));

@@ -25,16 +25,22 @@ internal sealed class OsProcessIsolation : IDisposable
     public bool IsAttached => jobHandle is not null && !jobHandle.IsInvalid;
     public ulong? JobMemoryLimitBytes => IsAttached ? jobMemoryLimitBytes : null;
 
-    public static OsProcessIsolation Attach(Process process)
+    public static OsProcessIsolation Attach(Process process, ulong? memoryLimitBytesOverride = null)
     {
         if (!OperatingSystem.IsWindows()) return new OsProcessIsolation(null);
+        if (memoryLimitBytesOverride is { } requestedLimit &&
+            (requestedLimit < CommandResourceLimits.MinimumJobMemoryBytes || requestedLimit > CommandResourceLimits.MaximumJobMemoryBytes))
+            throw new ArgumentOutOfRangeException(nameof(memoryLimitBytesOverride));
         try
         {
             var job = CreateJobObject(IntPtr.Zero, null);
             if (job == IntPtr.Zero) return new OsProcessIsolation(null);
             var handle = new SafeFileHandle(job, ownsHandle: true);
             var availablePhysicalBytes = GetAvailablePhysicalMemoryBytes();
-            var memoryLimitBytes = CommandResourceLimits.EstimateJobMemoryLimitBytes(availablePhysicalBytes);
+            var estimatedMemoryLimitBytes = CommandResourceLimits.EstimateJobMemoryLimitBytes(availablePhysicalBytes);
+            var memoryLimitBytes = memoryLimitBytesOverride is { } requestedBudget
+                ? Math.Min(estimatedMemoryLimitBytes, requestedBudget)
+                : estimatedMemoryLimitBytes;
             var limits = new JobObjectExtendedLimitInformation
             {
                 BasicLimitInformation = new JobObjectBasicLimitInformation

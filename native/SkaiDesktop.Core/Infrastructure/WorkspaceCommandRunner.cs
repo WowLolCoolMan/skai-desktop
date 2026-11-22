@@ -19,12 +19,16 @@ public sealed class WorkspaceCommandRunner
         string relativeWorkingDirectory,
         string command,
         TimeSpan timeout,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ulong? jobMemoryLimitBytesOverride = null)
     {
         if (string.IsNullOrWhiteSpace(command) || command.Length > MaxCommandCharacters || command.Contains('\0'))
             throw new ArgumentException($"Enter a command of 1 to {MaxCommandCharacters:N0} characters.", nameof(command));
         if (timeout < TimeSpan.FromSeconds(1) || timeout > MaxTimeout)
             throw new ArgumentOutOfRangeException(nameof(timeout), $"Command timeout must be between 1 second and {MaxTimeout.TotalMinutes:N0} minutes.");
+        if (jobMemoryLimitBytesOverride is { } memoryLimit &&
+            (memoryLimit < CommandResourceLimits.MinimumJobMemoryBytes || memoryLimit > CommandResourceLimits.MaximumJobMemoryBytes))
+            throw new ArgumentOutOfRangeException(nameof(jobMemoryLimitBytesOverride), "A command memory limit override must be between 256 MiB and 8 GiB.");
 
         var workingDirectory = ResolveWorkingDirectory(selectedRoot, relativeWorkingDirectory);
         var isWindows = OperatingSystem.IsWindows();
@@ -58,7 +62,7 @@ public sealed class WorkspaceCommandRunner
 
         using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         if (!process.Start()) throw new InvalidOperationException("The command process could not be started.");
-        using var isolation = OsProcessIsolation.Attach(process);
+        using var isolation = OsProcessIsolation.Attach(process, jobMemoryLimitBytesOverride);
         process.StandardInput.Close();
         var output = new StringBuilder();
         var outputGate = new object();
