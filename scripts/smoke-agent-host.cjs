@@ -105,7 +105,8 @@ async function run() {
   if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call") || !health.result?.capabilities?.includes("persona.discover"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
   const capacity = await request("system.capacity");
-  if (!capacity.ok || capacity.result?.scheduler?.activeTaskCount !== 0 || capacity.result?.scheduler?.queuedTaskCount !== 0 || capacity.result?.scheduler?.executionSlotLimit !== 1)
+  const reportedSlotLimit = capacity.result?.scheduler?.executionSlotLimit;
+  if (!capacity.ok || capacity.result?.scheduler?.activeTaskCount !== 0 || capacity.result?.scheduler?.queuedTaskCount !== 0 || !Number.isInteger(reportedSlotLimit) || reportedSlotLimit < 1)
     throw new Error(`system.capacity did not expose the bounded local scheduler snapshot: ${JSON.stringify(capacity)}`);
   const mcpConnections = await request("mcp.connections.list");
   if (!mcpConnections.ok || !Array.isArray(mcpConnections.result?.connections) || mcpConnections.result.connections.length !== 0)
@@ -357,15 +358,19 @@ async function run() {
     secondTerminal = snapshot.result.find(item => item.id === secondQueued.result.id) ?? null;
     if ([firstTerminal, secondTerminal].every(task => task && ["completed", "failed", "cancelled", "blocked"].includes(task.status))) break;
   }
-  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || maxActiveQueueRequests !== 1)
-    throw new Error(`Queued task dispatch did not run both tasks serially: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, maxActiveQueueRequests, queueRequestBodies })}`);
+  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || maxActiveQueueRequests < 1 || maxActiveQueueRequests > reportedSlotLimit)
+    throw new Error(`Queued task dispatch exceeded the reported local capacity: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, maxActiveQueueRequests, reportedSlotLimit, queueRequestBodies })}`);
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const capacitySnapshot = await request("system.capacity");
     if (capacitySnapshot.ok && capacitySnapshot.result?.scheduler?.activeTaskCount === 0 && capacitySnapshot.result?.scheduler?.queuedTaskCount === 0) break;
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  const cancellationLeader = await request("tasks.plan", { title: "Cancellation leader", instruction: "Keep the local slot occupied briefly.", environment: "local" });
-  const cancellationWaiter = await request("tasks.plan", { title: "Cancellation waiter", instruction: "Cancel while waiting for the local slot.", environment: "local" });
+  // Use an intentionally large model estimate so this pair exercises the
+  // single-slot cancellation path even on hosts with room for multiple small
+  // local runs.
+  const cancellationModelSizeBytes = 60 * 1024 * 1024 * 1024;
+  const cancellationLeader = await request("tasks.plan", { title: "Cancellation leader", instruction: "Keep the local slot occupied briefly.", environment: "local", modelSizeBytes: cancellationModelSizeBytes });
+  const cancellationWaiter = await request("tasks.plan", { title: "Cancellation waiter", instruction: "Cancel while waiting for the local slot.", environment: "local", modelSizeBytes: cancellationModelSizeBytes });
   for (const task of [cancellationLeader, cancellationWaiter]) {
     const queuedTask = await request("tasks.queue", { id: task.result.id });
     if (!queuedTask.ok || queuedTask.result?.status !== "queued") throw new Error("tasks.queue did not queue the cancellation pair.");

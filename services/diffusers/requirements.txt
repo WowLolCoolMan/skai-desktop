@@ -1,7 +1,7 @@
 # Installed only when the user opts into the built-in image runtime.
-diffusers>=0.33,<1
-transformers>=4.45,<6
-accelerate>=1.2,<2
-safetensors>=0.4
+diffusers>=0.40,<1
+transformers>=5.23.0,<6
+accelerate>=1.16.0,<2
+safetensors>=0.8.0
 torch>=2.1
 rembg[cpu]==2.0.87

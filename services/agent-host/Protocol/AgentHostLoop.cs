@@ -800,6 +800,29 @@ public static class AgentHostLoop
             });
             ollamaCandidatesAdded = true;
         }
+        if (uncensored && (string.IsNullOrWhiteSpace(query) || query.Contains("gemma", StringComparison.OrdinalIgnoreCase) || query.Contains("31b", StringComparison.OrdinalIgnoreCase)))
+        {
+            // Reviewed GGUF build of the dense Gemma 4 31B abliterated model.
+            // Keep this in the uncensored lane and route installation through
+            // LM Studio, which can import the repository and expose it through
+            // Skai's existing loopback OpenAI-compatible provider.
+            models.Insert(0, new
+            {
+                id = "huggingface:Kooten/gemma-4-31b-abliterated-v1.1-GGUF",
+                repository = "Kooten/gemma-4-31b-abliterated-v1.1-GGUF",
+                source = "Hugging Face",
+                kind = "llm",
+                downloads = 261L,
+                likes = 0L,
+                uncensored = true,
+                tags = new[] { "text-generation", "gemma4", "31b", "dense", "abliterated", "gguf" },
+                sizeBytes = (long)(18.7 * 1024 * 1024 * 1024),
+                contextLength = 131072,
+                installRoute = "lm-studio",
+                installable = true,
+                requiresAirLlm = false,
+            });
+        }
         if (string.IsNullOrWhiteSpace(query) || query.Contains("qwen", StringComparison.OrdinalIgnoreCase) || query.Contains("1m", StringComparison.OrdinalIgnoreCase))
             AddOllamaModel("org/qwen2.5-1m:7b", 4_111, 4.7, 986_000, ["text-generation", "qwen2", "1m-context", "ollama"]);
         if (string.IsNullOrWhiteSpace(query) || query.Contains("code", StringComparison.OrdinalIgnoreCase) || query.Contains("coder", StringComparison.OrdinalIgnoreCase))
@@ -908,6 +931,14 @@ public static class AgentHostLoop
         var text = RequiredSpeechText(request, "text", 4_000);
         var rate = OptionalDouble(request, "rate") ?? 1;
         if (rate is < 0.5 or > 2) throw new InvalidOperationException("rate must be between 0.5 and 2.");
+        if (OptionalString(request, "provider")?.Equals("elevenlabs", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var apiKey = RequiredBoundedString(request, "apiKey", 512);
+            var voiceId = RequiredBoundedString(request, "voiceId", 128);
+            var endpoint = RequiredBoundedString(request, "endpoint", 2_000);
+            var audio = CloudVoiceService.SynthesizeAsync(endpoint, voiceId, apiKey, text, rate).GetAwaiter().GetResult();
+            return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "elevenlabs-cloud", interruptible = true, audioDataUrl = audio });
+        }
         var engine = voice.Speak(text, rate);
         return new(ProtocolVersion, request.Id, true, new { spoken = true, engine, interruptible = true });
     }
@@ -1748,7 +1779,8 @@ public static class AgentHostLoop
 
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
         var settings = CreateSettingsStore().Load();
-        var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(task.ModelProvider));
+        var effectiveProvider = string.IsNullOrWhiteSpace(task.ModelProvider) ? settings.ModelProvider : task.ModelProvider;
+        var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(effectiveProvider));
         var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
@@ -1812,7 +1844,8 @@ public static class AgentHostLoop
         {
             var snapshot = await new LocalCapacityProbe().GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
             var settings = CreateSettingsStore().Load();
-            var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(task.ModelProvider), cancellationToken);
+            var effectiveProvider = string.IsNullOrWhiteSpace(task.ModelProvider) ? settings.ModelProvider : task.ModelProvider;
+            var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(effectiveProvider), cancellationToken);
             var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, task.ModelSizeBytes, task.ModelContextLength, task.AirLlmCompatible, runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
             lock (LocalExecutionGate)
             {

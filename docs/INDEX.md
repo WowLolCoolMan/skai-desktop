@@ -68,3 +68,12 @@ provides a shorter introduction.
   and license review, not a source reuse grant.
 - [Archived notes](archive/README.md) — completed work logs and superseded
   planning documents retained for historical context.
+
+## Community and licensing
+
+- [Contributor guide](../CONTRIBUTING.md)
+- [Code of Conduct](../CODE_OF_CONDUCT.md)
+- [Security policy](../SECURITY.md)
+- [Accessibility statement](../ACCESSIBILITY.md)
+- [Source Reference License](../LICENSE)
+- [Third-party notices](../THIRD_PARTY_NOTICES.md)

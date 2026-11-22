@@ -1,5 +1,12 @@
 # Third-party notices
 
+The root [LICENSE](LICENSE) applies to Skai-owned material only. The components
+and adaptations listed below, their bundled upstream license files, and any
+other material marked with a separate license are excluded from the Skai
+Desktop Source Reference License and remain governed by their respective
+licenses. Those third-party terms may grant rights that differ from the terms
+for Skai-owned code.
+
 Skai Desktop includes these renderer libraries. The packages are bundled for offline use; neither package contacts a service.
 
 - `marked` — MIT License. Copyright (c) 2018+, MarkedJS. The complete license is included at `node_modules/marked/LICENSE` in the source distribution and in the packaged application.

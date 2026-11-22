@@ -33,6 +33,7 @@
     "smoke:windows:installer": "node scripts/smoke-windows-installer.cjs",
     "smoke:electron:artifact": "node scripts/smoke-electron-artifact.cjs",
     "smoke:voice:acceptance": "node scripts/smoke-voice-acceptance.cjs",
+    "smoke:airllm": "node scripts/smoke-airllm.cjs",
     "smoke:electron:accessibility": "node scripts/smoke-electron-accessibility.cjs",
     "smoke:electron:themes": "node scripts/smoke-electron-themes.cjs",
     "smoke:electron:overflow": "node scripts/smoke-electron-overflow.cjs",

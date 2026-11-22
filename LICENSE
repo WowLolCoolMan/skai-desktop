@@ -1,21 +1,83 @@
-MIT License
-
+Skai Desktop Source Reference License 1.0
 Copyright (c) 2026 Skai Desktop
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Effective for the Skai Desktop source distribution from November 21, 2026.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This is a custom, source-available license. It is not an open-source license.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. Covered material
+
+“Covered Material” means original source code, documentation, and other
+materials in this repository that Skai Desktop or its authorized contributors
+own and are entitled to license under these terms. Covered Material excludes
+third-party materials and any component identified as subject to a separate
+license in THIRD_PARTY_NOTICES.md, licenses/, a file header, or its own license
+file. Those materials remain governed by their respective licenses.
+
+2. Limited reference permission
+
+You may access, view, read, and study Covered Material solely to evaluate or
+understand Skai Desktop as a reference. You may make private notes about what
+you learn and write an independent implementation of general ideas, facts, and
+functional concepts, provided that you do not copy or adapt protected
+expression from the Covered Material.
+
+You may quote brief excerpts only as reasonably necessary to discuss, review,
+or criticize Skai Desktop, with attribution and a link to the source. This
+permission does not allow publishing source files or substantial code excerpts.
+
+Nothing in this license limits permissions that GitHub's Terms of Service
+directly grant for viewing, forking, or reproducing repository content through
+GitHub's own features. Those platform permissions do not grant rights to use,
+modify, distribute, or incorporate Covered Material outside the GitHub
+Service.
+
+3. Uses that require separate written permission
+
+Except for the limited permissions in section 2, you may not, without prior
+written permission from the applicable copyright holder:
+
+- copy, modify, adapt, translate, or create derivative works from Covered
+  Material;
+- incorporate Covered Material into another product, service, repository, or
+  codebase, whether commercial or noncommercial;
+- distribute, publish, sublicense, sell, host, or make Covered Material
+  available outside GitHub's repository features; or
+- remove or alter copyright, license, or attribution notices.
+
+These restrictions apply only to Covered Material. They do not restrict rights
+you have under a separate third-party license or applicable law.
+
+4. Rights reserved
+
+All rights in Covered Material not expressly granted in section 2 are reserved
+by the applicable copyright holders. This license grants no rights to Skai
+Desktop names, logos, trademarks, or other brand assets except where separately
+stated.
+
+5. Earlier versions
+
+The Skai Desktop source published before November 21, 2026 was accompanied by
+the MIT License. A copy of that license is preserved at
+licenses/Legacy-Skai-Desktop-MIT-LICENSE.txt. This license applies
+prospectively to the source distribution published with it and later versions
+to the extent the applicable copyright holders have authority to do so. It
+does not revoke or change permissions already granted for earlier versions or
+copies obtained under the MIT License. Third-party licenses remain unchanged.
+
+6. Termination
+
+The permissions in this license terminate automatically if you materially
+violate its terms. They may be reinstated only by the applicable copyright
+holder in writing.
+
+7. Disclaimer
+
+COVERED MATERIAL IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY
+LAW, THE COPYRIGHT HOLDERS ARE NOT LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM THE MATERIAL OR ITS USE.
+
+For permission beyond this license, contact the Skai Desktop repository owner
+through https://github.com/WowLolCoolMan.

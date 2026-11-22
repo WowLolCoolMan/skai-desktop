@@ -13,6 +13,9 @@ powershell -ExecutionPolicy Bypass -File .\services\airllm\install.ps1
 On Linux/macOS use `bash services/airllm/install.sh`. The installer creates a
 user-local environment and installs AirLLM plus its runtime dependencies.
 Install the PyTorch wheel matching the machine's CUDA/CPU setup when needed.
+The current AirLLM adapter requires a CUDA-capable PyTorch installation and an
+NVIDIA GPU; Skai reports that requirement before downloading model weights when
+CUDA is unavailable.
 
 AirLLM model IDs must be Hugging Face IDs such as `Qwen/Qwen3-32B` or a local
 model directory. The first request may download and split the model into local

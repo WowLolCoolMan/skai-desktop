@@ -141,4 +141,4 @@ matrix](docs/CAPABILITY_MATRIX.md) records current evidence and boundaries; the
 
 Keep changes incremental, local-first, and testable. Preserve the Electron → isolated IPC → .NET Agent Host boundary, avoid exposing secrets to the renderer, do not add cloud model routes, and include validation evidence for user-facing changes.
 
-See [`LICENSE`](LICENSE) for project terms and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for separately licensed components.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor guide, development checks, and pull request process. The repository is source-available for reference; reuse rights are limited by the [Skai Desktop Source Reference License](LICENSE). Existing snapshots published under MIT remain under their original terms. Third-party components retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Read the [Code of Conduct](CODE_OF_CONDUCT.md), [Security Policy](SECURITY.md), and [Accessibility statement](ACCESSIBILITY.md) before contributing.
