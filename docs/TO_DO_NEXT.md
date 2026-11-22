@@ -96,8 +96,8 @@ and to any detailed plan rather than copying their full contents here.
   connection review and Staff Picks each
   have their own focused panel.
   Agent Host user-profile/settings handlers, long-running operation state, and
-  image, voice, and model/runtime workflows now have dedicated protocol
-  modules.
+  image, voice, model/runtime, and memory/corpus workflows now have dedicated
+  protocol modules.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
   bridge and storage contracts, keep current behavior, and integrate one
   reviewable slice at a time after syncing with main.

@@ -135,6 +135,9 @@ that users touch as each slice is moved.
 - Moved local model inventory, capacity reporting, AirLLM setup, and model pull
   status/cancellation handlers into `AgentHostLoop.Models.cs`; runtime methods
   and response shapes are unchanged.
+- Moved memory and document-corpus protocol handlers into
+  `AgentHostLoop.Memory.cs`; local persistence operations and response fields
+  remain the same.
 - Moved update IPC registration and its sender/URL checks into
   `update-ipc.cjs`; the existing updater manager remains responsible for update
   lifecycle and download state.
