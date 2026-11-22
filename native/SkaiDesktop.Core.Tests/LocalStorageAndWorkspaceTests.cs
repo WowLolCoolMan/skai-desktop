@@ -366,10 +366,13 @@ internal static class LocalStorageAndWorkspaceTests
                     TimeSpan.FromSeconds(10));
                 var allowlistOutputParts = allowlistProbe.Output.Split('|');
                 var allowlistPathPresent = allowlistOutputParts.Length > 1 && allowlistOutputParts[^1].Trim().Length > 0;
+                var allowlistFailure = allowlistProbe.ExitCode == 0
+                    ? string.Empty
+                    : $", failure={allowlistProbe.Output.Trim()[..Math.Min(240, allowlistProbe.Output.Trim().Length)]}";
                 Check(allowlistProbe.ExitCode == 0 &&
                       !allowlistProbe.Output.Contains("must-not-cross-command-boundary", StringComparison.Ordinal) &&
                       allowlistOutputParts.Length > 1 && allowlistPathPresent,
-                    $"project commands inherit required runtime paths but not arbitrary application environment variables (exit={allowlistProbe.ExitCode}, separator={allowlistOutputParts.Length > 1}, pathPresent={allowlistPathPresent}, isolation={allowlistProbe.IsolationStatus})");
+                    $"project commands inherit required runtime paths but not arbitrary application environment variables (exit={allowlistProbe.ExitCode}, separator={allowlistOutputParts.Length > 1}, pathPresent={allowlistPathPresent}{allowlistFailure}, isolation={allowlistProbe.IsolationStatus})");
                 Check(allowlistProbe.IsolationStatus.Contains("explicit runtime allowlist", StringComparison.Ordinal),
                     "project command evidence reports environment allowlist enforcement");
             }

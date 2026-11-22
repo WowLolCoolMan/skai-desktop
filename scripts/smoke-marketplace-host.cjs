@@ -4,16 +4,18 @@
  * provider-backed response shape without downloading a model. */
 
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const readline = require("node:readline");
 const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
 const root = path.resolve(__dirname, "..");
-// Filesystem MCP canonicalizes its allowed roots; resolve Windows 8.3 temp
-// paths once so the request and server compare the same path representation.
-const profileRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "skai-marketplace-smoke-")));
+// Keep the allowed root under the checkout. Windows runners can expose TEMP
+// through an 8.3 user-profile alias that the MCP server later expands, making
+// an otherwise identical allowlist path fail its exact-root check.
+const smokeTempRoot = path.join(root, ".tmp");
+fs.mkdirSync(smokeTempRoot, { recursive: true });
+const profileRoot = fs.mkdtempSync(path.join(smokeTempRoot, "marketplace-smoke-"));
 const env = {
   ...process.env,
   SRAI_SETTINGS_PATH: path.join(profileRoot, "settings.json"),
