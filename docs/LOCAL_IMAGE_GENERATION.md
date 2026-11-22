@@ -15,14 +15,17 @@ managed Python environment is installed on the local machine and is not bundled
 inside the desktop installer.
 
 The worker accepts one prompt per process and returns a bounded JPEG to the
-renderer. The renderer keeps recent output history in IndexedDB on this device,
+renderer. It supports both text-to-image and image-to-image from a validated
+local PNG/JPEG source. The renderer keeps recent output history in IndexedDB on this device,
 including the Diffusers image bytes, prompt, provider, and timestamp. History is
 limited to 24 records and 32 MiB of URL data. Runtime dependency installation,
 the first model download, and local CPU generation were exercised in Skai on
-2026-11-15. The persistent IndexedDB database and image blob were present after
-closing and relaunching the app; visually reopening the gallery entry after that
-restart still needs acceptance. Cancellation during inference and the packaged
-hardware matrix also remain unverified.
+2026-11-15. On 2026-11-22, direct worker acceptance returned 512×512 JPEGs for
+text-to-image and image-to-image; progress reported four actual text steps and
+two effective edit steps. The persistent IndexedDB database and image blob were
+present after closing and relaunching the app; visually reopening the gallery
+entry after that restart still needs acceptance. Live cancellation during
+inference and the packaged hardware matrix also remain unverified.
 
 ## ComfyUI integration
 
@@ -42,9 +45,9 @@ built-in Diffusers path.
   CPU. AMD GPU acceleration and backend selection are not implemented or
   verified; CPU may be slow.
 - ComfyUI history retains local output URLs, so the local ComfyUI service must be
-  available to view those outputs later. Built-in Diffusers editing, resumable
-  downloads/jobs, inference progress, and cancellation of active generation
-  remain open.
+  available to view those outputs later. Live cancellation through the
+  packaged UI, resumable downloads/jobs, and broader hardware acceptance remain
+  open.
 - Runtime setup and model download need clear disk/network requirements. Model
   weights and Python packages are separate downloads.
 - Prompts and model execution remain local. Model downloads contact Hugging Face

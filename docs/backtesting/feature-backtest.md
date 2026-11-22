@@ -31,7 +31,8 @@ worktree.
 | Repository hygiene and release configuration | `check:hygiene`, `check:release-config`, `audit:future-features` |
 | Windows 0.1.4 unsigned installer packaging and update metadata | `SKAI_ALLOW_UNSIGNED_INSTALLER=true node scripts/package-windows-installer.cjs` — NSIS artifact and `latest.yml` verified locally |
 | Windows 0.1.4 clean install and uninstall | Unsigned installer installed into a disposable profile, launched the packaged app, passed the packaged smoke, then silently uninstalled; completed 2026-11-22. This does not cover upgrade/data retention or rollback. |
-| Real local Diffusers generation progress | Installed SD-Turbo runtime generated a 512×512 CPU image; worker reported actual 1/4 through 4/4 inference steps. Agent Host now forwards step progress and cancellation to the image operation. |
+| Real local Diffusers image generation and editing | Installed SD-Turbo runtime returned valid 512×512 CPU JPEGs for text-to-image (4/4 scheduler steps) and image-to-image with a 512×512 local PNG source (2/2 effective scheduler steps). The edit source was a disposable fixture. |
+| Diffusers progress accuracy | Worker progress now uses Diffusers' actual effective timestep count; a real text run reported 1/4 through 4/4 and an edit run 1/2 through 2/2. Agent Host forwards step progress and cancellation to the image operation. |
 
 ## Conditional or incomplete coverage
 
@@ -45,6 +46,7 @@ worktree.
 | Release signing and lifecycle | Release audit confirms the gates exist. Cryptographic signing and clean-machine upgrade/rollback still require configured CI secrets and Windows/Ubuntu runners. |
 | Local Windows upgrade lifecycle | Disposable clean install/launch/uninstall passed for unsigned 0.1.4. The 0.1.3 → 0.1.4 upgrade smoke still needs a real 0.1.3 installer artifact; upgrade data retention and rollback remain unverified. |
 | WebM video sampling | H.264 MP4 sampling passes. The smoke harness's data-URL WebM probe is rejected by Chromium's URL safety policy on this host, so the run reports this and leaves actual packaged WebM decoding unverified. |
+| Diffusers cancellation and renderer-to-host editing | Worker text-to-image and image-to-image paths are accepted directly, but live cancellation during inference and the complete packaged UI → Agent Host → history/reopen workflow remain unverified. |
 | Linux AppImage packaging | The packager correctly refuses to run on Windows; build and acceptance require an Ubuntu/Linux runner. |
 
 ## Test-harness notes

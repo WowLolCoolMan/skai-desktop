@@ -40,8 +40,14 @@ def main(request):
             arguments.update({"image": source, "strength": 0.55})
         else:
             arguments.update({"height": 512, "width": 512})
-        total_steps = arguments["num_inference_steps"]
         def report_step(_pipeline, step, _timestep, callback_kwargs):
+            # Some schedulers expand or collapse the requested step count. Report
+            # the actual active schedule so the UI never promises phantom steps.
+            total_steps = (
+                getattr(_pipeline, "_num_timesteps", None)
+                or len(getattr(_pipeline.scheduler, "timesteps", []))
+                or arguments["num_inference_steps"]
+            )
             print(json.dumps({"type": "progress", "step": step + 1, "total": total_steps}), flush=True)
             return callback_kwargs
 
