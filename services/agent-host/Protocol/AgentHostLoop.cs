@@ -289,59 +289,6 @@ public static partial class AgentHostLoop
         error = operation.Error,
     });
 
-    private static AgentResponse GetImageRuntimeStatus(AgentRequest request) =>
-        new(ProtocolVersion, request.Id, true, new DiffusersImageProvider().GetRuntimeStatus());
-
-    private static AgentResponse StartImageRuntimeInstall(AgentRequest request)
-    {
-        lock (ImageRuntimeInstallsGate)
-        {
-            if (ImageRuntimeInstalls.Values.Any(operation => operation.State == "running"))
-                throw new InvalidOperationException("The optional image runtime setup is already running.");
-            var operation = new ImageRuntimeInstallOperation(Guid.NewGuid().ToString("N"), new CancellationTokenSource());
-            ImageRuntimeInstalls[operation.Id] = operation;
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await new DiffusersImageProvider().InstallRuntimeAsync(operation.AddProgress, operation.Cancellation.Token).ConfigureAwait(false);
-                    operation.Complete();
-                }
-                catch (OperationCanceledException) when (operation.Cancellation.IsCancellationRequested) { operation.Cancelled(); }
-                catch (Exception error) { operation.Fail(error.Message); }
-            });
-            return ImageRuntimeInstallResponse(request, operation);
-        }
-    }
-
-    private static AgentResponse GetImageRuntimeInstallStatus(AgentRequest request)
-    {
-        var id = RequiredBoundedString(request, "id", 64);
-        lock (ImageRuntimeInstallsGate)
-            return ImageRuntimeInstalls.TryGetValue(id, out var operation)
-                ? ImageRuntimeInstallResponse(request, operation)
-                : throw new KeyNotFoundException("The image runtime setup session no longer exists.");
-    }
-
-    private static AgentResponse CancelImageRuntimeInstall(AgentRequest request)
-    {
-        var id = RequiredBoundedString(request, "id", 64);
-        lock (ImageRuntimeInstallsGate)
-        {
-            if (!ImageRuntimeInstalls.TryGetValue(id, out var operation)) throw new KeyNotFoundException("The image runtime setup session no longer exists.");
-            if (operation.State == "running") operation.Cancellation.Cancel();
-            return ImageRuntimeInstallResponse(request, operation);
-        }
-    }
-
-    private static AgentResponse ImageRuntimeInstallResponse(AgentRequest request, ImageRuntimeInstallOperation operation) => new(ProtocolVersion, request.Id, true, new
-    {
-        id = operation.Id,
-        status = operation.State,
-        progress = operation.Progress.ToArray(),
-        error = operation.Error,
-    });
-
     private static AgentResponse ListVoiceModels(AgentRequest request) =>
         new(ProtocolVersion, request.Id, true, new
         {
