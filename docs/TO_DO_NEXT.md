@@ -83,6 +83,7 @@ and to any detailed plan rather than copying their full contents here.
   remain large. Persona matching and HTML parsing are now in focused Core
   helpers, and bounded public-source requests are isolated in an injectable
   client; research orchestration and evidence selection remain to be separated.
+  Agent Host request validation is also separated from the main loop.
 - **Agreed approach:** Follow the ordered, all-layer incremental plan; preserve
   bridge and storage contracts, keep current behavior, and integrate one
   reviewable slice at a time after syncing with main.
@@ -236,6 +237,10 @@ Move finished entries here with their commit/PR and verification evidence.
   builds pass with zero warnings. Bounded Wikipedia/Fandom fetching is now an
   injectable client with the same `HttpClient` test seam. Commits `a2a6d4e5`,
   `d2c0222f`, and `afe7cb07`.
+- **2026-11-22 — Agent Host request validation boundary.** Moved protocol
+  parameter checks, size limits, attachment validation, endpoint restrictions,
+  and speech-text normalization into a dedicated partial module. Agent Host
+  Release build passes with zero warnings. Commit `5bf18d30`.
 
 - **2026-11-18 — Coding Agent task journal, approval controls, and read-only
   project preflight.** Added task activity and restart reconciliation, approval

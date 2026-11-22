@@ -97,6 +97,9 @@ that users touch as each slice is moved.
 - Extracted bounded Wikipedia/Fandom requests, timeouts, host pacing, and
   retry handling into an injectable `PersonaWikiClient`; the coordinator still
   owns the existing research decisions and evidence selection.
+- Moved Agent Host request-parameter validation, bounds, and local endpoint
+  checks into `AgentHostLoop.RequestValidation.cs`; the public protocol and
+  guard behavior are unchanged.
 - Restored the Electron child-process launcher import required by the packaged
   app.
 - Restructured Settings so its content scrolls above a separate persistent
