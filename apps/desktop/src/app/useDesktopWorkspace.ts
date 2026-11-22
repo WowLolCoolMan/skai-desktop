@@ -170,6 +170,8 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [imagePrompt, setImagePrompt] = useState("");
   const [imageWorkflow, setImageWorkflow] = useState(localStorage.getItem("skai.imageWorkflow") ?? "");
   const [imageBusy, setImageBusy] = useState(false);
+  const [imageCancelRequested, setImageCancelRequested] = useState(false);
+  const [imageProgress, setImageProgress] = useState<string[]>([]);
   const [generatedImages, setGeneratedImages] = useState<ImageHistoryEntry[]>([]);
   const dismissError = useCallback(() => setError(null), []);
 
@@ -472,6 +474,8 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const generateImage = async (source?: import("../../shared/contracts").ChatAttachment) => {
     if (imageProvider === "comfyui" && !isLocalEndpoint(imageEndpoint)) { setError(LOCAL_ENDPOINT_ERROR); return; }
     setImageBusy(true);
+    setImageCancelRequested(false);
+    setImageProgress([]);
     setError(null);
     localStorage.setItem("skai.imageEndpoint", imageEndpoint);
     localStorage.setItem("skai.imageProvider", imageProvider);
@@ -482,16 +486,17 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       const operationId = (started.result as { id?: string }).id;
       if (!operationId) { setError("Image generation did not return an operation ID."); return; }
       activeImageGenerationId.current = operationId;
-      let result: { status: string; images?: Array<{ url: string; fileName: string }>; error?: string } = { status: "running" };
-      for (let attempt = 0; attempt < 1800 && result.status === "running"; attempt += 1) {
+      let result: { status: string; progress?: string[]; images?: Array<{ url: string; fileName: string }>; error?: string } = { status: "running" };
+      while (result.status === "running") {
         await new Promise((resolve) => window.setTimeout(resolve, 500));
         const status = await request("image.generate.status", { id: operationId });
         if (!status.ok) { setError(status.error?.message ?? "Image generation status was unavailable."); return; }
         result = status.result as typeof result;
+        setImageProgress(result.progress ?? []);
       }
       if (result.status === "cancelled") { setError("Image generation cancelled."); return; }
       if (result.status === "failed") { setError(result.error ?? "Image generation failed."); return; }
-      if (result.status !== "completed") { setError("Image generation timed out; the local operation may still be running."); return; }
+      if (result.status !== "completed") { setError("Image generation ended without a completed result."); return; }
       const createdAt = new Date().toISOString();
       const imageSource = imageProvider === "comfyui" ? "comfyui" : "diffusers";
       const images: ImageHistoryEntry[] = (result.images ?? []).map((image) => ({ ...image, createdAt, provider: imageSource, prompt: imagePrompt.trim() }));
@@ -502,6 +507,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     } finally {
       activeImageGenerationId.current = null;
       setImageBusy(false);
+      setImageCancelRequested(false);
     }
   };
   const cancelImageGeneration = async (): Promise<boolean> => {
@@ -509,12 +515,13 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     if (!id) return false;
     const response = await request("image.generate.cancel", { id });
     if (!response.ok) { setError(response.error?.message ?? "Image generation cancellation failed."); return false; }
-    activeImageGenerationId.current = null;
+    setImageCancelRequested(true);
+    setError(null);
     return true;
   };
   const pickImageSource = async () => { const response = await request("workspace.pickFiles"); if (!response.ok) throw new Error(response.error?.message ?? "Image selection failed."); const attachments = (response.result as { attachments?: import("../../shared/contracts").ChatAttachment[] }).attachments ?? []; const source = attachments.find((item) => item.mediaType === "image/png" || item.mediaType === "image/jpeg"); if (!source) return null; return source; };
   const importImageWorkflow = async () => { const response = await request("workspace.pickFiles"); if (!response.ok) throw new Error(response.error?.message ?? "A local workflow file could not be selected."); const attachments = (response.result as { attachments?: Array<{ fileName: string; content: string }> }).attachments ?? []; const workflowFile = attachments.find((attachment) => /\.(json|json5)$/i.test(attachment.fileName)); if (!workflowFile) throw new Error("Choose a ComfyUI API workflow file (.json or .json5)."); let parsed: unknown; try { parsed = JSON.parse(workflowFile.content); } catch { throw new Error("The selected workflow is not valid JSON."); } if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("The selected workflow must be a JSON object."); return { name: workflowFile.fileName.replace(/\.(json|json5)$/i, ""), workflow: JSON.stringify(parsed, null, 2) }; };
-  const routeState: AppRouteState = { route: route === "settings" ? settingsReturnRoute : route, workspaceTabId: activeWorkspaceTabId, conversations: chat.conversations, provider, model, responseMode: chat.responseMode, capacity, models, ollamaContextWindowTokens, localRamBudgetBytes, localGpuBudgetBytes, endpoint, messages: chat.messages, busy: chat.busy, attachments: chat.attachments, queuedMessages: chat.queuedMessages, conversationId: chat.conversationId, conversationTitle: chat.activeConversation?.title ?? "New chat", pinned: chat.activeConversation?.pinned ?? false, archived: chat.activeConversation?.archived ?? false, projects: coding.projects, selectedProject: coding.selectedProject, projectFiles: coding.projectFiles, selectedFile: coding.selectedFile, filePreview: coding.filePreview, filePreviewError: coding.filePreviewError, fileDraft: coding.fileDraft, fileOriginal: coding.fileOriginal, fileSummary: coding.fileSummary, fileBusy: coding.fileBusy, fileUndoAvailable: coding.fileUndoAvailable, terminalBusy: coding.terminalBusy, terminalOutput: coding.terminalOutput, terminalExitCode: coding.terminalExitCode, gitStatus: coding.gitStatus, gitBusy: coding.gitBusy, gitDiff: coding.gitDiff, gitDiffBusy: coding.gitDiffBusy, gitCommitBusy: coding.gitCommitBusy, gitPullRequestBusy: coding.gitPullRequestBusy, projectChecks: coding.projectChecks, projectChecksBusy: coding.projectChecksBusy, projectCheckBusy: coding.projectCheckBusy, themeMode, accentColor, density, backdrop, reduceMotion, petVisible, petWander, petInteractionDemo, petCharacter, petSpriteDataUrl, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled, imageProvider, imageEndpoint, imagePrompt, imageWorkflow, imageBusy, generatedImages, tasks, scheduledTasks, taskBusy, tasksLoading, tasksError, memoryEntries, memoryBusy, memoryLoading, memoryError, corpusDocuments, corpusLoading, corpusError };
+  const routeState: AppRouteState = { route: route === "settings" ? settingsReturnRoute : route, workspaceTabId: activeWorkspaceTabId, conversations: chat.conversations, provider, model, responseMode: chat.responseMode, capacity, models, ollamaContextWindowTokens, localRamBudgetBytes, localGpuBudgetBytes, endpoint, messages: chat.messages, busy: chat.busy, attachments: chat.attachments, queuedMessages: chat.queuedMessages, conversationId: chat.conversationId, conversationTitle: chat.activeConversation?.title ?? "New chat", pinned: chat.activeConversation?.pinned ?? false, archived: chat.activeConversation?.archived ?? false, projects: coding.projects, selectedProject: coding.selectedProject, projectFiles: coding.projectFiles, selectedFile: coding.selectedFile, filePreview: coding.filePreview, filePreviewError: coding.filePreviewError, fileDraft: coding.fileDraft, fileOriginal: coding.fileOriginal, fileSummary: coding.fileSummary, fileBusy: coding.fileBusy, fileUndoAvailable: coding.fileUndoAvailable, terminalBusy: coding.terminalBusy, terminalOutput: coding.terminalOutput, terminalExitCode: coding.terminalExitCode, gitStatus: coding.gitStatus, gitBusy: coding.gitBusy, gitDiff: coding.gitDiff, gitDiffBusy: coding.gitDiffBusy, gitCommitBusy: coding.gitCommitBusy, gitPullRequestBusy: coding.gitPullRequestBusy, projectChecks: coding.projectChecks, projectChecksBusy: coding.projectChecksBusy, projectCheckBusy: coding.projectCheckBusy, themeMode, accentColor, density, backdrop, reduceMotion, petVisible, petWander, petInteractionDemo, petCharacter, petSpriteDataUrl, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled, imageProvider, imageEndpoint, imagePrompt, imageWorkflow, imageBusy, imageCancelRequested, imageProgress, generatedImages, tasks, scheduledTasks, taskBusy, tasksLoading, tasksError, memoryEntries, memoryBusy, memoryLoading, memoryError, corpusDocuments, corpusLoading, corpusError };
   const selectModel = (nextModel: Model) => {
     const selectedProvider = nextModel.provider === "AirLLM" ? "AirLLM" : nextModel.provider === "LM Studio" ? "LM Studio" : nextModel.provider === "Ollama" ? "Ollama" : "Local API";
     setModel(nextModel.model);

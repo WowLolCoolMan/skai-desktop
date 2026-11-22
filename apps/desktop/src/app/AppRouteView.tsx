@@ -80,6 +80,8 @@ export type AppRouteState = {
   imagePrompt: string;
   imageWorkflow: string;
   imageBusy: boolean;
+  imageCancelRequested: boolean;
+  imageProgress: string[];
   generatedImages: Array<{ url: string; fileName: string }>;
   tasks: DesktopTask[];
   scheduledTasks: DesktopScheduledTask[];
@@ -183,7 +185,7 @@ export function AppRouteView({ state, actions }: { state: AppRouteState; actions
   if (route === "pet-workshop") return <PetWorkshopPage />;
   if (route === "voice-workbench") return <div className="feature-page voice-workbench-page"><VoiceWorkbench onBack={() => actions.onNavigate("marketplace")} /></div>;
   if (route === "models") return <ModelsPage models={state.models} onDiscover={actions.onDiscoverModels} onPull={actions.onPullModel} onCancelPull={actions.onCancelModelPull ?? (async () => false)} onSelect={actions.onSelectModel} />;
-  if (route === "images") return <ImagesPage provider={state.imageProvider} endpoint={state.imageEndpoint} prompt={state.imagePrompt} workflow={state.imageWorkflow} busy={state.imageBusy} images={state.generatedImages} onChange={actions.onImageChange} onGenerate={actions.onGenerateImage} onCancel={actions.onCancelImageGeneration ?? (async () => false)} onImportWorkflow={actions.onImportWorkflow ?? (async () => null)} onPickSourceImage={actions.onPickImageSource ?? (async () => null)} />;
+  if (route === "images") return <ImagesPage provider={state.imageProvider} endpoint={state.imageEndpoint} prompt={state.imagePrompt} workflow={state.imageWorkflow} busy={state.imageBusy} cancelRequested={state.imageCancelRequested} progress={state.imageProgress} images={state.generatedImages} onChange={actions.onImageChange} onGenerate={actions.onGenerateImage} onCancel={actions.onCancelImageGeneration ?? (async () => false)} onImportWorkflow={actions.onImportWorkflow ?? (async () => null)} onPickSourceImage={actions.onPickImageSource ?? (async () => null)} />;
   // Marketplace is the unified capabilities catalog. Keep the legacy plugins
   // route as an alias so existing deep links continue to work, but render the
   // Plugins-style catalog as the single entry point.

@@ -1712,6 +1712,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .plugins-browser { grid-template-columns: minmax(0, 1fr) 270px; gap: 10px; padding: 14px; }
   .plugins-detail, .plugins-mcp-note, .plugins-connections { width: 100%; }
 }
+.image-generation-progress { display: grid; gap: 6px; margin-top: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 28%, var(--skai-color-border)); border-radius: var(--skai-radius-md); background: color-mix(in srgb, var(--skai-color-accent) 5%, var(--skai-color-surface)); color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.image-generation-progress strong { color: var(--skai-color-text); font-size: var(--skai-text-xs); }
+.image-generation-progress ol { display: grid; gap: 3px; margin: 0; padding-left: 18px; }
 @media (max-width: 500px) {
   .plugins-page { grid-template-columns: 1fr; height: auto; min-height: 100%; overflow: visible; }
   .plugins-customize-nav { flex-direction: row; overflow-x: auto; overflow-y: visible; padding: 8px; border-right: 0; border-bottom: 1px solid var(--skai-color-border); }

@@ -148,17 +148,27 @@ and to any detailed plan rather than copying their full contents here.
 - **Priority:** High
 - **Owner:** Unclaimed
 - **Context:** The installed SD-Turbo runtime generated a real 512×512 CPU
-  image and reported actual inference-step progress. Diffusers now receives
-  the Agent Host cancellation token. Image-to-image was not verified in this
-  run; renderer-to-host edit/history acceptance and live cancellation during
-  inference are still open.
+  image and reported actual inference-step progress for both text-to-image
+  (4/4) and image-to-image (2/2). Diffusers receives the Agent Host
+  cancellation token. This pass fixed a cancellation race: the host no longer
+  reports a job as stopped before the worker exits, so another generation
+  cannot overlap the cancellation unwind. The Images page now displays the
+  most recent runtime-reported progress and a stopping state. Automated
+  provider tests cover ComfyUI queue polling, scoped cancellation, and local
+  endpoint enforcement. A packaged renderer-to-host edit/history run and live
+  cancellation during Diffusers inference remain open.
 - **Agreed approach:** Exercise the supported local runtimes and expose real
   stage/progress state when the runtime provides it. Cancellation must stop the
   active operation, preserve completed outputs, and return the UI to a usable
   state. Clearly label unknown progress instead of inventing a percentage.
-- **Acceptance:** A local generation and edit can be started, monitored, and
-  cancelled; runtime errors and missing dependencies are actionable; completed
-  images remain available; progress reflects runtime evidence.
+- **Acceptance:** Local generation and edit return valid output in the worker;
+  ComfyUI queue polling/cancellation and local-only endpoint checks pass in
+  automated tests. Still open: verify generation and edit from the packaged
+  renderer through Agent Host into persistent history, and cancel a live
+  Diffusers inference from the UI while confirming it has fully stopped before
+  another job can start. Runtime errors and missing dependencies must remain
+  actionable, completed images must remain available, and progress must reflect
+  runtime evidence.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
   [local image generation](LOCAL_IMAGE_GENERATION.md).
 

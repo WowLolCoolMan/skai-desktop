@@ -48,7 +48,6 @@ public static partial class AgentHostLoop
         {
             if (!ImageGenerations.TryGetValue(id, out var operation)) throw new KeyNotFoundException("The image generation session no longer exists.");
             operation.Cancellation.Cancel();
-            operation.Cancelled();
             return ImageGenerationResponse(request, operation);
         }
     }
