@@ -90,7 +90,8 @@ and to any detailed plan rather than copying their full contents here.
   Marketplace model facets and compatibility rules now live in a focused
   catalog helper; the tool/skill grid and inspector are now a separate
   presentation component. The Agent Host’s stdio lifecycle is separated from
-  its process state and store declarations.
+  its process state and store declarations. Electron Agent Host request and
+  workspace file-selection IPC now has its own registration module.
 - **Agreed approach:** Refactor incrementally by cohesive responsibility,
   preserve bridge/storage/runtime behavior, sync with `main` before each
   commit, and verify the layer being changed. Do not split files mechanically

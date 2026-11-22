@@ -1,6 +1,6 @@
 // Every agent method the renderer calls must be allowed by the Electron bridge
-// (apps/desktop/electron/main.cjs `allowedMethods`, plus the few methods main.cjs
-// handles itself) and implemented by the Agent Host. A method missing from the
+// (apps/desktop/electron/main.cjs `allowedMethods`, plus the few methods the
+// Electron shell handles itself) and implemented by the Agent Host. A method missing from the
 // allowlist fails at runtime with METHOD_NOT_ALLOWED; this audit catches it in CI.
 const fs = require("node:fs");
 const path = require("node:path");
@@ -19,8 +19,10 @@ if (!allowBlock) {
   process.exit(1);
 }
 const allowed = new Set([...allowBlock[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]));
-// Handled directly in main.cjs before requests reach the host.
-const shellHandled = new Set([...main.matchAll(/method === "([a-zA-Z]+\.[a-zA-Z.-]+)"/g)].map((match) => match[1]));
+// Handled directly in Electron before requests reach the host. Request routes
+// may live in focused IPC registration modules as well as the app entry point.
+const shellIpc = `${main}\n${read("apps/desktop/electron/workspace-ipc.cjs")}`;
+const shellHandled = new Set([...shellIpc.matchAll(/method === "([a-zA-Z]+\.[a-zA-Z.-]+)"/g)].map((match) => match[1]));
 
 const hostLoop = read("services/agent-host/Protocol/AgentHostLoop.cs");
 const hostMethods = new Set([...hostLoop.matchAll(/"([a-z]+(?:\.[a-zA-Z-]+)+)"\s*=>/g)].map((match) => match[1]));
