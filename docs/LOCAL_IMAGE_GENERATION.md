@@ -44,6 +44,7 @@ path. The UI should explain that SD-Turbo is not cached, offer one-time internet
 download guidance, and remain ready for retry. Python tracebacks and local cache
 paths are reduced to a short diagnostic before reaching the UI. Focused native
 tests cover this case and ordinary first-line worker errors.
+The rebuilt packaged Windows artifact passed this smoke on 2026-11-22.
 
 ## ComfyUI integration
 

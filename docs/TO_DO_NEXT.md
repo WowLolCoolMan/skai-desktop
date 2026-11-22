@@ -174,8 +174,8 @@ and to any detailed plan rather than copying their full contents here.
   reload, live cancellation, and starting another generation after cancellation
   now pass. The packaged missing-dependency state offers runtime setup and
   disables generation. Worker/runtime recovery is covered by a packaged-app
-  smoke and focused summary tests. Still open: rerun the packaged missing-model
-  smoke against a freshly rebuilt artifact, exercise a live ComfyUI instance,
+  smoke and focused summary tests. The freshly rebuilt packaged Windows
+  missing-model smoke now passes. Still open: exercise a live ComfyUI instance
   and validate additional hardware. Progress must continue to reflect runtime
   evidence.
 - **References:** [Capability matrix](CAPABILITY_MATRIX.md),
