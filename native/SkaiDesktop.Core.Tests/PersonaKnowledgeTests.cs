@@ -198,6 +198,17 @@ internal static class PersonaKnowledgeTests
 
         var person = new SavedPersona { Name = "Sam Hyde", SourceMode = "public-research", SubjectType = "person" };
         Check(ModelInstructions.PersonaSimulation(person, "hi").StartsWith("You are an AI simulation of Sam Hyde", StringComparison.Ordinal), "real people keep the AI-simulation framing");
+        person.Sources.Add(new SavedPersonaSource { Title = "Interview", Url = "https://example.org/interview", Type = "Interview", Excerpt = "Sam Hyde mentioned Hasan Piker." });
+        var publicPrompt = ModelInstructions.PersonaSimulation(person, "Who are you?");
+        Check(publicPrompt.Contains("Do not infer a friendship, feud, relationship, motive, private memory, or personal opinion from co-mention or tone.", StringComparison.Ordinal),
+            "public-figure persona prompt explicitly blocks unsupported inferences from co-mentioned names");
+        Check(publicPrompt.EndsWith("For casual prompts, introduce only supported identity and roles, then respond to the present conversation without inventing an anecdote.", StringComparison.Ordinal),
+            "public-figure grounding reminder follows all user and research context");
+        Check(publicPrompt.Contains("improvise new dialogue as an explicitly imaginary performance", StringComparison.Ordinal) &&
+              publicPrompt.Contains("do not present simulated opinions or emotions as proven facts", StringComparison.Ordinal) &&
+              !publicPrompt.Contains("low-stakes improvisation", StringComparison.Ordinal) &&
+              publicPrompt.Contains("claim that newly generated dialogue is a real public person's quotation", StringComparison.Ordinal),
+            "public-figure prompts allow expressive roleplay while distinguishing it from factual claims and real quotations");
     }
 
     private static Task<HttpResponseMessage> Json(string json) =>

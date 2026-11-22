@@ -224,7 +224,13 @@ and to any detailed plan rather than copying their full contents here.
   A bounded compact-evidence retry now recovers empty structured profile drafts.
   On 2026-11-22, the end-to-end Sam Hyde research-and-draft smoke passed with
   Qwen3 14B: 3 sources, 7 attributed turns, and all 9 profile fields. This run
-  did not include persona chat.
+  did not include persona chat. A subsequent full Sam Hyde smoke passed
+  discovery, research, drafting, save, and chat. Reviewing the actual reply
+  exposed that the product must distinguish newly improvised emotional dialogue
+  from factual claims and actual quotations. The public-figure prompt now makes
+  that distinction explicit and avoids prompting real-person chat to invent
+  historical details. This one-subject smoke is not a semantic truthfulness
+  evaluation; multi-turn adversarial factual checks remain open.
   Core checks and Agent Host build passed. A 14B local-model workflow completed
   profile and chat turns, and explicit childhood / backstory questions were
   safely blocked. The Joe answer still sounded generic and invented a
@@ -234,6 +240,9 @@ and to any detailed plan rather than copying their full contents here.
   drafting prompt before drawing a product-level conclusion.
 - **Agreed approach:** Keep attribution strict: count only lines confidently
   tied to the requested speaker; prefer an explicit evidence gap over guessing.
+  Keep roleplay expressive: simulated emotions and newly written dialogue are
+  allowed, while real-world biographical claims and actual quotations remain
+  evidence-bound and must never be presented as sourced speech without a citation.
   If a structured drafting pass returns no usable fields, retry it once with a
   compact evidence window and concise field instructions; do not invent values
   to fill gaps.
