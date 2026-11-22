@@ -145,6 +145,7 @@ public static partial class AgentHostLoop
             timedOut = result.TimedOut,
             outputTruncated = result.OutputTruncated,
             workingDirectory = result.WorkingDirectory,
+            isolationStatus = result.IsolationStatus,
         });
     }
 
@@ -169,9 +170,9 @@ public static partial class AgentHostLoop
         var started = DateTimeOffset.UtcNow;
         var result = await new WorkspaceCommandRunner().RunAsync(root, check.RelativeWorkingDirectory, check.Command, WorkspaceCommandRunner.MaxTimeout).ConfigureAwait(false);
         var completed = DateTimeOffset.UtcNow;
-        var evidence = new ProjectCheckEvidence(check.Id, check.Label, check.Command, check.RelativeWorkingDirectory, check.Source, result.ExitCode, result.Output, result.TimedOut, result.OutputTruncated, started, completed);
+        var evidence = new ProjectCheckEvidence(check.Id, check.Label, check.Command, check.RelativeWorkingDirectory, check.Source, result.ExitCode, result.Output, result.TimedOut, result.OutputTruncated, started, completed, result.IsolationStatus);
         var updated = CreateTaskStore().AttachVerificationEvidence(taskId, evidence);
-        return new(ProtocolVersion, request.Id, true, new { projectId, taskId, check, exitCode = result.ExitCode, output = result.Output, timedOut = result.TimedOut, outputTruncated = result.OutputTruncated, startedAtUtc = started, completedAtUtc = completed, task = updated });
+        return new(ProtocolVersion, request.Id, true, new { projectId, taskId, check, exitCode = result.ExitCode, output = result.Output, timedOut = result.TimedOut, outputTruncated = result.OutputTruncated, isolationStatus = result.IsolationStatus, startedAtUtc = started, completedAtUtc = completed, task = updated });
     }
 
     private static async Task<AgentResponse> StartProjectTerminalAsync(AgentRequest request)

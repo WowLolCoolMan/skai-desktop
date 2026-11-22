@@ -129,10 +129,19 @@ async function run() {
   if (!events.includes("tool.read_file.started") || !events.includes("tool.read_file.completed") || !events.includes("task.verification.completed"))
     throw new Error(`Task timeline did not preserve the read and verification events: ${events.join(", ")}`);
   const projectCheck = await call("project.check.run", { projectId: project.result.id, taskId: task.result.id, checkId: "npm:test" });
-  if (!projectCheck.ok || projectCheck.result?.exitCode !== 1 || !projectCheck.result?.output?.includes("explicit-project-check-output"))
-    throw new Error(`The explicitly selected project check did not preserve its failing exit status and output: ${JSON.stringify(projectCheck)}`);
-  if (!fs.existsSync(path.join(workspace, "preflight-executed.marker"))) throw new Error("The explicitly selected project check did not execute its fixture script.");
-  if (projectCheck.result?.task?.verificationEvidence?.exitCode !== 1 || !projectCheck.result?.task?.verificationEvidence?.output?.includes("explicit-project-check-output"))
+  const projectCheckEvidence = projectCheck.result?.task?.verificationEvidence;
+  const sandboxUnavailable = process.platform === "linux" && projectCheck.result?.isolationStatus?.includes("could not establish the required sandbox");
+  if (sandboxUnavailable) {
+    if (!projectCheck.ok || projectCheck.result?.exitCode === 0 || projectCheck.result?.output?.includes("explicit-project-check-output") || fs.existsSync(path.join(workspace, "preflight-executed.marker")))
+      throw new Error(`The restricted Linux host did not fail closed for the selected project check: ${JSON.stringify(projectCheck)}`);
+  } else {
+    if (!projectCheck.ok || projectCheck.result?.exitCode !== 1 || !projectCheck.result?.output?.includes("explicit-project-check-output"))
+      throw new Error(`The explicitly selected project check did not preserve its failing exit status and output: ${JSON.stringify(projectCheck)}`);
+    if (!fs.existsSync(path.join(workspace, "preflight-executed.marker"))) throw new Error("The explicitly selected project check did not execute its fixture script.");
+  }
+  if (projectCheckEvidence?.exitCode !== projectCheck.result?.exitCode ||
+      projectCheckEvidence?.output !== projectCheck.result?.output?.trim() ||
+      projectCheckEvidence?.isolationStatus !== projectCheck.result?.isolationStatus)
     throw new Error("The selected check result was not persisted with the task's reviewable artifact.");
   const journalText = fs.readFileSync(env.SRAI_OPERATIONS_PATH, "utf8");
   if (journalText.includes("journal read fixture")) throw new Error("The operation journal recorded file contents instead of metadata.");

@@ -211,6 +211,7 @@ export type DesktopTask = {
     outputTruncated: boolean;
     startedAtUtc: string;
     completedAtUtc: string;
+    isolationStatus?: string;
   } | null;
   dependsOn: string[];
   updatedAt: string;

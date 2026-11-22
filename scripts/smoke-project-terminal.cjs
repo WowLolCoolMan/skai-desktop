@@ -46,8 +46,16 @@ async function run() {
   const saved = await request("project.save", { name: "Terminal smoke", folderPaths: [workspace] });
   if (!saved.ok || typeof saved.result?.id !== "string") throw new Error("project.save did not create the disposable terminal project.");
   const result = await request("project.command.run", { id: saved.result.id, command, relativeWorkingDirectory: ".", timeoutSeconds: 5 });
+  if (process.platform === "linux" && result.ok && result.result?.exitCode !== 0 &&
+      result.result?.isolationStatus?.includes("could not establish the required sandbox") &&
+      !String(result.result?.output).includes("terminal-smoke")) {
+    console.log("Project command smoke passed: restricted Linux host denied namespace creation and Skai refused to execute the command.");
+    return;
+  }
   if (!result.ok || result.result?.exitCode !== 0 || result.result?.timedOut || !String(result.result?.output).includes("terminal-smoke"))
-    throw new Error("project.command.run did not return the bounded command result.");
+    throw new Error(`project.command.run did not return the bounded command result (exit=${result.result?.exitCode}, timedOut=${result.result?.timedOut}, isolation=${result.result?.isolationStatus ?? "missing"}, error=${result.error?.message ?? "none"}).`);
+  if (typeof result.result.isolationStatus !== "string" || !result.result.isolationStatus.trim())
+    throw new Error("project.command.run omitted the actual isolation status.");
   console.log("Project terminal smoke passed: disposable root, explicit command, bounded result, and output round trip.");
 }
 

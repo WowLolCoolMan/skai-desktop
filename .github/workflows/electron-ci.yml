@@ -103,6 +103,9 @@ jobs:
       - name: Smoke bounded project terminal
         run: npm run smoke:project-terminal
 
+      - name: Smoke task journal and explicit project checks
+        run: npm run smoke:task-journal
+
       - name: Smoke reviewed project editor
         run: npm run smoke:project-editor
 

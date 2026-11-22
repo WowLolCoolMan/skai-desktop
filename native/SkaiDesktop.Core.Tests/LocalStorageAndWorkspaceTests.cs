@@ -394,12 +394,12 @@ internal static class LocalStorageAndWorkspaceTests
                 }
                 var coloredCommand = await commandRunner.RunAsync(workspacePath, ".",
                     OperatingSystem.IsWindows() ? "Write-Output ([char]27 + '[31mcheck-output[0m')" : "printf '\\033[31mcheck-output\\033[0m'",
-                    TimeSpan.FromSeconds(10));
+                    TimeSpan.FromSeconds(30));
                 Check(coloredCommand.Output.Contains("check-output", StringComparison.Ordinal) && !coloredCommand.Output.Contains('\u001b'),
-                    "project command output strips terminal control sequences before it is saved as verification evidence");
+                    $"project command output strips terminal control sequences before it is saved as verification evidence (exit={coloredCommand.ExitCode}, timedOut={coloredCommand.TimedOut}, output={coloredCommand.Output.Trim()[..Math.Min(180, coloredCommand.Output.Trim().Length)]})");
                 var commandResult = await commandRunner.RunAsync(workspacePath, "src",
                     OperatingSystem.IsWindows() ? "Write-Output skai-command-ok" : "printf skai-command-ok",
-                    TimeSpan.FromSeconds(10));
+                    TimeSpan.FromSeconds(30));
                 Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
                 Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
                 Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows process containment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");

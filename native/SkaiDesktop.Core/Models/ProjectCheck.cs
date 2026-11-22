@@ -15,4 +15,5 @@ public sealed record ProjectCheckEvidence(
     bool TimedOut,
     bool OutputTruncated,
     DateTimeOffset StartedAtUtc,
-    DateTimeOffset CompletedAtUtc);
+    DateTimeOffset CompletedAtUtc,
+    string IsolationStatus = "");
