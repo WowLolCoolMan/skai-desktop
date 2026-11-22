@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Button } from "./Primitives";
 
 export type OverflowMenuItem = {
   label: string;
