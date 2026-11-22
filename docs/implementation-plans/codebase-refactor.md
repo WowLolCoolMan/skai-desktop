@@ -138,6 +138,9 @@ that users touch as each slice is moved.
 - Moved memory and document-corpus protocol handlers into
   `AgentHostLoop.Memory.cs`; local persistence operations and response fields
   remain the same.
+- Moved scheduled-task dispatch, persistence responses, and task lifecycle
+  handlers into `AgentHostLoop.Schedules.cs`; timing, completion, and the
+  conversation-result behavior remain unchanged.
 - Moved update IPC registration and its sender/URL checks into
   `update-ipc.cjs`; the existing updater manager remains responsible for update
   lifecycle and download state.
