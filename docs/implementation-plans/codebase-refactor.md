@@ -100,6 +100,10 @@ that users touch as each slice is moved.
 - Moved transcript-turn cleanup, speaker alias selection, and quote-line
   filtering into `PersonaQuoteEvidence`, retaining the old public speaker-label
   facade while keeping citation and evidence policy unchanged.
+- Split identity resolution/scoring and persona research orchestration from the
+  `PersonaKnowledgeSources` declaration into focused partials. The public
+  service, candidate scoring, research ordering, and evidence selection remain
+  unchanged; source retrieval remains behind `PersonaWikiClient`.
 - Split `ModelLibraryService` into local runtime discovery/management and
   remote catalog search/download partials. The public service and serialized
   model records remain unchanged; catalog validation and download behavior
@@ -149,11 +153,9 @@ that users touch as each slice is moved.
 
 ## Remaining work
 
-- Continue the renderer extraction; `PluginsPage.tsx`, `AgentHostLoop.cs`,
-  `PersonaKnowledgeSources.cs`, and `ModelLibraryService.cs` are among the
-  largest current mixed-responsibility files. Persona matching and HTML parsing
-  and HTTP fetching are now separate, but research orchestration and evidence
-  selection remain in `PersonaKnowledgeSources.cs`.
+- Continue the renderer and Electron shell extraction. `PluginsPage.tsx` and
+  Electron `main.cjs` remain large mixed-responsibility modules, and source-
+  specific persona retrieval still resides in `PersonaKnowledgeSources.cs`.
 - Complete installed speech-pack and real audio acceptance for local voice.
 - Keep OS isolation, image-runtime acceptance, and release/platform gaps in
   their existing capability entries; these are product completion work, not
