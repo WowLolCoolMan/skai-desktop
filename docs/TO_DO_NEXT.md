@@ -171,7 +171,13 @@ and to any detailed plan rather than copying their full contents here.
   successful workflow and missing-runtime recovery. A missing-model mode now
   verifies that offline cache misses are reported as actionable setup guidance
   and leave generation retryable; worker tracebacks and local cache paths are
-  suppressed from that user-facing error.
+  suppressed from that user-facing error. On 2026-11-22, the packaged
+  acceptance workflow was rerun successfully: cancellation returned the page
+  to idle, local generation returned a valid 512×512 JPEG, image-to-image
+  editing returned a second valid JPEG, and both outputs survived reload. The
+  packaged missing-runtime and missing-model recovery smokes also passed. The
+  AMD GPU was not exercised; ComfyUI was not running locally (port 8188 had no
+  listener).
 - **Agreed approach:** Exercise the supported local runtimes and expose real
   stage/progress state when the runtime provides it. Cancellation must stop the
   active operation, preserve completed outputs, and return the UI to a usable
@@ -245,7 +251,12 @@ and to any detailed plan rather than copying their full contents here.
   hypothetical personal anecdote; Jack's answer was more characterful but
   verbose. The test profile draft for Jack did not parse with the abbreviated
   draft prompt used by the smoke harness; rerun using the full in-app profile
-  drafting prompt before drawing a product-level conclusion.
+  drafting prompt before drawing a product-level conclusion. On 2026-11-22,
+  the David Lynch end-to-end smoke passed with Qwen3 14B: identity resolution,
+  expected death date, three sources, 60 attributed turns, eight drafted
+  fields, and chat response met the harness pass bar. This verifies the happy
+  path for one deceased public figure; its keyword-based chat check does not
+  establish semantic fidelity or cutoff truthfulness.
 - **Agreed approach:** Keep attribution strict: count only lines confidently
   tied to the requested speaker; prefer an explicit evidence gap over guessing.
   Keep roleplay expressive: simulated emotions and newly written dialogue are
