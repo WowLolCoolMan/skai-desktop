@@ -26,14 +26,35 @@ const { createAgentHostClient } = require("./agent-host-client.cjs");
 const { createPetStateStore } = require("./pet-state-store.cjs");
 const { createTrayController } = require("./tray-controller.cjs");
 const { createPetWindowController } = require("./pet-window.cjs");
+const { createSingleInstanceLease } = require("./single-instance-lease.cjs");
 
-// Acquire the lock before any platform-specific relaunch so simultaneous
-// launches cannot each schedule their own replacement process.
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-if (!hasSingleInstanceLock) {
+// Electron's lock is scoped to userData and, on Windows, the executable name.
+// The shared per-user lease also covers dev, packaged, and side-by-side builds.
+const electronSingleInstanceLock = app.requestSingleInstanceLock();
+let instanceLease;
+let hasSingleInstanceLock = false;
+if (!electronSingleInstanceLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => showMainWindow());
+  try {
+    instanceLease = createSingleInstanceLease({
+      fs: fsSync,
+      path,
+      appDataPath: app.getPath("appData"),
+      processObject: process,
+      pid: process.pid,
+      randomUUID,
+    });
+    hasSingleInstanceLock = instanceLease.acquire();
+  } catch (error) {
+    console.error(`[startup] Unable to establish the Skai Desktop instance lock: ${error.message}`);
+  }
+  if (!hasSingleInstanceLock) {
+    app.quit();
+  } else {
+    app.on("second-instance", () => showMainWindow());
+    process.once("exit", () => instanceLease.release());
+  }
 }
 
 // Chromium fixes its display backend before any of this file runs, and
