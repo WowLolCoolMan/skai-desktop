@@ -501,7 +501,7 @@ internal static class LocalStorageAndWorkspaceTests
                 Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows Process Security Environment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap and systemd cgroup sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
                 if (OperatingSystem.IsWindows())
                 {
-                    Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal) && commandResult.IsolationStatus.Contains("network denied", StringComparison.Ordinal) && commandResult.IsolationStatus.Contains($"maximum {OsProcessIsolation.MaxActiveProcesses} processes", StringComparison.Ordinal), "Windows Coding Agent evidence reports PSEC filesystem/network and Job Object memory/process boundaries");
+                    Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal) && commandResult.IsolationStatus.Contains("network denied", StringComparison.Ordinal) && commandResult.IsolationStatus.Contains($"maximum {OsProcessIsolation.MaxActiveProcesses} processes", StringComparison.Ordinal) && commandResult.IsolationStatus.Contains("CPU quota", StringComparison.Ordinal), "Windows Coding Agent evidence reports PSEC filesystem/network and Job Object memory/process/CPU boundaries");
                     var insideWindowsPath = Path.Combine(workspacePath, "src", "windows-sandbox-write-probe.txt");
                     var insideWindowsWrite = await commandRunner.RunAsync(workspacePath, "src",
                         "Set-Content -NoNewline -LiteralPath 'windows-sandbox-write-probe.txt' -Value 'sandbox-write'",

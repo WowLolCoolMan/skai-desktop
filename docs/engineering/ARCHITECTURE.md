@@ -58,7 +58,10 @@ approved command starts. Missing namespace or cgroup support prevents
 execution. Timeouts and cancellation terminate the scope.
 
 Windows uses a capability-free AppContainer for project filesystem and network
-isolation and a Job Object for process-tree memory and process-count limits.
+isolation and a Job Object for process-tree memory, process-count, and CPU
+limits. The Job Object applies a hard CPU quota capped at four logical cores,
+matching Linux's four-core ceiling. Failure to apply any required Job Object
+limit prevents the command from starting.
 Drive/share roots, project paths that traverse a symbolic link/junction/mount
 point, and directories under Windows, Program Files, or ProgramData cannot be
 selected as writable project roots. Failure to establish either required

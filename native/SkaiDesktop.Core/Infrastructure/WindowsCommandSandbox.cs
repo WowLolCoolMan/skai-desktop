@@ -44,7 +44,7 @@ internal sealed class WindowsCommandSandbox : IDisposable
     public OsProcessIsolation Isolation { get; }
     public TextReader StandardOutput => outputReader;
     public TextReader StandardError => TextReader.Null;
-    public string Status => $"Windows Process Security Environment active (selected project writable; runtime paths read-only; network denied by capability-free AppContainer; maximum {OsProcessIsolation.MaxActiveProcesses} processes; job memory cap {FormatGigabytes(Isolation.JobMemoryLimitBytes ?? 0)} GiB).";
+    public string Status => $"Windows Process Security Environment active (selected project writable; runtime paths read-only; network denied by capability-free AppContainer; maximum {OsProcessIsolation.MaxActiveProcesses} processes; CPU quota {Isolation.CpuQuotaPercent ?? 0}% ({Math.Clamp(Environment.ProcessorCount, 1, OsProcessIsolation.MaxCpuCores)} cores); job memory cap {FormatGigabytes(Isolation.JobMemoryLimitBytes ?? 0)} GiB).";
 
     [SupportedOSPlatform("windows")]
     public static WindowsCommandSandbox Start(string projectRoot, string workingDirectory, string command, IEnumerable<KeyValuePair<string, string?>> environment, ulong? memoryLimitBytesOverride)

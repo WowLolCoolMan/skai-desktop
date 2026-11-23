@@ -12,17 +12,22 @@ namespace SkaiDesktop.Core.Infrastructure;
 internal sealed class OsProcessIsolation : IDisposable
 {
     public const uint MaxActiveProcesses = 128;
+    public const int MaxCpuCores = 4;
+    private const uint CpuRateControlEnable = 0x1;
+    private const uint CpuRateControlHardCap = 0x4;
     private readonly SafeFileHandle? jobHandle;
     private readonly ulong? jobMemoryLimitBytes;
 
-    private OsProcessIsolation(SafeFileHandle? jobHandle, ulong? jobMemoryLimitBytes = null)
+    private OsProcessIsolation(SafeFileHandle? jobHandle, ulong? jobMemoryLimitBytes = null, int? cpuQuotaPercent = null)
     {
         this.jobHandle = jobHandle;
         this.jobMemoryLimitBytes = jobMemoryLimitBytes;
+        CpuQuotaPercent = cpuQuotaPercent;
     }
 
     public bool IsAttached => jobHandle is not null && !jobHandle.IsInvalid;
     public ulong? JobMemoryLimitBytes => IsAttached ? jobMemoryLimitBytes : null;
+    public int? CpuQuotaPercent { get; }
 
     public static OsProcessIsolation Attach(Process process, ulong? memoryLimitBytesOverride = null)
     {
@@ -52,12 +57,25 @@ internal sealed class OsProcessIsolation : IDisposable
                     : new UIntPtr(memoryLimitBytes),
             };
             var size = Marshal.SizeOf<JobObjectExtendedLimitInformation>();
-            if (!SetInformationJobObject(handle, JobObjectInfoType.ExtendedLimitInformation, ref limits, (uint)size) || !AssignProcessToJobObject(handle, process.Handle))
+            if (!SetInformationJobObject(handle, JobObjectInfoType.ExtendedLimitInformation, ref limits, (uint)size))
             {
                 handle.Dispose();
                 return new OsProcessIsolation(null);
             }
-            return new OsProcessIsolation(handle, memoryLimitBytes);
+
+            var cpuQuotaPercent = Math.Clamp(Environment.ProcessorCount, 1, MaxCpuCores) * 100;
+            var cpuRate = new JobObjectCpuRateControlInformation
+            {
+                ControlFlags = CpuRateControlEnable | CpuRateControlHardCap,
+                CpuRate = checked((uint)(cpuQuotaPercent * 100 / Math.Max(Environment.ProcessorCount, 1))),
+            };
+            if (!SetCpuRateControlInformation(handle, JobObjectInfoType.CpuRateControlInformation, ref cpuRate, (uint)Marshal.SizeOf<JobObjectCpuRateControlInformation>()) ||
+                !AssignProcessToJobObject(handle, process.Handle))
+            {
+                handle.Dispose();
+                return new OsProcessIsolation(null);
+            }
+            return new OsProcessIsolation(handle, memoryLimitBytes, cpuQuotaPercent);
         }
         catch (Win32Exception)
         {
@@ -71,7 +89,7 @@ internal sealed class OsProcessIsolation : IDisposable
 
     public static string DescribeCurrentPlatform(bool attached, ulong? memoryLimitBytes) => OperatingSystem.IsWindows()
         ? attached
-            ? $"Windows Job Object process containment active (maximum {MaxActiveProcesses} processes; job memory cap {FormatGigabytes(memoryLimitBytes ?? 0)} GiB)."
+            ? $"Windows Job Object process containment active (maximum {MaxActiveProcesses} processes; CPU quota {Math.Clamp(Environment.ProcessorCount, 1, MaxCpuCores) * 100}% ({Math.Clamp(Environment.ProcessorCount, 1, MaxCpuCores)} cores); job memory cap {FormatGigabytes(memoryLimitBytes ?? 0)} GiB)."
             : "Windows Job Object process containment could not be enabled; filesystem and network access are not sandboxed."
         : "OS process containment is unavailable on this platform; filesystem and network access are not sandboxed.";
 
@@ -95,6 +113,10 @@ internal sealed class OsProcessIsolation : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetInformationJobObject(SafeHandle job, JobObjectInfoType infoType, ref JobObjectExtendedLimitInformation jobObjectInfo, uint jobObjectInfoLength);
 
+    [DllImport("kernel32.dll", EntryPoint = "SetInformationJobObject", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetCpuRateControlInformation(SafeHandle job, JobObjectInfoType infoType, ref JobObjectCpuRateControlInformation jobObjectInfo, uint jobObjectInfoLength);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool AssignProcessToJobObject(SafeHandle job, IntPtr process);
@@ -105,7 +127,15 @@ internal sealed class OsProcessIsolation : IDisposable
 
     private enum JobObjectInfoType
     {
-        ExtendedLimitInformation = 9
+        ExtendedLimitInformation = 9,
+        CpuRateControlInformation = 15
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JobObjectCpuRateControlInformation
+    {
+        public uint ControlFlags;
+        public uint CpuRate;
     }
 
     [Flags]
