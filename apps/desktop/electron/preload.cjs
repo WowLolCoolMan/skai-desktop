@@ -2,6 +2,10 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("skaiAgent", {
   request: (method, params) => ipcRenderer.invoke("agent:request", method, params),
+  computer: {
+    capture: () => ipcRenderer.invoke("computer:capture"),
+    action: (action) => ipcRenderer.invoke("computer:action", action),
+  },
   media: {
     createLocalUrl: (mediaType, content) => ipcRenderer.invoke("media:create-local-url", { mediaType: String(mediaType), content: String(content) }),
     revokeLocalUrl: (url) => ipcRenderer.invoke("media:revoke-local-url", String(url)),

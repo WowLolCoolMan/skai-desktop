@@ -34,7 +34,7 @@ product decisions. A request-size limit does not prove 1M-token execution.
 
 ## Agents and tools
 
-- [ ] Computer use with screen, keyboard, and mouse control.
+- [x] Interactive computer use with local screen capture and model-directed mouse/keyboard actions. (Chat composer tool can capture/select a display, attach a reviewed screenshot, send bounded local input, or let a local vision model run up to 12 logged actions with a stop control. Windows input is implemented; other desktop platforms, persistent task-thread evidence, and accessibility/UI Automation targeting remain open.)
 - [ ] Built-in browser panel.
 - [ ] Python sandbox execution.
 - [ ] Parallel sub-agent delegation.
@@ -87,7 +87,7 @@ product decisions. A request-size limit does not prove 1M-token execution.
 - [ ] Notes with context injection.
 - [ ] Channels with model tagging and threads.
   - [x] System-wide hotkey and launcher integration. (The resident Electron app can be brought to the foreground with `Ctrl+Alt+Space` on Windows/Linux or `Cmd+Alt+Space` on macOS; the existing tray and second-instance paths remain available.)
-- [ ] Screen capture and screen awareness.
+- [x] Screen capture and screen awareness. (The composer captures a selected display locally, previews it, and lets the user attach it to a chat; computer-use sessions refresh the display after each action.)
 - [ ] Live presence.
 - [ ] End-to-end encrypted direct messages.
 - [ ] Clipboard history with AI search.

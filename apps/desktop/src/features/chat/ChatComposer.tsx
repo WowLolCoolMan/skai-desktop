@@ -9,6 +9,7 @@ import { AttachmentList } from "./AttachmentList";
 import { composerCommands, type ComposerCommand } from "./composerCommands";
 import { stopNativeSpeech, waitForLocalSpeechToFinish } from "../../services/nativeTts";
 import { isLocalAudioFile, transcribeLocalAudioFile } from "./localAudioTranscription";
+import { isLocalEndpoint } from "../../services/localOnly";
 
 type ChatComposerProps = {
   draft: string;
@@ -27,6 +28,10 @@ type ChatComposerProps = {
   onToggleDocumentsOnly: () => void;
   onVoiceTranscript: (transcript: string) => boolean;
   onAudioTranscript: (fileName: string, transcript: string) => void;
+  onSetAttachments: (attachments: ChatAttachment[]) => void;
+  provider: string;
+  endpoint: string;
+  model: string;
 };
 
 type SpeechRecognitionResultEvent = Event & { resultIndex: number; results: { [index: number]: { [index: number]: { transcript: string }; isFinal: boolean }; length: number } };
@@ -47,7 +52,7 @@ type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
 };
 type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
@@ -59,6 +64,17 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [audioTranscribing, setAudioTranscribing] = useState(false);
   const [audioTranscriptReady, setAudioTranscriptReady] = useState(false);
   const [omniOpen, setOmniOpen] = useState(false);
+  const [computerOpen, setComputerOpen] = useState(false);
+  const [computerScreens, setComputerScreens] = useState<Awaited<ReturnType<NonNullable<typeof window.skaiAgent.computer>['capture']>>>([]);
+  const [computerScreenId, setComputerScreenId] = useState("");
+  const [computerPoint, setComputerPoint] = useState<{ x: number; y: number } | null>(null);
+  const [computerText, setComputerText] = useState("");
+  const [computerKey, setComputerKey] = useState("Enter");
+  const [computerStatus, setComputerStatus] = useState<string | null>(null);
+  const [computerBusy, setComputerBusy] = useState(false);
+  const [computerTask, setComputerTask] = useState("");
+  const [computerSteps, setComputerSteps] = useState<string[]>([]);
+  const computerStopRef = useRef(false);
   const audioPickerRef = useRef<HTMLInputElement>(null);
   const audioAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -317,6 +333,82 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     if (command.route) onNavigate(command.route);
   };
 
+  const captureComputerScreens = async () => {
+    if (!window.skaiAgent?.computer) { setComputerStatus("Computer use is unavailable in this app build."); return; }
+    setComputerBusy(true); setComputerStatus("Capturing displays…");
+    try {
+      const screens = await window.skaiAgent.computer.capture();
+      setComputerScreens(screens);
+      setComputerScreenId((current) => screens.some((screen) => screen.id === current) ? current : screens[0]?.id ?? "");
+      setComputerPoint(null);
+      setComputerStatus(screens.length ? null : "No displays were found.");
+    } catch (error) { setComputerStatus(error instanceof Error ? error.message : "The display could not be captured."); }
+    finally { setComputerBusy(false); }
+  };
+
+  const selectedComputerScreen = computerScreens.find((screen) => screen.id === computerScreenId);
+  const runComputerAction = async (action: { action: "click" | "scroll" | "type" | "key"; x?: number; y?: number; button?: "left" | "right"; delta?: number; text?: string; key?: string }) => {
+    if (!selectedComputerScreen) return;
+    setComputerBusy(true); setComputerStatus("Sending input to the selected display…");
+    try {
+      await window.skaiAgent.computer?.action({ ...action, displayId: selectedComputerScreen.displayId });
+      setComputerStatus("Input sent. Refresh the display to inspect the result.");
+      await captureComputerScreens();
+    } catch (error) { setComputerStatus(error instanceof Error ? error.message : "Computer input failed."); }
+    finally { setComputerBusy(false); }
+  };
+
+  const attachComputerScreenshot = () => {
+    if (!selectedComputerScreen || attachments.length >= 5) return;
+    onSetAttachments([...attachments, { fileName: `screen-${new Date().toISOString().replace(/[:.]/g, "-")}.png`, mediaType: "image/png", content: selectedComputerScreen.content }]);
+    setOmniOpen(false); setComputerOpen(false); setComputerStatus("Screen image attached. Review it in the composer before sending.");
+  };
+
+  const stopComputerTask = () => { computerStopRef.current = true; setComputerStatus("Stopping after the current model response…"); };
+  const startComputerTask = async () => {
+    if (!computerTask.trim() || !selectedComputerScreen || computerBusy) return;
+    if (!isLocalEndpoint(endpoint)) { setComputerStatus("Computer-use model calls require a local endpoint so screen contents stay on this device."); return; }
+    computerStopRef.current = false;
+    setComputerBusy(true); setComputerSteps([]); setComputerStatus("Starting a local computer-use session…");
+    let currentScreen = selectedComputerScreen;
+    let taskFinished = false;
+    let reachedLimit = false;
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string; attachments?: ChatAttachment[] }> = [
+      { role: "system", content: `You control the user's selected desktop display. Follow their task instruction by selecting one concrete mouse or keyboard action per turn. The user explicitly started this computer-use session. You can click normalized coordinates from 0 to 1 relative to the screenshot, type text, press one supported key, or scroll (positive delta scrolls up). Do not claim an action succeeded until a later screenshot confirms it. Never invent screen contents. Return only one JSON object, with no markdown: {"action":"click","x":0.5,"y":0.5,"button":"left"}, {"action":"type","text":"..."}, {"action":"key","key":"Enter"}, {"action":"scroll","x":0.5,"y":0.5,"delta":480}, or {"action":"done","summary":"..."}. Supported keys: Enter, Tab, Escape, Backspace, Delete, Up, Down, Left, Right, Home, End, PageUp, PageDown, Space. Do at most 12 actions. Keep typed text to what the user requested.` },
+      { role: "user", content: computerTask.trim(), attachments: [{ fileName: "current-screen.png", mediaType: "image/png", content: currentScreen.content }] },
+    ];
+    try {
+      for (let step = 0; step < 12; step += 1) {
+        if (computerStopRef.current) break;
+        setComputerStatus(`Model planning action ${step + 1} of 12…`);
+        const response = await window.skaiAgent.request("chat.complete", { provider, endpoint, model, messages, responseMode: "think", maxTokens: 350, timeoutSeconds: 60 });
+        if (!response.ok) throw new Error(response.error?.message ?? "The local model could not plan a computer action.");
+        const raw = (response.result as { content?: unknown }).content;
+        if (typeof raw !== "string") throw new Error("The local model returned no action.");
+        const json = raw.match(/\{[\s\S]*\}/)?.[0];
+        if (!json) throw new Error("The model response was not a computer action. No action was sent.");
+        const action = JSON.parse(json) as Record<string, unknown>;
+        if (action.action === "done") { taskFinished = true; setComputerSteps((steps) => [...steps, `Finished: ${String(action.summary ?? "Task complete")}`]); setComputerStatus("Computer-use task finished."); break; }
+        if (computerStopRef.current) break;
+        const bounded = { action: action.action, x: action.x, y: action.y, button: action.button, text: action.text, key: action.key, delta: action.delta };
+        setComputerStatus(`Sending action ${step + 1} of 12…`);
+        await window.skaiAgent.computer?.action({ ...bounded, displayId: currentScreen.displayId } as Parameters<NonNullable<typeof window.skaiAgent.computer>["action"]>[0]);
+        const label = action.action === "click" ? `Click at ${Number(action.x).toFixed(2)}, ${Number(action.y).toFixed(2)}` : action.action === "type" ? `Type: ${String(action.text).slice(0, 80)}` : action.action === "key" ? `Press ${String(action.key)}` : `Scroll ${Number(action.delta) < 0 ? "up" : "down"}`;
+        setComputerSteps((steps) => [...steps, label]);
+        const freshScreens = await window.skaiAgent.computer?.capture();
+        const refreshed = freshScreens?.find((screen) => screen.id === currentScreen.id) ?? freshScreens?.[0];
+        if (!refreshed) throw new Error("The selected display could not be recaptured.");
+        currentScreen = refreshed; setComputerScreens(freshScreens ?? []); setComputerScreenId(refreshed.id);
+        messages.push({ role: "assistant", content: raw }, { role: "user", content: "Inspect the updated screen and choose the next action, or return done. Do not repeat an action unless the new screenshot shows it did not take effect.", attachments: [{ fileName: "current-screen.png", mediaType: "image/png", content: refreshed.content }] });
+        if (step === 11) reachedLimit = true;
+      }
+      if (computerStopRef.current) setComputerStatus("Computer-use session stopped.");
+      else if (reachedLimit) setComputerStatus("Stopped at the 12-action session limit. Review the display before starting another session.");
+      else if (!taskFinished) setComputerStatus("Computer-use session ended.");
+    } catch (error) { setComputerStatus(error instanceof Error ? error.message : "Computer-use session failed."); }
+    finally { computerStopRef.current = false; setComputerBusy(false); }
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (commandQuery !== null && commandMatches.length > 0) {
       if (event.key === "ArrowDown") { event.preventDefault(); setCommandIndex((index) => (index + 1) % commandMatches.length); return; }
@@ -366,7 +458,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     {voiceError && <div className="composer-voice-status"><p className="composer-voice-error" role="status">{voiceError}</p>{voicePackNeeded && <div className="composer-voice-install"><Button variant="secondary" type="button" disabled={voicePackInstalling} onClick={() => void installLocalSpeechPack()}>{voicePackInstalling ? "Installing local pack…" : "Install local speech pack"}</Button><span>The pack downloads once; dictation is processed on this device.</span></div>}</div>}
     {voiceFallbackNotice && <p className="composer-hint" role="status" onClick={() => setVoiceFallbackNotice(null)}>{voiceFallbackNotice}</p>}
     <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy || rewriteBusy} aria-pressed={documentsOnly} aria-label={documentsOnly ? "Documents only is on" : "Use documents only"} title={documentsOnly ? "Documents only: on" : "Use only attached documents as evidence"}><NavIcon name="document" /></Button><Button variant="ghost" type="button" onClick={() => setOmniOpen(true)} disabled={rewriteBusy || (attachments.length >= 5 && !audioTranscribing)} aria-haspopup="dialog" aria-expanded={omniOpen} aria-label="Add files or audio" aria-describedby="attachment-help" title="Add files, folders, or audio"><NavIcon name="plus" /></Button><Button variant={audioTranscribing ? "secondary" : "ghost"} type="button" onClick={() => audioAbortRef.current ? audioAbortRef.current.abort() : audioPickerRef.current?.click()} disabled={busy || rewriteBusy || voiceListening || handsFreeActive} aria-label={audioTranscribing ? "Stop audio transcription" : "Transcribe an audio file"} title={audioTranscribing ? "Stop audio transcription" : "Transcribe MP3, M4A, OGG, or WAV locally"}><NavIcon name={audioTranscribing ? "stop" : "audio"} /></Button>{!hasMessageContent && <Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"} title={voiceListening ? "Stop voice input" : "Dictate a message on this device"}><NavIcon name={voiceListening && !handsFreeActive ? "stop" : "microphone"} /></Button>}{!hasMessageContent && <Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={rewriteBusy || (voiceListening && !handsFreeActive) || audioTranscribing} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title="Start a local turn-based voice conversation"><NavIcon name={handsFreeActive ? "stop" : "headset"} /></Button>}<div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span>{hasMessageContent && <Button variant={busy ? "secondary" : "primary"} disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{rewriteBusy ? "Rewriting…" : busy ? "Queue ↗" : "Send ↗"}</Button>}</div></div>
-    <ModalDialog open={omniOpen} onClose={() => setOmniOpen(false)} titleId="omni-input-title" className="ui-dialog omni-input-dialog"><div className="dialog-heading"><div><p className="section-kicker">ADD TO THIS MESSAGE</p><h3 id="omni-input-title">Choose an input</h3><p>Attach local media or start a private voice turn. You can review attachments before sending.</p></div><button type="button" onClick={() => setOmniOpen(false)} aria-label="Close input menu">×</button></div><div className="omni-input-options"><button type="button" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><strong>Files and folders</strong><span>Images, documents, PDFs, and videos</span><small>{attachments.length}/5 attachments</small></button><button type="button" onClick={openAudioPickerFromOmni} disabled={busy || voiceListening || handsFreeActive}><strong>Audio file</strong><span>Transcribe MP3, M4A, OGG, or WAV on this device</span><small>No raw audio is sent</small></button><button type="button" onClick={startVoiceFromOmni} disabled={rewriteBusy || handsFreeActive || audioTranscribing}><strong>Voice input</strong><span>Dictate one message into the composer</span><small>On-device speech recognition</small></button><button type="button" onClick={startHandsFreeFromOmni} disabled={rewriteBusy || voiceListening || audioTranscribing}><strong>Voice Mode</strong><span>Have a turn-based hands-free conversation</span><small>End anytime</small></button></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setOmniOpen(false)}>Cancel</Button></div></ModalDialog>
+    <ModalDialog open={omniOpen} onClose={() => setOmniOpen(false)} titleId="omni-input-title" className="ui-dialog omni-input-dialog"><div className="dialog-heading"><div><p className="section-kicker">ADD TO THIS MESSAGE</p><h3 id="omni-input-title">Choose an input</h3><p>Attach local media or start a private voice turn. You can review attachments before sending.</p></div><button type="button" onClick={() => setOmniOpen(false)} aria-label="Close input menu">×</button></div><div className="omni-input-options"><button type="button" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><strong>Files and folders</strong><span>Images, documents, PDFs, and videos</span><small>{attachments.length}/5 attachments</small></button><button type="button" onClick={openAudioPickerFromOmni} disabled={busy || voiceListening || handsFreeActive}><strong>Audio file</strong><span>Transcribe MP3, M4A, OGG, or WAV on this device</span><small>No raw audio is sent</small></button><button type="button" onClick={startVoiceFromOmni} disabled={rewriteBusy || handsFreeActive || audioTranscribing}><strong>Voice input</strong><span>Dictate one message into the composer</span><small>On-device speech recognition</small></button><button type="button" onClick={startHandsFreeFromOmni} disabled={rewriteBusy || voiceListening || audioTranscribing}><strong>Voice Mode</strong><span>Have a turn-based hands-free conversation</span><small>End anytime</small></button><button type="button" onClick={() => { setOmniOpen(false); setComputerOpen(true); void captureComputerScreens(); }}><strong>Computer use</strong><span>View a screen, attach it for model context, or send direct mouse and keyboard input</span><small>Local display capture · Windows input</small></button></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setOmniOpen(false)}>Cancel</Button></div></ModalDialog>
+    <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL COMPUTER CONTROL</p><h3 id="computer-use-title">Computer use</h3><p>Ask the local vision model to act on this display, or use the direct controls. Each action is shown below; stop ends the session after the current model response.</p></div><button type="button" onClick={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} aria-label="Close computer use">×</button></div>{computerScreens.length > 1 && <label className="computer-screen-picker">Display<select value={computerScreenId} onChange={(event) => { setComputerScreenId(event.target.value); setComputerPoint(null); }} aria-label="Select display">{computerScreens.map((screen) => <option value={screen.id} key={screen.id}>{screen.name}</option>)}</select></label>}{selectedComputerScreen && <button type="button" className="computer-screen-preview" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setComputerPoint({ x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) }); }} aria-label="Choose a point on the captured display"><img src={`data:image/png;base64,${selectedComputerScreen.content}`} alt={`Captured display: ${selectedComputerScreen.name}`} />{computerPoint && <span className="computer-point-marker" style={{ left: `${computerPoint.x * 100}%`, top: `${computerPoint.y * 100}%` }} />}</button>}{!selectedComputerScreen && <p className="settings-help">Capture a display to begin.</p>}<div className="computer-use-controls computer-use-agent"><input value={computerTask} onChange={(event) => setComputerTask(event.target.value)} maxLength={2000} placeholder="Describe what you want the local model to do…" aria-label="Computer-use task" /><Button variant={computerBusy ? "secondary" : "primary"} type="button" disabled={!selectedComputerScreen || !computerTask.trim()} onClick={() => computerBusy ? stopComputerTask() : void startComputerTask()}>{computerBusy ? "Stop session" : "Start session"}</Button><Button variant="secondary" type="button" disabled={computerBusy} onClick={() => void captureComputerScreens()}>Refresh screen</Button><Button variant="secondary" type="button" disabled={!selectedComputerScreen || attachments.length >= 5 || computerBusy} onClick={attachComputerScreenshot}>Attach screenshot</Button></div><div className="computer-use-controls"><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "left" })}>Click point</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "right" })}>Right click</Button><input value={computerText} onChange={(event) => setComputerText(event.target.value)} maxLength={2000} placeholder="Text to type into the selected app" aria-label="Text to type" /><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerText || computerBusy} onClick={() => void runComputerAction({ action: "type", text: computerText })}>Type text</Button><select value={computerKey} onChange={(event) => setComputerKey(event.target.value)} aria-label="Key to press">{["Enter", "Tab", "Escape", "Backspace", "Delete", "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown", "Space"].map((key) => <option key={key}>{key}</option>)}</select><Button variant="secondary" type="button" disabled={!selectedComputerScreen || computerBusy} onClick={() => void runComputerAction({ action: "key", key: computerKey })}>Press key</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: 480 })}>Scroll up</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: -480 })}>Scroll down</Button></div>{computerSteps.length > 0 && <ol className="computer-use-steps" aria-label="Computer-use actions">{computerSteps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>}{computerStatus && <p className="computer-use-status" role="status">{computerBusy ? "Working… " : ""}{computerStatus}</p>}<div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setComputerOpen(false)}>Close</Button></div></ModalDialog>
     <ModalDialog open={handsFreeActive} onClose={endVoiceMode} titleId="voice-mode-title" className="ui-dialog voice-mode-dialog"><div className="voice-mode-session"><div className={`voice-mode-orb ${voiceListening ? "is-listening" : busy ? "is-speaking" : "is-preparing"}`} aria-hidden="true"><span /><span /><span /></div><p className="section-kicker">LOCAL VOICE MODE</p><h3 id="voice-mode-title">Voice conversation</h3><p className="voice-mode-state">{voiceListening ? "Listening on this device" : busy ? "Skai is responding" : "Preparing the next turn"}</p><p className="voice-mode-detail">{voiceListening ? "Speak naturally, then pause. Your words are transcribed locally before they are sent." : busy ? "The microphone is paused while the local model responds." : "The next listening turn will start after local speech finishes."}</p><div className="voice-mode-session-actions">{busy && <Button variant="ghost" type="button" onClick={stopNativeSpeech}>Stop speaking</Button>}<Button variant="secondary" type="button" onClick={endVoiceMode}>End voice mode</Button></div></div></ModalDialog>
   </section>;
 }

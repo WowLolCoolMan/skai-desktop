@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, screen, session, shell, systemPreferences, Tray } = require("electron");
+const { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, screen, session, shell, systemPreferences, Tray } = require("electron");
 const { spawn } = require("node:child_process");
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
@@ -17,6 +17,7 @@ const { augmentUserPath } = require("./user-path.cjs");
 const { createUpdateManager } = require("./update-manager.cjs");
 const { registerUpdateIpc } = require("./update-ipc.cjs");
 const { registerLocalMediaIpc } = require("./local-media-ipc.cjs");
+const { registerComputerUseIpc } = require("./computer-use-ipc.cjs");
 const { registerWindowIpc } = require("./window-ipc.cjs");
 const { registerPetIpc } = require("./pet-ipc.cjs");
 const { registerWorkspaceIpc } = require("./workspace-ipc.cjs");
@@ -1226,6 +1227,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   startAgentHost();
   registerLocalMediaIpc({ ipcMain, app, fs, fsSync, path, pathToFileURL, randomUUID, isMp4, isWebm, isAudioSignature });
+  registerComputerUseIpc({ ipcMain, desktopCapturer, screen, process, getMainWindow: () => mainWindow });
   if (!process.env.SKAI_DESKTOP_RENDERER_URL) applyProductionContentSecurityPolicy();
   // Theme: user theme files and picks (<userData>/themes, appearance.json), watched for live reload.
   const themeService = createThemeService({ userDataPath: app.getPath("userData"), getWindow: () => mainWindow, shell, dialog });

@@ -7,6 +7,8 @@ const desktopPackage = JSON.parse(fs.readFileSync(path.join(root, "apps", "deskt
 const main = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "main.cjs"), "utf8");
 const agentHostClient = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "agent-host-client.cjs"), "utf8");
 const localMediaIpc = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "local-media-ipc.cjs"), "utf8");
+const computerUseIpc = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "computer-use-ipc.cjs"), "utf8");
+const computerUse = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "computer-use.cjs"), "utf8");
 const workspaceIpc = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "workspace-ipc.cjs"), "utf8");
 const trayController = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "tray-controller.cjs"), "utf8");
 const petWindowController = fs.readFileSync(path.join(root, "apps", "desktop", "electron", "pet-window.cjs"), "utf8");
@@ -56,6 +58,8 @@ expect(localMediaIpc.includes('path.join(app.getPath("userData"), "media-samples
 expect(localMediaIpc.includes('ipcMain.handle("media:create-local-url"') && localMediaIpc.includes('"audio/mpeg"') && localMediaIpc.includes('"audio/wav"') && localMediaIpc.includes("isAudioSignature"), "audio input must be signature-checked and staged in private local media storage");
 expect(preload.includes("contextBridge.exposeInMainWorld"), "renderer communication must use preload");
 expect(preload.includes('"media:create-local-url"') && preload.includes('"media:revoke-local-url"'), "audio and video media access must use the scoped preload bridge");
+expect(preload.includes('"computer:capture"') && preload.includes('"computer:action"') && computerUseIpc.includes("withSkaiMinimized"), "computer use must expose only focused capture and input calls and restore Skai after foreground desktop interaction");
+expect(computerUse.includes("function validateAction") && computerUse.includes("input.text.length > 2000") && computerUse.includes("Math.abs(input.delta) > 1200"), "computer input must validate action types and bound text and scroll amounts");
 expect(!preload.includes("require(\"node:fs\")"), "preload must not expose filesystem access");
 expect(main.includes('"tasks.plan"'), "Electron bridge must expose the review-first local task planning method");
 expect(main.includes('"project.git.status"'), "Electron bridge must expose the read-only local Git status method");

@@ -374,6 +374,10 @@ export interface AppearanceBridge {
 
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
+  computer?: {
+    capture(): Promise<Array<{ id: string; name: string; displayId: string; display: { x: number; y: number; width: number; height: number } | null; previewWidth: number; previewHeight: number; content: string; mediaType: "image/png" }>>;
+    action(action: { action: "click" | "scroll" | "type" | "key"; displayId: string; x?: number; y?: number; button?: "left" | "right"; delta?: number; text?: string; key?: string }): Promise<{ ok: true }>;
+  };
   media?: {
     createLocalUrl(mediaType: "video/mp4" | "video/webm" | "audio/mp4" | "audio/webm" | "audio/mpeg" | "audio/wav" | "audio/ogg", content: string): Promise<string>;
     revokeLocalUrl(url: string): Promise<boolean>;
