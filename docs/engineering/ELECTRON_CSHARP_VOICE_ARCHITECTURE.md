@@ -35,9 +35,10 @@ it never falls back to remote recognition. Hands-free mode uses local Whisper
 with pause-segmented microphone turns and requests speech for replies. During
 reply playback it monitors the microphone with echo cancellation and requires
 sustained input before interrupting speech; the new turn is recorded and
-transcribed locally. Ending hands-free mode stops capture, transcription, and
-playback. Packaged barge-in acceptance remains open, and voice responses are
-still turn-based rather than streamed.
+transcribed locally, retaining a short microphone pre-roll so the beginning of
+the user's utterance is not discarded. Ending hands-free mode stops capture,
+transcription, and playback. Packaged barge-in acceptance remains open, and
+voice responses are still turn-based rather than streamed.
 
 The renderer owns the selected voice profile, primary model, and low-resource
 model. OS-native speech ships as the installed default. Pocket TTS is

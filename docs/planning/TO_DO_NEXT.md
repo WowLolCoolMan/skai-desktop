@@ -51,11 +51,12 @@ Mark an item done only when the linked workflow has evidence.
    Packaged acceptance now also verifies the denied-permission message and a
    successful retry. The local Whisper adapter smoke confirms an active Python
    transcription is terminated by the cancel request and returns no transcript.
-   During spoken replies, Voice Mode now monitors the local mic and cuts off
-   playback after sustained user speech, then records/transcribes that turn.
-   Focused voice-activity, typecheck, and build checks cover this implementation;
-   packaged interruption acceptance and streamed voice remain open. Keep the
-   path local.
+   During spoken replies, Voice Mode now monitors the local mic, cuts off
+   playback after sustained user speech, retains a short pre-roll to capture
+   the utterance onset, then records/transcribes that turn. Focused voice-
+   activity, typecheck, and build checks pass. Packaged Windows acceptance
+   still proves turn-based hands-free behavior, but does not yet prove barge-in;
+   streamed voice also remains open. Keep the path local.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
@@ -274,16 +275,19 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 - **2026-11-23:** Packaged Windows voice smoke now forces a microphone
   `NotAllowedError`, verifies Skai's permission guidance, restores local capture,
   and confirms a successful retry. The subsequent System.Speech fixture reached
-  local Whisper and produced one matching transcript attachment. Audio
-  transcription cancellation and hands-free remain unverified.
+  local Whisper and produced one matching transcript attachment. Packaged
+  hands-free acceptance verifies local Whisper submission and clean session
+  cancellation; barge-in coverage is tracked separately.
 
 - **2026-11-23:** Hands-free Voice Mode now supports acoustic barge-in during
   reply playback. It requires 180 ms of sustained microphone activity, discards
-  the assistant-playback recording segment, stops speech, and starts a fresh
-  local Whisper turn. Pending interruption transcripts wait for an in-flight
-  response to settle before submission. Focused unit, typecheck, and renderer
-  build checks pass; packaged barge-in and streamed-response acceptance remain
-  open.
+  assistant-playback audio while retaining the most recent 250 ms recording
+  segment as pre-roll, stops speech, and starts a fresh local Whisper turn.
+  Playback monitoring skips adaptive noise calibration so speech beginning
+  immediately is not learned as background noise. Pending interruption
+  transcripts wait for an in-flight response to settle before submission.
+  Focused unit, typecheck, renderer build, and general packaged Electron smoke
+  pass; packaged barge-in and streamed-response acceptance remain open.
 
 - **2026-11-23:** Marketplace → Installed now exposes update and removal for
   Ollama models, with host requests pinned to the discovered local endpoint.

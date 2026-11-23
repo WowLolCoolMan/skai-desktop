@@ -9,7 +9,7 @@ import { AttachmentList } from "./AttachmentList";
 import { composerCommands, type ComposerCommand } from "./composerCommands";
 import { stopNativeSpeech, waitForLocalSpeechToFinish } from "../../services/nativeTts";
 import { isLocalAudioFile, transcribeLocalAudioFile } from "./localAudioTranscription";
-import { audioRms, isSustainedVoiceActivity } from "./voiceActivity";
+import { audioRms, isSustainedVoiceActivity, voiceActivityThreshold } from "./voiceActivity";
 import { isLocalEndpoint } from "../../services/localOnly";
 
 type ChatComposerProps = {
@@ -82,7 +82,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const audioAbortRef = useRef<AbortController | null>(null);
   const whisperRecorderRef = useRef<{ recorder: MediaRecorder; stream: MediaStream; chunks: Blob[] } | null>(null);
   const whisperRecorderTimerRef = useRef<number | null>(null);
-  const handsFreeCaptureRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number; monitorDuringPlayback: boolean; bargeInTriggered: boolean } | null>(null);
+  const handsFreeCaptureRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; recentMonitorChunk: Blob | null; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number; monitorDuringPlayback: boolean; bargeInTriggered: boolean } | null>(null);
   const handsFreeAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const handsFreeRef = useRef(false);
@@ -351,10 +351,14 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       const samples = new Float32Array(analyser.fftSize);
       const mimeType = ["audio/webm;codecs=opus", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type));
       if (!mimeType) throw new Error("This desktop runtime cannot record a supported local audio format.");
-      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false };
+      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], recentMonitorChunk: null as Blob | null, abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false };
       handsFreeCaptureRef.current = capture;
       capture.recorder = new MediaRecorder(stream, { mimeType });
-      capture.recorder.ondataavailable = (event) => { if (event.data.size) capture.chunks.push(event.data); };
+      capture.recorder.ondataavailable = (event) => {
+        if (!event.data.size) return;
+        if (capture.monitorDuringPlayback) capture.recentMonitorChunk = event.data;
+        else capture.chunks.push(event.data);
+      };
       capture.recorder.start(250);
       setVoiceError(null);
       setVoiceListening(true);
@@ -410,8 +414,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         const level = audioRms(samples);
         document.querySelector(".voice-mode-session")?.setAttribute("data-input-level", level.toFixed(6));
         const now = performance.now();
-        const threshold = capture.monitorDuringPlayback ? Math.max(0.005, capture.noiseFloor * 2.8) : Math.max(0.0006, capture.noiseFloor * 1.6);
-        if (!capture.speechDetected && now - capture.calibrationStartedAt < 350) capture.noiseFloor = Math.min(0.02, capture.noiseFloor * 0.9 + level * 0.1);
+        const threshold = voiceActivityThreshold(capture.noiseFloor, capture.monitorDuringPlayback);
+        if (!capture.monitorDuringPlayback && !capture.speechDetected && now - capture.calibrationStartedAt < 350) capture.noiseFloor = Math.min(0.02, capture.noiseFloor * 0.9 + level * 0.1);
         if (level > threshold) {
           capture.lastSpeechAt = now;
           if (!capture.speechStartedAt) capture.speechStartedAt = now;
@@ -422,6 +426,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
             capture.monitorDuringPlayback = false;
             capture.startedAt = now;
             capture.chunks.length = 0;
+            if (capture.recentMonitorChunk) capture.chunks.push(capture.recentMonitorChunk);
+            capture.recentMonitorChunk = null;
             const previousRecorder = capture.recorder;
             if (previousRecorder && previousRecorder.state !== "inactive") {
               previousRecorder.ondataavailable = null;

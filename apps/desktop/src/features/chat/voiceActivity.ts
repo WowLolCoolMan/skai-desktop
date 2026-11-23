@@ -10,3 +10,7 @@ export function audioRms(samples: ArrayLike<number>) {
 export function isSustainedVoiceActivity(level: number, threshold: number, startedAt: number, now: number, durationMs = 180) {
   return level > threshold && startedAt > 0 && now - startedAt >= durationMs;
 }
+
+export function voiceActivityThreshold(noiseFloor: number, monitorDuringPlayback: boolean) {
+  return monitorDuringPlayback ? Math.max(0.005, noiseFloor * 2.8) : Math.max(0.0006, noiseFloor * 1.6);
+}
