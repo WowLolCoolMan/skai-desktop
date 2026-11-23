@@ -78,11 +78,14 @@ Mark an item done only when the linked workflow has evidence.
     paths for Kokoro and Piper; Whisper large-v3 covers local transcription.
     Only 40 of the 89 curated entries currently have real adapters, and the
     catalog smoke asserts that boundary. Implement and accept the next local
-    engine, prioritizing Qwen3-TTS, then Chatterbox, OmniVoice, and Higgs Audio.
-    Qwen's upstream recommends an isolated Python 3.12 environment with the
-    `qwen-tts` package; confirm individual model-card terms, resource fit,
-    offline operation, install cancellation, synthesis, and removal before
-    marking it installable ([upstream setup](https://github.com/QwenLM/Qwen3-TTS#quickstart)).
+    engine after checking hardware fit and license. Host smoke now synthesizes
+    offline WAVs: on this 32 GiB Windows/RX 7900 XTX machine, Piper generated
+    3.53 seconds of audio end-to-end in 0.83 seconds; Kokoro generated 3.26
+    seconds in 8.91 seconds. These are one-phrase timings, not a subjective
+    speech-quality rating. Qwen3-TTS is not an obvious realtime fit here: its
+    upstream recommends an isolated Python 3.12 environment, while its example
+    accelerator path uses CUDA; verify model-card terms and an actual local run
+    before enabling it ([upstream setup](https://github.com/QwenLM/Qwen3-TTS#quickstart)).
     Keep credentialed hosted services clearly separated from local catalog
     entries.
 12. **User-controlled provider gateway.** Add explicit local/cloud/hybrid chat
@@ -127,6 +130,13 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** `smoke:voice:acceptance` now invokes installed Kokoro and
+  Piper runtimes with network access disabled, validates the produced WAV and
+  non-silent signal, and reports full cold one-shot timing. On this Windows
+  host, Piper produced 3.53 seconds of audio in 0.83 seconds; Kokoro produced
+  3.26 seconds in 8.91 seconds. This does not assess how natural the generated
+  speech sounds. The check skips engines that are not installed.
 
 - **2026-11-23:** Packaged accessibility audit now reports 14 routes, zero WCAG
   violations, a working skip link/main landmark, and valid expanded Model
