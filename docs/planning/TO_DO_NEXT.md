@@ -51,6 +51,11 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   24.04/WSL2 acceptance verified the 256 MiB memory ceiling against a touched
   320 MiB allocation, the 128-process cap against 160 spawn attempts, project
   filesystem boundaries, network denial, timeout, and cancellation.
+- **2026-11-22:** Repaired a race in packaged theme acceptance so gallery-theme
+  saves are polled until `appearance.json` is valid. Packaged theme acceptance
+  passed dark/light/system, alternate backdrops, 960×640 layout, Settings/Chat
+  contrast, and custom-theme reload/recovery. One Settings screenshot was
+  visually inspected; the broader live UI review remains open.
 - **2026-11-22:** Windows Coding Agent commands now use Windows Process Security
   Environment (PSEC) filesystem grants and a capability-free AppContainer. On
   the current Windows 11 host, native acceptance confirms nested project writes,

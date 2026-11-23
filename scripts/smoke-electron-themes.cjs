@@ -286,7 +286,10 @@ async function main() {
   await devtools.evaluate("[...document.querySelectorAll('.theme-card')].find((card) => card.querySelector('.theme-card-name')?.textContent === 'Catppuccin Latte')?.click(); 1");
   await waitFor(devtools.evaluate, "JSON.stringify([document.documentElement.dataset.scheme, document.documentElement.dataset.themeId])", (value) => value === JSON.stringify(["light", "builtin:Catppuccin/Catppuccin Latte"]), "gallery preview in the theme's own scheme");
   await devtools.evaluate("[...document.querySelectorAll('.theme-gallery-preview-bar button')].find((button) => button.textContent?.startsWith('Apply'))?.click(); 1");
-  await waitFor(async () => (fs.existsSync(path.join(smokeUserDataDir, "appearance.json")) ? fs.readFileSync(path.join(smokeUserDataDir, "appearance.json"), "utf8") : "{}"), "", (value) => JSON.parse(value).lightTheme === "builtin:Catppuccin/Catppuccin Latte", "gallery Apply to save the light pick");
+  await waitFor(async () => (fs.existsSync(path.join(smokeUserDataDir, "appearance.json")) ? fs.readFileSync(path.join(smokeUserDataDir, "appearance.json"), "utf8") : "{}"), "", (value) => {
+    try { return JSON.parse(value).lightTheme === "builtin:Catppuccin/Catppuccin Latte"; }
+    catch { return false; } // The app may still be writing the settings file; retry on the next poll.
+  }, "gallery Apply to save the light pick");
   await waitFor(devtools.evaluate, "document.documentElement.dataset.scheme", (value) => value === "dark", "app to return to its own (dark) scheme after Apply");
   fs.mkdirSync(themesDir, { recursive: true });
   writeTheme("#102030");

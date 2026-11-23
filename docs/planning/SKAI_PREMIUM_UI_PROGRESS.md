@@ -178,3 +178,17 @@ and cross-platform acceptance.
   the previous section state.
 - Verification: `desktop:typecheck` and `desktop:build` passed. No live visual
   matrix was run after this refinement.
+
+### Theme acceptance reliability — 2026-11-22
+
+- Fixed a race in the packaged theme acceptance script: applying a gallery
+  theme saves `appearance.json` asynchronously, and the poll could read an
+  incomplete file and fail before the write completed. The predicate now
+  retries until valid JSON contains the saved theme.
+- `npm run smoke:electron:themes` passed after the fix. It exercised dark,
+  light, and system themes, alternate backdrops, a constrained 960×640 window,
+  text contrast on Settings and Chat, and custom-theme live reload/recovery.
+- Visually inspected the packaged dark Settings appearance screenshot at
+  1440×900; the header, preference rail, preview, gallery, and save action were
+  visible without clipping. Native-window interaction and route-by-route visual
+  acceptance remain open; this does not close the professional UI pass.
