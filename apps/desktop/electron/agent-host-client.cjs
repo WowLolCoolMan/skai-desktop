@@ -38,6 +38,7 @@ function createAgentHostClient(options) {
 
   let host;
   let hostReader;
+  let restartOnNextRequest = false;
   let nextRequestId = 1;
   const pending = new Map();
 
@@ -61,6 +62,8 @@ function createAgentHostClient(options) {
   }
 
   function start() {
+    if (host) return;
+    restartOnNextRequest = false;
     const command = packagedRuntime ? packagedHost : "dotnet";
     const args = packagedRuntime ? ["--stdio"] : ["run", "--project", hostProject, "--no-launch-profile", "--", "--stdio"];
     host = spawn(command, args, {
@@ -98,11 +101,15 @@ function createAgentHostClient(options) {
       const error = { v: 1, ok: false, error: { code: "HOST_EXITED", message: `Agent host exited (${code ?? signal}).` } };
       hostReader?.close();
       settlePending(error);
-      if (host === startedHost) host = undefined;
+      if (host === startedHost) {
+        host = undefined;
+        restartOnNextRequest = !isQuitting();
+      }
     });
   }
 
   function stop(onStopped) {
+    restartOnNextRequest = false;
     if (!host) {
       onStopped?.();
       return;
@@ -137,6 +144,7 @@ function createAgentHostClient(options) {
     if (params !== undefined && (params === null || typeof params !== "object" || Array.isArray(params))) {
       return Promise.resolve({ v: 1, ok: false, error: { code: "INVALID_PARAMS", message: "Agent parameters must be an object." } });
     }
+    if (!host && restartOnNextRequest && !isQuitting()) start();
     if (!host || host.stdin.destroyed) {
       const response = { v: 1, ok: false, error: { code: "HOST_UNAVAILABLE", message: "Agent host is not running." } };
       const completion = petCompletionText(method, response);

@@ -94,6 +94,17 @@ async function run() {
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(stopped, true);
   assert.equal((await client.request("settings.get", {})).error.code, "HOST_UNAVAILABLE");
+
+  client.start();
+  const crashedHost = host;
+  crashedHost.exitCode = 1;
+  crashedHost.emit("exit", 1, null);
+  const launchesBeforeRecovery = launches.length;
+  const recoveryPromise = client.request("settings.get", {});
+  assert.equal(launches.length, launchesBeforeRecovery + 1, "a request after an unexpected host exit relaunches the host");
+  const recoveryRequest = requests.at(-1);
+  host.stdout.write(`${JSON.stringify({ v: 1, id: recoveryRequest.id, ok: true, result: "recovered" })}\n`);
+  assert.equal((await recoveryPromise).result, "recovered", "the retried local request completes on the recovered host");
   console.log("Agent Host client checks passed.");
 }
 
