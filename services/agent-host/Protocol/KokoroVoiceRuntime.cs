@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using SkaiDesktop.Core.Services;
 
 namespace SkaiDesktop.AgentHost.Protocol;
 
@@ -18,7 +19,7 @@ internal static class KokoroVoiceRuntime
     private static string? installError;
     private static string installStep = "";
 
-    private static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "Kokoro");
+    private static string Root => VoiceRuntimeStatus.GetVoiceRuntimeRoot("Kokoro");
     private static string ModelPath => Path.Combine(Root, ModelName);
     private static string VoicesPath => Path.Combine(Root, VoicesName);
     private static string PythonPath => Path.Combine(Root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");

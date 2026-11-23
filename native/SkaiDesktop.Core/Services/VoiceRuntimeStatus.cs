@@ -32,7 +32,7 @@ public static class VoiceRuntimeStatus
     {
         get
         {
-            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "Kokoro");
+            var root = GetVoiceRuntimeRoot("Kokoro");
             var python = Path.Combine(root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");
             return File.Exists(Path.Combine(root, "kokoro-v1.0.int8.onnx"))
                 && File.Exists(Path.Combine(root, "voices-v1.0.bin"))
@@ -45,7 +45,7 @@ public static class VoiceRuntimeStatus
     {
         get
         {
-            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "Piper");
+            var root = GetVoiceRuntimeRoot("Piper");
             var python = Path.Combine(root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");
             return File.Exists(Path.Combine(root, "en_US-hifi_tts_92-medium.onnx"))
                 && File.Exists(Path.Combine(root, "en_US-hifi_tts_92-medium.onnx.json"))
@@ -58,7 +58,7 @@ public static class VoiceRuntimeStatus
     {
         get
         {
-            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "ChatterboxNano");
+            var root = GetVoiceRuntimeRoot("ChatterboxNano");
             var python = Path.Combine(root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");
             return File.Exists(python)
                 && new[] { "added_tokens.json", "conds.pt", "merges.txt", "s3gen_meanflow.safetensors", "special_tokens_map.json", "t3_nano_v1.safetensors", "tokenizer_config.json", "ve.safetensors", "vocab.json" }
@@ -97,7 +97,17 @@ public static class VoiceRuntimeStatus
     public static string GetPocketTtsRoot()
     {
         var overridePath = Environment.GetEnvironmentVariable("SKAI_POCKET_TTS_ROOT");
-        if (!string.IsNullOrWhiteSpace(overridePath)) return Path.GetFullPath(overridePath);
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "PocketTTS");
+        return !string.IsNullOrWhiteSpace(overridePath) ? Path.GetFullPath(overridePath) : GetVoiceRuntimeRoot("PocketTTS");
+    }
+
+    /// <summary>Returns an engine's per-user runtime directory or its child under an isolated test root.</summary>
+    public static string GetVoiceRuntimeRoot(string engineDirectory)
+    {
+        if (engineDirectory is not ("Kokoro" or "Piper" or "ChatterboxNano" or "PocketTTS" or "WhisperLargeV3"))
+            throw new ArgumentOutOfRangeException(nameof(engineDirectory), "Unknown local voice runtime directory.");
+        var isolatedRoot = Environment.GetEnvironmentVariable("SKAI_VOICE_ROOT");
+        return !string.IsNullOrWhiteSpace(isolatedRoot)
+            ? Path.Combine(Path.GetFullPath(isolatedRoot), engineDirectory)
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", engineDirectory);
     }
 }

@@ -40,6 +40,8 @@
     "smoke:electron:artifact": "node scripts/smoke-electron-artifact.cjs",
     "smoke:voice:acceptance": "node scripts/smoke-voice-acceptance.cjs",
     "smoke:voice:pocket-tts": "node scripts/smoke-pocket-tts.cjs",
+    "smoke:voice:piper": "node scripts/smoke-piper-adapter.cjs",
+    "check:syntax:voice-piper": "node --check scripts/smoke-piper-adapter.cjs",
     "smoke:voice:workbench": "node scripts/smoke-voice-workbench.cjs",
     "test:voice:activity": "node scripts/test-voice-activity.cjs",
     "smoke:chatterbox-adapter": "node scripts/smoke-chatterbox-adapter.cjs",

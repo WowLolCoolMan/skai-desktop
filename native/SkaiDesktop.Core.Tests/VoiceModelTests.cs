@@ -1,4 +1,5 @@
 using SkaiDesktop.Core.Models;
+using SkaiDesktop.Core.Services;
 using static TestSupport;
 
 internal static class VoiceModelTests
@@ -12,6 +13,18 @@ internal static class VoiceModelTests
         Check(VoiceModelCatalog.All.Any(model => model.Id == "fish-speech" && model.SupportsAudioEffects), "voice catalog exposes expressive audio capability metadata");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "piper" && model.IsLowResource), "voice catalog exposes a compact offline runtime");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "piper" && model.License.Contains("GPL-3.0") && model.License.Contains("CC-BY-4.0")), "voice catalog exposes Piper engine and voice-data license terms");
+        var previousVoiceRoot = Environment.GetEnvironmentVariable("SKAI_VOICE_ROOT");
+        try
+        {
+            Environment.SetEnvironmentVariable("SKAI_VOICE_ROOT", Path.Combine(Path.GetTempPath(), "skai-voice-root"));
+            Check(VoiceRuntimeStatus.GetVoiceRuntimeRoot("Piper") == Path.Combine(Path.GetTempPath(), "skai-voice-root", "Piper"), "voice runtimes honor the isolated acceptance root");
+            Check(VoiceRuntimeStatus.GetVoiceRuntimeRoot("WhisperLargeV3").EndsWith(Path.Combine("skai-voice-root", "WhisperLargeV3"), StringComparison.OrdinalIgnoreCase), "voice root supports the registered Whisper runtime");
+            var rejectedUnknownRuntime = false;
+            try { VoiceRuntimeStatus.GetVoiceRuntimeRoot("Unregistered"); }
+            catch (ArgumentOutOfRangeException) { rejectedUnknownRuntime = true; }
+            Check(rejectedUnknownRuntime, "voice root rejects unregistered runtime directories");
+        }
+        finally { Environment.SetEnvironmentVariable("SKAI_VOICE_ROOT", previousVoiceRoot); }
         var chatterbox = VoiceModelCatalog.All.Single(model => model.Id == "chatterbox");
         Check(chatterbox.Name == "Chatterbox Nano" && !chatterbox.IsLowResource && chatterbox.License.StartsWith("MIT"), "voice catalog identifies the official MIT CPU-oriented Chatterbox Nano variant without overstating its memory fit");
         Check(chatterbox.SupportsVoiceCloning && chatterbox.SupportsEmotion && chatterbox.SourceUrl == "https://huggingface.co/ResembleAI/chatterbox-nano", "voice catalog exposes Chatterbox Nano features and official model card");

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using SkaiDesktop.Core.Services;
 
 namespace SkaiDesktop.AgentHost.Protocol;
 
@@ -27,7 +28,7 @@ internal static class WhisperVoiceRuntime
     private static string installStep = "";
     private static string? installError;
 
-    private static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "WhisperLargeV3");
+    private static string Root => VoiceRuntimeStatus.GetVoiceRuntimeRoot("WhisperLargeV3");
     private static string ModelRoot => Path.Combine(Root, "model");
     private static string PythonPath => Path.Combine(Root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");
     public static bool IsInstalled => File.Exists(PythonPath) && ModelFiles.All(file => File.Exists(Path.Combine(ModelRoot, file))) &&

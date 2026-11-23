@@ -153,6 +153,13 @@ Mark an item done only when the linked workflow has evidence.
     paths contained spaces; Skai now gives the runtime the cache's 8.3 path
     while retaining the normal storage location. The smoke terminates the
     Agent Host process tree and removes its isolated profile after success.
+    A new `npm run smoke:voice:piper` acceptance now does the same for Piper:
+    it installs into a disposable `SKAI_VOICE_ROOT`, verifies Marketplace
+    readiness, synthesizes a nonempty WAV through the Agent Host, and removes
+    the temporary profile after success. The Piper child process explicitly
+    receives closed stdin so it cannot inherit and wait on the Agent Host's
+    protocol pipe. Focused `--voice-models` tests cover the isolated root and
+    reject unregistered runtime directories.
     Cross-device speech quality and clean installs on other operating systems
     remain unverified.
     The isolated Voice Workbench UI smoke now builds its renderer before
@@ -292,6 +299,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   Ubuntu WSL passed Bubblewrap/cgroup project filesystem isolation, network
   denial, 256 MiB memory and 128-process limits, timeout, and cancellation.
   Native Linux desktop and additional Windows profiles remain open.
+
+- **2026-11-23:** Added a clean isolated Piper Marketplace installation and
+  Agent Host speech acceptance. On Windows x64, Piper 1.5.0 and its pinned
+  English voice installed in a disposable root, appeared available in the
+  catalog, and synthesized a valid 96,812-byte WAV. Fixed stdin inheritance
+  that caused the Agent Host synthesis subprocess to stall. Focused voice root
+  tests and `node --check` for the smoke script pass.
 
 - **2026-11-23:** Added a pinned Chatterbox Nano Marketplace installer and
   local synthesis adapter. Setup uses an isolated CPU-only Python environment,

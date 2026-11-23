@@ -13,6 +13,12 @@ if (args.Length == 1 && args[0].Equals("--chat-provider", StringComparison.Ordin
     Console.WriteLine("Selected chat-provider checks passed.");
     return;
 }
+if (args.Length == 1 && args[0].Equals("--voice-models", StringComparison.OrdinalIgnoreCase))
+{
+    VoiceModelTests.Run();
+    Console.WriteLine("Selected voice model checks passed.");
+    return;
+}
 if (args.Length == 1 && args[0].Equals("--workspace-sandbox", StringComparison.OrdinalIgnoreCase))
 {
     await LocalStorageAndWorkspaceTests.RunAsync();

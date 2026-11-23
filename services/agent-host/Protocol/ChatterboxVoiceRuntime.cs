@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using SkaiDesktop.Core.Services;
 
 namespace SkaiDesktop.AgentHost.Protocol;
 
@@ -35,7 +36,7 @@ internal static class ChatterboxVoiceRuntime
 
     static ChatterboxVoiceRuntime() => AppDomain.CurrentDomain.ProcessExit += (_, _) => StopWorker();
 
-    private static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "ChatterboxNano");
+    private static string Root => VoiceRuntimeStatus.GetVoiceRuntimeRoot("ChatterboxNano");
     private static string ModelPath(string file) => Path.Combine(Root, file);
     private static string PythonPath => Path.Combine(Root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");
     private static string MarkerPath => Path.Combine(Root, "installed.json");
