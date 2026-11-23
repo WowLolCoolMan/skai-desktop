@@ -72,8 +72,13 @@ Mark an item done only when the linked workflow has evidence.
    checkpoint discovery, workflow submission, progress polling, cancellation
    with an empty queue afterward, image-to-image source upload, edited PNG
    retrieval, and payload validation using `Juggernaut-XL_v9.safetensors` on
-   the RX 7900 XTX. Remaining: confirm GPU execution from ComfyUI's own device
-   logs. Repeat with `npm run smoke:image:comfy-live`. See the
+    the RX 7900 XTX. Repeated on 2026-11-23: cancellation cleared the queue;
+    ComfyUI returned `skai-live-acceptance_00004_.png` and edited
+    `skai-live-acceptance_00005_.png` (324,096 bytes). Its live `/system_stats`
+    identifies PyTorch ROCm 10.1.0 and the AMD Radeon RX 7900 XTX with 25.75
+    GiB VRAM. This confirms the runtime sees the GPU, but no execution log or
+    utilization sample was captured during generation, so direct proof of GPU
+    execution remains open. Repeat with `npm run smoke:image:comfy-live`. See the
    [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
 6. **Windows update acceptance — Blocked on release · Owner: User / release
    owner.** The current-source loopback install passed. Read-only checks now
