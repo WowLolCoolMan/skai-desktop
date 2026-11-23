@@ -3,55 +3,121 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080d15">
-  <meta name="description" content="Skai Desktop is a local-first workspace for AI chat, coding, projects, and local models.">
-  <title>Skai Desktop — Your local AI workspace</title>
+  <meta name="theme-color" content="#080b12">
+  <meta name="description" content="Meet Skai Desktop: a local-first AI workspace for chat, projects, coding, creative tools, and models that run on your machine.">
+  <title>Skai Desktop — Bring AI down to earth</title>
   <link rel="icon" href="site-assets/skaiwolficon.webp">
   <link rel="stylesheet" href="site.css">
 </head>
 <body>
+  <a class="skip-link" href="#story">Skip to the story</a>
+  <div class="read-progress" aria-hidden="true"></div>
   <header class="topbar">
-    <a class="brand" href="#top"><img src="site-assets/skaiwolficon.webp" alt=""><span>SKAI DESKTOP</span></a>
-    <nav aria-label="Main navigation"><a href="#features">Features</a><a href="#privacy">Local by design</a><a href="#docs">Docs</a><a class="nav-cta" href="https://github.com/WowLolCoolMan/skai-desktop">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <a class="brand" href="#top" aria-label="Skai Desktop home"><img src="site-assets/skaiwolficon.webp" alt=""><span>SKAI <b>DESKTOP</b></span></a>
+    <nav aria-label="Main navigation">
+      <a href="#workflow">How it works</a><a href="#local">Your data</a><a href="#reality">The real story</a>
+      <a class="nav-cta" href="https://github.com/WowLolCoolMan/skai-desktop/releases/latest">Get Skai <span aria-hidden="true">↗</span></a>
+    </nav>
   </header>
+
   <main id="top">
-    <section class="hero">
+    <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="pulse"></span> PRIVATE BY DEFAULT · BUILT FOR YOUR DESKTOP</p>
-        <h1>Your AI workspace.<br><span>On your machine.</span></h1>
-        <p class="lead">Chat with local models, work in real projects, review agent changes, and keep your tools together in one desktop app.</p>
-        <div class="hero-actions"><a class="button primary" href="https://github.com/WowLolCoolMan/skai-desktop/releases">Explore releases <span aria-hidden="true">↗</span></a><a class="button secondary" href="https://github.com/WowLolCoolMan/skai-desktop">View the source</a></div>
-        <p class="hero-note">Active development · Electron + React + .NET · source for reference</p>
+        <p class="eyebrow"><span class="pulse"></span> AN AI WORKSPACE THAT STAYS YOURS</p>
+        <h1 id="hero-title">Bring AI<br>down to <em>earth.</em></h1>
+        <p class="lead">Your models. Your projects. Your call. Skai brings AI chat, coding, documents, voice, and creative tools into one desktop workspace—running with local services you choose.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="https://github.com/WowLolCoolMan/skai-desktop/releases/latest">Meet the latest release <span aria-hidden="true">↗</span></a>
+          <a class="button secondary" href="#workflow">Take the 90-second tour <span aria-hidden="true">↓</span></a>
+        </div>
+        <p class="hero-note"><span>0.1.4</span> · TESTING RELEASE · WINDOWS + LINUX · SOURCE AVAILABLE</p>
       </div>
-      <div class="hero-art"><img src="site-assets/skai-desktop-hero.webp" alt="Illustration of the Skai Desktop workspace"><div class="art-caption"><span class="status-dot"></span> One workspace. Your computer.</div></div>
+      <div class="hero-art">
+        <img src="site-assets/skai-desktop-hero.webp" alt="Skai's AI workspace emerging from a glowing desktop landscape">
+        <div class="art-caption"><span class="status-dot"></span>One idea in. Real work out.</div>
+        <span class="art-index" aria-hidden="true">FIG. 01 / YOUR DESKTOP</span>
+      </div>
+      <a class="scroll-cue" href="#story"><span class="scroll-line"></span>THE SHORT VERSION <span aria-hidden="true">↓</span></a>
     </section>
-    <section class="proof" aria-label="Project principles"><div><b>Local model runtimes</b><span>Ollama · LM Studio · more</span></div><div><b>Real project tools</b><span>Editor · terminal · Git</span></div><div><b>Human-reviewed work</b><span>Diffs · approvals · undo</span></div></section>
-    <section class="section" id="features">
-      <div class="section-heading"><p class="eyebrow">A WORKSPACE THAT CONNECTS THE STEPS</p><h2>From a question to finished work.</h2><p>Keep the model, project context, tools, and review in one flow.</p></div>
-      <div class="feature-grid">
-        <article class="feature"><div class="icon">◉</div><h3>Local AI chat</h3><p>Discover local models, manage conversations, attach files, ground a turn only in its documents, compare models, and use on-device dictation with spoken hands-free turns where supported.</p><span class="tag">OLLAMA · LM STUDIO · LOCAL APIs</span></article>
-        <article class="feature"><div class="icon">⌘</div><h3>Code with your project open</h3><p>Browse project files in Monaco, inspect changes, use a guarded terminal, and keep edits reviewable.</p><span class="tag">MONACO · DIFFS · TERMINAL</span></article>
-        <article class="feature"><div class="icon">⟁</div><h3>Agents with a review step</h3><p>Plan work, track activity, manage approvals, and inspect proposed changes before they touch your files.</p><span class="tag">LOCAL TASKS · APPROVALS</span></article>
-        <article class="feature"><div class="icon">✳</div><h3>Local creative tools</h3><p>Set up local Stable Diffusion Turbo or connect ComfyUI, discover checkpoints, and start from built-in image workflows.</p><span class="tag">DIFFUSERS · COMFYUI · LOCAL</span></article>
-        <article class="feature"><div class="icon">▤</div><h3>Memory that you can manage</h3><p>Review and edit saved information, organize conversations, and keep app state on your device.</p><span class="tag">LOCAL STORAGE · CONTROLS</span></article>
-        <article class="feature"><div class="icon">◌</div><h3>Pets with their own personality</h3><p>Inspect all seven built-ins in Pet Workshop, tune their behavior, and make local concept art for a custom companion. Blaze can pounce and breathe animated fire without moving your cursor.</p><span class="tag">PET WORKSHOP · LOCAL GENERATION</span></article>
+
+    <section class="story-intro" id="story" aria-labelledby="story-title">
+      <div class="story-index"><span>01</span><span>THE PROBLEM</span></div>
+      <div class="story-copy">
+        <p class="eyebrow">TOO MANY WINDOWS. TOO LITTLE CONTEXT.</p>
+        <h2 id="story-title">AI can answer.<br><em>Can it help you finish?</em></h2>
+        <p>A chat window can give you an idea. Then the real work starts: find the right file, open the model, move the answer, check the change, remember what happened.</p>
+        <p>Skai is built to keep those steps together. Start with a question or a project. Bring the context. Work with your model. Review what changed. <strong>You decide what stays.</strong></p>
+      </div>
+      <div class="quote-card"><span class="quote-mark">“</span><p>From first question<br>to work you can review.</p><span class="quote-rule"></span><span class="micro-label">THE SKAI LOOP</span></div>
+    </section>
+
+    <section class="tour section" id="workflow" aria-labelledby="workflow-title">
+      <div class="section-heading">
+        <div class="story-index"><span>02</span><span>THE WORKFLOW</span></div>
+        <p class="eyebrow">FOUR STEPS. ONE PLACE TO THINK.</p>
+        <h2 id="workflow-title">A useful answer is<br>only the beginning.</h2>
+        <p>Follow the thread from “what if?” to a result you understand.</p>
+      </div>
+      <ol class="steps">
+        <li class="step"><span class="step-no">01</span><span class="step-glyph" aria-hidden="true">⌕</span><h3>Choose your model</h3><p>Connect Ollama, LM Studio, or another supported local runtime. Pick the model for the job.</p><details><summary>What does “local model” mean?</summary><p>The model runs through a service on your computer. Skai does not silently switch your chat to a hosted model when something is unavailable.</p></details></li>
+        <li class="step"><span class="step-no">02</span><span class="step-glyph" aria-hidden="true">＋</span><h3>Bring real context</h3><p>Open a project, attach a document, or keep a conversation going. The work has somewhere to live.</p><details><summary>Can I keep a turn focused?</summary><p>Yes. Documents-only grounding can restrict a response to the files attached for that turn, excluding project, memory, and skill context.</p></details></li>
+        <li class="step"><span class="step-no">03</span><span class="step-glyph" aria-hidden="true">⌘</span><h3>Make something happen</h3><p>Explore an idea, edit a file, run an approved task, create an image, or work with audio and video.</p><details><summary>What if I’m not a developer?</summary><p>Skai also brings together document chat, voice, model discovery, image workflows, saved personas, themes, and seven animated desktop companions.</p></details></li>
+        <li class="step"><span class="step-no">04</span><span class="step-glyph" aria-hidden="true">✓</span><h3>Review. Then decide.</h3><p>Inspect proposed project changes. Keep the useful parts, undo, or ask for another pass.</p><details><summary>Does the agent change files on its own?</summary><p>Project work is designed to stay reviewable. Supported Coding Agent commands run inside OS isolation, and Skai refuses them when it cannot establish the required sandbox.</p></details></li>
+      </ol>
+      <p class="details-nudge"><span aria-hidden="true">↗</span> Open any question above for the details most product pages leave out.</p>
+    </section>
+
+    <section class="capabilities section" aria-labelledby="capabilities-title">
+      <div class="section-heading split-heading"><div><div class="story-index"><span>03</span><span>THE TOOLKIT</span></div><p class="eyebrow">MORE THAN A CHAT BOX</p><h2 id="capabilities-title">One workspace.<br>Room to move.</h2></div><p>Different kinds of work, with the same useful rhythm: bring context, make progress, stay in control.</p></div>
+      <div class="capability-list">
+        <article class="capability capability-code"><span class="cap-number">01 / BUILD</span><div class="cap-icon" aria-hidden="true">{ }</div><div><h3>Your project, in the conversation.</h3><p>Browse code in the Monaco editor. Use project-linked chat and tasks. Inspect diffs, use guarded commands, and keep an undo path.</p><span class="chip-row"><span>PROJECTS</span><span>EDITOR + DIFFS</span><span>REVIEWABLE TASKS</span></span></div><span class="cap-arrow" aria-hidden="true">↗</span></article>
+        <article class="capability capability-models"><span class="cap-number">02 / EXPLORE</span><div class="cap-icon" aria-hidden="true">◌</div><div><h3>Pick the model. Keep the control.</h3><p>Discover local models, compare options, attach documents, search and organize conversations, and use local voice workflows where supported.</p><span class="chip-row"><span>OLLAMA</span><span>LM STUDIO</span><span>VOICE + FILES</span></span></div><span class="cap-arrow" aria-hidden="true">↗</span></article>
+        <article class="capability capability-create"><span class="cap-number">03 / CREATE</span><div class="cap-icon" aria-hidden="true">✳</div><div><h3>Make space for the side quests.</h3><p>Try local image generation with Diffusers or connect ComfyUI. Tune the desktop, save personas, and let a companion wander around it.</p><span class="chip-row"><span>DIFFUSERS</span><span>COMFYUI</span><span>SEVEN COMPANIONS</span></span></div><span class="cap-arrow" aria-hidden="true">↗</span></article>
+      </div>
+      <a class="text-link" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/planning/CAPABILITY_MATRIX.md">See what is verified, partial, and still being worked on <span aria-hidden="true">→</span></a>
+    </section>
+
+    <section class="local-section" id="local" aria-labelledby="local-title">
+      <div class="local-visual"><img src="site-assets/skai-desktop-mark.webp" alt="Skai Desktop mark"><span class="orbit orbit-one"></span><span class="orbit orbit-two"></span><span class="local-stamp">YOUR MACHINE<br>YOUR CHOICE</span></div>
+      <div class="local-copy"><div class="story-index"><span>04</span><span>THE BOUNDARY</span></div><p class="eyebrow">LOCAL BY DESIGN. CLEAR ABOUT THE EXCEPTIONS.</p><h2 id="local-title">Your prompts<br>stay <em>close.</em></h2>
+        <p>For the current release, chat runs through the local model runtime you choose. Skai does not send chat prompts to hosted model providers or quietly fall back to the cloud.</p>
+        <div class="boundary-list"><div><span class="boundary-icon">✓</span><p><b>You choose the model.</b><br>Connect the local runtime you want to use.</p></div><div><span class="boundary-icon">✓</span><p><b>No hidden cloud route.</b><br>If local inference is unavailable, Skai does not silently reroute your chat.</p></div><div><span class="boundary-icon boundary-net">↗</span><p><b>Some actions use the internet.</b><br>Search, GitHub, and catalog or model downloads connect when you choose those actions.</p></div></div>
+        <details class="deep-read"><summary>What “local-first” does—and doesn’t—promise</summary><p>Local chat is the product boundary today; it is not a claim that the entire computer is offline. Optional services like web search and GitHub need the network. Model downloads need the network too. User-connected cloud chat is a future direction, not an available feature in this release.</p></details>
+        <a class="text-link" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/planning/CAPABILITY_MATRIX.md">Read the privacy and capability boundaries <span aria-hidden="true">→</span></a>
       </div>
     </section>
-    <section class="privacy" id="privacy"><div class="privacy-mark"><img src="site-assets/skai-desktop-mark.webp" alt="Skai Desktop mark"></div><div><p class="eyebrow">YOUR MACHINE SETS THE BOUNDARY</p><h2>Local by design.</h2><p>AI inference runs through local services you choose. Skai does not route prompts to hosted model providers or silently fall back to the cloud. External integrations such as GitHub are explicit actions you start.</p><a class="text-link" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/planning/CAPABILITY_MATRIX.md">Read the capability matrix <span aria-hidden="true">→</span></a></div></section>
-    <section class="section docs-section" id="docs"><div class="section-heading"><p class="eyebrow">GET TO KNOW THE PROJECT</p><h2>Documentation, without the scavenger hunt.</h2><p>Implementation status is evidence-based. Planned work is labeled as planned.</p></div>
+
+    <section class="reality section" id="reality" aria-labelledby="reality-title">
+      <div class="reality-intro"><div class="story-index"><span>05</span><span>THE REAL STORY</span></div><p class="eyebrow">NO HYPE WITHOUT THE FOOTNOTES</p><h2 id="reality-title">Early means<br><em>still becoming.</em></h2><p>Skai is actively developed. Some workflows have focused test evidence; others still need real-world acceptance. Here’s the honest snapshot before you invest your time.</p><a class="button secondary" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/operations/RELEASE_READINESS.md">Read release readiness <span aria-hidden="true">↗</span></a></div>
+      <div class="reality-board">
+        <div class="reality-row"><span class="signal signal-green"></span><div><b>Working paths</b><p>Local chat and model discovery, project editor, themes, conversation tools, and more.</p></div><span class="state">EVIDENCE IN REPO</span></div>
+        <div class="reality-row"><span class="signal signal-amber"></span><div><b>Partial paths</b><p>Voice, image generation, Coding Agent, terminal, and companions have known acceptance gaps.</p></div><span class="state state-amber">LIMITS DOCUMENTED</span></div>
+        <div class="reality-row"><span class="signal signal-blue"></span><div><b>Still planned</b><p>Hosted model routes are not available. No release date promises are made here.</p></div><span class="state state-blue">NOT IN THIS BUILD</span></div>
+        <a class="board-link" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/planning/CAPABILITY_MATRIX.md">Get the complete capability map <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+
+    <section class="download section" id="download" aria-labelledby="download-title">
+      <div class="download-copy"><div class="story-index"><span>06</span><span>YOUR NEXT MOVE</span></div><p class="eyebrow">CURIOUS ENOUGH TO TRY IT?</p><h2 id="download-title">Take it for<br>a <em>test drive.</em></h2><p>Start with the current testing release, or run from source if you want to see how it works under the hood.</p><div class="hero-actions"><a class="button primary" href="https://github.com/WowLolCoolMan/skai-desktop/releases/latest">Open the latest release <span aria-hidden="true">↗</span></a><a class="button secondary" href="https://github.com/WowLolCoolMan/skai-desktop">Explore the source <span aria-hidden="true">↗</span></a></div></div>
+      <div class="download-facts"><p class="micro-label">BEFORE YOU CLICK DOWNLOAD</p><div class="fact"><span class="fact-key">RELEASE</span><b>0.1.4 testing build</b></div><div class="fact"><span class="fact-key">PLATFORMS</span><b>Windows 10/11 · Linux x64</b></div><div class="fact"><span class="fact-key">MODEL</span><b>Local runtime, configured by you</b></div><div class="fact"><span class="fact-key">WINDOWS SIGNING</span><b>Unsigned testing installer</b></div><p class="download-footnote">macOS is not yet covered by the release acceptance matrix. Check the release notes and readiness report before installing.</p><a class="text-link" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/operations/RELEASE_READINESS.md">Know what’s ready before you install <span aria-hidden="true">→</span></a></div>
+    </section>
+
+    <section class="docs-section section" aria-labelledby="docs-title">
+      <div class="section-heading"><p class="eyebrow">WANT THE WHOLE PICTURE?</p><h2 id="docs-title">Pick your rabbit hole.</h2><p>Short on time? Start with the capability map. Want to build? Go straight to the architecture.</p></div>
       <div class="docs-grid">
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/README.md"><span class="doc-type">START HERE</span><b>Project overview</b><span>What Skai is, how to run it, and where the code lives.</span><i>↗</i></a>
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/planning/CAPABILITY_MATRIX.md"><span class="doc-type">CURRENT STATUS</span><b>Capability matrix</b><span>What works, what is partial, and the remaining boundaries.</span><i>↗</i></a>
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/README.md"><span class="doc-type">DOCUMENTATION</span><b>All project docs</b><span>Browse the complete curated documentation index.</span><i>↗</i></a>
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/engineering/ARCHITECTURE.md"><span class="doc-type">ENGINEERING</span><b>Architecture</b><span>Electron, the Agent Host, Core services, and their boundaries.</span><i>↗</i></a>
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/planning/FUTURE_FEATURES.md"><span class="doc-type">ROADMAP</span><b>Future features</b><span>The open backlog, with local-first constraints made clear.</span><i>↗</i></a>
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/guides/LOCAL_IMAGE_GENERATION.md"><span class="doc-type">IMAGES</span><b>Local image generation</b><span>Managed Diffusers runtime, ComfyUI workflows, and acceptance status.</span><i>↗</i></a>
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/guides/PETS_AND_COMPANIONS.md"><span class="doc-type">COMPANIONS</span><b>Pets and companions</b><span>Sprite loops, personalities, Blaze's fight scene, and local pet generation.</span><i>↗</i></a>
-        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/CHANGELOG.md"><span class="doc-type">RELEASES</span><b>Changelog</b><span>Version history and notable changes.</span><i>↗</i></a>
+        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/README.md"><span class="doc-type">5 MIN · ORIENTATION</span><b>Project overview</b><span>What Skai is, what it does, and how to run it.</span><i>↗</i></a>
+        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/planning/CAPABILITY_MATRIX.md"><span class="doc-type">THE HONEST MAP</span><b>Capability matrix</b><span>Working, partial, planned, and the evidence behind each.</span><i>↗</i></a>
+        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/engineering/ARCHITECTURE.md"><span class="doc-type">FOR BUILDERS</span><b>Architecture</b><span>How Electron, React, and the .NET Agent Host fit together.</span><i>↗</i></a>
+        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/guides/MODEL_LIBRARY.md"><span class="doc-type">CHOOSE YOUR MODEL</span><b>Model library</b><span>Supported runtimes, discovery, installs, and compatibility.</span><i>↗</i></a>
+        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/docs/guides/LOCAL_IMAGE_GENERATION.md"><span class="doc-type">MAKE SOMETHING</span><b>Local image generation</b><span>Diffusers, ComfyUI, and what still needs acceptance.</span><i>↗</i></a>
+        <a class="doc-card" href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/CONTRIBUTING.md"><span class="doc-type">JOIN THE WORK</span><b>Contribute</b><span>Find your way into the project and shape what comes next.</span><i>↗</i></a>
       </div>
+      <p class="docs-endnote">The site gives you the shape of the idea. The docs give you the receipts.</p>
     </section>
-    <section class="closing"><p class="eyebrow">SOURCE FOR REFERENCE · LOCAL FIRST · IN ACTIVE DEVELOPMENT</p><h2>Make your desktop<br>work like yours.</h2><a class="button primary" href="https://github.com/WowLolCoolMan/skai-desktop">Follow the project <span aria-hidden="true">↗</span></a></section>
+
+    <section class="closing"><p class="eyebrow">LOCAL FIRST · REVIEWABLE WORK · STILL IN THE MAKING</p><h2>Bring your curiosity.<br>Keep your judgment.</h2><p>Skai is a tool for the work you choose to do with it. Make the next step yours.</p><a class="button primary" href="https://github.com/WowLolCoolMan/skai-desktop">Step into the project <span aria-hidden="true">↗</span></a></section>
   </main>
-  <footer><a class="brand" href="#top"><img src="site-assets/skaiwolficon.webp" alt=""><span>SKAI DESKTOP</span></a><span>Made for local work. Source is published for reference under restricted terms.</span><a href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/LICENSE">License <span aria-hidden="true">↗</span></a></footer>
+
+  <footer><a class="brand" href="#top"><img src="site-assets/skaiwolficon.webp" alt=""><span>SKAI <b>DESKTOP</b></span></a><span>Source-available under the Skai Desktop Source Reference License.</span><a href="https://github.com/WowLolCoolMan/skai-desktop/blob/main/LICENSE">Read the license <span aria-hidden="true">↗</span></a></footer>
 </body>
 </html>
