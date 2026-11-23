@@ -22,6 +22,7 @@ worktree.
 | Memory workflows | `smoke-memory` |
 | PDF attachment policy | `smoke-pdf-attachment` |
 | Scanned PDF OCR | Packaged Windows smoke confirms a generated image-only PDF is locally rendered and the fixture text is recognized with the bundled English OCR runtime. Mixed PDFs and non-English OCR remain unsupported. |
+| Packaged video and audio formats | `smoke:electron:artifact` records and decodes a VP8 WebM through the scoped local media file bridge, samples it into four timestamped JPEGs, and samples the H.264 MP4 fixture into four frames. A synthetic silent WAV reaches local Whisper; this checks the processing path, not speech intelligibility. |
 | Local voice engines | Kokoro and Piper generated valid WAV audio through Skai's Agent Host; Whisper large-v3 transcribed a Piper-generated local audio fixture. |
 | Installed AirLLM sidecar preflight | `npm run smoke:airllm` |
 | Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, one-shot microphone capture/stop/Whisper completion, and unavailable-language browser speech pack behavior | `smoke:electron:artifact` |
@@ -49,7 +50,7 @@ worktree.
 | Persona model quality | Qwen3 14B completed David Lynch identity, death-date, research, attributed-turn, nine-field draft, initial chat, and posthumous follow-up without a stream disconnect. The follow-up explicitly declined knowledge beyond its future boundary. A 2010-era run returned a generic opening persona reply and missed the quality bar. These checks do not establish semantic fidelity or cutoff truthfulness across multiple turns and subjects. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |
 | Release signing and lifecycle | Release audit and metadata checks pass. Local unsigned Windows install/upgrade/uninstall and loopback-feed updater acceptance pass; Linux local-feed update/install/reopen/rollback and published-feed update/install/reopen pass under WSL2. Production signing is deferred by the owner; signed updater metadata and native Linux acceptance remain open. |
-| WebM video sampling | Packaged smoke generated a VP8 WebM recording and the app sampled it into four timestamped JPEG frames; H.264 MP4 also sampled into four frames. Chromium rejects the harness's separate data-URL probe under its URL safety policy, but the packaged attachment/sampling path succeeds. |
+| WebM video sampling | Packaged smoke uses the app's scoped local media bridge for both metadata decoding and attachment sampling; four timestamped frames were produced. H.264 MP4 also sampled into four frames. |
 | Diffusers GPU and ComfyUI acceptance | The packaged CPU path passes live cancellation, text-to-image, image-to-image, and history restoration after reload. This host has an AMD RX 7900 XTX, but the installed worker used CPU; GPU acceleration and a live ComfyUI server remain unverified. |
 | Published `electron-updater` channel and rollback/recovery | The published Linux 0.1.4 feed successfully updated and reopened the released AppImage in an isolated WSL2 profile. The release updater predates rollback; current-source Linux rollback passes only in the loopback acceptance. Published Windows in-app update and native Linux desktop acceptance remain open. |
 

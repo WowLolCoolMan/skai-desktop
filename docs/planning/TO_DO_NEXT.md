@@ -100,8 +100,11 @@ Mark an item done only when the linked workflow has evidence.
     Packaged English OCR handles image-only scanned PDFs locally, up to 20 pages;
     the attachment is labeled as OCR and its text remains untrusted. Mixed PDFs
     with both selectable text and scanned pages are not OCRed page by page.
-18. **Packaged media coverage.** Verify real WebM and audio fixtures in the
-    packaged app; make format and model capability errors clear.
+18. **Packaged media coverage — Done · Codex.** The packaged Windows smoke
+    records and decodes VP8 WebM through the same local file bridge used by the
+    app, samples it into four timestamped frames, and also samples the H.264
+    MP4 fixture. WAV reaches local Whisper; spoken-word quality remains tracked
+    under item 2.
 19. **Context and run capacity.** Verify actual 1M-token execution with a
     compatible model; improve runtime-aware estimates and safe concurrency.
 20. **Production update trust.** Add signed update metadata and prepare trusted
@@ -191,6 +194,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   text without a hosted OCR route. OCR is limited to the first 20 pages and
   16,000 characters; resulting text is labeled OCR and untrusted. Mixed
   selectable/scanned PDFs and other OCR languages remain unsupported.
+
+- **2026-11-23:** Packaged Windows media smoke now stores a generated VP8 WebM
+  through Skai's scoped local media bridge, decodes its metadata, and samples
+  four timestamped frames; the H.264 MP4 fixture also yields four frames. WAV
+  file transcription reaches local Whisper. The synthetic silent WAV verifies
+  the processing path only; intelligible speech quality remains open under
+  voice acceptance.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
