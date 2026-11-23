@@ -49,10 +49,10 @@ public static class VoiceModelCatalog
         {
             SupportsStreaming = false, SupportsEmotion = false, AvailabilityNote = "Install the local runtime and checksum-verified model files from Marketplace."
         },
-        new("chatterbox", "Chatterbox Nano", "English expressive speech synthesis with voice cloning and paralinguistic cues; Nano is the CPU-oriented 110M variant.", "Chatterbox-TTS 0.1.7 · PyTorch", "MIT model / MIT runtime", "110M parameters; runtime dependencies add substantial disk use", false, true, "https://huggingface.co/ResembleAI/chatterbox-nano")
+        new("chatterbox", "Chatterbox Nano", "English expressive speech using its built-in voice. The upstream supports reference-voice cloning, but Skai does not expose custom reference audio yet.", "Chatterbox-TTS 0.1.7 · PyTorch 2.6 CPU", "MIT model / MIT runtime", "~1.9 GB weights; 6 GB free disk recommended", false, false, "https://huggingface.co/ResembleAI/chatterbox-nano")
         {
-            SupportsVoiceCloning = true, SupportsEmotion = true, SupportsAudioEffects = true,
-            AvailabilityNote = "Upstream documents CPU inference for Nano. Skai's isolated installer and synthesis adapter are not connected yet; model terms are MIT."
+            AdapterAvailable = true, SupportsVoiceCloning = true, SupportsEmotion = true, SupportsAudioEffects = true,
+            AvailabilityNote = "Installed through Skai's isolated CPU runtime with pinned and verified local weights. The warm worker remains resident while Skai runs; custom reference audio is not exposed yet."
         },
         new("qwen3-tts", "Qwen3-TTS", "Multilingual local speech with voice design, cloning, and streaming generation.", "PyTorch", "Apache-2.0 / model-specific", "0.6B or 1.7B model", false, false, "https://github.com/QwenLM/Qwen3-TTS")
         {

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added a Marketplace installer and local synthesis adapter for Chatterbox Nano
+  using a pinned CPU runtime and checksum-verified model files. End-to-end
+  installation and non-silent local WAV synthesis passed on Windows; warm
+  throughput was near real time, cold model loading took about 24 seconds, and
+  spoken-word quality is not yet reviewed.
+
+### Fixed
+
+- Selected NumPy 2 for Chatterbox installs on Python 3.13, matching upstream's
+  dependency requirements, and made Marketplace recover when installed model
+  files are missing.
+
 ## [0.1.4] - 2026-11-16
 
 ### Added

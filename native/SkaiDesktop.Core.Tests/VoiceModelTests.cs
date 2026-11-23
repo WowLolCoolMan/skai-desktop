@@ -13,9 +13,9 @@ internal static class VoiceModelTests
         Check(VoiceModelCatalog.All.Any(model => model.Id == "piper" && model.IsLowResource), "voice catalog exposes a compact offline runtime");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "piper" && model.License.Contains("GPL-3.0") && model.License.Contains("CC-BY-4.0")), "voice catalog exposes Piper engine and voice-data license terms");
         var chatterbox = VoiceModelCatalog.All.Single(model => model.Id == "chatterbox");
-        Check(chatterbox.Name == "Chatterbox Nano" && chatterbox.IsLowResource && chatterbox.License.StartsWith("MIT"), "voice catalog identifies the official MIT CPU-oriented Chatterbox Nano variant");
+        Check(chatterbox.Name == "Chatterbox Nano" && !chatterbox.IsLowResource && chatterbox.License.StartsWith("MIT"), "voice catalog identifies the official MIT CPU-oriented Chatterbox Nano variant without overstating its memory fit");
         Check(chatterbox.SupportsVoiceCloning && chatterbox.SupportsEmotion && chatterbox.SourceUrl == "https://huggingface.co/ResembleAI/chatterbox-nano", "voice catalog exposes Chatterbox Nano features and official model card");
-        Check(chatterbox.AvailabilityNote.Contains("not connected"), "voice catalog does not imply an unsupported Chatterbox adapter is installable");
+        Check(chatterbox.AdapterAvailable && chatterbox.AvailabilityNote.Contains("pinned"), "voice catalog exposes the verified Chatterbox adapter and pinned local runtime");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "qwen3-tts" && model.SupportsStreaming), "voice catalog exposes Qwen3-TTS streaming");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "omnivoice"), "voice catalog exposes OmniVoice");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "higgs-audio-v2" && model.SupportsAudioEffects), "voice catalog exposes Higgs Audio v2 expressive effects");

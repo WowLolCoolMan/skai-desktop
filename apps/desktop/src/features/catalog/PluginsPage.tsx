@@ -22,7 +22,7 @@ import {
   type MarketplaceEntry,
 } from "./marketplaceEntries";
 import { useMarketplaceMcp, type McpConnection, type McpTool } from "./useMarketplaceMcp";
-import { registerInstalledVoiceModel } from "../../services/nativeTts";
+import { registerInstalledVoiceModel, unregisterInstalledVoiceModel } from "../../services/nativeTts";
 export { VoiceWorkbench } from "./VoiceWorkbench";
 
 export function PluginsPage({
@@ -99,15 +99,16 @@ export function PluginsPage({
     if (voiceBusy) return;
     const isPiper = entry.adapter === "local-voice-piper";
     const isWhisper = entry.adapter === "local-voice-whisper";
-    const method = isWhisper ? "whisper" : isPiper ? "piper" : "kokoro";
-    const modelName = isWhisper ? "Whisper large-v3" : isPiper ? "Piper" : "Kokoro";
-    const voiceId = isPiper ? "piper" : "kokoro-82m-onnx";
+    const isChatterbox = entry.adapter === "local-voice-chatterbox";
+    const method = isWhisper ? "whisper" : isChatterbox ? "chatterbox" : isPiper ? "piper" : "kokoro";
+    const modelName = isWhisper ? "Whisper large-v3" : isChatterbox ? "Chatterbox Nano" : isPiper ? "Piper" : "Kokoro";
+    const voiceId = isChatterbox ? "chatterbox" : isPiper ? "piper" : "kokoro-82m-onnx";
     setVoiceBusy(true);
     setNotice(`Preparing an isolated local ${modelName} runtime…`);
     try {
       const started = await request(`voice.${method}.install.start`);
       if (!started.ok) throw new Error(started.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation could not start.`);
-      const deadline = Date.now() + (isWhisper ? 60 : 10) * 60_000;
+      const deadline = Date.now() + (isChatterbox ? 45 : isWhisper ? 60 : 10) * 60_000;
       while (Date.now() < deadline) {
         const status = await request(`voice.${method}.install.status`);
         if (!status.ok) throw new Error(status.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation status could not be read.`);
@@ -161,7 +162,7 @@ export function PluginsPage({
     try {
       const endpoint = localStorage.getItem("skai.endpoint") ?? "http://localhost:11434/v1";
       const provider = localStorage.getItem("skai.provider") ?? "Ollama";
-      const [catalogResponse, skillsResponse, connectionsResponse, runtimeResponse, kokoroResponse, piperResponse, whisperResponse] =
+      const [catalogResponse, skillsResponse, connectionsResponse, runtimeResponse, kokoroResponse, piperResponse, chatterboxResponse, whisperResponse] =
         await Promise.all([
           request("marketplace.catalog"),
           request("skills.list"),
@@ -169,10 +170,13 @@ export function PluginsPage({
           request("models.list", { endpoint, provider }),
           request("voice.kokoro.install.status"),
           request("voice.piper.install.status"),
+          request("voice.chatterbox.install.status"),
           request("voice.whisper.install.status"),
         ]);
       if (kokoroResponse.ok && (kokoroResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("kokoro-82m-onnx");
       if (piperResponse.ok && (piperResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("piper");
+      if (chatterboxResponse.ok && (chatterboxResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("chatterbox");
+      else if (chatterboxResponse.ok) unregisterInstalledVoiceModel("chatterbox");
       if (whisperResponse.ok && (whisperResponse.result as { installed?: boolean }).installed) localStorage.setItem("skai.voice.whisperInstalled", "true");
       if (!catalogResponse.ok)
         throw new Error(

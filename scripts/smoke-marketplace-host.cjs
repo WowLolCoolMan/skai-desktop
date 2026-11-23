@@ -57,7 +57,7 @@ function request(method, params, timeoutMs = 45_000) {
 async function run() {
   const health = await request("runtime.health");
   const capabilities = health.result?.capabilities ?? [];
-  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe"]) {
+  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe"]) {
     if (!health.ok || !capabilities.includes(capability)) throw new Error(`runtime.health did not advertise ${capability}.`);
   }
   const catalog = await request("marketplace.catalog");
@@ -73,6 +73,7 @@ async function run() {
       : entry.id === "figma-mcp" ? "local-mcp-figma"
       : entry.id === "supabase-mcp" ? "local-mcp-supabase"
       : entry.id === "kokoro-82m" ? "local-voice-kokoro"
+      : entry.id === "chatterbox" ? "local-voice-chatterbox"
       : entry.id === "piper" ? "local-voice-piper"
       : entry.id === "whisper-large-v3" ? "local-voice-whisper"
       : entry.category === "Coding" || entry.category === "Chat / General LLM" ? "local-model-search" : "none";
@@ -81,7 +82,7 @@ async function run() {
     }
   }
   const backedEntries = curated.filter(entry => entry.installable === true);
-  if (backedEntries.length !== 40) throw new Error(`Expected 40 entries with real local adapters; found ${backedEntries.length}.`);
+  if (backedEntries.length !== 41) throw new Error(`Expected 41 entries with real local adapters; found ${backedEntries.length}.`);
   const kokoroStatus = await request("voice.kokoro.install.status");
   if (!kokoroStatus.ok || typeof kokoroStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(kokoroStatus.result?.status)) {
     throw new Error(`Kokoro local runtime status is incomplete: ${JSON.stringify(kokoroStatus)}`);
@@ -89,6 +90,10 @@ async function run() {
   const piperStatus = await request("voice.piper.install.status");
   if (!piperStatus.ok || typeof piperStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(piperStatus.result?.status)) {
     throw new Error(`Piper local runtime status is incomplete: ${JSON.stringify(piperStatus)}`);
+  }
+  const chatterboxStatus = await request("voice.chatterbox.install.status");
+  if (!chatterboxStatus.ok || typeof chatterboxStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(chatterboxStatus.result?.status)) {
+    throw new Error(`Chatterbox local runtime status is incomplete: ${JSON.stringify(chatterboxStatus)}`);
   }
   const whisperStatus = await request("voice.whisper.install.status");
   if (!whisperStatus.ok || typeof whisperStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(whisperStatus.result?.status)) {

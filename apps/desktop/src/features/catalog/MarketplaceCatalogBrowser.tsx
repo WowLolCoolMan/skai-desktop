@@ -178,6 +178,10 @@ export function MarketplaceCatalogBrowser({
                             const installed = localStorage.getItem("skai.voice.whisperInstalled") === "true";
                             return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? "Installed · Whisper ready" : voiceBusy ? "Installing local model…" : "Install Whisper large-v3 · 3.09 GB"}</Button></div>;
                           })()}
+                          {selected.adapter === "local-voice-chatterbox" && (() => {
+                            const installed = localStorage.getItem("skai.voice.chatterboxInstalled") === "true";
+                            return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? "Installed · Chatterbox Nano ready" : voiceBusy ? "Preparing about 2 GB of local weights…" : "Install Chatterbox Nano · ~1.9 GB"}</Button></div>;
+                          })()}
                           {["local-mcp-filesystem", "local-mcp-playwright"].includes(selected.adapter ?? "") && (
                             <div className="plugins-detail-actions">
                               <Button variant="primary" type="button" disabled={busy} onClick={() => onInstallMcp(selected)}>

@@ -80,17 +80,18 @@ Mark an item done only when the linked workflow has evidence.
 
 11. **Requested voice engines.** Marketplace currently has verified install/use
     paths for Kokoro and Piper; Whisper large-v3 covers local transcription.
-    Only 40 of the 89 curated entries currently have real adapters, and the
-    catalog smoke asserts that boundary. Chatterbox is now identified by its
-    upstream's CPU-oriented 110M Nano model and MIT model/runtime terms rather
-    than the unrelated Turbo listing; its installer and synthesis adapter are
-    still missing. Upstream reports 3x realtime on an 8-core CPU, which is not
-    a Skai acceptance result. Implement and accept the next local engine after
-    checking hardware fit and license. Host smoke now synthesizes
-    offline WAVs: on this 32 GiB Windows/RX 7900 XTX machine, Piper generated
-    3.53 seconds of audio end-to-end in 0.83 seconds; Kokoro generated 3.26
-    seconds in 8.91 seconds. These are one-phrase timings, not a subjective
-    speech-quality rating. Qwen3-TTS is not an obvious realtime fit here: its
+    41 of 89 curated entries now have real adapters, and the catalog smoke
+    asserts that boundary. Chatterbox Nano has a pinned isolated CPU installer,
+    verified model downloads, a resident worker, and Marketplace/voice
+    selection wiring. The end-to-end smoke passed install, hash checks, and
+    non-silent local WAV synthesis on this Ryzen 7 5800X3D: the warm path made
+    3.04 seconds of audio in 3.36 seconds; cold startup plus synthesis took
+    23.64 seconds for 2.56 seconds of audio. This shows near-real-time warm
+    throughput on one phrase, with slow first-use model loading; spoken quality
+    and other hardware remain unreviewed. Earlier host smoke measured Piper at
+    3.53 seconds of audio in 0.83 seconds and Kokoro at 3.26 seconds in 8.91
+    seconds on the 32 GiB Windows/RX 7900 XTX machine; those one-phrase timings
+    are not a subjective speech-quality rating. Qwen3-TTS is not an obvious realtime fit here: its
     upstream recommends an isolated Python 3.12 environment, while its example
     accelerator path uses CUDA; verify model-card terms and an actual local run
     before enabling it ([upstream setup](https://github.com/QwenLM/Qwen3-TTS#quickstart)).
@@ -145,6 +146,16 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** Added a pinned Chatterbox Nano Marketplace installer and
+  local synthesis adapter. Setup uses an isolated CPU-only Python environment,
+  verifies every downloaded model file, and checks local speech before marking
+  the engine installed. Python 3.13 setup selects NumPy 2 to match upstream's
+  dependency metadata. The warm worker remains local to the Agent Host. The
+  end-to-end install and WAV smoke passed, including non-silent 24 kHz output.
+  On the Ryzen 7 5800X3D, cold load plus a 2.64-second sample took 20.31 seconds;
+  a warm 3.12-second sample took 3.27 seconds. First-use latency and spoken
+  quality remain open; see the capability matrix for the acceptance boundary.
 
 - **2026-11-23:** If the local Agent Host exits or its request pipe breaks
   unexpectedly, Electron now retires the unusable child and relaunches on the

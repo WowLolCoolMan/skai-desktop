@@ -41,7 +41,7 @@ export const voiceModels: InstalledVoiceModel[] = [
   { id: "os-native", name: "OS-native speech", detail: "Windows and Linux system voices", size: "No model", installed: true, lowResource: true },
   { id: "kokoro-82m-onnx", name: "Kokoro 82M ONNX", detail: "English offline local speech", size: "~136 MB INT8 model + voices", installed: false, lowResource: false },
   { id: "piper", name: "Piper English", detail: "Compact offline English speech", size: "~64 MB voice model", installed: false, lowResource: true },
-  { id: "chatterbox", name: "Chatterbox", detail: "Expressive local speech with voice cloning and paralinguistic cues", size: "Model-dependent", installed: false, lowResource: false },
+  { id: "chatterbox", name: "Chatterbox Nano", detail: "English local speech; CPU-only runtime with resident model worker", size: "~1.9 GB weights + CPU runtime", installed: false, lowResource: false },
   { id: "qwen3-tts", name: "Qwen3-TTS", detail: "Multilingual local voice design, cloning, and streaming", size: "0.6B or 1.7B model", installed: false, lowResource: false },
   { id: "omnivoice", name: "OmniVoice", detail: "Omnilingual zero-shot local speech", size: "Model-dependent", installed: false, lowResource: false },
   { id: "higgs-audio-v2", name: "Higgs Audio v2", detail: "Expressive local multi-speaker audio generation", size: "3B model", installed: false, lowResource: false },
@@ -57,6 +57,7 @@ export const cloudVoiceProviders = [
 
 export const installedVoiceModels = voiceModels.filter((voice) => voice.installed
   || (voice.id === "kokoro-82m-onnx" && localStorage.getItem("skai.voice.kokoroInstalled") === "true")
+  || (voice.id === "chatterbox" && localStorage.getItem("skai.voice.chatterboxInstalled") === "true")
   || (voice.id === "piper" && localStorage.getItem("skai.voice.piperInstalled") === "true"));
 
 export function registerInstalledVoiceModel(id: string) {
@@ -64,7 +65,16 @@ export function registerInstalledVoiceModel(id: string) {
   if (!voice || installedVoiceModels.some((item) => item.id === id)) return;
   installedVoiceModels.push({ ...voice, installed: true });
   if (id === "kokoro-82m-onnx") localStorage.setItem("skai.voice.kokoroInstalled", "true");
+  if (id === "chatterbox") localStorage.setItem("skai.voice.chatterboxInstalled", "true");
   if (id === "piper") localStorage.setItem("skai.voice.piperInstalled", "true");
+}
+
+export function unregisterInstalledVoiceModel(id: string) {
+  const index = installedVoiceModels.findIndex((item) => item.id === id);
+  if (index >= 0) installedVoiceModels.splice(index, 1);
+  if (id === "kokoro-82m-onnx") localStorage.removeItem("skai.voice.kokoroInstalled");
+  if (id === "chatterbox") localStorage.removeItem("skai.voice.chatterboxInstalled");
+  if (id === "piper") localStorage.removeItem("skai.voice.piperInstalled");
 }
 
 function resolveInstalledVoiceModel(value: string | null) {
@@ -144,6 +154,10 @@ export async function speakNativeResponse(text: string, force = false, profileId
       if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/")) {
         activeCloudAudio?.pause();
         activeCloudAudio = new Audio(audioDataUrl);
+        if ((speech.result as { engine?: unknown }).engine === "chatterbox-nano-local") {
+          activeCloudAudio.preservesPitch = true;
+          activeCloudAudio.playbackRate = profile.rate;
+        }
         activeCloudAudio.addEventListener("ended", () => { activeCloudAudio = null; }, { once: true });
         await activeCloudAudio.play();
       }

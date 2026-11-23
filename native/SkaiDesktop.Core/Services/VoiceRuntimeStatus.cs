@@ -24,4 +24,17 @@ public static class VoiceRuntimeStatus
                 && File.Exists(Path.Combine(root, "installed.json"));
         }
     }
+
+    public static bool IsChatterboxInstalled
+    {
+        get
+        {
+            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "ChatterboxNano");
+            var python = Path.Combine(root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");
+            return File.Exists(python)
+                && new[] { "added_tokens.json", "conds.pt", "merges.txt", "s3gen_meanflow.safetensors", "special_tokens_map.json", "t3_nano_v1.safetensors", "tokenizer_config.json", "ve.safetensors", "vocab.json" }
+                    .All(file => File.Exists(Path.Combine(root, file)))
+                && File.Exists(Path.Combine(root, "installed.json"));
+        }
+    }
 }

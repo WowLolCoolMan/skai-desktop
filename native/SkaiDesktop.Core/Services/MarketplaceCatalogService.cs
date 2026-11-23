@@ -22,7 +22,7 @@ public static class MarketplaceCatalogService
                 entries.Add(new(item.id, item.name, provider, category, license, item.description, runtime, capabilities.Split('|'), item.source));
         }
 
-        Add("Voice (TTS/STT)", "Resemble AI", "MIT", "Chatterbox-TTS 0.1.7 · Chatterbox Nano (110M) · local PyTorch", "text-to-speech|offline|english|voice-cloning|emotion-tags|cpu", ("chatterbox", "Chatterbox Nano", "English local speech synthesis with reference-voice cloning and paralinguistic tags. Upstream documents CPU inference; model is 110M parameters.", "https://huggingface.co/ResembleAI/chatterbox-nano"));
+        Add("Voice (TTS/STT)", "Resemble AI", "MIT", "Chatterbox-TTS 0.1.7 · PyTorch 2.6 CPU · pinned Hugging Face checkpoint", "text-to-speech|offline|english|emotion-tags|cpu", ("chatterbox", "Chatterbox Nano", "Local English speech with its built-in speaker and expressive cues. Skai's current voice controls do not yet accept custom reference audio.", "https://huggingface.co/ResembleAI/chatterbox-nano"));
         Add("Voice (TTS/STT)", "hexgrad", "Apache-2.0 model / MIT runtime", "Pinned kokoro-onnx 0.6.1 · isolated Python · local ONNX", "text-to-speech|offline|english", ("kokoro-82m", "Kokoro-82M", "English offline neural speech synthesis with a Skai installer and local playback adapter.", "https://huggingface.co/hexgrad/Kokoro-82M"));
         Add("Voice (TTS/STT)", "Alibaba", "Apache-2.0", "Local Python/PyTorch; installer not connected", "text-to-speech|voice-design|voice-cloning|streaming", ("qwen3-tts", "Qwen3-TTS", "Multilingual local speech with voice design and cloning.", "https://github.com/QwenLM/Qwen3-TTS"));
         Add("Voice (TTS/STT)", "Fish Audio", "Research NC", "Local runtime; verify model terms", "text-to-speech|voice-cloning|emotion", ("fish-audio-s2-pro", "Fish Audio S2 Pro", "Expressive speech generation; research non-commercial terms apply.", "https://github.com/fishaudio/fish-speech"));
@@ -107,16 +107,16 @@ public static class MarketplaceCatalogService
             runtime = voice.Runtime,
             license = voice.License,
             size = voice.Size,
-            installed = voice.Id == "kokoro-82m-onnx" ? VoiceRuntimeStatus.IsKokoroInstalled : voice.Id == "piper" ? VoiceRuntimeStatus.IsPiperInstalled : voice.IsInstalled,
+            installed = voice.Id == "kokoro-82m-onnx" ? VoiceRuntimeStatus.IsKokoroInstalled : voice.Id == "piper" ? VoiceRuntimeStatus.IsPiperInstalled : voice.Id == "chatterbox" ? VoiceRuntimeStatus.IsChatterboxInstalled : voice.IsInstalled,
             lowResource = voice.IsLowResource,
             sourceUrl = voice.SourceUrl,
-            adapterAvailable = voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper",
+            adapterAvailable = voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper" or "chatterbox",
             supportsStreaming = voice.SupportsStreaming,
             supportsVoiceCloning = voice.SupportsVoiceCloning,
             supportsEmotion = voice.SupportsEmotion,
             supportsAudioEffects = voice.SupportsAudioEffects,
             availabilityNote = voice.AvailabilityNote,
-            installable = (voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper") && !string.IsNullOrWhiteSpace(voice.SourceUrl) && !(voice.Id == "kokoro-82m-onnx" && VoiceRuntimeStatus.IsKokoroInstalled) && !(voice.Id == "piper" && VoiceRuntimeStatus.IsPiperInstalled),
+            installable = (voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper" or "chatterbox") && !string.IsNullOrWhiteSpace(voice.SourceUrl) && !(voice.Id == "kokoro-82m-onnx" && VoiceRuntimeStatus.IsKokoroInstalled) && !(voice.Id == "piper" && VoiceRuntimeStatus.IsPiperInstalled) && !(voice.Id == "chatterbox" && VoiceRuntimeStatus.IsChatterboxInstalled),
         }).ToArray(),
         skills = SkillCatalogService.BuiltIns.Select(skill => new
         {
@@ -166,6 +166,8 @@ public static class MarketplaceCatalogService
                     ? "Skai creates an isolated Python environment, installs kokoro-onnx 0.6.1, and downloads the INT8 Kokoro ONNX weights and voice pack. Both model files are checked against pinned SHA-256 digests before use. The Kokoro model is Apache-2.0; runtime package is MIT. Speech is synthesized locally."
                 : ResolveAdapter(entry) == "local-voice-piper"
                     ? "Skai installs the pinned Windows-compatible piper-tts 1.5.0 runtime in an isolated Python environment and downloads a pinned English voice, JSON config, and MODEL_CARD from a fixed Hugging Face revision. SHA-256 hashes are checked before use. Piper engine is GPL-3.0; voice data is CC BY 4.0 and requires attribution. Synthesis stays local."
+                : ResolveAdapter(entry) == "local-voice-chatterbox"
+                    ? "Skai installs CPU-only PyTorch and the Chatterbox-TTS source at a pinned commit in an isolated Python environment, then downloads about 1.9 GB of required Nano checkpoint files from a fixed Hugging Face revision. File hashes are verified before local synthesis. Allow at least 6 GB free for setup. The 110M-parameter English model is MIT licensed; initial model loading is memory and disk intensive."
                 : ResolveAdapter(entry) == "local-voice-whisper"
                     ? "Skai installs faster-whisper 1.2.1 into an isolated Python environment and downloads the 3.09 GB Systran large-v3 conversion at a pinned Hugging Face revision. SHA-256 hashes are verified for every model file. Transcription uses CPU int8, runs offline, and sends no audio to a service. Keep at least 4 GB free for download and additional RAM for inference."
                 : ResolveAdapter(entry) == "local-mcp-playwright"
@@ -188,6 +190,7 @@ public static class MarketplaceCatalogService
         {
             "kokoro-82m" => "local-voice-kokoro",
             "piper" => "local-voice-piper",
+            "chatterbox" => "local-voice-chatterbox",
             "whisper-large-v3" => "local-voice-whisper",
             "filesystem-mcp" => "local-mcp-filesystem",
             "playwright-mcp" => "local-mcp-playwright",
