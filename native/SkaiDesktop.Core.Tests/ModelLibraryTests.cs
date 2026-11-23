@@ -30,11 +30,11 @@ internal static class ModelLibraryTests
             Check(requestUri?.Host == "huggingface.co" && requestUri.Query.Contains("filter=gguf", StringComparison.Ordinal), "model library searches Hugging Face GGUF repositories");
             var data = requestUri?.Query.Contains("abliterated", StringComparison.OrdinalIgnoreCase) == true
                 ? "[{\"id\":\"org/model-abliterated-gguf\",\"downloads\":1234,\"likes\":12,\"tags\":[\"gguf\",\"abliterated\"]}]"
-                : "[{\"id\":\"org/model-gguf\",\"downloads\":1234,\"likes\":12,\"tags\":[\"gguf\"]},{\"id\":\"org/model-uncensored-gguf\",\"downloads\":9,\"tags\":[\"uncensored\"]}]";
+                : "[{\"id\":\"org/model-gguf\",\"downloads\":1234,\"likes\":12,\"tags\":[\"gguf\",\"license:apache-2.0\"],\"cardData\":{\"license\":\"apache-2.0\"}},{\"id\":\"org/model-uncensored-gguf\",\"downloads\":9,\"tags\":[\"uncensored\"]}]";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(data) });
         })));
         var hubModels = await hfSearch.SearchHuggingFaceAsync("small instruct", uncensored: false);
-        Check(hubModels.Count == 1 && hubModels[0].Id == "org/model-gguf" && hubModels[0].Downloads == 1234, "model library parses Hub IDs and popularity metadata");
+        Check(hubModels.Count == 1 && hubModels[0].Id == "org/model-gguf" && hubModels[0].Downloads == 1234 && hubModels[0].License == "apache-2.0", "model library parses Hub IDs, popularity, and published license metadata");
         var uncensoredHubModels = await hfSearch.SearchHuggingFaceAsync("small instruct", uncensored: true);
         Check(uncensoredHubModels.Count >= 1 && uncensoredHubModels.All(model => model.IsUncensored), "uncensored catalog includes only explicitly labeled repositories");
         var boundedCatalog = new ModelLibraryService(new HttpClient(new StubHandler((_, _) =>

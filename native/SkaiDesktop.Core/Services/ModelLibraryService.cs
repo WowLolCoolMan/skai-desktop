@@ -322,7 +322,7 @@ public sealed partial class ModelLibraryService(HttpClient? httpClient = null, s
 
 }
 
-public sealed record HubModel(string Id, long Downloads, int Likes, bool IsUncensored = false, string[]? Tags = null, long? SizeBytes = null, int? ContextLength = null);
+public sealed record HubModel(string Id, long Downloads, int Likes, bool IsUncensored = false, string[]? Tags = null, long? SizeBytes = null, int? ContextLength = null, string? License = null);
 public sealed record ModelScopeGgufFile(string Path, long SizeBytes, string? Sha256);
 public sealed record ModelScopeGgufPackage(string Repository, string Name, IReadOnlyList<ModelScopeGgufFile> Files, long Downloads, bool IsUncensored = false)
 {

@@ -73,9 +73,10 @@ Mark an item done only when the linked workflow has evidence.
     health reporting, and recovery for supported stdio/HTTP servers.
 14. **Model fit and license guidance — In progress · Codex.** The model
     inspector now compares package size against current free RAM, reports GPU
-    memory when telemetry exists, and labels the result as advisory. Remaining:
-    surface trustworthy license metadata and validate fit against real models
-    and runtimes.
+    memory when telemetry exists, and labels the result as advisory. Hugging
+    Face results now surface license metadata from the model card or license
+    tag, and clearly prompt source review when neither is published. Remaining:
+    validate fit against real models and runtimes.
 15. **Resumable model installs — In progress · Codex.** The Skai-managed
     ModelScope GGUF installer now persists checksum-keyed partial shards,
     resumes with HTTP Range, validates the complete size/hash/signature, and
@@ -117,6 +118,11 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   larger than current free RAM, and explains runtime/context overhead. It does
   not claim package size guarantees that a model will fit.
 
+- **2026-11-22:** Marketplace search carries Hugging Face license metadata from
+  the model card, falling back to the repository's license tag. When neither is
+  present, the model inspector says that license metadata is unavailable and
+  directs users to review the source repository before use.
+
 - **2026-11-22:** ModelScope GGUF downloads now resume from a checksum-keyed
   local partial file when the server supports byte ranges. The adapter checks
   the returned range, expected size, full SHA-256, and GGUF signature before
@@ -126,8 +132,9 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 
 - **2026-11-22:** Windows Coding Agent Job Object acceptance and the full native
   core suite pass when the sandbox stress group runs before longer test groups.
-  The tests continue to verify the 1 GiB allocation, 256 MiB memory denial,
-  filesystem/network isolation, timeout, and cancellation.
+  The allocation control now respects the OS-clamped available memory cap; the
+  suite continues to verify a 320 MiB allocation where capacity permits,
+  256 MiB memory denial, filesystem/network isolation, timeout, and cancellation.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed

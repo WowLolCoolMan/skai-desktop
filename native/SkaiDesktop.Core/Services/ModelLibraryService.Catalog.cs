@@ -48,10 +48,11 @@ public sealed partial class ModelLibraryService
                         .Sum()
                     : null;
                 var contextLength = ReadContextLength(item);
+                var license = ReadLicense(item, tags);
                 return new HubModel(id,
                     item.TryGetProperty("downloads", out var downloads) && downloads.TryGetInt64(out var count) ? count : 0,
                     item.TryGetProperty("likes", out var likes) && likes.TryGetInt32(out var likeCount) ? likeCount : 0,
-                    label, tags, sizeBytes, contextLength);
+                    label, tags, sizeBytes, contextLength, license);
             }));
         }
         var filtered = (uncensored ? allModels.Where(model => model.IsUncensored) : allModels.Where(model => !model.IsUncensored));
@@ -67,6 +68,17 @@ public sealed partial class ModelLibraryService
             foreach (var name in new[] { "max_position_embeddings", "model_max_length", "max_sequence_length", "seq_length" })
                 if (textConfig.TryGetProperty(name, out var value) && value.TryGetInt32(out var length) && length is > 0 and < 10_000_000) return length;
         return null;
+    }
+
+    private static string? ReadLicense(JsonElement item, IEnumerable<string> tags)
+    {
+        if (item.TryGetProperty("cardData", out var cardData) && cardData.ValueKind == JsonValueKind.Object
+            && cardData.TryGetProperty("license", out var license) && license.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(license.GetString()))
+            return license.GetString()!.Trim();
+
+        var licenseTag = tags.FirstOrDefault(tag => tag.StartsWith("license:", StringComparison.OrdinalIgnoreCase));
+        return licenseTag is null ? null : licenseTag["license:".Length..];
     }
 
     /// <summary>Finds text-generation repositories with full Transformers weights for the optional AirLLM route.</summary>

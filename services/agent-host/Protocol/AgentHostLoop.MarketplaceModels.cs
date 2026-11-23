@@ -40,6 +40,7 @@ public static partial class AgentHostLoop
                 tags = model.Tags ?? [],
                 sizeBytes = model.SizeBytes,
                 contextLength = model.ContextLength,
+                license = model.License,
                 installRoute = "lm-studio",
                 installable = true,
             }));
@@ -65,6 +66,7 @@ public static partial class AgentHostLoop
                 tags = model.Tags ?? [],
                 sizeBytes = model.SizeBytes,
                 contextLength = model.ContextLength,
+                license = model.License,
                 installRoute = "airllm",
                 requiresAirLlm = true,
                 installable = false,

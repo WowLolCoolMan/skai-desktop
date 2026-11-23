@@ -10,6 +10,7 @@ export type MarketplaceModel = {
   tags: string[];
   sizeBytes?: number | null;
   contextLength?: number | null;
+  license?: string | null;
   installRoute: string;
   installable: boolean;
   requiresAirLlm?: boolean;
