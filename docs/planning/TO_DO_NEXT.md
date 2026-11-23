@@ -20,9 +20,11 @@ keep this queue focused on unfinished work.
 Ordered around open acceptance blockers and the user's explicit priorities.
 Mark an item done only when the linked workflow has evidence.
 
-1. **UI and accessibility acceptance — In progress · Codex.** Manually review
-   the 17-route matrix, keyboard/focus behavior, assistive technology, narrow
-   layouts, and pet animations. Record screenshots and gaps in
+1. **UI and accessibility acceptance — In progress · Codex.** The packaged
+   audit covers 14 routes with zero automated WCAG violations; 29 checks remain
+   incomplete and require manual review. Review the 17-route matrix,
+   keyboard/focus behavior, assistive technology, narrow layouts, and pet
+   animations. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
 2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke now
    records and stops a short microphone clip and confirms local Whisper returns
@@ -108,6 +110,12 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** Packaged accessibility audit inspected 14 routes and found
+  zero automated WCAG violations, zero serious/critical findings, a working
+  skip link, and a working main landmark. Twenty-nine checks remain incomplete
+  for manual review; this does not close the 17-route visual and assistive
+  technology acceptance item.
 
 - **2026-11-22:** Marketplace now lists saved local ComfyUI workflows, identifies
   the active workflow, and lets users activate one without leaving Marketplace.
