@@ -1,4 +1,4 @@
-type AudioMediaType = "audio/mp4" | "audio/mpeg" | "audio/ogg" | "audio/wav";
+type AudioMediaType = "audio/mp4" | "audio/mpeg" | "audio/ogg" | "audio/wav" | "audio/webm";
 type RecognitionResultEvent = Event & { resultIndex: number; results: { [index: number]: { [index: number]: { transcript: string }; isFinal: boolean }; length: number } };
 type LocalRecognition = {
   continuous: boolean;
@@ -18,18 +18,18 @@ type RecognitionConstructor = (new () => LocalRecognition) & {
 
 const maxAudioBytes = 20 * 1024 * 1024;
 const maxAudioDurationSeconds = 15 * 60;
-const audioTypes: Record<string, AudioMediaType> = { m4a: "audio/mp4", mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav" };
+const audioTypes: Record<string, AudioMediaType> = { m4a: "audio/mp4", mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav", webm: "audio/webm" };
 
 export function isLocalAudioFile(file: File) {
   const extension = file.name.toLowerCase().split(".").pop() ?? "";
   const expected = audioTypes[extension];
-  return Boolean(expected && (!file.type || file.type === "application/octet-stream" || file.type === expected || (extension === "wav" && file.type === "audio/x-wav")));
+  return Boolean(expected && (!file.type || file.type === "application/octet-stream" || file.type === expected || file.type.startsWith(`${expected};`) || (extension === "wav" && file.type === "audio/x-wav")));
 }
 
 export async function transcribeLocalAudioFile(file: File, signal: AbortSignal) {
   const extension = file.name.toLowerCase().split(".").pop() ?? "";
   const mediaType = audioTypes[extension];
-  if (!mediaType || !isLocalAudioFile(file)) throw new Error("Choose an MP3, M4A, OGG, or WAV audio file.");
+  if (!mediaType || !isLocalAudioFile(file)) throw new Error("Choose an MP3, M4A, OGG, WAV, or WebM audio file.");
   if (!file.size || file.size > maxAudioBytes) throw new Error("Audio files must be smaller than 20 MB to transcribe locally.");
   const whisperStatus = await window.skaiAgent?.request("voice.whisper.install.status");
   if (whisperStatus?.ok && (whisperStatus.result as { installed?: boolean } | undefined)?.installed) {

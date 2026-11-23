@@ -61,6 +61,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [omniOpen, setOmniOpen] = useState(false);
   const audioPickerRef = useRef<HTMLInputElement>(null);
   const audioAbortRef = useRef<AbortController | null>(null);
+  const whisperRecorderRef = useRef<{ recorder: MediaRecorder; stream: MediaStream; chunks: Blob[] } | null>(null);
+  const whisperRecorderTimerRef = useRef<number | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const handsFreeRef = useRef(false);
   const awaitingResponseRef = useRef(false);
@@ -83,6 +85,10 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   useEffect(() => () => {
     handsFreeRef.current = false;
     audioAbortRef.current?.abort();
+    if (whisperRecorderTimerRef.current !== null) window.clearTimeout(whisperRecorderTimerRef.current);
+    const recorder = whisperRecorderRef.current;
+    whisperRecorderRef.current = null;
+    if (recorder) { recorder.recorder.onstop = null; try { recorder.recorder.stop(); } catch { /* It may already have stopped. */ } recorder.stream.getTracks().forEach((track) => track.stop()); }
     if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
     recognitionRef.current?.stop();
     recognitionRef.current = null;
@@ -184,9 +190,50 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     }
   };
 
+  const startWhisperMicrophone = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { void startVoiceRecognition(false); return; }
+    try {
+      const whisper = await window.skaiAgent?.request("voice.whisper.install.status");
+      if (!whisper?.ok || !(whisper.result as { installed?: boolean } | undefined)?.installed) { void startVoiceRecognition(false); return; }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) { stream.getTracks().forEach((track) => track.stop()); setVoiceError("This desktop runtime cannot record a supported local audio format."); return; }
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const recording = { recorder, stream, chunks: [] as Blob[] };
+      whisperRecorderRef.current = recording;
+      setVoiceError(null);
+      setVoiceListening(true);
+      recorder.ondataavailable = (event) => { if (event.data.size) recording.chunks.push(event.data); };
+      recorder.onerror = () => {
+        if (whisperRecorderRef.current === recording) whisperRecorderRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
+        setVoiceListening(false);
+        setVoiceError("Local microphone recording failed. Check microphone permissions and try again.");
+      };
+      recorder.onstop = () => {
+        if (whisperRecorderTimerRef.current !== null) window.clearTimeout(whisperRecorderTimerRef.current);
+        whisperRecorderTimerRef.current = null;
+        if (whisperRecorderRef.current === recording) whisperRecorderRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
+        setVoiceListening(false);
+        const blob = new Blob(recording.chunks, { type: mimeType });
+        if (!blob.size) { setVoiceError("No microphone audio was captured."); return; }
+        if (blob.size > 20 * 1024 * 1024) { setVoiceError("This recording exceeded the 20 MB local transcription limit. Try a shorter recording."); return; }
+        void transcribeAudioFile(new File([blob], `microphone-${Date.now()}.webm`, { type: "audio/webm" }));
+      };
+      recorder.start(1000);
+      whisperRecorderTimerRef.current = window.setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 5 * 60 * 1000);
+    } catch (error) {
+      setVoiceListening(false);
+      setVoiceError(error instanceof Error && error.name === "NotAllowedError" ? "Microphone access was denied. Allow it in desktop app permissions and try again." : "The local microphone could not start. Check device permissions and try again.");
+    }
+  };
+
   const toggleVoiceInput = () => {
+    const recording = whisperRecorderRef.current;
+    if (recording) { try { recording.recorder.stop(); } catch { /* It may already have stopped. */ } return; }
     if (voiceListening) { recognitionRef.current?.stop(); return; }
-    void startVoiceRecognition(false);
+    void startWhisperMicrophone();
   };
 
   const toggleHandsFree = () => {
@@ -358,14 +405,15 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     {commandQuery !== null && <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} />}
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}><span>{queued.text}</span>{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`}>×</button></div>)}</div>}
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
-    <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,audio/mpeg,audio/mp4,audio/ogg,audio/wav" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
+    <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
     <textarea value={draft} disabled={rewriteBusy} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : "Message your model…"} aria-label="Message your model" aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
-    {audioTranscribing && <p className="composer-hint" role="status">Transcribing the selected audio on this device…</p>}
+    {voiceListening && whisperRecorderRef.current && <p className="composer-hint" role="status">Recording locally. Select the microphone again to transcribe, or leave it to stop automatically after five minutes.</p>}
+    {audioTranscribing && <p className="composer-hint" role="status">Transcribing audio with local Whisper on this device…</p>}
     {audioTranscriptReady && <p className="composer-hint" role="status">Local transcript added to the draft. Review it before sending.</p>}
     {voiceError && <div className="composer-voice-status"><p className="composer-voice-error" role="status">{voiceError}</p>{voicePackNeeded && <div className="composer-voice-install"><Button variant="secondary" type="button" disabled={voicePackInstalling} onClick={() => void installLocalSpeechPack()}>{voicePackInstalling ? "Installing local pack…" : "Install local speech pack"}</Button><span>The pack downloads once; dictation is processed on this device.</span></div>}</div>}
     {voiceFallbackNotice && <p className="composer-hint" role="status" onClick={() => setVoiceFallbackNotice(null)}>{voiceFallbackNotice}</p>}
-    <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy || rewriteBusy} aria-pressed={documentsOnly} aria-label={documentsOnly ? "Documents only is on" : "Use documents only"} title={documentsOnly ? "Documents only: on" : "Use only attached documents as evidence"}><NavIcon name="document" /></Button><Button variant="ghost" type="button" onClick={() => setOmniOpen(true)} disabled={rewriteBusy || (attachments.length >= 5 && !audioTranscribing)} aria-haspopup="dialog" aria-expanded={omniOpen} aria-label="Add files or audio" aria-describedby="attachment-help" title="Add files, folders, or audio"><NavIcon name="plus" /></Button><Button variant={audioTranscribing ? "secondary" : "ghost"} type="button" onClick={() => audioAbortRef.current ? audioAbortRef.current.abort() : audioPickerRef.current?.click()} disabled={busy || rewriteBusy || voiceListening || handsFreeActive} aria-label={audioTranscribing ? "Stop audio transcription" : "Transcribe an audio file"} title={audioTranscribing ? "Stop audio transcription" : "Transcribe MP3, M4A, OGG, or WAV locally"}><NavIcon name={audioTranscribing ? "stop" : "audio"} /></Button>{!hasMessageContent && <Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"} title={voiceListening ? "Stop voice input" : "Dictate a message on this device"}><NavIcon name={voiceListening && !handsFreeActive ? "stop" : "microphone"} /></Button>}{!hasMessageContent && <Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={rewriteBusy || (voiceListening && !handsFreeActive) || audioTranscribing} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title="Start a local turn-based voice conversation"><NavIcon name={handsFreeActive ? "stop" : "headset"} /></Button>}<div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span>{hasMessageContent && <Button variant={busy ? "secondary" : "primary"} disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{rewriteBusy ? "Rewriting…" : busy ? "Queue ↗" : "Send ↗"}</Button>}</div></div>
+    <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy || rewriteBusy} aria-pressed={documentsOnly} aria-label={documentsOnly ? "Documents only is on" : "Use documents only"} title={documentsOnly ? "Documents only: on" : "Use only attached documents as evidence"}><NavIcon name="document" /></Button><Button variant="ghost" type="button" onClick={() => setOmniOpen(true)} disabled={rewriteBusy || (attachments.length >= 5 && !audioTranscribing)} aria-haspopup="dialog" aria-expanded={omniOpen} aria-label="Add files or audio" aria-describedby="attachment-help" title="Add files, folders, or audio"><NavIcon name="plus" /></Button><Button variant={audioTranscribing ? "secondary" : "ghost"} type="button" onClick={() => audioAbortRef.current ? audioAbortRef.current.abort() : audioPickerRef.current?.click()} disabled={busy || rewriteBusy || voiceListening || handsFreeActive} aria-label={audioTranscribing ? "Stop audio transcription" : "Transcribe an audio file"} title={audioTranscribing ? "Stop audio transcription" : "Transcribe MP3, M4A, OGG, WAV, or WebM locally"}><NavIcon name={audioTranscribing ? "stop" : "audio"} /></Button>{!hasMessageContent && <Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"} title={voiceListening ? "Stop voice input and transcribe locally" : "Record a local Whisper dictation"}><NavIcon name={voiceListening && !handsFreeActive ? "stop" : "microphone"} /></Button>}{!hasMessageContent && <Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={rewriteBusy || (voiceListening && !handsFreeActive) || audioTranscribing} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title="Start a local turn-based voice conversation"><NavIcon name={handsFreeActive ? "stop" : "headset"} /></Button>}<div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span>{hasMessageContent && <Button variant={busy ? "secondary" : "primary"} disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{rewriteBusy ? "Rewriting…" : busy ? "Queue ↗" : "Send ↗"}</Button>}</div></div>
     <ModalDialog open={omniOpen} onClose={() => setOmniOpen(false)} titleId="omni-input-title" className="ui-dialog omni-input-dialog"><div className="dialog-heading"><div><p className="section-kicker">ADD TO THIS MESSAGE</p><h3 id="omni-input-title">Choose an input</h3><p>Attach local media or start a private voice turn. You can review attachments before sending.</p></div><button type="button" onClick={() => setOmniOpen(false)} aria-label="Close input menu">×</button></div><div className="omni-input-options"><button type="button" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><strong>Files and folders</strong><span>Images, documents, PDFs, and videos</span><small>{attachments.length}/5 attachments</small></button><button type="button" onClick={openAudioPickerFromOmni} disabled={busy || voiceListening || handsFreeActive}><strong>Audio file</strong><span>Transcribe MP3, M4A, OGG, or WAV on this device</span><small>No raw audio is sent</small></button><button type="button" onClick={startVoiceFromOmni} disabled={rewriteBusy || handsFreeActive || audioTranscribing}><strong>Voice input</strong><span>Dictate one message into the composer</span><small>On-device speech recognition</small></button><button type="button" onClick={startHandsFreeFromOmni} disabled={rewriteBusy || voiceListening || audioTranscribing}><strong>Voice Mode</strong><span>Have a turn-based hands-free conversation</span><small>End anytime</small></button></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setOmniOpen(false)}>Cancel</Button></div></ModalDialog>
     <ModalDialog open={handsFreeActive} onClose={endVoiceMode} titleId="voice-mode-title" className="ui-dialog voice-mode-dialog"><div className="voice-mode-session"><div className={`voice-mode-orb ${voiceListening ? "is-listening" : busy ? "is-speaking" : "is-preparing"}`} aria-hidden="true"><span /><span /><span /></div><p className="section-kicker">LOCAL VOICE MODE</p><h3 id="voice-mode-title">Voice conversation</h3><p className="voice-mode-state">{voiceListening ? "Listening on this device" : busy ? "Skai is responding" : "Preparing the next turn"}</p><p className="voice-mode-detail">{voiceListening ? "Speak naturally, then pause. Your words are transcribed locally before they are sent." : busy ? "The microphone is paused while the local model responds." : "The next listening turn will start after local speech finishes."}</p><div className="voice-mode-session-actions">{busy && <Button variant="ghost" type="button" onClick={stopNativeSpeech}>Stop speaking</Button>}<Button variant="secondary" type="button" onClick={endVoiceMode}>End voice mode</Button></div></div></ModalDialog>
   </section>;
