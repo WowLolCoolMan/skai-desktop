@@ -89,8 +89,10 @@ Mark an item done only when the linked workflow has evidence.
     reassigns colliding IDs, strips legacy project context, and leaves existing
     conversations intact. Verified by the disposable Agent Host smoke; see
     [conversation import](../guides/CONVERSATION_IMPORT.md).
-17. **Scanned documents and data files.** Add local OCR for scanned PDFs and
-    capability-aware handling for spreadsheets and other unsupported content.
+17. **Scanned documents and data files — In progress · Codex.** `.xlsx`
+    attachments now extract bounded cached cell values locally without running
+    formulas. Remaining: add and verify a packaged local OCR engine for scanned
+    PDFs; OCR is still unavailable and disclosed to users.
 18. **Packaged media coverage.** Verify real WebM and audio fixtures in the
     packaged app; make format and model capability errors clear.
 19. **Context and run capacity.** Verify actual 1M-token execution with a
@@ -154,6 +156,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   reassigned, legacy project context is stripped, and repeated imports skip
   prior chats. A disposable Agent Host smoke verifies preview-without-writing,
   collision handling, project-context stripping, and idempotence.
+
+- **2026-11-22:** Chat can attach `.xlsx` files up to 20 MB. The Agent Host
+  reads bounded Open XML workbook, relationship, shared-string, and worksheet
+  parts locally; it includes sheet names and cell references, never executes
+  formulas, and returns at most the normal per-file text budget. CSV remains a
+  plain local text attachment. Scanned PDF OCR still needs an installable local
+  runtime and acceptance coverage.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed

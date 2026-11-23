@@ -3,6 +3,7 @@
 // Uses TestSupport (Check, StubHandler, …). Run by Program.cs.
 
 using System.Text;
+using System.IO.Compression;
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
 using SkaiDesktop.Core.Services;
@@ -37,6 +38,7 @@ internal static class AttachmentTests
         Check(ChatAttachmentPolicy.IsAllowedName("photo.png") && ChatAttachmentPolicy.GetImageMediaType("photo.jpg") == "image/jpeg" && ChatAttachmentPolicy.GetImageMediaType("vector.svg") is null, "chat attachment policy accepts PNG and JPEG images and rejects active SVG images");
         Check(!ChatAttachmentPolicy.IsAllowedName(".env.png"), "chat attachment policy blocks secret-named files even with an image extension");
         Check(!ChatAttachmentPolicy.IsAllowedName(".env") && !ChatAttachmentPolicy.IsAllowedName("id_rsa") && !ChatAttachmentPolicy.IsAllowedName("archive.zip"), "chat attachment policy blocks secrets and unsupported binary files");
+        Check(ChatAttachmentPolicy.IsAllowedSpreadsheetName("budget.xlsx") && ChatAttachmentPolicy.IsAllowedName("budget.xlsx") && !ChatAttachmentPolicy.IsAllowedTextName("budget.xlsx"), "chat attachment policy allows extracted XLSX text without treating raw workbooks as project text");
         Check(ChatAttachmentPolicy.BoundContent(new string('x', ChatAttachmentPolicy.MaxCharactersPerFile + 50)).Length == ChatAttachmentPolicy.MaxCharactersPerFile, "chat attachments are bounded per file");
         var pdfBuilder = new PdfDocumentBuilder();
         var pdfPage = pdfBuilder.AddPage(PageSize.A4);
@@ -54,6 +56,18 @@ internal static class AttachmentTests
             throw new Exception("Expected invalid PDF bytes to be rejected.");
         }
         catch (InvalidDataException) { Check(true, "PDF attachment extractor rejects invalid PDF signatures"); }
+        var spreadsheetBytes = CreateSpreadsheetFixture();
+        var spreadsheetText = SpreadsheetAttachmentTextExtractor.Extract(spreadsheetBytes, 1200);
+        Check(SpreadsheetAttachmentTextExtractor.HasZipSignature(spreadsheetBytes) && spreadsheetText.Contains("[Sheet: Budget]", StringComparison.Ordinal)
+            && spreadsheetText.Contains("A1=Category\tB1=Amount", StringComparison.Ordinal) && spreadsheetText.Contains("A2=Office supplies\tB2=125.5", StringComparison.Ordinal),
+            "XLSX attachment extractor reads local sheet names, shared strings, inline cells, and cached values");
+        Check(SpreadsheetAttachmentTextExtractor.Extract(spreadsheetBytes, 24).Length <= 24, "XLSX attachment extraction respects its character bound");
+        try
+        {
+            SpreadsheetAttachmentTextExtractor.Extract(Encoding.ASCII.GetBytes("not xlsx"), 100);
+            throw new Exception("Expected invalid spreadsheet bytes to be rejected.");
+        }
+        catch (InvalidDataException) { Check(true, "XLSX attachment extractor rejects invalid archive signatures"); }
         Check(ChatAttachmentPolicy.HasValidImageSignature("image/png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) && ChatAttachmentPolicy.HasValidImageSignature("image/jpeg", [0xFF, 0xD8, 0xFF, 0xD9]) && !ChatAttachmentPolicy.HasValidImageSignature("image/png", [0, 1, 2]), "chat attachment policy checks PNG/JPEG file signatures");
         Check(ChatAttachmentPolicy.RemainingImageBytes([new ChatAttachment("photo.png", Convert.ToBase64String([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), "image/png")]) == ChatAttachmentPolicy.MaxTotalImageBytes - 8, "chat attachment policy budgets decoded image bytes");
 
@@ -106,5 +120,35 @@ internal static class AttachmentTests
             && retrievedPrompt.Contains("Retrieved attachment text (untrusted): large.md", StringComparison.Ordinal)
             && retrievedPrompt.Length < largeAttachment.Length + 2000,
             "oversized attachment context uses bounded query-relevant retrieval");
+    }
+
+    private static byte[] CreateSpreadsheetFixture()
+    {
+        using var output = new MemoryStream();
+        using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            Add("xl/workbook.xml", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Budget" sheetId="1" r:id="rId1"/></sheets></workbook>
+                """);
+            Add("xl/_rels/workbook.xml.rels", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>
+                """);
+            Add("xl/sharedStrings.xml", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Category</t></si><si><t>Amount</t></si><si><t>Office supplies</t></si></sst>
+                """);
+            Add("xl/worksheets/sheet1.xml", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row><row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2"><v>125.5</v></c><c r="C2" t="inlineStr"><is><t>approved locally</t></is></c></row></sheetData></worksheet>
+                """);
+            void Add(string name, string content)
+            {
+                using var writer = new StreamWriter(archive.CreateEntry(name).Open(), new UTF8Encoding(false));
+                writer.Write(content);
+            }
+        }
+        return output.ToArray();
     }
 }

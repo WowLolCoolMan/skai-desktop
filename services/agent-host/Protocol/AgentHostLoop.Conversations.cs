@@ -167,6 +167,21 @@ public static partial class AgentHostLoop
         return new(ProtocolVersion, request.Id, true, new { fileName, mediaType = (string?)null, content });
     }
 
+    private static AgentResponse ExtractSpreadsheetAttachment(AgentRequest request)
+    {
+        var fileName = RequiredBoundedString(request, "fileName", 260);
+        if (!ChatAttachmentPolicy.IsAllowedSpreadsheetName(fileName))
+            throw new InvalidOperationException("Only approved .xlsx spreadsheet attachments can be extracted.");
+        var encoded = RequiredBoundedString(request, "content", checked((int)(((SpreadsheetAttachmentTextExtractor.MaxWorkbookBytes + 2) / 3) * 4 + 4)));
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(encoded); }
+        catch (FormatException exception) { throw new InvalidDataException("The spreadsheet attachment encoding is invalid.", exception); }
+        if (bytes.Length > SpreadsheetAttachmentTextExtractor.MaxWorkbookBytes)
+            throw new InvalidDataException("The spreadsheet attachment exceeds the local extraction limit.");
+        var content = SpreadsheetAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
+        return new(ProtocolVersion, request.Id, true, new { fileName, mediaType = (string?)null, content });
+    }
+
     private static AgentResponse SaveConversation(AgentRequest request)
     {
         var title = RequiredBoundedString(request, "title", 200);

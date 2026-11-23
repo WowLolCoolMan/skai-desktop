@@ -36,7 +36,7 @@ function registerWorkspaceIpc({
     }
     if (method === "workspace.pickFiles") {
       const window = BrowserWindow.fromWebContents(event.sender);
-      const result = await dialog.showOpenDialog(window, { properties: ["openFile", "multiSelections"], filters: [{ name: "Chat files", extensions: ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "toml", "html", "css", "js", "ts", "jsx", "tsx", "cs", "py", "java", "go", "rs", "c", "h", "cpp", "hpp", "sh", "sql", "log", "pdf", "png", "jpg", "jpeg", "mp4", "webm"] }] });
+      const result = await dialog.showOpenDialog(window, { properties: ["openFile", "multiSelections"], filters: [{ name: "Chat files", extensions: ["txt", "md", "markdown", "csv", "xlsx", "json", "xml", "yaml", "yml", "toml", "html", "css", "js", "ts", "jsx", "tsx", "cs", "py", "java", "go", "rs", "c", "h", "cpp", "hpp", "sh", "sql", "log", "pdf", "png", "jpg", "jpeg", "mp4", "webm"] }] });
       if (result.canceled) return { v: 1, ok: true, result: { attachments: [] } };
       const attachments = [];
       let textCharacters = 0;
@@ -48,10 +48,11 @@ function registerWorkspaceIpc({
         if (isBlockedAttachmentName(fileName)) throw new Error(`That file name cannot be attached: ${fileName}`);
         const imageType = extension === ".png" ? "image/png" : [".jpg", ".jpeg"].includes(extension) ? "image/jpeg" : null;
         const isPdf = extension === ".pdf";
+        const isSpreadsheet = extension === ".xlsx";
         const videoType = extension === ".mp4" ? "video/mp4" : extension === ".webm" ? "video/webm" : null;
-        if (!imageType && !isPdf && !videoType && !attachmentTextExtensions.has(extension)) throw new Error(`That file type cannot be attached: ${fileName}`);
+        if (!imageType && !isPdf && !isSpreadsheet && !videoType && !attachmentTextExtensions.has(extension)) throw new Error(`That file type cannot be attached: ${fileName}`);
         const bytes = await fs.readFile(filePath);
-        if (bytes.length > (isPdf || videoType ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The selected file is too large: ${fileName}`);
+        if (bytes.length > (isPdf || isSpreadsheet || videoType ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The selected file is too large: ${fileName}`);
         if (imageType) {
           if (!(imageType === "image/png" ? isPng(bytes) : isJpeg(bytes))) throw new Error(`The selected image is not valid: ${fileName}`);
           imageBytes += bytes.length;
@@ -64,6 +65,14 @@ function registerWorkspaceIpc({
           videoBytes += bytes.length;
           if (videoBytes > 40 * 1024 * 1024) throw new Error("Selected videos exceed the combined 40 MB limit.");
           attachments.push({ fileName, mediaType: videoType, content: bytes.toString("base64") });
+        } else if (isSpreadsheet) {
+          if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error(`The selected spreadsheet is not a valid Open XML file: ${fileName}`);
+          const extracted = await requestAgent("workspace.attachment.extractSpreadsheet", { fileName, content: bytes.toString("base64") });
+          if (!extracted.ok) throw new Error(extracted.error?.message ?? `Could not extract ${fileName}.`);
+          const content = extracted.result?.content ?? "";
+          textCharacters += content.length;
+          if (textCharacters > 48_000) throw new Error("Selected text files exceed the combined character limit.");
+          attachments.push({ fileName, mediaType: null, content });
         } else {
           const content = bytes.toString("utf8").slice(0, 16000);
           textCharacters += content.length;
