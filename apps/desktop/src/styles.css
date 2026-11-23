@@ -3335,3 +3335,70 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .app-content-coding .coding-page-active .coding-task-drawer { min-height: 280px; }
   .sidebar-project-tree { max-height: 38vh; flex: 0 1 38vh; }
 }
+
+/* Coding workspace: compact, graphite layout inspired by Codex desktop. */
+.app-shell:has(.thread-sidebar.is-coding-agent) { grid-template-columns: 56px 300px minmax(0, 1fr); background: #171717; }
+.app-shell:has(.thread-sidebar.is-coding-agent) .app-main,
+.app-shell:has(.thread-sidebar.is-coding-agent) .app-content-coding { background: #171717; }
+.app-shell:has(.thread-sidebar.is-coding-agent) .thread-sidebar { background: #1c1c1c; border-color: #303030; }
+.app-shell:has(.thread-sidebar.is-coding-agent) .workspace-tabs-hotkeys { background: #1c1c1c; border-color: #303030; }
+.app-content-coding .coding-project-heading { min-height: 48px; border-color: #303030; }
+.app-content-coding .coding-project-heading strong { font-size: 14px; }
+.app-content-coding .coding-project-context { border-color: #303030; }
+.app-content-coding .coding-project-context-actions .ui-button { color: #b7b7b7; }
+.app-content-coding .coding-workspace-tabs { gap: 3px; margin: 0; padding: 8px 0; }
+.app-content-coding .coding-workspace-tabs [role="tab"] { border-radius: 7px; }
+.app-content-coding .coding-session-grid.is-chat:has(.coding-task-drawer) { grid-template-columns: minmax(0, 1fr) minmax(300px, 31%); gap: 10px; }
+.app-content-coding .coding-task-drawer { padding: 12px; border-color: #303030; border-radius: 10px; background: #1c1c1c; }
+.app-content-coding .coding-task-drawer > header { border-color: #303030; }
+.app-content-coding .coding-inspector-tabs { display: flex; flex-wrap: nowrap; gap: 2px; overflow-x: auto; border-color: #303030; }
+.app-content-coding .coding-inspector-tabs [role="tab"] { flex: 0 0 auto; padding-inline: 9px; }
+.app-content-coding .coding-inspector-tabs [aria-selected="true"] { color: #f3f3f3; background: #303030; }
+.app-content-coding .coding-source-inspector { display: grid; align-content: start; gap: 0; min-height: 0; overflow: auto; }
+.app-content-coding .coding-source-inspector article { display: grid; gap: 5px; padding: 13px 8px; border-bottom: 1px solid #303030; }
+.app-content-coding .coding-source-inspector article strong { overflow-wrap: anywhere; color: #efefef; font-size: 12px; font-weight: 550; }
+.app-content-coding .coding-source-inspector article span { color: #949494; font-size: 11px; }
+.app-content-coding .coding-source-inspector .coding-change-empty { margin: 16px 8px; }
+.app-content-coding .project-thread-panel { min-width: 0; background: #171717; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .chat-context-bar { min-height: 42px; margin: 0; padding: 4px 10px; border-color: #303030; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .chat-heading-copy { display: none; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .chat-header-actions { width: 100%; justify-content: flex-end; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .chat-layout { padding: 0 10px 10px; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .chat-rail { display: none; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .chat-column { min-height: 0; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .conversation-surface { background: transparent; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .message-list { width: min(100%, 760px); margin-inline: auto; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .composer-card { width: min(100%, 760px); background: #292929; border-color: #383838; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .composer-card > textarea { min-height: 74px; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .composer-action-right { gap: 8px; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .composer-action-right .composer-hint { max-width: 260px; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .model-picker { min-width: 150px; max-width: 220px; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .queued-message { border-color: #383838; background: #222; }
+@media (max-width: 1100px) {
+  .app-shell:has(.thread-sidebar.is-coding-agent) { grid-template-columns: 48px 250px minmax(0, 1fr); }
+  .app-content-coding .coding-session-grid.is-chat:has(.coding-task-drawer) { grid-template-columns: minmax(0, 1fr) minmax(260px, 34%); }
+}
+
+.app-shell:has(.thread-sidebar.is-coding-agent) {
+  --skai-color-canvas: #171717;
+  --skai-color-sidebar: #1d1d1d;
+  --skai-color-surface: #202020;
+  --skai-color-surface-raised: #242424;
+  --skai-color-surface-soft: #292929;
+  --skai-color-border: #383838;
+  --skai-color-accent: #3478f6;
+  --skai-color-accent-text: #72a7ff;
+  --skai-color-user-bubble: #174a8b;
+  --skai-color-user-bubble-border: #2563a8;
+}
+.app-shell:has(.thread-sidebar.is-coding-agent) .app-main,
+.app-shell:has(.thread-sidebar.is-coding-agent) .app-content-coding,
+.app-shell:has(.thread-sidebar.is-coding-agent) .coding-page-active,
+.app-shell:has(.thread-sidebar.is-coding-agent) .coding-session-grid,
+.app-shell:has(.thread-sidebar.is-coding-agent) .project-thread-panel,
+.app-shell:has(.thread-sidebar.is-coding-agent) .chat-page.is-coding-agent { background: #171717; }
+.app-shell:has(.thread-sidebar.is-coding-agent) .workspace-tab-list { flex: 1 1 0; min-width: 0; }
+.app-shell:has(.thread-sidebar.is-coding-agent) .workspace-tab { flex: 0 1 220px; min-width: 140px; }
+.app-shell:has(.thread-sidebar.is-coding-agent) .workspace-tab-select span { display: block; }
+.app-content-coding .coding-task-drawer { background: #1d1d1d; }
+.app-content-coding .project-thread-panel .chat-page.is-coding-agent .conversation-surface { background: #171717; }
