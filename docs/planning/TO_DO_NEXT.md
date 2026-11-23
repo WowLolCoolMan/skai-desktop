@@ -161,8 +161,11 @@ Mark an item done only when the linked workflow has evidence.
    rechecks its read-only tool set, and performs another approved read. The
    smoke also exercises loopback Streamable HTTP session negotiation, protocol
    header continuity, approved reads, denied writes, revocation, and fresh
-   session recovery. Remaining: verify setup/use/revoke for additional curated
-   MCP server adapters.
+   session recovery. Figma and Supabase entries now state their exact local
+   setup prerequisites and loopback routes; their live desktop/CLI servers
+   were unavailable on the acceptance machine. Remaining: verify live setup,
+   use, and revoke for those services when available, then cover additional
+   curated MCP server adapters.
 14. **Model fit and license guidance — In progress · Codex.** The model
     inspector now compares package size against current free RAM, reports GPU
     memory when telemetry exists, and labels the result as advisory. Hugging

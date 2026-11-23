@@ -282,6 +282,19 @@ async function run() {
   }
   const backedEntries = curated.filter(entry => entry.installable === true);
   if (backedEntries.length !== 42) throw new Error(`Expected 42 entries with real local adapters; found ${backedEntries.length}.`);
+  const figma = curated.find(entry => entry.id === "figma-mcp");
+  if (figma?.adapter !== "local-mcp-figma" || !figma.installable
+    || !figma.description?.includes("Dev or Full seat")
+    || !figma.installReview?.includes("127.0.0.1:3845/mcp")
+    || !figma.installReview.includes("Dev Mode")
+    || !figma.installReview.includes("hosted Figma MCP"))
+    throw new Error(`Figma's local desktop service requirements are missing or inaccurately advertised: ${JSON.stringify(figma)}`);
+  const supabase = curated.find(entry => entry.id === "supabase-mcp");
+  if (supabase?.adapter !== "local-mcp-supabase" || !supabase.installable
+    || !supabase.description?.includes("local Supabase CLI stack")
+    || !supabase.installReview?.includes("127.0.0.1:54321/mcp")
+    || !supabase.installReview.includes("hosted Supabase MCP"))
+    throw new Error(`Supabase's local CLI service requirements are missing or inaccurately advertised: ${JSON.stringify(supabase)}`);
   const voicePipelines = [
     ["kokoro-82m", "isolated Python", "INT8 Kokoro ONNX"],
     ["piper", "isolated Python", "pinned English voice"],

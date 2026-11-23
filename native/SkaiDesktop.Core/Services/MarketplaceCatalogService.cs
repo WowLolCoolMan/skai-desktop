@@ -67,7 +67,7 @@ public static class MarketplaceCatalogService
             else if (item.id == "filesystem-mcp")
                 Add("MCP Servers", "Model Context Protocol", "MIT / Apache-2.0 transition", "Node.js 24+ · local stdio · read-only by default", "filesystem|read-only|local-tools", (item.id, item.name, "Browse files in one folder you choose. Skai starts the official local server in read-only mode and keeps tool calls behind explicit approval.", "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem"));
             else if (item.id == "figma-mcp")
-                Add("MCP Servers", "Figma", "Proprietary · Figma desktop", "Figma desktop · loopback HTTP", "design-context|local-desktop-server|explicit-approval", (item.id, item.name, "Connect to Figma's local desktop MCP server after enabling it in Dev Mode. The official desktop server listens on 127.0.0.1:3845 and requires a Figma account and eligible seat.", "https://help.figma.com/hc/en-us/articles/39216419318551-Get-started-with-the-Figma-MCP-server"));
+                Add("MCP Servers", "Figma", "Proprietary · Figma desktop", "Figma desktop · loopback HTTP", "design-context|local-desktop-server|explicit-approval", (item.id, item.name, "Connect to Figma's local desktop MCP server after enabling it in Dev Mode. Figma requires a Dev or Full seat on an eligible plan. Skai uses the local design-context server, not Figma's hosted MCP or canvas-writing workflow.", "https://developers.figma.com/docs/figma-mcp-server/local-server-installation/"));
             else if (item.id == "supabase-mcp")
                 Add("MCP Servers", "Supabase", "Apache-2.0", "Supabase CLI · local loopback HTTP", "database|local-development|explicit-approval", (item.id, item.name, "Connect to the MCP endpoint exposed by a running local Supabase CLI stack. This supports the local project only and does not connect to Supabase's hosted MCP service.", "https://github.com/supabase/mcp"));
             else
@@ -180,7 +180,7 @@ public static class MarketplaceCatalogService
                 : ResolveAdapter(entry) == "local-mcp-filesystem"
                     ? "Skai installs @modelcontextprotocol/server-filesystem@2.4.0 on first connect and starts it locally over stdio. Choose one folder to share; the server exposes read-only tools by default and requires Node.js 24 or newer."
                 : ResolveAdapter(entry) == "local-mcp-figma"
-                    ? "Requires Figma desktop to be running with its local MCP server enabled in Dev Mode. Skai connects only to http://127.0.0.1:3845/mcp; hosted Figma MCP endpoints are not used. Review each tool call before execution."
+                    ? "Requires the Figma desktop app, a Design file open, and the desktop MCP server enabled in Dev Mode. Figma requires a Dev or Full seat on a Professional, Education, Organization, Government, or Enterprise plan. Skai connects only to http://127.0.0.1:3845/mcp; hosted Figma MCP and canvas-writing workflows are not used. Review each tool call before execution."
                 : ResolveAdapter(entry) == "local-mcp-supabase"
                     ? "Requires Supabase CLI with a local stack already running. Skai connects only to http://127.0.0.1:54321/mcp; hosted Supabase MCP routes are not used. Experimental multi-project stacks may use another port; add that local endpoint in MCP Connections."
                 : "No verified in-app installer is connected for this category yet. This listing is unavailable for installation until Skai has a compatible local adapter.",
