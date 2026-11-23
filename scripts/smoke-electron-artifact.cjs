@@ -139,19 +139,28 @@ async function main() {
   console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}`);
   await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
   await sleep(150);
-  let dictationResult;
-  if (localVoiceState.api && localVoiceState.processLocally && localVoiceState.availability === "available") {
-    dictationResult = JSON.stringify({ button: true, error: "", listening: false, skipped: true });
-  } else {
-    const dictationStarted = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
-    dictationResult = JSON.stringify({ button: dictationStarted === "clicked", error: "", listening: false });
-    const dictationDeadline = Date.now() + 5_000;
-    while (Date.now() < dictationDeadline) {
-      dictationResult = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input' || item.getAttribute('aria-label') === 'Stop voice input'); return JSON.stringify({ button: Boolean(button), error: document.querySelector('.composer-voice-error')?.textContent ?? '', listening: button?.getAttribute('aria-pressed') === 'true' }); })()");
-      const result = JSON.parse(dictationResult);
-      if (result.error || result.listening) break;
-      await sleep(100);
-    }
+  const dictationStarted = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
+  let dictationResult = JSON.stringify({ button: dictationStarted === "clicked", started: false, stopped: false, settled: false, error: "", listening: false, transcript: false, localRecognition: localVoiceState.availability });
+  let recorderStarted = false;
+  let recorderStopped = false;
+  const dictationStartDeadline = Date.now() + 10_000;
+  while (Date.now() < dictationStartDeadline) {
+    const state = JSON.parse(await evaluate(mainTarget, "(() => JSON.stringify({ listening: [...document.querySelectorAll('button')].some((item) => item.getAttribute('aria-label') === 'Stop voice input' && item.getAttribute('aria-pressed') === 'true'), transcribing: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Transcribing audio with local Whisper')), transcript: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Local transcript added')), error: document.querySelector('.composer-voice-error')?.textContent ?? '' }))()"));
+    if (state.listening) { recorderStarted = true; break; }
+    if (state.error) break;
+    await sleep(100);
+  }
+  if (recorderStarted) {
+    await sleep(300);
+    const stopResult = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Stop voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
+    recorderStopped = stopResult === "clicked";
+  }
+  const dictationDeadline = Date.now() + 60_000;
+  while (Date.now() < dictationDeadline) {
+    const state = JSON.parse(await evaluate(mainTarget, "(() => JSON.stringify({ button: Boolean([...document.querySelectorAll('button')].find((item) => ['Start voice input', 'Stop voice input'].includes(item.getAttribute('aria-label')))), error: document.querySelector('.composer-voice-error')?.textContent ?? '', listening: [...document.querySelectorAll('button')].some((item) => item.getAttribute('aria-label') === 'Stop voice input' && item.getAttribute('aria-pressed') === 'true'), transcribing: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Transcribing audio with local Whisper')), transcript: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Local transcript added')) }))()"));
+    dictationResult = JSON.stringify({ button: dictationStarted === "clicked", started: recorderStarted, stopped: recorderStopped, settled: !state.listening && !state.transcribing && Boolean(state.transcript || state.error), error: state.error, listening: state.listening, transcript: state.transcript, localRecognition: localVoiceState.availability });
+    if (!state.listening && !state.transcribing && (state.transcript || state.error)) break;
+    await sleep(100);
   }
   console.log(`Packaged dictation outcome: ${dictationResult}`);
   const settingsResult = await evaluate(mainTarget, "(async () => { location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 250)); const settingsNav = document.querySelector('.settings-nav'); const tabs = [...(settingsNav?.querySelectorAll('button') ?? [])]; const tab = tabs.find((button) => button.textContent?.trim() === 'Models & Providers'); if (!tab) return JSON.stringify({ route: location.hash, tab: false, airLlmCheck: false, petControls: false }); tab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); const airLlmCheck = [...document.querySelectorAll('.settings-content button')].some((button) => button.textContent?.trim() === 'Check readiness'); const petTab = [...(settingsNav?.querySelectorAll('button') ?? [])].find((button) => button.textContent?.trim() === 'Pet'); if (!petTab) return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: false }); petTab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: document.body.innerText.includes('Show all pets') && document.body.innerText.includes('Let the active pet walk around') }); })()");
@@ -180,7 +189,8 @@ async function main() {
   const petState = JSON.parse(petResult);
   const petReducedState = JSON.parse(petReducedResult);
   const error = dictationState.error.toLowerCase();
-  const dictationFailClosed = dictationState.skipped || (!voiceState.api && error.includes("system speech input is not available")) || (voiceState.api && !voiceState.processLocally && error.includes("cannot guarantee on-device")) || (voiceState.processLocally && voiceState.availability !== "available" && (error.includes("remote recognition is disabled") || error.includes("no on-device speech pack")));
+  const dictationFailClosed = dictationState.button && dictationState.started && dictationState.stopped && dictationState.settled
+    && (dictationState.transcript || !error.includes("remote"));
   const webmSamplingWorked = !videoFixture.supported || (videoFixture.recorded && videoFixture.dropped && videoState.frames.length === 4 && videoState.frames.every((frame) => frame.kind.startsWith("Video frame")));
   const webmProbeBlockedByHarness = videoFixture.probeDetails?.error?.toLowerCase().includes("url safety check") ?? false;
   const videoSamplingWorked = (webmSamplingWorked || webmProbeBlockedByHarness)

@@ -24,10 +24,11 @@ Mark an item done only when the linked workflow has evidence.
    the 17-route matrix, keyboard/focus behavior, assistive technology, narrow
    layouts, and pet animations. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
-2. **Real microphone voice — In progress · Codex.** Exercise the new local
-   Whisper microphone path with a real device; verify draft insertion,
-   cancellation, permissions, and recovery, then test hands-free on a local
-   speech pack. Keep the path local. See the
+2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke now
+   records and stops a short microphone clip and confirms local Whisper returns
+   a reviewable transcript on this host. Still verify intelligible speech,
+   permission denial/recovery, cancellation, and hands-free on a local speech
+   pack. Keep the path local. See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — In progress · Codex.** Verify Windows
   PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Windows
@@ -117,6 +118,12 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   accepted by the existing offline Whisper path. A live microphone acceptance
   run is still required; hands-free mode continues to require local browser
   speech recognition.
+
+- **2026-11-22:** Packaged Windows smoke now exercises one-shot microphone
+  dictation through start, stop, and local Whisper completion. It passed on this
+  host while Chromium's separate on-device speech pack remained unavailable.
+  This confirms the local Whisper route only; intelligible spoken-word quality,
+  microphone permission denial/recovery, and hands-free acceptance remain open.
 
 - **2026-11-22:** Marketplace model details now include a device-fit advisory
   based on the live local RAM/GPU capacity probe and catalog package size. It
