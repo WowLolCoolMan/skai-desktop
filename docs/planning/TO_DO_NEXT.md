@@ -99,12 +99,15 @@ Mark an item done only when the linked workflow has evidence.
    adapters, and the other 48 expose no install action. The curated
    `qwen3-coder:30b-a3b-q4_K_M` Ollama route now has update and removal actions
    in Installed; its install/remove contract smoke passes against a disposable
-   loopback runtime and rejects hosted removal. The mock proves exact routing,
-   not a real model download or inference. Remaining: accept a real curated
-   package install/use/remove on an available local runtime and verify the
-   remaining MCP/voice adapters against their documented license/runtime
-   requirements. Saved ComfyUI workflows can be reviewed and activated inside
-   Marketplace.
+   loopback runtime and rejects hosted removal. Added the official
+   [`qwen2.5:0.5b` model](https://ollama.com/library/qwen2.5%3A0.5b)
+   (398 MB, Apache-2.0) as a low-footprint local option.
+   `npm run smoke:marketplace-real-ollama` passed a real install, `chat.complete`
+   inference, Marketplace removal, and post-removal inventory check against a
+   temporary Ollama server and model directory; the normal user Ollama model
+   inventory was unchanged afterward. Remaining: verify the remaining MCP and
+   voice adapters against their documented license/runtime requirements.
+   Saved ComfyUI workflows can be reviewed and activated inside Marketplace.
 10. **GitHub workflow acceptance — Blocked on test account · Owner: User.** Core
     tests cover permission denial, network failure, request cancellation,
     pending/slow-down retry, stale branch/conflict detection, and protected-token

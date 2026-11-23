@@ -6,6 +6,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const net = require("node:net");
 const readline = require("node:readline");
 const http = require("node:http");
 const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
@@ -53,6 +54,110 @@ function request(method, params, timeoutMs = 45_000) {
     pending.set(id, response => { clearTimeout(timer); resolve(response); });
     child.stdin.write(`${JSON.stringify({ v: 1, id, method, params })}\n`);
   });
+}
+
+async function getFreeLoopbackPort() {
+  const probe = net.createServer();
+  await new Promise((resolve, reject) => { probe.once("error", reject); probe.listen(0, "127.0.0.1", resolve); });
+  const { port } = probe.address();
+  await new Promise(resolve => probe.close(resolve));
+  return port;
+}
+
+async function waitForOllama(endpoint, server, getStderr) {
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    if (server.exitCode !== null) throw new Error(`Temporary Ollama exited before becoming ready: ${getStderr()}`);
+    try {
+      const response = await fetch(`${endpoint}/api/tags`, { signal: AbortSignal.timeout(3_000) });
+      if (response.ok) return;
+    } catch { /* The isolated runtime is still starting. */ }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  throw new Error(`Temporary Ollama did not become ready: ${getStderr()}`);
+}
+
+async function stopProcess(processHandle) {
+  if (!processHandle || processHandle.exitCode !== null) return;
+  processHandle.kill();
+  await Promise.race([
+    new Promise(resolve => processHandle.once("exit", resolve)),
+    new Promise(resolve => setTimeout(resolve, 10_000)),
+  ]);
+}
+
+async function runRealOllamaMarketplaceAcceptance(model) {
+  if (!process.argv.includes("--real-local-ollama")) return false;
+  const modelRoot = path.join(profileRoot, "real-ollama-models");
+  fs.mkdirSync(modelRoot, { recursive: true });
+  const port = await getFreeLoopbackPort();
+  const endpoint = `http://127.0.0.1:${port}`;
+  const ollama = spawn(process.platform === "win32" ? "ollama.exe" : "ollama", ["serve"], {
+    cwd: root,
+    env: { ...process.env, OLLAMA_HOST: `127.0.0.1:${port}`, OLLAMA_MODELS: modelRoot, OLLAMA_NOPRUNE: "1" },
+    stdio: ["ignore", "ignore", "pipe"],
+    windowsHide: true,
+  });
+  let ollamaStderr = "";
+  ollama.stderr.on("data", chunk => { ollamaStderr += chunk.toString(); });
+  let installId;
+  let modelRemoved = false;
+  try {
+    await waitForOllama(endpoint, ollama, () => ollamaStderr.slice(-2_000));
+    console.log(`Temporary Ollama is ready at ${endpoint}; model data is isolated under the smoke profile.`);
+
+    const started = await request("marketplace.models.install.start", { source: "ollama", repository: model.repository, endpoint });
+    if (!started.ok || !started.result?.id) throw new Error(`The real Marketplace model install did not start: ${JSON.stringify(started)}`);
+    installId = started.result.id;
+    const installDeadline = Date.now() + 10 * 60_000;
+    let installStatus;
+    let lastProgressCount = -1;
+    while (Date.now() < installDeadline) {
+      installStatus = await request("marketplace.models.install.status", { id: installId });
+      if (!installStatus.ok || installStatus.result?.status !== "running") break;
+      const progress = installStatus.result.progress ?? [];
+      if (progress.length !== lastProgressCount) {
+        lastProgressCount = progress.length;
+        const latest = progress.at(-1);
+        if (latest?.completed != null && latest?.total != null) console.log(`Marketplace pull: ${latest.completed}/${latest.total} bytes.`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 1_000));
+    }
+    if (!installStatus?.ok || installStatus.result?.status !== "completed") throw new Error(`The real Marketplace model install did not complete: ${JSON.stringify(installStatus)}`);
+    const installedTags = await (await fetch(`${endpoint}/api/tags`)).json();
+    if (!installedTags.models?.some(item => item.name === model.repository || item.name.startsWith(`${model.repository}:`)))
+      throw new Error(`Ollama did not list the installed model after Marketplace reported completion: ${JSON.stringify(installedTags)}`);
+
+    const use = await request("chat.complete", {
+      endpoint,
+      model: model.repository,
+      provider: "Ollama",
+      timeoutSeconds: 285,
+      maxTokens: 80,
+      messages: [{ role: "user", content: "Reply with a brief greeting and say that local model inference works." }],
+    }, 300_000);
+    const responseText = use.result?.content;
+    if (!use.ok || typeof responseText !== "string" || responseText.trim().length < 2)
+      throw new Error(`The installed Marketplace model did not produce a local chat response: ${JSON.stringify(use)}`);
+    console.log(`Real Marketplace model inference passed (${model.repository}; ${responseText.trim().slice(0, 160)}).`);
+
+    const removed = await request("marketplace.models.remove", { endpoint, model: model.repository });
+    if (!removed.ok || removed.result?.removed !== true || removed.result?.provider !== "Ollama")
+      throw new Error(`The real Marketplace model removal did not complete: ${JSON.stringify(removed)}`);
+    modelRemoved = true;
+    const remainingTags = await (await fetch(`${endpoint}/api/tags`)).json();
+    if (remainingTags.models?.some(item => item.name === model.repository || item.name.startsWith(`${model.repository}:`)))
+      throw new Error(`Ollama still lists ${model.repository} after Marketplace removal.`);
+    console.log(`Real Marketplace install/use/remove passed for ${model.repository}.`);
+    return true;
+  } finally {
+    if (!modelRemoved && installId) {
+      await request("marketplace.models.install.cancel", { id: installId }).catch(() => {});
+      await request("marketplace.models.remove", { endpoint, model: model.repository }).catch(() => {});
+    }
+    await stopProcess(ollama);
+    fs.rmSync(modelRoot, { recursive: true, force: true });
+  }
 }
 
 async function run() {
@@ -235,8 +340,17 @@ async function run() {
     throw new Error(`The curated Ollama model does not expose its verified install route: ${JSON.stringify(ollama)}`);
   }
 
-  // Exercise the exact Marketplace install/remove protocol against a disposable
-  // local Ollama-compatible endpoint. No real model download or deletion occurs.
+  const lightweightModel = ollama.result?.models?.find(model => model.repository === "qwen2.5:0.5b");
+  if (!lightweightModel?.installable || lightweightModel.installRoute !== "ollama-pull" || lightweightModel.sizeBytes !== 398_000_000 || lightweightModel.license !== "Apache-2.0")
+    throw new Error(`The lightweight curated Ollama model does not expose its bounded install route: ${JSON.stringify(lightweightModel)}`);
+
+  // Verify the exact Marketplace protocol through a fake runtime by default;
+  // pass --real-local-ollama for isolated install, inference, and removal.
+  if (process.argv.includes("--real-local-ollama")) {
+    await runRealOllamaMarketplaceAcceptance(lightweightModel);
+    const remoteRemoval = await request("marketplace.models.remove", { endpoint: "https://example.com", model: lightweightModel.repository });
+    if (remoteRemoval.ok || !remoteRemoval.error?.message?.includes("loopback")) throw new Error("Marketplace model removal accepted a hosted endpoint.");
+  } else {
   const runtimeRequests = [];
   const runtime = http.createServer(async (incoming, outgoing) => {
     const chunks = [];
@@ -268,6 +382,7 @@ async function run() {
     if (remoteRemoval.ok || !remoteRemoval.error?.message?.includes("loopback")) throw new Error("Marketplace model removal accepted a hosted endpoint.");
   } finally {
     await new Promise(resolve => runtime.close(resolve));
+  }
   }
   console.log(`Marketplace host smoke passed (${providers.length} providers, ${search.result.models.length} model results).`);
 }

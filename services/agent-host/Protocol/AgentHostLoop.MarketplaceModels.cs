@@ -116,12 +116,12 @@ public static partial class AgentHostLoop
         // library entries for the user's common local workflows; Ollama resolves tags
         // on confirmation and handles the pull through the configured local endpoint.
         var ollamaCandidatesAdded = false;
-        void AddOllamaModel(string tag, long downloads, double sizeGb, int context, string[] tags)
+        void AddOllamaModel(string tag, long downloads, double sizeGb, int context, string[] tags, long? reportedSizeBytes = null, string? license = null)
         {
             models.Insert(0, new
             {
                 id = $"ollama:{tag}", repository = tag, source = "Ollama", kind = "llm", downloads, likes = 0L,
-                uncensored = false, tags, sizeBytes = (long)(sizeGb * 1024 * 1024 * 1024), contextLength = context,
+                uncensored = false, tags, sizeBytes = reportedSizeBytes ?? (long)(sizeGb * 1024 * 1024 * 1024), contextLength = context, license,
                 installRoute = "ollama-pull", installable = true,
             });
             ollamaCandidatesAdded = true;
@@ -149,6 +149,8 @@ public static partial class AgentHostLoop
                 requiresAirLlm = false,
             });
         }
+        if (includeOllama && (string.IsNullOrWhiteSpace(query) || query.Contains("qwen", StringComparison.OrdinalIgnoreCase)))
+            AddOllamaModel("qwen2.5:0.5b", 0, 0.398, 32_768, ["text-generation", "small", "qwen2", "ollama"], 398_000_000, "Apache-2.0");
         if (includeOllama && (string.IsNullOrWhiteSpace(query) || query.Contains("qwen", StringComparison.OrdinalIgnoreCase) || query.Contains("1m", StringComparison.OrdinalIgnoreCase)))
             AddOllamaModel("org/qwen2.5-1m:7b", 4_111, 4.7, 986_000, ["text-generation", "qwen2", "1m-context", "ollama"]);
         if (includeOllama && (string.IsNullOrWhiteSpace(query) || query.Contains("code", StringComparison.OrdinalIgnoreCase) || query.Contains("coder", StringComparison.OrdinalIgnoreCase)))
