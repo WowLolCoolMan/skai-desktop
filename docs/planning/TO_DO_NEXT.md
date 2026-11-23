@@ -121,7 +121,8 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 - **2026-11-22:** Marketplace search carries Hugging Face license metadata from
   the model card, falling back to the repository's license tag. When neither is
   present, the model inspector says that license metadata is unavailable and
-  directs users to review the source repository before use.
+  directs users to review the source repository before use. Full-weight results
+  also retain published context length, including 1M-token values.
 
 - **2026-11-22:** ModelScope GGUF downloads now resume from a checksum-keyed
   local partial file when the server supports byte ranges. The adapter checks

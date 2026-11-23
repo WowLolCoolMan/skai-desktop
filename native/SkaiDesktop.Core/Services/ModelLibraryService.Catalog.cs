@@ -123,7 +123,9 @@ public sealed partial class ModelLibraryService
                     sizeBytes = repositorySize;
                 var downloads = item.TryGetProperty("downloads", out var downloadsElement) && downloadsElement.TryGetInt64(out var count) ? count : 0;
                 var likes = item.TryGetProperty("likes", out var likesElement) && likesElement.TryGetInt32(out var likeCount) ? likeCount : 0;
-                models.Add(new HubModel(id!, downloads, likes, isUncensored, tags, sizeBytes));
+                var contextLength = ReadContextLength(item);
+                var license = ReadLicense(item, tags);
+                models.Add(new HubModel(id!, downloads, likes, isUncensored, tags, sizeBytes, contextLength, license));
             }
         }
         return models.DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase).OrderByDescending(model => model.Downloads).ToArray();

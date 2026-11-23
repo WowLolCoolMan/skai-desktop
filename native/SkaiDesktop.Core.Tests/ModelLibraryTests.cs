@@ -50,6 +50,14 @@ internal static class ModelLibraryTests
         }
         var ignoredCatalogModels = await boundedCatalog.SearchHuggingFaceAsync("small", uncensored: false);
         Check(ignoredCatalogModels.Count == 0, "model catalog ignores oversized remote model IDs");
+        var airLlmCatalog = new ModelLibraryService(new HttpClient(new StubHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("[{\"id\":\"org/full-weights\",\"downloads\":42,\"tags\":[\"text-generation\",\"license:mit\"],\"cardData\":{\"license\":\"apache-2.0\"},\"config\":{\"max_position_embeddings\":1048576},\"siblings\":[{\"rfilename\":\"model.safetensors\",\"size\":4096}]}]")
+            }))));
+        var airLlmModels = await airLlmCatalog.SearchHuggingFaceAirLlmAsync("full weights", uncensored: false);
+        Check(airLlmModels.Count == 1 && airLlmModels[0].License == "apache-2.0" && airLlmModels[0].ContextLength == 1048576,
+            "full-weight model catalog results include published license and context metadata");
         var localInventory = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
         {
             var models = (request.RequestUri?.Port, request.RequestUri?.AbsolutePath) switch
