@@ -63,6 +63,11 @@ Failure to establish either required boundary prevents execution. These
 controls apply only when the user explicitly runs a detected project check or
 command; preflight only detects available checks.
 
+Coding Agent commands are currently disabled on macOS and any other platform
+without a supported sandbox adapter. Skai refuses the command before launching
+a shell instead of silently running it with host filesystem and network access.
+The separately user-opened Interactive Terminal remains a host shell.
+
 Built-in and custom pet profiles are managed in the renderer's Pet Workshop.
 See [Pets and companions](../guides/PETS_AND_COMPANIONS.md) for the strip format, behavior
 defaults, and local generation flow.

@@ -39,6 +39,7 @@ public sealed class WorkspaceCommandRunner
             (memoryLimit < CommandResourceLimits.MinimumJobMemoryBytes || memoryLimit > CommandResourceLimits.MaximumJobMemoryBytes))
             throw new ArgumentOutOfRangeException(nameof(jobMemoryLimitBytesOverride), "A command memory limit override must be between 256 MiB and 8 GiB.");
 
+        EnsureSupportedPlatform(OperatingSystem.IsWindows(), OperatingSystem.IsLinux());
         var workingDirectory = ResolveWorkingDirectory(selectedRoot, relativeWorkingDirectory);
         var isWindows = OperatingSystem.IsWindows();
         ProcessStartInfo startInfo = new()
@@ -132,6 +133,12 @@ public sealed class WorkspaceCommandRunner
             truncated != 0,
             workingDirectory,
             $"{isolationStatus} Command environment is restricted to an explicit runtime allowlist.");
+    }
+
+    internal static void EnsureSupportedPlatform(bool isWindows, bool isLinux)
+    {
+        if (!isWindows && !isLinux)
+            throw new PlatformNotSupportedException("Coding Agent commands are disabled on this platform because Skai cannot establish its required OS sandbox. The command was not executed.");
     }
 
     public static string ResolveWorkingDirectory(string selectedRoot, string relativeWorkingDirectory)

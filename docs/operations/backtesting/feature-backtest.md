@@ -17,6 +17,7 @@ worktree.
 | Capacity-aware concurrency and cancellation | Agent Host smoke with measured slot limit and oversized cancellation fixture |
 | Marketplace catalog and model results | `npm run smoke:marketplace-host` |
 | Project browser, terminal, editor, reviewed undo | `smoke-project-browser`, `smoke-project-terminal`, `smoke-project-editor` |
+| Coding Agent command isolation | Windows Core acceptance proves project-only writes, denied neighboring host-file reads/writes, denied loopback networking, process-count and memory limits, timeout/cancellation, and fail-closed policy for unsupported OSes. Ubuntu 24.04/WSL2 acceptance for Bubblewrap and systemd cgroup limits is documented in [To Do Next](../../planning/TO_DO_NEXT.md); native Linux desktop and broader OS profile coverage remain open. |
 | Chat queue, conversation search, metadata, fork/export/archive | `smoke-chat-queue`, `smoke-conversation-search`, `smoke-conversation-metadata` |
 | Memory workflows | `smoke-memory` |
 | PDF attachment policy | `smoke-pdf-attachment` |

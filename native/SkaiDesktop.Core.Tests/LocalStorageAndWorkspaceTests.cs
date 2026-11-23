@@ -15,6 +15,17 @@ internal static class LocalStorageAndWorkspaceTests
 {
     public static async Task RunAsync()
     {
+        WorkspaceCommandRunner.EnsureSupportedPlatform(isWindows: true, isLinux: false);
+        WorkspaceCommandRunner.EnsureSupportedPlatform(isWindows: false, isLinux: true);
+        try
+        {
+            WorkspaceCommandRunner.EnsureSupportedPlatform(isWindows: false, isLinux: false);
+            throw new Exception("Expected an unsupported OS to refuse Coding Agent command execution.");
+        }
+        catch (PlatformNotSupportedException error)
+        {
+            Check(error.Message.Contains("The command was not executed", StringComparison.Ordinal), "unsupported OS sandbox policy refuses Coding Agent commands before process launch");
+        }
         Check(CommandResourceLimits.EstimateJobMemoryLimitBytes(2UL * 1024 * 1024 * 1024) == 1024UL * 1024 * 1024,
             "Coding Agent job memory budget uses half of available RAM for a typical host");
         Check(CommandResourceLimits.EstimateJobMemoryLimitBytes(64UL * 1024 * 1024 * 1024) == CommandResourceLimits.MaximumJobMemoryBytes,
@@ -347,7 +358,21 @@ internal static class LocalStorageAndWorkspaceTests
                 ? await commandRunner.RunAsync(workspacePath, ".", "printf skai-sandbox-probe", TimeSpan.FromSeconds(15))
                 : null;
             var linuxSandboxUnavailable = linuxSandboxProbe?.IsolationStatus.Contains("could not establish the required sandbox", StringComparison.Ordinal) == true;
-            if (linuxSandboxUnavailable)
+            var unsupportedSandboxPlatform = !OperatingSystem.IsWindows() && !OperatingSystem.IsLinux();
+            if (unsupportedSandboxPlatform)
+            {
+                var sideEffectPath = Path.Combine(workspacePath, "unsupported-platform-command-ran.txt");
+                try
+                {
+                    await commandRunner.RunAsync(workspacePath, ".", $"touch '{sideEffectPath}'", TimeSpan.FromSeconds(10));
+                    throw new Exception("Expected unsupported OS command execution to be refused.");
+                }
+                catch (PlatformNotSupportedException error)
+                {
+                    Check(error.Message.Contains("The command was not executed", StringComparison.Ordinal) && !File.Exists(sideEffectPath), "Coding Agent command on an unsupported OS fails closed before process launch");
+                }
+            }
+            else if (linuxSandboxUnavailable)
             {
                 Check(linuxSandboxProbe!.ExitCode != 0 && !linuxSandboxProbe.Output.Contains("skai-sandbox-probe", StringComparison.Ordinal),
                     "Linux command runner fails closed without executing when the host denies required namespaces");
@@ -505,8 +530,6 @@ internal static class LocalStorageAndWorkspaceTests
                     else
                         Console.WriteLine("SKIP Linux cgroup memory stress probe: requires 2 GiB available to the test runtime and /usr/bin/python3.");
                 }
-                else if (!OperatingSystem.IsWindows())
-                    Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "unsupported process boundaries clearly report that filesystem and network are not sandboxed");
                 if (OperatingSystem.IsWindows() && GC.GetGCMemoryInfo().TotalAvailableMemoryBytes >= 2L * 1024 * 1024 * 1024)
                 {
                     const string memoryProbe = "try { $probe = New-Object 'byte[]' 335544320; $probe[0] = 1; $probe[$probe.Length - 1] = 1; exit 99 } catch { [Console]::Error.WriteLine($_.Exception.GetType().FullName); exit 73 }";
