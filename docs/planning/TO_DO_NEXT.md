@@ -41,7 +41,9 @@ Mark an item done only when the linked workflow has evidence.
    output, not subjective quality. Chromium's native offline `en-US`
    recognition remains unavailable, so hands-free acceptance is still open.
    Packaged acceptance now also verifies the denied-permission message and a
-   successful retry. Cancellation acceptance remains. Keep the path local.
+   successful retry. The local Whisper adapter smoke confirms an active Python
+   transcription is terminated by the cancel request and returns no transcript.
+   Keep the path local. Hands-free and streamed voice acceptance remain open.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
@@ -190,6 +192,16 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** Local audio cancellation now carries an operation ID from the
+  composer through the Electron bridge to the Agent Host. Whisper kills the
+  active Python process tree, removes its temporary audio, and returns a
+  cancellation result; a bounded registry handles cancel-before-start races.
+  `node scripts/smoke-whisper-adapter.cjs` verified a live transcription was
+  running when canceled and returned no transcript. Agent Host build, desktop
+  typecheck, bridge-method/local-only audits, and packaged Windows microphone
+  smoke passed. This closes turn-based audio transcription cancellation only;
+  real-time voice mode is still incomplete.
 
 - **2026-11-23:** Packaged Windows voice smoke now forces a microphone
   `NotAllowedError`, verifies Skai's permission guidance, restores local capture,

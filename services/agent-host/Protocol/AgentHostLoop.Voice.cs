@@ -44,8 +44,16 @@ public static partial class AgentHostLoop
         if (audio.Length is < 4 or > 28_000_000) throw new InvalidOperationException("Choose an audio file smaller than 20 MB.");
         var fileName = RequiredBoundedString(request, "fileName", 128);
         var language = OptionalString(request, "language");
-        var result = WhisperVoiceRuntime.TranscribeAsync(audio, fileName, language).GetAwaiter().GetResult();
+        var operationId = OptionalString(request, "operationId");
+        var result = WhisperVoiceRuntime.TranscribeAsync(audio, fileName, language, operationId).GetAwaiter().GetResult();
         return new(ProtocolVersion, request.Id, true, result);
+    }
+
+    private static AgentResponse CancelVoiceTranscription(AgentRequest request)
+    {
+        var operationId = RequiredBoundedString(request, "operationId", 64);
+        var result = WhisperVoiceRuntime.CancelTranscription(operationId);
+        return new(ProtocolVersion, request.Id, true, new { cancellationRequested = result.Requested, wasRunning = result.WasRunning });
     }
 
     private static AgentResponse SpeakVoice(AgentRequest request, OsNativeTtsService voice)

@@ -58,7 +58,7 @@ function request(method, params, timeoutMs = 45_000) {
 async function run() {
   const health = await request("runtime.health");
   const capabilities = health.result?.capabilities ?? [];
-  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.models.remove", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe"]) {
+  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.models.remove", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel"]) {
     if (!health.ok || !capabilities.includes(capability)) throw new Error(`runtime.health did not advertise ${capability}.`);
   }
   const catalog = await request("marketplace.catalog");

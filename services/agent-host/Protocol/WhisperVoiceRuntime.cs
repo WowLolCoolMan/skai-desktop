@@ -18,6 +18,10 @@ internal static class WhisperVoiceRuntime
     private static readonly string[] ModelHashes = [ConfigHash, ModelHash, PreprocessorHash, TokenizerHash, VocabularyHash];
     private const string ModelBase = $"https://huggingface.co/Systran/faster-whisper-large-v3/resolve/{Revision}/";
     private static readonly object Gate = new();
+    private static readonly object TranscriptionGate = new();
+    private static readonly Dictionary<string, CancellationTokenSource> ActiveTranscriptions = [];
+    private static readonly Dictionary<string, DateTimeOffset> PendingTranscriptionCancellations = [];
+    private static readonly Dictionary<string, DateTimeOffset> CompletedTranscriptions = [];
     private static Task? installTask;
     private static string installState = "not-installed";
     private static string installStep = "";
@@ -46,7 +50,27 @@ internal static class WhisperVoiceRuntime
         lock (Gate) return new { installed = IsInstalled, status = IsInstalled ? "installed" : installState, step = installStep, error = installError, modelSizeBytes = 3_087_284_237L };
     }
 
-    public static async Task<object> TranscribeAsync(string audioBase64, string fileName, string? language)
+    public static (bool Requested, bool WasRunning) CancelTranscription(string operationId)
+    {
+        if (!Guid.TryParse(operationId, out var parsed)) return (false, false);
+        var id = parsed.ToString("D");
+        lock (TranscriptionGate)
+        {
+            PruneTranscriptionIds();
+            if (ActiveTranscriptions.TryGetValue(id, out var active))
+            {
+                active.Cancel();
+                return (true, true);
+            }
+            if (CompletedTranscriptions.ContainsKey(id)) return (false, false);
+            if (PendingTranscriptionCancellations.Count >= 64)
+                PendingTranscriptionCancellations.Remove(PendingTranscriptionCancellations.MinBy(item => item.Value).Key);
+            PendingTranscriptionCancellations[id] = DateTimeOffset.UtcNow;
+            return (true, false);
+        }
+    }
+
+    public static async Task<object> TranscribeAsync(string audioBase64, string fileName, string? language, string? operationId = null)
     {
         if (!IsInstalled) throw new InvalidOperationException("Install Whisper large-v3 from Marketplace before transcribing audio.");
         if (audioBase64.Length is < 4 or > 28_000_000) throw new InvalidOperationException("Choose an audio file smaller than 20 MB.");
@@ -57,12 +81,25 @@ internal static class WhisperVoiceRuntime
         try { audio = Convert.FromBase64String(audioBase64); }
         catch (FormatException error) { throw new InvalidOperationException("The local audio encoding is invalid.", error); }
         if (audio.Length is < 16 or > 20 * 1024 * 1024) throw new InvalidOperationException("Choose an audio file smaller than 20 MB.");
+        var id = RegisterTranscription(operationId, out var cancellation);
+        var cancellationToken = cancellation?.Token ?? CancellationToken.None;
         var temporaryAudio = Path.Combine(Path.GetTempPath(), $"skai-whisper-{Guid.NewGuid():N}{extension}");
-        await File.WriteAllBytesAsync(temporaryAudio, audio).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await File.WriteAllBytesAsync(temporaryAudio, audio, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            try { File.Delete(temporaryAudio); } catch { }
+            CompleteTranscription(id, cancellation);
+            throw;
+        }
         try
         {
             const string script = "import json, sys\nfrom faster_whisper import WhisperModel\nmodel_path, audio_path, language = sys.argv[1:]\nmodel = WhisperModel(model_path, device='cpu', compute_type='int8', cpu_threads=min(4, max(1, (__import__('os').cpu_count() or 2)//2)))\nsegments, info = model.transcribe(audio_path, language=language or None, beam_size=5, vad_filter=False)\ntext = ' '.join(segment.text.strip() for segment in segments).strip()\nprint('SKAI_WHISPER_RESULT:' + json.dumps({'text': text, 'language': info.language}, ensure_ascii=False))\n";
-            var result = await RunAsync(PythonPath, ["-u", "-c", script, ModelRoot, temporaryAudio, safeLanguage], TimeSpan.FromMinutes(30), offline: true).ConfigureAwait(false);
+            var result = await RunAsync(PythonPath, ["-u", "-c", script, ModelRoot, temporaryAudio, safeLanguage], TimeSpan.FromMinutes(30), offline: true, cancellationToken: cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             var payload = result.Split('\n').LastOrDefault(line => line.StartsWith("SKAI_WHISPER_RESULT:", StringComparison.Ordinal));
             if (payload is null) throw new InvalidOperationException("Whisper completed without returning a transcript.");
             using var document = JsonDocument.Parse(payload["SKAI_WHISPER_RESULT:".Length..]);
@@ -72,7 +109,62 @@ internal static class WhisperVoiceRuntime
             if (string.IsNullOrWhiteSpace(transcript)) throw new InvalidOperationException("Whisper did not recognize speech in this audio.");
             return new { transcript, language = detectedLanguage, engine = "whisper-large-v3-local" };
         }
-        finally { try { File.Delete(temporaryAudio); } catch { } }
+        finally
+        {
+            try { File.Delete(temporaryAudio); } catch { }
+            CompleteTranscription(id, cancellation);
+        }
+    }
+
+    private static string? RegisterTranscription(string? operationId, out CancellationTokenSource? cancellation)
+    {
+        cancellation = null;
+        if (string.IsNullOrWhiteSpace(operationId)) return null;
+        if (!Guid.TryParse(operationId, out var parsed)) throw new InvalidOperationException("The audio transcription operation ID is invalid.");
+        var id = parsed.ToString("D");
+        cancellation = new CancellationTokenSource();
+        lock (TranscriptionGate)
+        {
+            PruneTranscriptionIds();
+            if (CompletedTranscriptions.ContainsKey(id) || ActiveTranscriptions.ContainsKey(id))
+            {
+                cancellation.Dispose();
+                cancellation = null;
+                throw new InvalidOperationException("The audio transcription operation ID has already been used.");
+            }
+            if (PendingTranscriptionCancellations.Remove(id))
+            {
+                CompletedTranscriptions[id] = DateTimeOffset.UtcNow;
+                cancellation.Dispose();
+                cancellation = null;
+                throw new OperationCanceledException("Audio transcription cancelled before it started.");
+            }
+            ActiveTranscriptions.Add(id, cancellation);
+        }
+        return id;
+    }
+
+    private static void CompleteTranscription(string? id, CancellationTokenSource? cancellation)
+    {
+        if (id is null || cancellation is null) return;
+        lock (TranscriptionGate)
+        {
+            ActiveTranscriptions.Remove(id);
+            CompletedTranscriptions[id] = DateTimeOffset.UtcNow;
+            PruneTranscriptionIds();
+        }
+        cancellation.Dispose();
+    }
+
+    private static void PruneTranscriptionIds()
+    {
+        var expired = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(2);
+        foreach (var id in PendingTranscriptionCancellations.Where(item => item.Value < expired).Select(item => item.Key).ToArray())
+            PendingTranscriptionCancellations.Remove(id);
+        foreach (var id in CompletedTranscriptions.Where(item => item.Value < expired).Select(item => item.Key).ToArray())
+            CompletedTranscriptions.Remove(id);
+        while (CompletedTranscriptions.Count > 256)
+            CompletedTranscriptions.Remove(CompletedTranscriptions.MinBy(item => item.Value).Key);
     }
 
     private static async Task InstallAsync()
@@ -146,7 +238,7 @@ internal static class WhisperVoiceRuntime
 
     private static void SetStep(string step) { lock (Gate) installStep = step; }
 
-    private static async Task<string> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, bool offline = false)
+    private static async Task<string> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, bool offline = false, CancellationToken cancellationToken = default)
     {
         using var process = new Process { StartInfo = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true } };
         foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
@@ -161,8 +253,15 @@ internal static class WhisperVoiceRuntime
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         using var timeoutSource = new CancellationTokenSource(timeout);
-        try { await process.WaitForExitAsync(timeoutSource.Token).ConfigureAwait(false); }
-        catch (OperationCanceledException) { try { process.Kill(entireProcessTree: true); } catch { } throw new TimeoutException("Whisper setup or transcription timed out."); }
+        using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(timeoutSource.Token, cancellationToken);
+        try { await process.WaitForExitAsync(linkedSource.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            await process.WaitForExitAsync().ConfigureAwait(false);
+            if (cancellationToken.IsCancellationRequested) throw new OperationCanceledException("Audio transcription cancelled.", cancellationToken);
+            throw new TimeoutException("Whisper setup or transcription timed out.");
+        }
         var output = await stdout.ConfigureAwait(false);
         var error = await stderr.ConfigureAwait(false);
         if (process.ExitCode != 0) throw new InvalidOperationException($"Whisper local step failed: {new string(error.Where(c => !char.IsControl(c)).Take(1_000).ToArray())}");

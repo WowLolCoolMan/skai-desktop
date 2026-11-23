@@ -36,9 +36,26 @@ export async function transcribeLocalAudioFile(file: File, signal: AbortSignal) 
     throwIfAborted(signal);
     const audioBase64 = await fileToBase64(file);
     throwIfAborted(signal);
-    const response = await window.skaiAgent?.request("voice.whisper.transcribe", {
-      audioBase64, fileName: file.name, language: navigator.language || "en-US",
+    const operationId = crypto.randomUUID();
+    let abortHandler: (() => void) | undefined;
+    const cancelled = new Promise<never>((_, reject) => {
+      abortHandler = () => {
+        void window.skaiAgent?.request("voice.whisper.transcribe.cancel", { operationId });
+        reject(new DOMException("Audio transcription cancelled.", "AbortError"));
+      };
+      signal.addEventListener("abort", abortHandler, { once: true });
     });
+    let response;
+    try {
+      response = await Promise.race([
+        window.skaiAgent?.request("voice.whisper.transcribe", {
+          audioBase64, fileName: file.name, language: navigator.language || "en-US", operationId,
+        }) ?? Promise.reject(new Error("Local audio transcription is unavailable.")),
+        cancelled,
+      ]);
+    } finally {
+      if (abortHandler) signal.removeEventListener("abort", abortHandler);
+    }
     throwIfAborted(signal);
     if (!response?.ok) throw new Error(response?.error?.message ?? "Local Whisper transcription failed.");
     const transcript = (response.result as { transcript?: unknown } | undefined)?.transcript;
