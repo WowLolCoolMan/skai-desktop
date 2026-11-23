@@ -24,7 +24,7 @@ keep this queue focused on unfinished work.
 | Coding Agent isolation | In progress · Codex | Verify cgroup controls on supported Linux desktop profiles and Windows PSEC on additional Windows profiles. | Linux approved commands now require Bubblewrap plus a user systemd cgroup scope with process-tree memory cap, swap disabled, maximum 128 processes, and CPU quota capped at four cores; setup fails closed. Ubuntu 24.04/WSL2 acceptance proves actual memory and process limits, workspace-only writes, denied sibling access/network, timeout, and cancellation. Windows PSEC and Job Object acceptance remains verified on this Windows 11 host; no unattended or parallel commands without broader acceptance. | [Architecture](../engineering/ARCHITECTURE.md), [readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md) |
 | Image runtime coverage | In progress · Unclaimed | Exercise a live ComfyUI server and validate GPU or additional hardware. | Show only runtime-reported progress; cancellation must stop the job and leave the page usable. | [Image guide](../guides/LOCAL_IMAGE_GENERATION.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Release validation | In progress · Unclaimed | Complete published-feed and native desktop updater acceptance. | Headless Ubuntu 24.04/WSL2 acceptance now covers AppImage update and in-app rollback from synthetic 0.1.3 to 0.1.4 and back, preserving user data. Published feed, signed metadata, and native Linux desktop acceptance remain open. Production signing is deferred by the owner. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
-| Persona research and chat | In progress · Unclaimed | Improve name-only transcript discovery and evaluate multi-turn factual boundaries with a local model. | Dated source filtering now applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. Continue conservative attribution and evidence removal. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
+| Persona research and chat | In progress · Unclaimed | Improve name-only transcript discovery and extend multi-turn cutoff checks across era/persona types. | Dated source filtering now applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. A live local-model check now carries the discovered death date into the saved card and tests a later turn; continue conservative attribution and evidence removal. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Local, cloud, and hybrid gateway | In progress · Codex | Continue the provider and secret-store contracts; add a supported provider only after consent and credential handling are ready. | Require explicit routing, OS-protected secrets, clear data-destination disclosure, and a working offline-only mode. No silent fallback. | [Provider gateway plan](implementation-plans/provider-gateway.md) |
 
 ## Recently completed
@@ -62,6 +62,12 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   microphone/cancellation behavior. Packaged Electron on this Windows host
   reports local `en-US` recognition unavailable, and Skai fails closed with a
   clear error instead of remote dictation.
+- **2026-11-22:** The live Persona smoke now persists discovered birth/death
+  dates and the effective cutoff into the saved card. On `qwen3:14b`, Joe Rogan
+  passed research/draft/chat (3 sources, 59 attributed turns, 9 card fields),
+  and David Lynch passed the same flow plus a multi-turn 2026 knowledge-boundary
+  probe using the 2025-01-16 death cutoff (3 sources, 60 attributed turns, 9
+  fields). Additional living/era profiles and model evaluations remain open.
 - **2026-11-22:** Windows Coding Agent commands now use Windows Process Security
   Environment (PSEC) filesystem grants and a capability-free AppContainer. On
   the current Windows 11 host, native acceptance confirms nested project writes,

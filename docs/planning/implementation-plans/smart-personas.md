@@ -16,3 +16,14 @@
 - Chat always receives the simulation identity and cutoff policy; it cannot claim to be the real person or invent real quotes.
 - Conversations remember the persona and exports/copies preserve the “AI simulation … Not the real person” label.
 - Electron bridge, local-only audit, desktop typecheck, Agent Host build, and native tests pass.
+
+## Live acceptance
+
+`npm run smoke:personas -- --only "David Lynch"` now saves the researched death
+date as the persona's knowledge cutoff and asks a second question about 2026 in
+the same conversation. The 2026-11-22 run with local `qwen3:14b` passed with
+three sources, 60 attributed transcript turns, nine drafted fields, and a
+cutoff-aware follow-up. A separate Joe Rogan run passed with three sources, 59
+attributed turns, nine fields, and a conversational response. These are
+single-model, single-profile samples; living-person era dates and broader
+multi-turn evaluation still need coverage.

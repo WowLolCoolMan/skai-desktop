@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Live persona-building smoke: for a set of hard names (typos, "X from Y", single names, famous and
 // obscure characters, a real person) it runs the same Agent Host calls as the Personas page —
-// discover, research, draft, save, one chat turn — and checks each against a pass bar.
+// discover, research, draft, save, and chat — and checks each against a pass bar. For deceased
+// people, it saves the discovered death date as the cutoff and probes a later turn about 2026.
 //
 // Needs the network (Wikipedia, Fandom, Wikiquote, web search) and a local model, so it is not part
 // of CI; the offline logic is covered by PersonaKnowledgeTests in the Core test runner.
@@ -89,6 +90,8 @@ async function runSubject(subject) {
   row.checks.sources = sources.length >= 3;
   if (subject.expect.deathDate) row.checks.lifeDates = subject.expect.deathDate.test(research.result?.identity?.deathDate ?? "");
   row.checks.dialogue = subjectType === "person" ? attributedTurns >= 3 : attributedTurns >= 20;
+  const deathDate = research.result?.identity?.deathDate ?? "";
+  const knowledgeCutoffDate = deathDate || new Date().toISOString().slice(0, 10);
 
   let draft = {};
   if (sources.length) {
@@ -100,13 +103,32 @@ async function runSubject(subject) {
   } else row.checks.draft = false;
 
   if (withChat && sources.length) {
-    const saved = await request("persona.save", { persona: { name: subjectName, sourceMode: "public-research", subjectType, roles: draft.roles ?? "", voice: draft.speechPatterns ?? "", personality: draft.personality ?? "", thinkingStyle: draft.thinkingStyle ?? "", interactionStyle: draft.interactionStyle ?? "", values: draft.values ?? "", knowledge: draft.knowledge ?? "", evidenceBoundaries: draft.evidenceBoundaries ?? "", timeline: draft.timeline ?? "", sources } }, 30_000);
+    const saved = await request("persona.save", { persona: { name: subjectName, sourceMode: "public-research", subjectType, birthDate: research.result?.identity?.birthDate ?? "", deathDate, knowledgeCutoffDate, roles: draft.roles ?? "", voice: draft.speechPatterns ?? "", personality: draft.personality ?? "", thinkingStyle: draft.thinkingStyle ?? "", interactionStyle: draft.interactionStyle ?? "", values: draft.values ?? "", knowledge: draft.knowledge ?? "", evidenceBoundaries: draft.evidenceBoundaries ?? "", timeline: draft.timeline ?? "", sources } }, 30_000);
     const personaId = saved.result?.persona?.id;
     if (personaId) {
-      const [chat, chatSecs] = await timed(() => request("chat.complete", { ...model, personaId, timeoutSeconds: 240, messages: [{ role: "user", content: "Hey! Who are you, and what's on your mind today?" }] }, 360_000));
+      const openingQuestion = "Hey! Who are you, and what's on your mind today?";
+      const [chat, chatSecs] = await timed(() => request("chat.complete", { ...model, personaId, timeoutSeconds: 240, suppressProgressiveResearch: true, messages: [{ role: "user", content: openingQuestion }] }, 360_000));
       const reply = String(chat.result?.content ?? "");
       row.chat = { secs: chatSecs, reply: reply.slice(0, 600), error: chat.error?.message };
       row.checks.chat = chat.ok && reply.length > 40 && subject.expect.chat.test(reply);
+      if (deathDate && chat.ok) {
+        const cutoffQuestion = "What do you know about events in 2026, and how do you feel about them?";
+        const [followup, followupSecs] = await timed(() => request("chat.complete", {
+          ...model,
+          personaId,
+          timeoutSeconds: 240,
+          suppressProgressiveResearch: true,
+          messages: [
+            { role: "user", content: openingQuestion },
+            { role: "assistant", content: reply },
+            { role: "user", content: cutoffQuestion },
+          ],
+        }, 360_000));
+        const cutoffReply = String(followup.result?.content ?? "");
+        const acknowledgesLimit = /\b(?:don't know|do not know|cannot know|can't know|not aware|not sure|can't speak to|cannot speak to|beyond my (?:knowledge|time)|outside my (?:knowledge|experience)|after my time|past my time|I wouldn't know|I would not know)\b/i.test(cutoffReply);
+        row.cutoffChat = { cutoff: knowledgeCutoffDate, secs: followupSecs, reply: cutoffReply.slice(0, 700), error: followup.error?.message };
+        row.checks.cutoff = followup.ok && acknowledgesLimit;
+      }
     } else { row.chat = { error: saved.error?.message }; row.checks.chat = false; }
   }
   row.passed = Object.values(row.checks).every(Boolean);
@@ -121,7 +143,7 @@ async function runSubject(subject) {
     const row = await runSubject(subject);
     report.push(row);
     const failed = Object.entries(row.checks).filter(([, ok]) => !ok).map(([name]) => name);
-    console.log(`${row.passed ? "PASS" : "FAIL"} ${row.input} -> ${row.discover.picked?.name ?? "(no match)"} | ${row.research.sources} sources, ${row.research.attributedTurns} attributed lines | draft ${row.draft?.filled?.length ?? 0} fields${row.chat ? ` | chat ${row.chat.secs}s` : ""}${failed.length ? ` | failed: ${failed.join(", ")}` : ""}`);
+    console.log(`${row.passed ? "PASS" : "FAIL"} ${row.input} -> ${row.discover.picked?.name ?? "(no match)"} | ${row.research.sources} sources, ${row.research.attributedTurns} attributed lines | draft ${row.draft?.filled?.length ?? 0} fields${row.chat ? ` | chat ${row.chat.secs}s` : ""}${row.cutoffChat ? ` | cutoff ${row.checks.cutoff ? "held" : "unverified"} (${row.cutoffChat.cutoff})` : ""}${failed.length ? ` | failed: ${failed.join(", ")}` : ""}`);
   }
   if (reportPath) fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   child.kill();
