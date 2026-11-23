@@ -3,27 +3,29 @@
 <div align="center">
   <img src="assets/branding/skaiwolficon.png" width="112" alt="Skai Desktop wolf icon" />
   <h1>Skai Desktop</h1>
-  <p><strong>Local AI for the work behind the conversation.</strong></p>
-  <p>Bring chat, coding, projects, models, and creative tools together in one desktop workspace you control.</p>
+  <p><strong>One desktop for everything you want to do with AI.</strong></p>
+  <p>Bring your models, projects, and ideas into one workspace—whether you code, create, explore, or just want a capable AI on your own machine.</p>
 </div>
 
 <p align="center">
   <img src="assets/branding/skai-desktop-hero.png" alt="Skai Desktop workspace" />
 </p>
 
-Skai is built for the whole AI work loop: choose a model, bring in the right context, work with your files, review what changed, and keep or undo the result. Your conversations and project work live side by side in one app, with local model choice and clear boundaries around agent actions.
+Skai Desktop is built for people who want AI to fit their work, instead of reshaping their work around a single chat box. Start with a question, a codebase, a document, or a creative idea. Choose a model, bring in context, work through the task, and stay in control of the result.
 
 > **Try the 0.1.4 testing release:** [Download from GitHub Releases](https://github.com/WowLolCoolMan/skai-desktop/releases/latest). The Windows release is unsigned; production code signing is deferred while the app is in active development. See [release readiness](docs/operations/RELEASE_READINESS.md) for verified status and remaining limits.
 
-## A workspace built around the whole job
+## Why switch to Skai?
 
-**Ask → add project context → work with files and tools → review → keep or undo**
+If your AI setup is scattered across a chat app, a model launcher, a coding tool, and a folder of creative utilities, Skai is an attempt to bring that work together. It is for developers who want an agent beside their project, hobbyists exploring local models, and creative users moving between ideas and media.
 
-- **Your models, your choice.** Connect local runtimes such as Ollama, LM Studio, LocalAI, llama.cpp, or vLLM. Discover installed models, compare them, and switch explicitly; Skai does not silently choose another model for you.
-- **From conversation to project work.** Keep chats linked to projects, inspect files, edit in Monaco, review diffs, run approved commands, and follow task activity in the conversation that started it.
-- **Agent actions you can inspect.** Coding tasks use bounded tools, approvals, cancellation, and undo. Approved project commands run in OS sandboxes on supported Windows and Linux systems; Skai refuses to start them when it cannot establish the required isolation.
-- **Tools beyond text.** Use local image generation and editing, document and media attachments, voice tools, saved personas, and animated desktop companions.
-- **One coherent desktop app.** Chats, projects, models, Marketplace, memory, settings, and tools are part of the same workspace, so context can travel with the work.
+- **Bring your own models.** Connect a supported local runtime and choose which model handles the work. Chat prompts stay on your machine in the current release; Skai does not silently switch to a hosted model.
+- **Take an idea through to a result.** Keep project context with the conversation, inspect and edit files, review agent changes, and keep or undo the work.
+- **Stay in the loop.** Agent actions are bounded and reviewable, with approvals, cancellation, and undo. Supported project commands use OS isolation and fail closed when Skai cannot establish it.
+- **Use AI for more than coding.** Chat, documents, images, audio, personas, local creative tools, and desktop companions share the same app.
+- **Help make the bigger idea real.** Skai is early and still has rough edges. Users and contributors can help decide what gets better next.
+
+**The idea:** ask → bring context → work → review → keep or undo.
 
 ## What you can do
 
@@ -35,6 +37,30 @@ Skai is built for the whole AI work loop: choose a model, bring in the right con
 | **Voice and media** | Local speech output, local audio transcription, hands-free controls, image generation/editing, and local video-frame sampling. Microphone dictation depends on the operating system's speech pack. |
 | **Marketplace and tools** | Search supported catalogs, review installs, manage installed items, and connect local MCP tools. Support varies by category; the [capability matrix](docs/planning/CAPABILITY_MATRIX.md) lists current boundaries. |
 | **Personal workspace** | Themes, keyboard shortcuts, in-app documentation, saved personas, and seven built-in animated companions. |
+
+See the [capability matrix](docs/planning/CAPABILITY_MATRIX.md) for what has been verified and what still has limits.
+
+## What we want to build next
+
+The long-term goal is an AI desktop that can grow with what people want to do: bring their own models, tools, context, and ideas, then move from the first question to a finished result. We are prioritizing useful workflows and trustworthy foundations over feature checklists.
+
+- **Talk to your AI naturally:** improve real-time voice, interruption, local speech, and workflows that combine text, images, audio, and video.
+- **Build and create in one flow:** bring project planning, implementation, checks, previews, and change review together, with useful browser and Python tools as they are ready.
+- **Get more from local models:** broaden runtime support, improve hardware-aware scheduling, and explore local model training and fine-tuning.
+- **Make the workspace yours:** expand reusable personas, voice choices, skills, integrations, and creative workflows while keeping model and tool choices in the user's hands.
+
+These are goals, not release-date promises. Some work is underway; other ideas need design, engineering, and real-world testing. The [future features list](docs/planning/FUTURE_FEATURES.md) tracks proposals, and the [active work queue](docs/planning/TO_DO_NEXT.md) shows near-term work and evidence.
+
+## Help build the AI desktop you want
+
+The best way to back Skai is to try it and tell us what feels useful, confusing, or broken. If you build software, improve a feature or fix a rough edge. If you use AI for something else, show us the workflow you wish your desktop could handle.
+
+- [Try the latest release](https://github.com/WowLolCoolMan/skai-desktop/releases/latest)
+- [See current capabilities and gaps](docs/planning/CAPABILITY_MATRIX.md)
+- [Find active work](docs/planning/TO_DO_NEXT.md)
+- [Read the contributor guide](CONTRIBUTING.md)
+
+Skai Desktop is source-available under the [Skai Desktop Source Reference License](LICENSE); review the license and [contribution terms](CONTRIBUTING.md) before contributing.
 
 ## Local-first, with clear boundaries
 
