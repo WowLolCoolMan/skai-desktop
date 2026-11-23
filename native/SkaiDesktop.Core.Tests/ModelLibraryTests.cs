@@ -35,6 +35,14 @@ internal static class ModelLibraryTests
         })));
         var hubModels = await hfSearch.SearchHuggingFaceAsync("small instruct", uncensored: false);
         Check(hubModels.Count == 1 && hubModels[0].Id == "org/model-gguf" && hubModels[0].Downloads == 1234 && hubModels[0].License == "apache-2.0", "model library parses Hub IDs, popularity, and published license metadata");
+        var unpublishedLicenseCatalog = new ModelLibraryService(new HttpClient(new StubHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("[{\"id\":\"org/model-no-license\",\"downloads\":1,\"tags\":[\"gguf\"]}]")
+            }))));
+        var unpublishedLicenseModels = await unpublishedLicenseCatalog.SearchHuggingFaceAsync("small instruct", uncensored: false);
+        Check(unpublishedLicenseModels.Count == 1 && unpublishedLicenseModels[0].License is null,
+            "model library leaves license unknown when the publisher provides no license metadata");
         var uncensoredHubModels = await hfSearch.SearchHuggingFaceAsync("small instruct", uncensored: true);
         Check(uncensoredHubModels.Count >= 1 && uncensoredHubModels.All(model => model.IsUncensored), "uncensored catalog includes only explicitly labeled repositories");
         var boundedCatalog = new ModelLibraryService(new HttpClient(new StubHandler((_, _) =>

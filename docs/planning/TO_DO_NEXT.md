@@ -191,13 +191,14 @@ Mark an item done only when the linked workflow has evidence.
     inspector now compares package size against current free RAM, reports GPU
     memory when telemetry exists, and labels the result as advisory. Hugging
     Face results now surface license metadata from the model card or license
-    tag, and clearly prompt source review when neither is published. Remaining:
-    local Model Library acceptance passes (including license metadata, runtime
-    inventories, exact model labels, bounded search/install, and resumable
-    ModelScope downloads). The 32 GiB Windows host has two local model response
-    samples in the feature backtest. Validate across more hardware and compare
-    GPU/offload behavior; this Windows host has no supported NVIDIA memory
-    telemetry.
+    tag, and clearly prompt source review when neither is published. On
+    2026-11-23, the focused Model Library suite passed license parsing and
+    explicitly confirms that missing publisher metadata stays unknown; it also
+    covers runtime inventories, exact model labels, bounded search/install,
+    and resumable ModelScope downloads. The 32 GiB Windows host has two local
+    model response samples in the feature backtest. Remaining: validate fit
+    estimates across more hardware and compare GPU/offload behavior; this
+    Windows host has no supported NVIDIA memory telemetry.
 15. **Resumable model installs — In progress · Codex.** The Skai-managed
     ModelScope GGUF installer now persists checksum-keyed partial shards,
   resumes with HTTP Range, preserves partial bytes on cancellation, validates
