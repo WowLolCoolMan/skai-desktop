@@ -252,6 +252,12 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   suite continues to verify a 320 MiB allocation where capacity permits,
   256 MiB memory denial, filesystem/network isolation, timeout, and cancellation.
 
+- **2026-11-23:** Focused Windows sandbox acceptance also verifies that drive
+  roots, protected Windows/Program Files/ProgramData roots, and a system folder
+  reached through a directory junction alias are rejected before command launch.
+  Linux system-root and namespace acceptance remains covered by the Ubuntu
+  24.04 WSL run below; cross-profile verification is still open.
+
 - **2026-11-22:** Ubuntu 24.04 WSL sandbox acceptance passed Bubblewrap and
   cgroup checks for project-only filesystem writes, host-file isolation,
   disabled network, memory and process caps, timeout, and cancellation. Native

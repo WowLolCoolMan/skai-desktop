@@ -6,6 +6,7 @@
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
 using SkaiDesktop.Core.Services;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Globalization;
@@ -354,6 +355,69 @@ internal static class LocalStorageAndWorkspaceTests
             catch (ArgumentOutOfRangeException)
             {
                 Check(true, "project command rejects sub-second timeouts");
+            }
+            if (OperatingSystem.IsWindows())
+            {
+                var protectedRoots = new[]
+                {
+                    Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)),
+                }.Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+                foreach (var protectedRoot in protectedRoots)
+                {
+                    try
+                    {
+                        await commandRunner.RunAsync(protectedRoot!, ".", "Write-Output sandbox-root-probe", TimeSpan.FromSeconds(5));
+                        throw new Exception($"Expected Windows protected project root '{protectedRoot}' to be rejected before process launch.");
+                    }
+                    catch (InvalidOperationException error) when (
+                        error.Message.Contains("cannot use a drive or share root", StringComparison.Ordinal) ||
+                        error.Message.Contains("cannot use a protected operating-system or application-data folder", StringComparison.Ordinal))
+                    {
+                        Check(true, $"Windows Coding Agent refuses protected writable project root '{protectedRoot}' before process launch");
+                    }
+                }
+
+                var windowsRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                var linkedParent = Path.Combine(settingsDirectory, "windows-system-alias");
+                var linkedParentCreated = false;
+                var junctionStart = new ProcessStartInfo(Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    Arguments = $"/d /c mklink /J \"{linkedParent}\" \"{windowsRoot}\"",
+                };
+                using (var junctionProcess = Process.Start(junctionStart))
+                {
+                    if (junctionProcess is not null)
+                    {
+                        junctionProcess.WaitForExit();
+                        linkedParentCreated = junctionProcess.ExitCode == 0 && Directory.Exists(linkedParent);
+                    }
+                }
+                if (!linkedParentCreated) Console.WriteLine("SKIP Windows system-path alias probe: this profile cannot create directory junctions.");
+                if (linkedParentCreated)
+                {
+                    try
+                    {
+                        await commandRunner.RunAsync(Path.Combine(linkedParent, "System32"), ".", "Write-Output sandbox-reparse-probe", TimeSpan.FromSeconds(5));
+                        throw new Exception("Expected a project root reached through a Windows symbolic link to be rejected before process launch.");
+                    }
+                    catch (InvalidOperationException error) when (
+                        error.Message.Contains("cannot use a project path that traverses a symbolic link", StringComparison.Ordinal) ||
+                        error.Message.Contains("selected project folder is unavailable or linked", StringComparison.Ordinal))
+                    {
+                        Check(true, "Windows Coding Agent rejects a protected system directory reached through a project-path symbolic link");
+                    }
+                    finally
+                    {
+                        if (Directory.Exists(linkedParent)) Directory.Delete(linkedParent);
+                    }
+                }
             }
             var linuxSandboxProbe = OperatingSystem.IsLinux()
                 ? await commandRunner.RunAsync(workspacePath, ".", "printf skai-sandbox-probe", TimeSpan.FromSeconds(15))

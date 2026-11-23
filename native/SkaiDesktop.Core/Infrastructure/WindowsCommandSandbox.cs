@@ -52,7 +52,9 @@ internal sealed class WindowsCommandSandbox : IDisposable
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The Windows process security environment is available only on Windows.");
         var normalizedRoot = Path.GetFullPath(projectRoot);
         var normalizedWorkingDirectory = Path.GetFullPath(workingDirectory);
+        EnsureSafeWorkspacePath(normalizedRoot);
         if (!IsWithin(normalizedRoot, normalizedWorkingDirectory)) throw new UnauthorizedAccessException("The selected command directory escapes the project root.");
+        EnsureNoReparsePoints(normalizedWorkingDirectory);
 
         var identity = CreateProfileName(normalizedRoot);
         var appContainerSid = CreateOrDeriveProfileSid(identity);
@@ -148,6 +150,52 @@ internal sealed class WindowsCommandSandbox : IDisposable
     {
         var relative = Path.GetRelativePath(root, path);
         return relative == "." || (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal));
+    }
+
+    private static void EnsureSafeWorkspacePath(string projectRoot)
+    {
+        EnsureNoReparsePoints(projectRoot);
+        if (string.Equals(projectRoot, Path.GetPathRoot(projectRoot), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Windows Coding Agent commands cannot use a drive or share root as the writable project. Choose a dedicated project folder.");
+
+        var protectedRoots = new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        };
+        foreach (var protectedRoot in protectedRoots)
+        {
+            if (string.IsNullOrWhiteSpace(protectedRoot) || !Directory.Exists(protectedRoot)) continue;
+            var normalizedProtectedRoot = Path.GetFullPath(protectedRoot);
+            if (IsWithin(normalizedProtectedRoot, projectRoot))
+                throw new InvalidOperationException("Windows Coding Agent commands cannot use a protected operating-system or application-data folder as the writable project. Choose a dedicated project folder.");
+        }
+    }
+
+    private static void EnsureNoReparsePoints(string path)
+    {
+        var volumeRoot = Path.GetPathRoot(path)
+            ?? throw new InvalidOperationException("Windows could not determine the selected project volume.");
+        var currentPath = volumeRoot;
+        try
+        {
+            foreach (var segment in path[volumeRoot.Length..].Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries))
+            {
+                currentPath = Path.Combine(currentPath, segment);
+                if ((File.GetAttributes(currentPath) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidOperationException("Windows Coding Agent commands cannot use a project path that traverses a symbolic link, junction, or mount point. Choose a direct project folder.");
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new InvalidOperationException("Windows could not verify that the selected project path avoids symbolic links, junctions, and mount points. The command was not executed.", error);
+        }
     }
 
     private static (Process Process, OsProcessIsolation Isolation, SafeFileHandle OutputRead) CreateSuspendedCommand(

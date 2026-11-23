@@ -59,9 +59,12 @@ execution. Timeouts and cancellation terminate the scope.
 
 Windows uses a capability-free AppContainer for project filesystem and network
 isolation and a Job Object for process-tree memory and process-count limits.
-Failure to establish either required boundary prevents execution. These
-controls apply only when the user explicitly runs a detected project check or
-command; preflight only detects available checks.
+Drive/share roots, project paths that traverse a symbolic link/junction/mount
+point, and directories under Windows, Program Files, or ProgramData cannot be
+selected as writable project roots. Failure to establish either required
+boundary prevents execution. These controls apply only when the user explicitly
+runs a detected project check or command; preflight only detects available
+checks.
 
 Coding Agent commands are currently disabled on macOS and any other platform
 without a supported sandbox adapter. Skai refuses the command before launching
