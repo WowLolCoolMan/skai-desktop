@@ -8,10 +8,10 @@ const source = fs.readFileSync("apps/desktop/src/features/chat/voiceActivity.ts"
   .replace("export function voiceActivityThreshold", "function voiceActivityThreshold")
   .replace("samples: ArrayLike<number>", "samples")
   .replaceAll(": number", "")
-  .replaceAll(": boolean", "")
-  .replace(") {", ") {") + "\nthis.audioRms = audioRms; this.isSustainedVoiceActivity = isSustainedVoiceActivity; this.voiceActivityThreshold = voiceActivityThreshold;";
+  .replaceAll(": boolean", "");
+const executableSource = `${source}\nthis.audioRms = audioRms; this.isSustainedVoiceActivity = isSustainedVoiceActivity; this.voiceActivityThreshold = voiceActivityThreshold;`;
 const context = {};
-vm.runInNewContext(source, context);
+vm.runInNewContext(executableSource, context);
 assert.equal(context.audioRms([]), 0);
 assert.equal(context.audioRms([0, 0, 0]), 0);
 assert.equal(context.audioRms([1, -1]), 1);
