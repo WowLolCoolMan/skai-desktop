@@ -114,6 +114,11 @@ const PROBE = String.raw`(() => {
 const routeType = fs.readFileSync(path.join(__dirname, "..", "apps", "desktop", "src", "app", "types.ts"), "utf8").match(/export type Route = ([^;]+);/);
 const routes = routeType ? [...routeType[1].matchAll(/"([a-z-]+)"/g)].map((match) => match[1]) : [];
 if (routes.length < 5) throw new Error("Could not read the Route union from apps/desktop/src/app/types.ts.");
+const settingsSource = fs.readFileSync(path.join(__dirname, "..", "apps", "desktop", "src", "features", "settings", "SettingsPage.tsx"), "utf8");
+const settingsCategorySource = settingsSource.match(/const categories = \[([^\]]+)\] as const;/)?.[1] ?? "";
+const settingsCategories = [...settingsCategorySource.matchAll(/"([^\"]+)"/g)].map((match) => match[1]);
+if (settingsCategories.length < 5) throw new Error("Could not read the settings categories from SettingsPage.tsx.");
+const captureDirectory = path.join(__dirname, "..", ".tmp", "ui-matrix-review");
 // Match BrowserWindow's supported minimum size (960×640); smaller synthetic
 // viewports cannot be reached because Electron clamps the actual window.
 const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [960, 640]];
@@ -171,13 +176,28 @@ async function main() {
         phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/${route}`;
         await cdp.evaluate(`location.hash = '#/${route}'; 1`);
         await sleep(260);
-        const issues = await cdp.evaluate(PROBE);
-        const problems = [];
-        if (issues.blank) problems.push("blank page");
-        if (issues.pageOverflowX > 1) problems.push(`page scrolls sideways by ${issues.pageOverflowX}px`);
-        for (const [kind, label] of [["offscreen", "off-screen"], ["clipped", "clipped"], ["bleed", "bleeds out of its card"], ["unreachable", "unreachable"]]) for (const item of issues[kind]) problems.push(`${label}: ${item.el} "${item.text}" at ${item.box.join(",")}${item.container ? ` in ${item.container}` : ""}${kind === "unreachable" ? ` clip-chain ${JSON.stringify(item.clips)}` : ""}`);
-        for (const [a, b] of issues.overlap) problems.push(`overlap: ${a.el} "${a.text}" ${JSON.stringify(a.box)} in ${JSON.stringify(a.card)} x ${b.el} "${b.text}" ${JSON.stringify(b.box)} in ${JSON.stringify(b.card)}`);
-        if (problems.length) findings.push(`${phase}\n    ${problems.join("\n    ")}`);
+        const states = route === "settings" ? settingsCategories : [null];
+        for (const category of states) {
+          if (category) {
+            await cdp.evaluate(`([...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === ${JSON.stringify(category)})?.click(), 1)`);
+            await sleep(90);
+            phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
+          }
+          const issues = await cdp.evaluate(PROBE);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const name = category ? `settings-${category}` : route;
+            const safeName = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, `${safeName}.png`), Buffer.from(screenshot.data, "base64"));
+          }
+          const problems = [];
+          if (issues.blank) problems.push("blank page");
+          if (issues.pageOverflowX > 1) problems.push(`page scrolls sideways by ${issues.pageOverflowX}px`);
+          for (const [kind, label] of [["offscreen", "off-screen"], ["clipped", "clipped"], ["bleed", "bleeds out of its card"], ["unreachable", "unreachable"]]) for (const item of issues[kind]) problems.push(`${label}: ${item.el} "${item.text}" at ${item.box.join(",")}${item.container ? ` in ${item.container}` : ""}${kind === "unreachable" ? ` clip-chain ${JSON.stringify(item.clips)}` : ""}`);
+          for (const [a, b] of issues.overlap) problems.push(`overlap: ${a.el} "${a.text}" ${JSON.stringify(a.box)} in ${JSON.stringify(a.card)} x ${b.el} "${b.text}" ${JSON.stringify(b.box)} in ${JSON.stringify(b.card)}`);
+          if (problems.length) findings.push(`${phase}\n    ${problems.join("\n    ")}`);
+        }
       }
     }
   }
@@ -185,7 +205,7 @@ async function main() {
   cdp.close();
   if (runtimeErrors.length) findings.push(`runtime errors:\n    ${[...new Set(runtimeErrors)].slice(0, 15).join("\n    ")}`);
   if (findings.length) throw new Error(`UI matrix smoke found ${findings.length} problem group(s):\n  ${findings.slice(0, 25).join("\n  ")}`);
-  console.log(`Packaged UI matrix smoke passed: ${testedRoutes.length} routes x ${testedViewports.length} window sizes x ${variants.length} theme/sidebar variants, no runtime errors.`);
+  console.log(`Packaged UI matrix smoke passed: ${testedRoutes.length} routes x ${testedViewports.length} window sizes x ${variants.length} theme/sidebar variants, including ${settingsCategories.length} settings categories; no runtime errors.`);
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => {

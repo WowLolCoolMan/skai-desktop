@@ -365,6 +365,8 @@ async function main() {
   const socket = devtools.socket;
   socket?.addEventListener("message", watchNetwork);
   await waitFor(devtools.evaluate, "Boolean([...document.querySelectorAll('button, a, [role=button]')].find((item) => item.textContent?.includes('Theme smoke'))?.click() ?? false) || Boolean(document.querySelector('.project-file-list'))", Boolean, "smoke project card");
+  await devtools.evaluate("[...document.querySelectorAll('[role=tab]')].find((item) => item.textContent?.trim() === 'Files')?.click(); 1");
+  await waitFor(devtools.evaluate, "document.querySelector('[role=tab][aria-selected=true]')?.textContent?.trim()", (value) => value === "Files", "project Files tab");
   await waitFor(devtools.evaluate, "Boolean([...document.querySelectorAll('button')].find((item) => item.textContent?.includes('hello.ts'))?.click() ?? false) || Boolean(document.querySelector('.monaco-editor'))", Boolean, "smoke project file");
   const monacoState = JSON.parse(await waitFor(devtools.evaluate, "JSON.stringify({ editor: Boolean(document.querySelector('.monaco-editor .view-lines')), background: document.querySelector('.monaco-editor .monaco-editor-background') ? getComputedStyle(document.querySelector('.monaco-editor .monaco-editor-background')).backgroundColor : '', height: Math.round(document.querySelector('.monaco-editor-shell')?.getBoundingClientRect().height ?? 0), codeSurface: getComputedStyle(document.documentElement).getPropertyValue('--skai-color-code-surface').trim() })", (value) => JSON.parse(value).editor, "bundled Monaco editor to load"));
   const toRgb = (hex) => { const digits = hex.replace("#", ""); return `rgb(${[0, 2, 4].map((i) => parseInt(digits.slice(i, i + 2), 16)).join(", ")})`; };
