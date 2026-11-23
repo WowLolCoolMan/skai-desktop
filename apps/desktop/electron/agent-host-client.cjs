@@ -80,7 +80,9 @@ function createAgentHostClient(options) {
       if (host === startedHost) {
         host = undefined;
         restartOnNextRequest = !isQuitting();
-        if (startedHost.exitCode === null && !startedHost.killed) startedHost.kill();
+        if (startedHost.exitCode === null && !startedHost.killed) {
+          try { startedHost.kill(); } catch { /* The broken pipe may outlive the process handle. */ }
+        }
       }
     });
 
