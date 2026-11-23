@@ -84,11 +84,15 @@ Mark an item done only when the linked workflow has evidence.
    path; expose license/runtime requirements and never leave an entry looking
    usable when its adapter is missing. `npm run smoke:marketplace-host` passes:
    all 89 listings are accounted for, the 41 backed entries map to real local
-   adapters, and the other 48 expose no install action. Exact model package
-   install/use/removal and remaining MCP/voice adapter journeys are still open.
-   Next: finish exact package lifecycle for curated models and verify remaining
-   adapters one by one against their documented license/runtime requirements.
-   Saved ComfyUI workflows can be reviewed and activated inside Marketplace.
+   adapters, and the other 48 expose no install action. The curated
+   `qwen3-coder:30b-a3b-q4_K_M` Ollama route now has update and removal actions
+   in Installed; its install/remove contract smoke passes against a disposable
+   loopback runtime and rejects hosted removal. The mock proves exact routing,
+   not a real model download or inference. Remaining: accept a real curated
+   package install/use/remove on an available local runtime and verify the
+   remaining MCP/voice adapters against their documented license/runtime
+   requirements. Saved ComfyUI workflows can be reviewed and activated inside
+   Marketplace.
 10. **GitHub workflow acceptance — Blocked on test account · Owner: User.** Core
     tests cover permission denial, network failure, request cancellation,
     pending/slow-down retry, stale branch/conflict detection, and protected-token
@@ -101,6 +105,18 @@ Mark an item done only when the linked workflow has evidence.
 
 11. **Requested voice engines.** Marketplace currently has verified install/use
     paths for Kokoro and Piper; Whisper large-v3 covers local transcription.
+    User-provided working-pipeline reference: isolated Python 3.12.15 (~21 MB),
+    speech packages (~319.5 MB), Whisper base.en (~140.9 MB), Kyutai Pocket TTS
+    English (~208.9 MB), and the `alba` voice (~5.9 MB), each with its role and
+    local footprint visible. Use it as the acceptance shape for a coherent
+    voice setup and use flow; it does not by itself establish Skai compatibility.
+    The Marketplace voice inspector now shows the verified pipeline roles for
+    Whisper, Kokoro, Piper, and Chatterbox (private runtime, recognition or
+    synthesis component, and local output/playback) beside each install action.
+    The catalog smoke checks those role markers, while
+    `npm run smoke:voice:acceptance` passes local Kokoro and Piper WAV
+    container/non-silent signal checks. These are runtime and signal checks,
+    not subjective speech-quality or live microphone acceptance.
     41 of 89 curated entries now have real adapters, and the catalog smoke
     asserts that boundary. Chatterbox Nano has a pinned isolated CPU installer,
     verified model downloads, a resident worker, and Marketplace/voice
@@ -172,6 +188,21 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+- **2026-11-23:** Marketplace → Installed now exposes update and removal for
+  Ollama models, with host requests pinned to the discovered local endpoint.
+  `npm run smoke:marketplace-host` verified the exact curated Qwen3 Coder tag
+  reaches Ollama pull/delete APIs on a disposable loopback server and that a
+  hosted delete is rejected. This accepts the UI-to-runtime contract; a real
+  model download/use/remove remains open under item 9.
+
+- **2026-11-23:** Marketplace voice entries now disclose their local pipeline
+  stages before install: isolated runtime, recognition or synthesis package,
+  model/voice data, and local output. The supported Kokoro, Piper, Chatterbox,
+  and Whisper entries retain their existing pinned installers. Marketplace
+  host smoke validates the four role descriptions; the voice acceptance probe
+  passes Kokoro and Piper WAV signal checks on this host. Microphone accuracy,
+  hands-free speech-pack availability, and subjective voice quality remain
+  external/device acceptance work under items 1, 2, and 11.
 
 - **2026-11-23:** The local Coding Agent now accepts native Ollama tool calls or
   one bounded JSON action per turn. The isolated Agent Host smoke verifies the

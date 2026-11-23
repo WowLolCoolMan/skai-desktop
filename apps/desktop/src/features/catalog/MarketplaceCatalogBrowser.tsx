@@ -17,6 +17,37 @@ function entryIcon(entry: MarketplaceEntry) {
   return "terminal" as const;
 }
 
+function voicePipelineParts(entry: MarketplaceEntry) {
+  switch (entry.adapter) {
+    case "local-voice-whisper":
+      return [
+        ["Private runtime", "Isolated Python environment"],
+        ["Recognition", "Whisper large-v3 · local transcription"],
+        ["Output", "Reviewable transcript stays on this device"],
+      ];
+    case "local-voice-kokoro":
+      return [
+        ["Private runtime", "Isolated Python + ONNX runtime"],
+        ["Speech output", "Kokoro INT8 model and English voice pack"],
+        ["Playback", "Local WAV synthesis"],
+      ];
+    case "local-voice-piper":
+      return [
+        ["Private runtime", "Isolated Python + Piper runtime"],
+        ["Speech output", "Pinned English ONNX voice model"],
+        ["Playback", "Local WAV synthesis with attribution terms"],
+      ];
+    case "local-voice-chatterbox":
+      return [
+        ["Private runtime", "Isolated CPU Python environment"],
+        ["Speech output", "Pinned Chatterbox Nano checkpoint"],
+        ["Playback", "Resident local worker with built-in voice"],
+      ];
+    default:
+      return null;
+  }
+}
+
 type Props = {
   groups: GroupedEntries;
   selected: MarketplaceEntry | null;
@@ -56,7 +87,7 @@ export function MarketplaceCatalogBrowser({
 
   return (
 <div className={`plugins-browser${selected ? " has-selection" : ""}`}>
-                <div className="plugins-catalog" aria-label="Skai capabilities">
+                <div className="plugins-catalog" role="region" aria-label="Skai capabilities">
                   {groups.map(([category, categoryEntries]) => (
                     <section className="plugins-category" key={category}>
                       <h3>
@@ -181,6 +212,11 @@ export function MarketplaceCatalogBrowser({
                             const installed = localStorage.getItem("skai.voice.chatterboxInstalled") === "true";
                             return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? "Installed · Chatterbox Nano ready" : voiceBusy ? "Preparing about 2 GB of local weights…" : "Install Chatterbox Nano · ~1.9 GB"}</Button></div>;
                           })()}
+                          {voicePipelineParts(selected) && <div className="plugins-voice-pipeline" aria-label="Local voice pipeline">
+                            <strong>Local pipeline</strong>
+                            <span>Each stage stays on this device. Review the runtime and model terms above before installing.</span>
+                            <dl>{voicePipelineParts(selected)!.map(([label, detail]) => <div key={label}><dt>{label}</dt><dd>{detail}</dd></div>)}</dl>
+                          </div>}
                           {["local-mcp-filesystem", "local-mcp-playwright"].includes(selected.adapter ?? "") && (
                             <div className="plugins-detail-actions">
                               <Button variant="primary" type="button" disabled={busy} onClick={() => onInstallMcp(selected)}>

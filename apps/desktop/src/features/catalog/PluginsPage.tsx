@@ -212,12 +212,18 @@ export function PluginsPage({
     const endpoint = localStorage.getItem("skai.endpoint") ?? "http://localhost:11434/v1";
     const provider = localStorage.getItem("skai.provider") ?? "Ollama";
     setRuntimeStatus("Checking");
-    void request("models.list", { endpoint, provider }).then((response) => {
+    void request("models.runtime.status", { endpoint, provider }).then(async (response) => {
       if (!active) return;
-      if (response.ok) {
-        setRuntimeModelCount(((response.result as unknown[]) ?? []).length);
-        setRuntimeStatus("ready");
-      } else setRuntimeStatus("setup required");
+      if (!response.ok || !(response.result as { available?: boolean } | undefined)?.available) {
+        setRuntimeModelCount(0);
+        setRuntimeStatus("unavailable");
+        return;
+      }
+      const inventory = await request("models.list", { endpoint, provider });
+      if (!active) return;
+      const result = (inventory.result as Array<{ provider?: string }>) ?? [];
+      setRuntimeModelCount(result.filter((model) => model.provider?.toLowerCase() === provider.toLowerCase()).length);
+      setRuntimeStatus("ready");
     }).catch(() => { if (active) setRuntimeStatus("unavailable"); });
     return () => { active = false; };
   }, [loading, view]);
@@ -330,7 +336,7 @@ export function PluginsPage({
             )}
             {catalogSection === "Discover" && !query.trim() && (
               <section className="plugins-start-panel" aria-label="Marketplace actions">
-                <div><p className="section-kicker">LOCAL WORKSPACE</p><h3>Marketplace</h3><p>Model search finds packages for local runtimes. Inference stays on your configured runtime.</p><div className="marketplace-runtime-state"><strong>Local runtime</strong><StatusBadge tone={runtimeStatus === "ready" ? "success" : runtimeStatus === "unavailable" ? "danger" : "warning"}>{runtimeStatus}</StatusBadge><span>{localStorage.getItem("skai.provider") ?? "Ollama"}{runtimeStatus === "ready" ? ` · ${runtimeModelCount} models` : ""}</span></div></div>
+                <div><p className="section-kicker">LOCAL WORKSPACE</p><h3>Marketplace</h3><p>Model search finds packages for local runtimes. Inference stays on your configured runtime.</p><div className="marketplace-runtime-state"><strong>Local runtime</strong><StatusBadge tone={runtimeStatus === "ready" ? "success" : runtimeStatus === "unavailable" ? "danger" : "warning"}>{runtimeStatus}</StatusBadge><span>{runtimeStatus === "ready" ? `${localStorage.getItem("skai.provider") ?? "Local runtime"} · ${runtimeModelCount} models` : "No responding local runtime detected"}</span></div></div>
                 <div className="plugins-start-actions"><Button variant="primary" type="button" onClick={() => changeCatalogSection("Models")}>Search models</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("MCP Servers")}>Connect MCP</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("Installed")}>Open installed</Button><Button variant="ghost" type="button" onClick={() => changeCatalogSection("Updates")}>Check updates</Button></div>
               </section>
             )}

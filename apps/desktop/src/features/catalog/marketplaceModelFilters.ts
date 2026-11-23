@@ -25,6 +25,7 @@ export type MarketplaceModelFilters = {
   app: string;
   context: string;
   uncensored: boolean;
+  availableRamBytes?: number | null;
 };
 
 const normalizeTag = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -33,20 +34,31 @@ export function marketplaceModelFilterOptions() {
   return {
     tasks: ["All tasks", "Chat", "Code", "Embeddings", "Image", "Audio", "Video", "Vision", "Speech"],
     libraries: ["All libraries", "GGUF", "Transformers", "MLX", "PyTorch", "TensorFlow", "Safetensors"],
-    apps: ["All apps", "Ollama", "LM Studio", "AirLLM", "llama.cpp", "vLLM", "Jan", "LocalAI"],
+    apps: ["All install paths", "Ollama", "LM Studio", "AirLLM"],
   };
 }
 
 export function filterMarketplaceModels(models: MarketplaceModel[], filters: MarketplaceModelFilters) {
-  const sizeLimit = filters.size === "Any size" ? Number.POSITIVE_INFINITY : Number(filters.size) * 1024 ** 3;
+  const sizeMatches = (model: MarketplaceModel) => {
+    if (filters.size === "Any size") return true;
+    if (model.sizeBytes == null) return false;
+    const size = model.sizeBytes / 1024 ** 3;
+    if (filters.size === "Fits my PC") return Boolean(filters.availableRamBytes && model.sizeBytes <= filters.availableRamBytes);
+    if (filters.size === "Tiny") return size <= 4;
+    if (filters.size === "Small") return size > 4 && size <= 10;
+    if (filters.size === "Medium") return size > 10 && size <= 20;
+    if (filters.size === "Big") return size > 20;
+    const legacyLimit = Number(filters.size);
+    return Number.isFinite(legacyLimit) && model.sizeBytes <= legacyLimit * 1024 ** 3;
+  };
   const normalizedTask = filters.task === "All tasks" ? "" : normalizeTag(filters.task);
   const normalizedLibrary = filters.library === "All libraries" ? "" : normalizeTag(filters.library);
-  const normalizedApp = filters.app === "All apps" ? "" : normalizeTag(filters.app);
+  const normalizedApp = filters.app === "All install paths" || filters.app === "All apps" ? "" : normalizeTag(filters.app);
 
   return models.filter((model) => {
     const matchesProvider = filters.provider === "All providers"
       || (filters.provider === "AirLLM" ? model.requiresAirLlm === true : model.source === filters.provider && !model.requiresAirLlm);
-    const matchesSize = filters.size === "Any size" || (model.sizeBytes != null && model.sizeBytes <= sizeLimit);
+    const matchesSize = sizeMatches(model);
     const tags = model.tags.map(normalizeTag);
     const taskAliases: Record<string, string[]> = {
       chat: ["chat", "conversational", "instruct", "text generation"],
@@ -60,7 +72,8 @@ export function filterMarketplaceModels(models: MarketplaceModel[], filters: Mar
     };
     const matchesTask = !normalizedTask || (taskAliases[normalizedTask] ?? [normalizedTask]).some((alias) => tags.some((tag) => tag.includes(normalizeTag(alias))));
     const matchesLibrary = !normalizedLibrary || tags.some((tag) => tag.includes(normalizedLibrary));
-    const matchesApp = !normalizedApp || normalizeTag(model.source).includes(normalizedApp) || tags.some((tag) => tag.includes(normalizedApp));
+    const route = model.requiresAirLlm ? "airllm" : model.installRoute.startsWith("ollama-") ? "ollama" : model.installRoute === "lm-studio" ? "lm studio" : "";
+    const matchesApp = !normalizedApp || normalizeTag(route) === normalizedApp;
     const matchesContext = filters.context === "Any context"
       || (filters.context === "1M-class window" && (model.contextLength ?? 0) >= 900_000);
     return matchesProvider && matchesSize && matchesTask && matchesLibrary && matchesApp && matchesContext;
@@ -72,7 +85,7 @@ export function countActiveMarketplaceModelFilters(filters: MarketplaceModelFilt
     filters.provider !== "All providers",
     filters.task !== "All tasks",
     filters.library !== "All libraries",
-    filters.app !== "All apps",
+    filters.app !== "All install paths" && filters.app !== "All apps",
     filters.size !== "Any size",
     filters.context !== "Any context",
     filters.uncensored,

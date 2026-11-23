@@ -1,10 +1,40 @@
 using SkaiDesktop.Core.Services;
 using SkaiDesktop.Core.Models;
+using System.Text.Json;
 
 namespace SkaiDesktop.AgentHost.Protocol;
 
 public static partial class AgentHostLoop
 {
+    private static AgentResponse GetModelRuntimeStatus(AgentRequest request)
+    {
+        var endpoint = RequiredLocalEndpoint(request, "endpoint", 2_000);
+        var provider = RequiredBoundedString(request, "provider", 64).Trim();
+        var isOllama = provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase);
+        var endpointUri = new Uri(endpoint.TrimEnd('/') + "/");
+        var probeUri = isOllama
+            ? new UriBuilder(endpointUri) { Path = "/api/tags", Query = "", Fragment = "" }.Uri
+            : new UriBuilder(endpointUri) { Path = "/v1/models", Query = "", Fragment = "" }.Uri;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            using var response = client.GetAsync(probeUri).GetAwaiter().GetResult();
+            if (!response.IsSuccessStatusCode)
+                return new(ProtocolVersion, request.Id, true, new { provider, available = false, status = "unavailable" });
+            using var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+            using var json = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 16 });
+            var collectionName = isOllama ? "models" : "data";
+            var available = json.RootElement.ValueKind == JsonValueKind.Object
+                && json.RootElement.TryGetProperty(collectionName, out var entries)
+                && entries.ValueKind == JsonValueKind.Array;
+            return new(ProtocolVersion, request.Id, true, new { provider, available, status = available ? "ready" : "unavailable" });
+        }
+        catch (Exception error) when (error is HttpRequestException or TaskCanceledException or JsonException or IOException)
+        {
+            return new(ProtocolVersion, request.Id, true, new { provider, available = false, status = "unavailable" });
+        }
+    }
+
     private static AgentResponse GetLocalCapacity(AgentRequest request)
     {
         var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();

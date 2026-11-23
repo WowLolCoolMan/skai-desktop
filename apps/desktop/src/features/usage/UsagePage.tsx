@@ -1,21 +1,112 @@
+import type { DesktopConversation, DesktopProject, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
 import { Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 
 type UsagePageProps = {
-  conversationCount: number;
-  projectCount: number;
-  taskCount: number;
+  conversations: DesktopConversation[];
+  projects: DesktopProject[];
+  tasks: DesktopTask[];
+  scheduledTasks: DesktopScheduledTask[];
   memoryCount: number;
+  corpusCount: number;
+  savedImageCount: number;
   provider: string;
   model: string;
+  capacity: LocalCapacitySnapshot | null;
 };
 
-export function UsagePage({ conversationCount, projectCount, taskCount, memoryCount, provider, model }: UsagePageProps) {
-  const hasWorkspaceActivity = conversationCount + projectCount + taskCount + memoryCount > 0;
+const numberFormat = new Intl.NumberFormat();
+const formatCount = (value: number) => numberFormat.format(value);
+const formatDate = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Date unavailable" : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+};
+const formatBytes = (bytes: number | null | undefined) => bytes == null || !Number.isFinite(bytes) || bytes < 0
+  ? "Not measured"
+  : bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${(bytes / 1024 ** 2).toFixed(0)} MB`;
+const percent = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? null : Math.max(0, Math.min(100, value));
+const usagePercent = (used: number | null, total: number | null) => used == null || total == null || total <= 0 ? null : percent(used / total * 100);
+
+function UsageMeter({ label, detail, value }: { label: string; detail: string; value: number | null }) {
+  return <div className="usage-meter">
+    <div className="usage-meter-heading"><strong>{label}</strong><span>{detail}</span></div>
+    <div className="usage-meter-track" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value ?? undefined}><span style={{ width: value == null ? "0%" : `${value}%` }} /></div>
+    <small>{value == null ? "Not measured" : `${Math.round(value)}% in use`}</small>
+  </div>;
+}
+
+function StatCard({ label, value, detail }: { label: string; value: number | string; detail: string }) {
+  return <Card className="usage-stat"><span>{label}</span><strong>{value}</strong><small>{detail}</small></Card>;
+}
+
+export function UsagePage({ conversations, projects, tasks, scheduledTasks, memoryCount, corpusCount, savedImageCount, provider, model, capacity }: UsagePageProps) {
+  const messages = conversations.flatMap((conversation) => conversation.messages.filter((message) => message.role !== "system"));
+  const userPrompts = messages.filter((message) => message.role === "user").length;
+  const completedTasks = tasks.filter((task) => task.status === "completed").length;
+  const attentionTasks = tasks.filter((task) => task.status === "failed" || task.status === "blocked").length;
+  const activeTasks = tasks.filter((task) => task.status === "running" || task.status === "verifying").length;
+  const queuedTasks = tasks.filter((task) => task.status === "queued").length;
+  const recentConversations = [...conversations].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5);
+  const recentTasks = [...tasks].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5);
+  const modelCounts = new Map<string, number>();
+  const providerCounts = new Map<string, number>();
+  for (const conversation of conversations) {
+    if (conversation.model) modelCounts.set(conversation.model, (modelCounts.get(conversation.model) ?? 0) + 1);
+    if (conversation.modelProvider) providerCounts.set(conversation.modelProvider, (providerCounts.get(conversation.modelProvider) ?? 0) + 1);
+  }
+  const topModels = [...modelCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const providers = [...providerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const ramUsed = capacity?.ramTotalBytes != null && capacity.ramAvailableBytes != null ? Math.max(0, capacity.ramTotalBytes - capacity.ramAvailableBytes) : null;
+  const gpuUsed = capacity?.gpu?.totalBytes != null && capacity.gpu.availableBytes != null ? Math.max(0, capacity.gpu.totalBytes - capacity.gpu.availableBytes) : null;
+  const cpuValue = percent(capacity?.cpuUtilizationPercent);
+  const scheduledActive = scheduledTasks.filter((task) => task.status === "scheduled").length;
+  const hasActivity = conversations.length + projects.length + tasks.length + memoryCount + corpusCount + savedImageCount > 0;
+
   return <div className="feature-page usage-page">
-    <PageHeader eyebrow="LOCAL RUNTIME" title="Usage" description="Review the local workspace snapshot and the measurements Skai can verify on this computer." />
-    <div className="usage-grid">
-      <Card className="usage-summary"><div className="panel-heading"><div><p className="section-kicker">WORKSPACE SNAPSHOT</p><h3>What is active on this computer</h3></div><StatusBadge tone="neutral">No telemetry</StatusBadge></div>{hasWorkspaceActivity ? <div className="usage-list"><span><b>Saved conversations</b>{conversationCount}</span><span><b>Projects</b>{projectCount}</span><span><b>Tasks tracked</b>{taskCount}</span><span><b>Memory notes</b>{memoryCount}</span><span><b>Selected provider</b>{provider || "Not selected"}</span><span><b>Selected model</b>{model || "Not selected"}</span></div> : <EmptyState title="Your local workspace is empty" description="Start a chat, open a project, or save a memory note and this page will reflect that local activity." />}</Card>
-      <Card className="usage-boundary"><p className="section-kicker">MEASUREMENTS</p><h3>What Skai can verify</h3><p>Skai reports counts and selections from local state. It does not invent token totals, dollar costs, GPU memory, or latency when the host has not measured them.</p><div className="usage-list"><span><b>Stored locally</b> Workspace counts, operation status, and provider provenance.</span><span><b>Not inferred</b> Token counts, cost, GPU memory, or latency.</span><span><b>Cloud-safe</b> This page sends no telemetry.</span></div></Card>
+    <PageHeader eyebrow="LOCAL RUNTIME" title="Usage" description="Understand your workspace activity, agent workload, and the local resources currently in use." />
+    <section className="usage-overview" aria-label="Workspace totals">
+      <StatCard label="Saved conversations" value={formatCount(conversations.length)} detail={`${formatCount(userPrompts)} prompts · ${formatCount(messages.length)} messages`} />
+      <StatCard label="Agent tasks" value={formatCount(tasks.length)} detail={`${formatCount(completedTasks)} completed · ${formatCount(attentionTasks)} need attention`} />
+      <StatCard label="Projects" value={formatCount(projects.length)} detail={`${formatCount(projects.filter((project) => project.folderPaths.length > 0).length)} connected to folders`} />
+      <StatCard label="Saved image history" value={formatCount(savedImageCount)} detail="Recent local outputs · history keeps up to 24" />
+    </section>
+
+    <div className="usage-dashboard">
+      <Card className="usage-card usage-activity">
+        <div className="usage-card-heading"><div><p className="section-kicker">RECENT ACTIVITY</p><h3>Your latest work</h3></div><StatusBadge tone={activeTasks > 0 ? "warning" : "neutral"}>{activeTasks > 0 ? `${activeTasks} active` : "All caught up"}</StatusBadge></div>
+        <div className="usage-activity-columns">
+          <section aria-label="Recent conversations"><h4>Conversations</h4>{recentConversations.length ? <div className="usage-activity-list">{recentConversations.map((conversation) => <article className="usage-activity-row" key={conversation.id}><div><strong title={conversation.title}>{conversation.title || "Untitled conversation"}</strong><small>{conversation.mode === "Coding Agent" ? "Coding agent" : "Chat"} · {formatCount(conversation.messages.filter((message) => message.role !== "system").length)} messages</small></div><time dateTime={conversation.updatedAt}>{formatDate(conversation.updatedAt)}</time></article>)}</div> : <EmptyState title="No conversations yet" description="Saved conversations will appear here." />}</section>
+          <section aria-label="Recent agent tasks"><h4>Agent tasks</h4>{recentTasks.length ? <div className="usage-activity-list">{recentTasks.map((task) => <article className="usage-activity-row" key={task.id}><div><strong title={task.title}>{task.title}</strong><small>{task.projectId ? "Project task" : "Conversation task"} · {formatDate(task.updatedAt)}</small></div><span className={`usage-task-status is-${task.status}`}>{task.status.replaceAll("_", " ")}</span></article>)}</div> : <EmptyState title="No agent tasks yet" description="Tasks created by Chat or Coding agents will show up here." />}</section>
+        </div>
+      </Card>
+
+      <Card className="usage-card usage-capacity">
+        <div className="usage-card-heading"><div><p className="section-kicker">LIVE CAPACITY</p><h3>Local machine</h3></div><span className="usage-updated">{capacity ? `Updated ${formatDate(capacity.capturedAtUtc)}` : "Waiting for runtime"}</span></div>
+        {capacity ? <>
+          <UsageMeter label="System memory" detail={`${formatBytes(ramUsed)} / ${formatBytes(capacity.ramTotalBytes)}`} value={usagePercent(ramUsed, capacity.ramTotalBytes)} />
+          {capacity.gpu && <UsageMeter label={capacity.gpu.name || "GPU memory"} detail={`${formatBytes(gpuUsed)} / ${formatBytes(capacity.gpu.totalBytes)}`} value={usagePercent(gpuUsed, capacity.gpu.totalBytes)} />}
+          <UsageMeter label="CPU" detail={cpuValue == null ? "Usage unavailable" : `${Math.round(cpuValue)}% in use`} value={cpuValue} />
+          {capacity.runtime?.loadedModels?.length ? <div className="usage-loaded-models"><h4>Loaded models</h4>{capacity.runtime.loadedModels.map((loaded, index) => <div key={`${loaded.runtime}-${loaded.model}-${index}`}><strong>{loaded.model}</strong><span>{loaded.runtime} · RAM {formatBytes(loaded.ramBytes)} · GPU {formatBytes(loaded.gpuBytes)}</span></div>)}</div> : <p className="usage-note">{capacity.runtime?.loadedModelNote ?? "No loaded model details reported by the runtime."}</p>}
+          {capacity.scheduler && <p className="usage-scheduler">{capacity.scheduler.activeTaskCount} active · {capacity.scheduler.queuedTaskCount} queued · {capacity.scheduler.executionSlotLimit} execution slots{capacity.scheduler.limitingResource ? ` · limited by ${capacity.scheduler.limitingResource}` : ""}</p>}
+        </> : <EmptyState title="Runtime measurements unavailable" description="Reconnect to the local agent host to see memory, CPU, and loaded-model readings." />}
+      </Card>
+
+      <Card className="usage-card usage-models">
+        <div className="usage-card-heading"><div><p className="section-kicker">MODEL FOOTPRINT</p><h3>Saved conversation mix</h3></div></div>
+        <div className="usage-current-model"><span>Current selection</span><strong>{model || "No model selected"}</strong><small>{provider || "Provider unavailable"}</small></div>
+        {topModels.length ? <div className="usage-breakdown">{topModels.map(([name, count]) => <div className="usage-breakdown-row" key={name}><div><strong title={name}>{name}</strong><span>{formatCount(count)} conversations</span></div><div className="usage-breakdown-track"><i style={{ width: `${Math.max(6, count / topModels[0][1] * 100)}%` }} /></div></div>)}</div> : <p className="usage-note">Model history will appear as conversations are saved.</p>}
+        {providers.length > 0 && <p className="usage-provider-summary">Providers in saved history: {providers.map(([name, count]) => `${name} ${formatCount(count)}`).join(" · ")}</p>}
+      </Card>
+
+      <Card className="usage-card usage-inventory">
+        <div className="usage-card-heading"><div><p className="section-kicker">LOCAL INVENTORY</p><h3>What Skai has saved</h3></div></div>
+        {hasActivity ? <div className="usage-inventory-grid">
+          <div><strong>{formatCount(memoryCount)}</strong><span>Memory notes</span></div>
+          <div><strong>{formatCount(corpusCount)}</strong><span>Reference documents</span></div>
+          <div><strong>{formatCount(scheduledActive)}</strong><span>Scheduled runs</span></div>
+          <div><strong>{formatCount(queuedTasks)}</strong><span>Queued tasks</span></div>
+        </div> : <EmptyState title="Your workspace is empty" description="Activity and saved local data will appear here as you use Skai." />}
+        <p className="usage-privacy-note">This view reads local workspace and runtime state. It does not send telemetry or estimate token counts, cost, or latency.</p>
+      </Card>
     </div>
   </div>;
 }

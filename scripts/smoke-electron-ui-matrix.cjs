@@ -94,8 +94,11 @@ const PROBE = String.raw`(() => {
   // Only the part of a control its scroll/clip ancestors actually show can overlap anything.
   const visibleRect = (el) => { const r = el.getBoundingClientRect(); let box = { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll|hidden|clip)/.test(s.overflow + s.overflowX + s.overflowY)) { const ar = a.getBoundingClientRect(); box = { left: Math.max(box.left, ar.left), top: Math.max(box.top, ar.top), right: Math.min(box.right, ar.right), bottom: Math.min(box.bottom, ar.bottom) }; } } return { left: box.left, top: box.top, right: Math.max(box.left, box.right), bottom: Math.max(box.top, box.bottom), width: Math.max(0, box.right - box.left), height: Math.max(0, box.bottom - box.top) }; };
   const controls = all.filter((el) => el.matches('button,input,select,textarea') && !el.closest('.sr-only') && !outOfView(el));
+  const overlayRoot = (el) => el.closest('[role="dialog"], [role="menu"], [role="listbox"], .global-rail-extras-panel');
   for (let i = 0; i < controls.length; i++) for (let j = i + 1; j < controls.length; j++) {
     const a = controls[i], b = controls[j]; if (a.contains(b) || b.contains(a)) continue;
+    const overlayA = overlayRoot(a), overlayB = overlayRoot(b);
+    if (overlayA !== overlayB && (overlayA || overlayB)) continue;
     const ra = visibleRect(a), rb = visibleRect(b);
     const ix = Math.max(0, Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left)), iy = Math.max(0, Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top));
     const small = Math.min(ra.width * ra.height, rb.width * rb.height);

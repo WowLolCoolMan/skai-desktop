@@ -84,6 +84,18 @@ async function run() {
   }
   const backedEntries = curated.filter(entry => entry.installable === true);
   if (backedEntries.length !== 41) throw new Error(`Expected 41 entries with real local adapters; found ${backedEntries.length}.`);
+  const voicePipelines = [
+    ["kokoro-82m", "isolated Python", "INT8 Kokoro ONNX"],
+    ["piper", "isolated Python", "pinned English voice"],
+    ["chatterbox", "isolated Python", "Chatterbox-TTS source"],
+    ["whisper-large-v3", "isolated Python", "faster-whisper"],
+  ];
+  for (const [id, runtimeMarker, componentMarker] of voicePipelines) {
+    const entry = curated.find(item => item.id === id);
+    if (!entry || !entry.installReview?.toLowerCase().includes(runtimeMarker.toLowerCase()) || !entry.installReview.toLowerCase().includes(componentMarker.toLowerCase())) {
+      throw new Error(`Voice pipeline metadata is incomplete for ${id}: ${JSON.stringify(entry)}`);
+    }
+  }
   const kokoroStatus = await request("voice.kokoro.install.status");
   if (!kokoroStatus.ok || typeof kokoroStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(kokoroStatus.result?.status)) {
     throw new Error(`Kokoro local runtime status is incomplete: ${JSON.stringify(kokoroStatus)}`);
