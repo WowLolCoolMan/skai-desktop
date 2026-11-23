@@ -40,7 +40,8 @@ Mark an item done only when the linked workflow has evidence.
    Kokoro, Piper, and Windows SAPI synthesis probes pass; they confirm audio
    output, not subjective quality. Chromium's native offline `en-US`
    recognition remains unavailable, so hands-free acceptance is still open.
-   Also verify permission denial/recovery and cancellation. Keep the path local.
+   Packaged acceptance now also verifies the denied-permission message and a
+   successful retry. Cancellation acceptance remains. Keep the path local.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
@@ -189,6 +190,13 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** Packaged Windows voice smoke now forces a microphone
+  `NotAllowedError`, verifies Skai's permission guidance, restores local capture,
+  and confirms a successful retry. The subsequent System.Speech fixture reached
+  local Whisper and produced one matching transcript attachment. Audio
+  transcription cancellation and hands-free remain unverified.
+
 - **2026-11-23:** Marketplace → Installed now exposes update and removal for
   Ollama models, with host requests pinned to the discovered local endpoint.
   `npm run smoke:marketplace-host` verified the exact curated Qwen3 Coder tag

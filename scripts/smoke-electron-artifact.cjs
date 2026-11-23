@@ -223,16 +223,52 @@ async function main() {
   const whisperStatusRaw = await evaluate(mainTarget, "(async () => JSON.stringify(await window.skaiAgent.request('voice.whisper.install.status')))()");
   const whisperStatus = JSON.parse(whisperStatusRaw);
   const whisperInstalled = whisperStatus.ok === true && whisperStatus.result?.installed === true;
+  const microphoneDenialResult = await evaluate(mainTarget, `(async () => {
+    const devices = navigator.mediaDevices;
+    const originalDescriptor = Object.getOwnPropertyDescriptor(devices, 'getUserMedia');
+    const originalGetUserMedia = devices.getUserMedia;
+    Object.defineProperty(devices, 'getUserMedia', { configurable: true, value: async () => { throw new DOMException('Permission denied', 'NotAllowedError'); } });
+    try {
+      const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input');
+      if (!button) return JSON.stringify({ button: false, message: '' });
+      button.click();
+      for (let waited = 0; waited < 5000; waited += 50) {
+        const message = document.querySelector('.composer-voice-error')?.textContent ?? '';
+        if (message) return JSON.stringify({ button: true, denied: message.includes('Microphone access was denied'), message });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return JSON.stringify({ button: true, denied: false, message: '' });
+    } finally {
+      if (originalDescriptor) Object.defineProperty(devices, 'getUserMedia', originalDescriptor);
+      else { delete devices.getUserMedia; if (devices.getUserMedia !== originalGetUserMedia) Object.defineProperty(devices, 'getUserMedia', { configurable: true, writable: true, value: originalGetUserMedia }); }
+    }
+  })()`);
+  const microphoneDenialState = JSON.parse(microphoneDenialResult);
+  console.log(`Packaged microphone permission denial/retry path: ${JSON.stringify({ button: microphoneDenialState.button, denied: microphoneDenialState.denied })}`);
+  const microphoneRecoveryResult = await evaluate(mainTarget, `(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      return JSON.stringify({ recovered: true });
+    } catch (error) { return JSON.stringify({ recovered: false, error: error?.name ?? 'unknown' }); }
+  })()`);
+  const microphoneRecoveryState = JSON.parse(microphoneRecoveryResult);
+  console.log(`Packaged microphone permission recovery probe: ${JSON.stringify(microphoneRecoveryState)}`);
+  await evaluate(mainTarget, "location.hash = '#/usage'; window.dispatchEvent(new PopStateEvent('popstate')); 'usage'");
+  await sleep(250);
+  await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
+  const permissionRecoveryRemount = await evaluate(mainTarget, "(async () => { for (let waited = 0; waited < 10000; waited += 100) { if (document.querySelector('.composer-card') && document.querySelector('button[aria-label=\"Start voice input\"]')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
   const dictationStarted = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
   console.log(`Packaged microphone recording: ${dictationStarted === "clicked" ? "start requested" : dictationStarted}`);
   let dictationResult = JSON.stringify({ button: dictationStarted === "clicked", started: false, stopped: false, settled: false, error: "", listening: false, transcribingObserved: false, transcript: false, whisperInstalled, localRecognition: localVoiceState.availability });
   let recorderStarted = false;
   let recorderStopped = false;
   const dictationStartDeadline = Date.now() + 10_000;
+  const dictationStartAt = Date.now();
   while (Date.now() < dictationStartDeadline) {
     const state = JSON.parse(await evaluate(mainTarget, "(() => JSON.stringify({ listening: [...document.querySelectorAll('button')].some((item) => item.getAttribute('aria-label') === 'Stop voice input' && item.getAttribute('aria-pressed') === 'true'), transcribing: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Transcribing audio with local Whisper')), transcript: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Local transcript added')), error: document.querySelector('.composer-voice-error')?.textContent ?? '' }))()"));
     if (state.listening) { recorderStarted = true; break; }
-    if (state.error) break;
+    if (state.error && Date.now() - dictationStartAt >= 5_000) break;
     await sleep(100);
   }
   if (recorderStarted) {
@@ -292,8 +328,8 @@ async function main() {
     && mp4DropResult === "dropped" && mp4VideoState.frames.length === 4 && mp4VideoState.frames.every((frame) => frame.kind.startsWith("Video frame"));
   const localAudioHandled = audioInputStarted === "selected" && localAudioState.input && !localAudioState.transcribing
     && (localAudioState.transcript || localAudioState.error.toLowerCase().includes("on-device speech pack") || localAudioState.error.toLowerCase().includes("no speech was recognized"));
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }
