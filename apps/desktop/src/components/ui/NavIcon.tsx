@@ -1,11 +1,12 @@
 import type { SVGProps } from "react";
 
-export type NavIconName = "chat" | "code" | "activity" | "model" | "image" | "marketplace" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "search" | "plus" | "document" | "audio" | "microphone" | "headset" | "stop" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
+export type NavIconName = "home" | "chat" | "code" | "activity" | "model" | "image" | "marketplace" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "search" | "plus" | "document" | "audio" | "microphone" | "headset" | "stop" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
 
 export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVGSVGElement>) {
   const common = { fill: "none", stroke: "currentColor", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, strokeWidth: 1.65 };
   let content: React.ReactNode;
   switch (name) {
+    case "home": content = <><path {...common} d="m3.5 10 8.5-7 8.5 7" /><path {...common} d="M5.5 9v11h13V9M9.5 20v-6h5v6" /></>; break;
     case "chat": content = <><path {...common} d="M4 4.5h16v10H9l-4.5 4v-4H4z" /><path {...common} d="M8 8.5h8M8 11.5h5" /></> ; break;
     case "code": content = <><path {...common} d="m8 6-5 6 5 6M16 6l5 6-5 6M14 3l-4 18" /></> ; break;
     case "activity": content = <path {...common} d="M3 12h3l2.3-5.5L12 18l2.7-7 1.8 3H21" />; break;

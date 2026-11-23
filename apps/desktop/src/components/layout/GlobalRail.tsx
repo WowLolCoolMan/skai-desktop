@@ -4,7 +4,7 @@ import { NavIcon, type NavIconName } from "../ui/NavIcon";
 import { installedVoiceModels } from "../../services/nativeTts";
 
 const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = [
-  { route: "chat", icon: "chat", label: "Home" },
+  { route: "chat", icon: "home", label: "Home" },
   { route: "images", icon: "image", label: "Images" },
   { route: "usage", icon: "activity", label: "Usage" },
   { route: "marketplace", icon: "marketplace", label: "Marketplace" },

@@ -195,6 +195,30 @@ internal static class ChatProviderTests
         Check(sourceMessage.Content == "Find the rollback checklist" && sourceMessage.Attachments is [{ FileName: "release-notes.pdf" }],
             "provider attachment prompt construction does not mutate the saved conversation message");
 
+        string? toolPayload = null;
+        var ollamaToolProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
+        {
+            Check(request.RequestUri?.AbsolutePath == "/api/chat", "native Ollama tools use the local chat route");
+            toolPayload = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"message\":{\"content\":\"\",\"tool_calls\":[{\"id\":\"call_read\",\"function\":{\"name\":\"read_file\",\"arguments\":{\"path\":\"src/index.js\"}}}]}}\n", Encoding.UTF8, "application/json")
+            };
+        })));
+        var toolReply = await ollamaToolProvider.CompleteOllamaToolChatAsync(
+            new AppSettings { Endpoint = "http://localhost:11434", Model = "qwen3-coder:30b", ModelProvider = "Ollama", Temperature = 0.2 },
+            [new OllamaToolChatMessage("system", "Use tools."), new OllamaToolChatMessage("user", "Read the file.")],
+            [new { type = "function", function = new { name = "read_file", parameters = new { type = "object", properties = new { path = new { type = "string" } }, required = new[] { "path" } } } }],
+            CancellationToken.None);
+        Check(toolReply.Content == string.Empty && toolReply.ToolCalls is [{ Name: "read_file", Id: "call_read" }],
+            "native Ollama tool calls parse when the assistant content is empty");
+        using (var toolRequest = JsonDocument.Parse(toolPayload!))
+        {
+            Check(toolRequest.RootElement.GetProperty("think").ValueKind == JsonValueKind.False
+                && toolRequest.RootElement.GetProperty("tools").GetArrayLength() == 1,
+                "Qwen3 native tool requests disable thinking and include bounded tool schemas");
+        }
+
         string? qwenPayload = null;
         var qwenProvider = new OpenAiCompatibleProvider(new HttpClient(new StubHandler(async (request, cancellationToken) =>
         {
@@ -205,12 +229,12 @@ internal static class ChatProviderTests
             };
         })));
         await qwenProvider.StreamChatAsync(
-            new AppSettings { Endpoint = "http://localhost:11434", Model = "qwen3:14b", ModelProvider = "Ollama", OllamaContextWindowTokens = 4096 },
+            new AppSettings { Endpoint = "http://localhost:11434", Model = "hf.co/Thaurock/Qwen3-Coder-30B-A3B-Instruct-abliterated-GGUF:Q4_K_M", ModelProvider = "Ollama", OllamaContextWindowTokens = 4096 },
             [new ChatMessage("user", "Reply conversationally")], _ => { }, CancellationToken.None, maxTokens: 100);
         using (var qwenRequest = JsonDocument.Parse(qwenPayload!))
         {
             Check(qwenRequest.RootElement.GetProperty("think").ValueKind == JsonValueKind.False,
-                "Qwen3 native Ollama requests disable hidden reasoning so bounded chats return visible content");
+                "downloaded Hugging Face Qwen3 Ollama requests disable hidden reasoning so bounded chats return visible content");
         }
 
         string? qwenCompatiblePayload = null;
@@ -223,12 +247,12 @@ internal static class ChatProviderTests
             };
         })));
         await qwenCompatibleProvider.StreamChatAsync(
-            new AppSettings { Endpoint = "http://localhost:11434/v1", Model = "qwen3:14b", ModelProvider = "Ollama" },
+            new AppSettings { Endpoint = "http://localhost:11434/v1", Model = "hf.co/abliterant/Qwen3.8-27B-RANA-abliterated-GGUF:Q4_K_M", ModelProvider = "Ollama" },
             [new ChatMessage("user", "Reply conversationally")], _ => { }, CancellationToken.None, maxTokens: 100);
         using (var qwenCompatibleRequest = JsonDocument.Parse(qwenCompatiblePayload!))
         {
             Check(qwenCompatibleRequest.RootElement.GetProperty("think").ValueKind == JsonValueKind.False,
-                "Qwen3 OpenAI-compatible Ollama requests disable hidden reasoning under the default response budget");
+                "downloaded Hugging Face Qwen3 OpenAI-compatible Ollama requests disable hidden reasoning under the default response budget");
         }
 
         string? millionContextPayload = null;

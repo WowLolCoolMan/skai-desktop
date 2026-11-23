@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card } from "../../components/ui/Primitives";
 import { NavIcon } from "../../components/ui/NavIcon";
 import "./pluginsMcpHealth.css";
-import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
+import { installedVoiceModels, refreshInstalledVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { request } from "./marketplaceRequest";
 
 type WorkbenchVoiceProfile = {
@@ -78,7 +78,17 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   const [newProfileName, setNewProfileName] = useState("");
   const [clipStorageNotice, setClipStorageNotice] = useState<string | null>(null);
   const [rightsNoticeOpen, setRightsNoticeOpen] = useState(() => localStorage.getItem(WORKBENCH_NOTICE_KEY) !== "true");
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => { await refreshInstalledVoiceModels(); if (active) setSettings(selectedVoiceSettings()); };
+    void refresh();
+    window.addEventListener("skai:voice-models-updated", refresh);
+    return () => { active = false; window.removeEventListener("skai:voice-models-updated", refresh); };
+  }, []);
   const activeWorkbench = workbenchProfiles.find((item) => item.id === activeWorkbenchId) ?? null;
+  const activeRuntimeId = settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId;
+  const activeRuntime = installedVoiceModels.find((voice) => voice.id === activeRuntimeId);
+  const hasOptionalLowResourceRuntime = installedVoiceModels.some((voice) => voice.lowResource && voice.id !== settings.primaryModelId);
   const update = (
     key:
       "profileId" | "primaryModelId" | "lowResourceMode" | "voiceOutputEnabled",
@@ -143,6 +153,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
           <p className="section-kicker">VOICE PROFILE</p>
           <h3>{profile.name}</h3>
           <p>{profile.description}</p>
+          <p className="marketplace-muted">This profile adjusts pacing for {activeRuntime?.name ?? "the available local runtime"}; voice characteristics depend on that runtime.</p>
           <label className="marketplace-field">
             Profile
             <select
@@ -182,6 +193,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
               value={settings.primaryModelId}
               onChange={(event) => update("primaryModelId", event.target.value)}
             >
+              {installedVoiceModels.length === 0 && <option value="">No installed local runtime is available</option>}
               {installedVoiceModels.map((voice) => (
                 <option key={voice.id} value={voice.id}>
                   {voice.name}
@@ -206,7 +218,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
               <small>Keep voice output opt-in.</small>
             </span>
           </label>
-          <label className="marketplace-toggle">
+          {hasOptionalLowResourceRuntime && <label className="marketplace-toggle">
             <input
               type="checkbox"
               checked={settings.lowResourceMode}
@@ -218,7 +230,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
               <strong>Low-resource mode</strong>
               <small>Prefer a smaller CPU-first runtime.</small>
             </span>
-          </label>
+          </label>}
         </Card>
         <Card>
           <p className="section-kicker">CLIPS</p>

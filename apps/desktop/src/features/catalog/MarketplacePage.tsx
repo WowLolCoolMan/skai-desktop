@@ -3,14 +3,14 @@ import type { Model, Route } from "../../app/types";
 import type { AgentResponse, DesktopPersona, UpdateCheckResult } from "../../../shared/contracts";
 import { Button, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
-import { installedVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
+import { installedVoiceModels, refreshInstalledVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { countActiveMarketplaceModelFilters, filterMarketplaceModels, isMarketplaceModelInstallRouteAvailable, marketplaceModelFilterOptions, type MarketplaceModel } from "./marketplaceModelFilters";
 
 export type MarketplaceSection = Section;
 type Section = "Discover" | "Models" | "Image models" | "Voices" | "Image workflows" | "Skills" | "Tools" | "Installed" | "Updates";
 type Filter = "All" | "Local models" | "Voices" | "Image workflows" | "Skills" | "Tools";
 type CatalogItem = { id: string; title: string; filter: Filter; description: string; detail: string; icon: NavIconName; status: string; tone: "neutral" | "success" | "warning"; publisher: string; version: string; compatibility: string; nextStep: string; installable: boolean };
-type InstalledRecord = { id: string; name: string; detail: string; state: string; icon: NavIconName; source: string; requirements: string; nextStep: string; remove?: () => void; health?: () => void };
+type InstalledRecord = { id: string; name: string; detail: string; state: string; icon: NavIconName; source: string; requirements: string; nextStep: string; update?: () => void; remove?: () => void; health?: () => void };
 type MarketplaceCatalog = { providers: Array<{ id: string; name: string; kinds: string[]; remote: boolean }>; voiceProviders?: Array<{ id: string; name: string; kind: string; requiresUserKey: boolean; status: string }>; voices: Array<{ id: string; name: string; description: string; runtime: string; license: string; size: string; installed: boolean; lowResource: boolean; sourceUrl: string; adapterAvailable: boolean; supportsStreaming: boolean; supportsVoiceCloning: boolean; supportsEmotion: boolean; supportsAudioEffects: boolean; availabilityNote: string; installable: boolean }>; skills: Array<{ id: string; name: string; description: string; category: string; permissions: string[]; source: string; installed: boolean; enabled: boolean; installable: boolean }>; tools: Array<{ id: string; name: string; description: string; category: string; access: string; builtIn: boolean; status: string; source?: string | null; installable: boolean }> };
 
 const items: CatalogItem[] = [
@@ -39,6 +39,20 @@ function marketplacePreference<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
+function normalizeModelSearchQuery(value: string) {
+  let normalized = value.trim();
+  for (let attempt = 0; attempt < 2 && normalized.startsWith('"') && normalized.endsWith('"'); attempt += 1) {
+    try {
+      const decoded: unknown = JSON.parse(normalized);
+      if (typeof decoded !== "string" || decoded === normalized) break;
+      normalized = decoded.trim();
+    } catch { break; }
+  }
+  const backslashes = (normalized.match(/\\/g) ?? []).length;
+  if (normalized.length > 160 || (normalized.length > 28 && backslashes > 8 && backslashes / normalized.length > 0.1)) return "";
+  return normalized;
+}
+
 // Embedded in the unified Marketplace catalog (PluginsPage) for the hub sections that catalog
 // does not cover itself: remote model search/install, Diffusers LoRAs and the local inventory.
 const EMBEDDED_SECTIONS: Section[] = ["Models", "Voices", "Image workflows", "Installed"];
@@ -53,6 +67,7 @@ const sectionIcons: Record<Section, NavIconName> = {
   Installed: "memory",
   Updates: "arrow-up-right",
 };
+const providerOptions = ["All providers", "Ollama", "Hugging Face", "ModelScope", "AirLLM"] as const;
 
 type SavedImageWorkflow = { name: string; workflow: string };
 type LocalCapacity = { ramTotalBytes?: number | null; ramAvailableBytes?: number | null; gpu?: { name?: string; totalBytes?: number | null; availableBytes?: number | null } | null; measurementNote?: string | null };
@@ -66,13 +81,18 @@ function readSavedImageWorkflows(): SavedImageWorkflow[] {
 
 export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange, onImportWorkflow, initialSection = "Discover", onBack, onSectionChange, initialQuery }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; onImageChange?: (key: "endpoint" | "prompt" | "workflow" | "provider", value: string) => void; onImportWorkflow?: () => Promise<{ name: string; workflow: string } | null>; initialSection?: Section; onBack?: () => void; onSectionChange?: (section: Section) => void; initialQuery?: string }) {
   const [section, setSection] = useState<Section>(initialSection);
-  const [query, setQuery] = useState(() => initialQuery ?? marketplacePreference(`query.${initialSection.toLowerCase()}`, ""));
+  const [query, setQuery] = useState(() => normalizeModelSearchQuery(initialQuery ?? marketplacePreference(`query.${initialSection.toLowerCase()}`, "")));
   const [selectedId, setSelectedId] = useState(items[0].id);
   const [voiceSettings, setVoiceSettings] = useState(selectedVoiceSettings);
   const [catalog, setCatalog] = useState<MarketplaceCatalog | null>(null);
   const [models, setModels] = useState<MarketplaceModel[]>([]);
   const [modelLoading, setModelLoading] = useState(false);
   const modelSearchRequestRef = useRef(0);
+  const initialModelSearchStartedRef = useRef(false);
+  const lastProviderSearchRef = useRef<string | null>(null);
+  const capacityLoadStartedRef = useRef(false);
+  const airLlmLoadStartedRef = useRef(false);
+  const catalogLoadStartedRef = useRef(false);
   const [modelError, setModelError] = useState<string | null>(null);
   const [uncensored, setUncensored] = useState(false);
   const [provider, setProvider] = useState(() => marketplacePreference("models.provider", "All providers"));
@@ -85,7 +105,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   const [installStatus, setInstallStatus] = useState<string | null>(null);
   const [installOperationId, setInstallOperationId] = useState<string | null>(null);
   const [reviewModel, setReviewModel] = useState<MarketplaceModel | null>(null);
-  const [installedModels, setInstalledModels] = useState<Array<{ model: string; vision: string; capabilities: string[]; provider?: string }>>([]);
+  const [installedModels, setInstalledModels] = useState<Array<{ model: string; vision: string; capabilities: string[]; provider?: string; endpoint?: string | null }>>([]);
   const [installedConnections, setInstalledConnections] = useState<Array<{ connectionId: string; serverId: string; transport: string; state: string }>>([]);
   const [selectedInstalledId, setSelectedInstalledId] = useState<string | null>(null);
   const [pinnedItems, setPinnedItems] = useState<string[]>(() => marketplacePreference("installed.pinned", []));
@@ -93,6 +113,8 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   const [installedInventoryError, setInstalledInventoryError] = useState<string | null>(null);
   const [installedLoading, setInstalledLoading] = useState(false);
   const [installedError, setInstalledError] = useState<string | null>(null);
+  const [installedActionBusy, setInstalledActionBusy] = useState(false);
+  const [installedActionStatus, setInstalledActionStatus] = useState<string | null>(null);
   const [selectedRemoteModelId, setSelectedRemoteModelId] = useState<string | null>(null);
   const [mcpMarketplaceBusy, setMcpMarketplaceBusy] = useState(false);
   const [mcpMarketplaceStatus, setMcpMarketplaceStatus] = useState<string | null>(null);
@@ -122,34 +144,72 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   useEffect(() => {
     const updates = window.skaiAgent?.updates;
     if (!updates) return;
-    void updates.state().then((result) => { if (result) setUpdateResult(result); }).catch(() => undefined);
-    if (initialSection === "Updates") void updates.check().then(setUpdateResult).catch(() => setUpdateResult({ available: false, currentVersion: "Unknown", status: "error", message: "Update check failed." }));
+    let active = true;
+    void updates.state().then((result) => { if (active && result) setUpdateResult(result); }).catch(() => undefined);
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
+    if (section !== "Updates") return;
+    const updates = window.skaiAgent?.updates;
+    if (!updates) return;
     let active = true;
-    void request("system.capacity").then((response) => {
-      if (active && response.ok) setLocalCapacity(response.result as LocalCapacity);
-    }).catch(() => undefined);
+    void updates.check().then((result) => { if (active) setUpdateResult(result); }).catch(() => { if (active) setUpdateResult({ available: false, currentVersion: "Unknown", status: "error", message: "Update check failed." }); });
     return () => { active = false; };
-  }, []);
+  }, [section]);
+
+  useEffect(() => {
+    if (section !== "Models") return;
+    if (!capacityLoadStartedRef.current) {
+      capacityLoadStartedRef.current = true;
+      void request("system.capacity").then((response) => {
+        if (response.ok) setLocalCapacity(response.result as LocalCapacity);
+      }).catch(() => undefined);
+    }
+    if (!airLlmLoadStartedRef.current) {
+      airLlmLoadStartedRef.current = true;
+      void request("airllm.status").then((response) => {
+        if (response.ok) setAirLlmReady(Boolean((response.result as { dependenciesAvailable?: boolean }).dependenciesAvailable));
+        else setAirLlmReady(false);
+      }).catch(() => setAirLlmReady(false));
+    }
+    if (!initialModelSearchStartedRef.current) {
+      initialModelSearchStartedRef.current = true;
+      void searchModels(query, uncensored, provider, !query.trim() && (provider === "All providers" || provider === "Ollama"));
+    } else if (lastProviderSearchRef.current !== null && lastProviderSearchRef.current !== provider) {
+      void searchModels(query, uncensored, provider);
+    }
+  }, [section, provider]);
+
+  useEffect(() => {
+    const needsCatalog = section !== "Models" && section !== "Updates" && section !== "Image models" && section !== "Image workflows";
+    if (!needsCatalog || catalogLoadStartedRef.current) return;
+    catalogLoadStartedRef.current = true;
+    void request("marketplace.catalog").then((response) => {
+      if (response.ok) setCatalog(response.result as MarketplaceCatalog);
+      else {
+        catalogLoadStartedRef.current = false;
+        setModelError(response.error?.message ?? "Marketplace catalog could not be loaded.");
+      }
+    });
+  }, [section]);
+
+  useEffect(() => {
+    if (section !== "Voices") return;
+    let active = true;
+    const refreshVoices = async () => {
+      await refreshInstalledVoiceModels();
+      if (active) setVoiceSettings(selectedVoiceSettings());
+    };
+    void refreshVoices();
+    window.addEventListener("skai:voice-models-updated", refreshVoices);
+    return () => { active = false; window.removeEventListener("skai:voice-models-updated", refreshVoices); };
+  }, [section]);
 
   const useAirLlmModel = (model: MarketplaceModel) => {
     if (!model.requiresAirLlm || !onSelectAirLlmModel) return;
     onSelectAirLlmModel({ model: model.repository, displayName: model.repository, vision: "unsupported", capabilities: ["Text generation"], provider: "AirLLM", endpoint: null, sizeBytes: model.sizeBytes });
   };
-
-  useEffect(() => {
-    void request("marketplace.catalog").then((response) => {
-      if (response.ok) setCatalog(response.result as MarketplaceCatalog);
-      else setModelError(response.error?.message ?? "Marketplace catalog could not be loaded.");
-    });
-    void request("airllm.status").then((response) => {
-      if (response.ok) setAirLlmReady(Boolean((response.result as { dependenciesAvailable?: boolean }).dependenciesAvailable));
-      else setAirLlmReady(false);
-    }).catch(() => setAirLlmReady(false));
-    if (initialSection === "Models") void searchModels(initialQuery ?? "");
-  }, []);
 
   const marketplaceItems = useMemo<CatalogItem[]>(() => {
     const voiceItems: CatalogItem[] = (catalog?.voices ?? []).filter((voice) => voice.installed).map((voice) => ({
@@ -194,7 +254,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
       if (!response.ok) {
         setInstalledError(response.error?.message ?? "The local model inventory could not be loaded.");
         setInstalledModels([]);
-      } else setInstalledModels((response.result as Array<{ model: string; vision: string; capabilities: string[]; provider?: string }>) ?? []);
+      } else setInstalledModels((response.result as Array<{ model: string; vision: string; capabilities: string[]; provider?: string; endpoint?: string | null }>) ?? []);
     } catch { setInstalledError("The local model inventory could not be loaded."); }
     finally { setInstalledLoading(false); }
   };
@@ -245,8 +305,44 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     if (!response.ok) { setInstalledInventoryError(response.error?.message ?? "MCP server could not be removed."); return; }
     setInstalledConnections((current) => current.filter((item) => item.connectionId !== connectionId));
   };
+  const updateOllamaModel = async (model: string, endpoint?: string | null) => {
+    if (!endpoint || installedActionBusy) return;
+    setInstalledActionBusy(true);
+    setInstalledActionStatus(`Checking ${model} for an updated Ollama version…`);
+    try {
+      const started = await request("models.pull.start", { endpoint, model });
+      if (!started.ok) throw new Error(started.error?.message ?? "The model update could not start.");
+      const id = (started.result as { id?: string }).id;
+      if (!id) throw new Error("The model update did not return an operation ID.");
+      for (let attempt = 0; attempt < 600; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        const status = await request("models.pull.status", { id });
+        if (!status.ok) throw new Error(status.error?.message ?? "The model update status could not be read.");
+        const result = status.result as { status: string; progress?: string[]; error?: string };
+        setInstalledActionStatus(result.progress?.at(-1) ?? `Model update · ${result.status}`);
+        if (result.status === "completed") { setInstalledActionStatus(`${model} is up to date.`); await loadInstalledModels(); return; }
+        if (result.status === "failed" || result.status === "cancelled") throw new Error(result.error ?? `Model update ${result.status}.`);
+      }
+      throw new Error("The model update timed out; its local operation may still be running.");
+    } catch (error) { setInstalledActionStatus(error instanceof Error ? error.message : "The model update failed."); }
+    finally { setInstalledActionBusy(false); }
+  };
+  const removeOllamaModel = async (model: string, endpoint?: string | null) => {
+    if (!endpoint || installedActionBusy) return;
+    setInstalledActionBusy(true);
+    setInstalledActionStatus(`Removing ${model} from Ollama…`);
+    try {
+      const response = await request("marketplace.models.remove", { endpoint, model });
+      if (!response.ok) throw new Error(response.error?.message ?? "The model could not be removed.");
+      setInstalledActionStatus(`${model} removed from Ollama.`);
+      setSelectedInstalledId(null);
+      await loadInstalledModels();
+    } catch (error) {
+      setInstalledActionStatus(error instanceof Error ? error.message : "The model could not be removed.");
+    } finally { setInstalledActionBusy(false); }
+  };
   const installedRecords: InstalledRecord[] = [
-    ...installedModels.map((item) => ({ id: `model:${item.provider}:${item.model}`, name: item.model, detail: `${item.provider ?? "Local runtime"} · ${item.capabilities.join(" · ") || "Text generation"}`, state: "installed", icon: "model" as NavIconName, source: item.provider ?? "Configured local runtime", requirements: item.capabilities.join(" · ") || "Text generation", nextStep: "This model is available in the local runtime. Model removal is not exposed by the current host contract." })),
+    ...installedModels.map((item) => ({ id: `model:${item.provider}:${item.model}`, name: item.model, detail: `${item.provider ?? "Local runtime"} · ${item.capabilities.join(" · ") || "Text generation"}`, state: "installed", icon: "model" as NavIconName, source: item.provider ?? "Configured local runtime", requirements: item.capabilities.join(" · ") || "Text generation", nextStep: item.provider === "Ollama" ? "Update or remove this model through its local Ollama runtime." : "This model is managed by its local provider; Skai cannot update or remove it here.", update: item.provider === "Ollama" ? () => void updateOllamaModel(item.model, item.endpoint) : undefined, remove: item.provider === "Ollama" ? () => void removeOllamaModel(item.model, item.endpoint) : undefined })),
     ...installedConnections.map((item) => ({ id: `mcp:${item.connectionId}`, name: item.serverId, detail: `${item.transport} · ${item.connectionId}`, state: item.state === "healthy" ? "installed" : "limited", icon: "terminal" as NavIconName, source: item.connectionId, requirements: item.transport, nextStep: item.state === "healthy" ? "Connection responds to the host health check." : "Check health or remove this MCP connection.", health: () => void checkMcpHealth(item.connectionId), remove: () => void removeMcpConnection(item.connectionId) })),
     ...(catalog?.tools ?? []).filter((item) => item.builtIn).map((item) => ({ id: `tool:${item.id}`, name: item.name, detail: item.description, state: "installed", icon: "terminal" as NavIconName, source: "Skai", requirements: item.access, nextStep: "Open the related local workflow to use this capability." })),
     ...(catalog?.skills ?? []).filter((item) => item.installed).map((item) => ({ id: `skill:${item.id}`, name: item.name, detail: `${item.source} · ${item.enabled ? "Enabled" : "Disabled"}`, state: "installed", icon: "sparkle" as NavIconName, source: item.source, requirements: item.permissions.join(" · ") || "No extra permissions", nextStep: item.enabled ? "This skill is available to the local agent." : "Enable the skill in its local settings before use." })),
@@ -309,29 +405,40 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     } finally { setImageWorkflowImporting(false); }
   };
 
-  async function searchModels(nextQuery = query, nextUncensored = uncensored) {
+  async function searchModels(nextQuery = query, nextUncensored = uncensored, nextProvider = provider, curatedOnly = false) {
     const requestId = ++modelSearchRequestRef.current;
+    lastProviderSearchRef.current = nextProvider;
     setModelLoading(true);
     setModelError(null);
-    setModels([]);
-    setSelectedRemoteModelId(null);
+    let timeoutId = 0;
     try {
-      const response = await request("marketplace.models.search", { query: nextQuery.trim(), uncensored: nextUncensored });
+      const response = await Promise.race([
+        request("marketplace.models.search", { query: normalizeModelSearchQuery(nextQuery), uncensored: nextUncensored, provider: nextProvider, curatedOnly }),
+        new Promise<never>((_, reject) => { timeoutId = window.setTimeout(() => reject(new Error("MODEL_SEARCH_TIMEOUT")), 30_000); }),
+      ]);
       if (requestId !== modelSearchRequestRef.current) return;
       if (!response.ok) {
-        setModelError(response.error?.message ?? "Remote model discovery failed.");
+        setModelError(response.error?.message ?? "Model search failed.");
         return;
       }
       const result = response.result as { models?: MarketplaceModel[]; providers?: Record<string, string> };
       setModels(result.models ?? []);
+      setSelectedRemoteModelId(null);
       if (Object.values(result.providers ?? {}).some((status) => status !== "ready")) {
         setModelError("Some model sources did not respond in time. Showing results from the sources that are available.");
       }
-    } catch {
-      if (requestId === modelSearchRequestRef.current) setModelError("Remote model discovery failed.");
+    } catch (error) {
+      if (requestId === modelSearchRequestRef.current) setModelError(error instanceof Error && error.message === "MODEL_SEARCH_TIMEOUT" ? "Model search took too long. Check your connection and try again." : "Model search failed.");
     } finally {
+      window.clearTimeout(timeoutId);
       if (requestId === modelSearchRequestRef.current) setModelLoading(false);
     }
+  }
+
+  function cancelModelSearch() {
+    modelSearchRequestRef.current += 1;
+    setModelLoading(false);
+    setModelError(null);
   }
 
   async function installModel(model: MarketplaceModel) {
@@ -417,7 +524,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   };
   const sectionDescription: Record<Section, string> = {
     Discover: "Choose the next capability you actually need, then review its local requirements before changing this computer.",
-    Models: "Browse quantized local model downloads and full Transformers models through the optional AirLLM route. AirLLM weights download only when first used.",
+    Models: "Quick picks load first. Choose a provider to search its catalog; review the runtime, size, and device fit before installing.",
     "Image models": "Search Hugging Face for safetensors LoRAs compatible with local Diffusers image generation. Downloads stay in Skai’s local image-model folder.",
     Voices: "Browse installed voice runtimes and available adapters, then choose the runtime and profile Skai should use for speech.",
     "Image workflows": "Review local ComfyUI workflows and configure them in Image Studio.",
@@ -429,21 +536,23 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
 
   const sectionHeading: Record<Section, string> = { Discover: "Explore the marketplace", Models: "Local models", "Image models": "Image models & LoRAs", Voices: "Voice profiles", "Image workflows": "Image workflows", Skills: "Agent skills", Tools: "Tools & integrations", Installed: "Installed tools", Updates: "Updates" };
   const categoryCards: Array<{ title: string; description: string; section: Section; icon: NavIconName; status: string; availability: "ready" | "setup" | "limited" }> = [
-    { title: "Local models", description: "Find a model, check its source and size, then review a local install.", section: "Models", icon: "model", status: modelError ? "Catalog needs attention" : "Live model search", availability: modelError ? "setup" : "ready" },
-    { title: "Image models & LoRAs", description: "Search supported image adapters and manage files stored on this device.", section: "Image models", icon: "image", status: `${installedImageAssets.length} installed · Diffusers required`, availability: "setup" },
-    { title: "Agent skills", description: "Browse local skills available to Skai and review their permission scope.", section: "Skills", icon: "sparkle", status: catalog ? `${catalog.skills.filter((skill) => skill.installed).length} available locally` : "Checking local catalog", availability: "ready" },
-    { title: "Tools & integrations", description: "Review built-in capabilities and connect the verified REA MCP package.", section: "Tools", icon: "terminal", status: "REA connector available", availability: "ready" },
-    { title: "Voice profiles", description: "Choose and preview voices available in this installation.", section: "Voices", icon: "activity", status: catalog ? `${catalog.voices.filter((voice) => voice.installed).length} available locally` : "Checking local voices", availability: "ready" },
-    { title: "Installed library", description: "See models, MCP servers, skills, voices, and image assets available here.", section: "Installed", icon: "marketplace", status: "Refresh local inventory", availability: "ready" },
+    { title: "Local models", description: "Search by task, runtime, size, or context. Review device fit before installing.", section: "Models", icon: "model", status: "Quick picks · provider search", availability: "ready" },
+    { title: "Image models & LoRAs", description: "Find image adapters and manage the LoRA files stored on this device.", section: "Image models", icon: "image", status: `${installedImageAssets.length} installed · Diffusers required`, availability: "setup" },
+    { title: "Image workflows", description: "Import and activate local ComfyUI workflows for Image Studio.", section: "Image workflows", icon: "image", status: `${savedImageWorkflows.length} saved locally`, availability: "ready" },
+    { title: "Tools & integrations", description: "Browse built-in tools, MCP servers, and compatible integrations.", section: "Tools", icon: "terminal", status: "Connections and permissions", availability: "ready" },
+    { title: "Voice runtimes", description: "Choose an installed voice engine and preview its available profiles.", section: "Voices", icon: "activity", status: catalog ? `${catalog.voices.filter((voice) => voice.installed).length} installed locally` : "Checking local voices", availability: "ready" },
+    { title: "Agent skills", description: "Review local skills and the permission scope each one uses.", section: "Skills", icon: "sparkle", status: catalog ? `${catalog.skills.filter((skill) => skill.installed).length} installed locally` : "Checking local catalog", availability: "ready" },
+    { title: "Installed library", description: "Update or remove models and other items managed by Skai.", section: "Installed", icon: "marketplace", status: "Manage local installs", availability: "ready" },
+    { title: "Skai updates", description: "Check the signed release channel for a verified desktop update.", section: "Updates", icon: "arrow-up-right", status: updateResult?.available ? `Version ${updateResult.version} available` : "Check for updates", availability: "ready" },
   ];
   const modelResults = <section className="marketplace-remote-results" aria-label="Remote model sources">
     <div className="panel-heading"><div><p className="section-kicker">REMOTE MODEL SOURCES</p><h3>Models for local runtimes</h3><p className="panel-subtitle">GGUF packages install through compatible runtimes. Transformers repositories use the optional AirLLM route and download weights on first use.</p></div><StatusBadge tone={modelError ? "warning" : "success"}>{modelLoading ? "Polling" : modelError ? "Partial" : "Live catalog"}</StatusBadge></div>
-    <details className="marketplace-model-filter-disclosure"><summary><span>Filters</span><small>{activeModelFilterCount ? `${activeModelFilterCount} active` : "Optional"}</small></summary><div className="marketplace-model-controls marketplace-model-filters"><label>Task<select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}>{taskOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}><option>All providers</option><option>Ollama</option><option>Hugging Face</option><option>ModelScope</option><option>AirLLM</option></select></label><label>Library<select value={libraryFilter} onChange={(event) => setLibraryFilter(event.target.value)}>{libraryOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>App/runtime<select value={appFilter} onChange={(event) => setAppFilter(event.target.value)}><option>All apps</option>{appOptions.slice(1).map((option) => <option key={option}>{option}</option>)}</select></label><label>Context window<select value={contextFilter} onChange={(event) => setContextFilter(event.target.value)}><option>Any context</option><option>1M-class window</option></select></label><label>Maximum model size<select value={size} onChange={(event) => setSize(event.target.value)}><option>Any size</option><option value="8">8 GB</option><option value="14">14 GB</option><option value="24">24 GB</option><option value="40">40 GB</option></select></label><label className="settings-toggle"><span><strong>Include abliterated</strong><small>Only show explicit uncensored/abliterated labels.</small></span><input type="checkbox" checked={uncensored} onChange={(event) => { setUncensored(event.target.checked); void searchModels(query, event.target.checked); }} /></label></div></details>
+    <details className="marketplace-model-filter-disclosure"><summary><span>Filters</span><small>{activeModelFilterCount ? `${activeModelFilterCount} active` : "Optional"}</small></summary><div className="marketplace-model-controls marketplace-model-filters"><label>Task<select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}>{taskOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Library<select value={libraryFilter} onChange={(event) => setLibraryFilter(event.target.value)}>{libraryOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Runtime<select value={appFilter} onChange={(event) => setAppFilter(event.target.value)}>{appOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Context<select value={contextFilter} onChange={(event) => setContextFilter(event.target.value)}><option>Any context</option><option>1M-class window</option></select></label><label>Max download size<select value={size} onChange={(event) => setSize(event.target.value)}><option>Any size</option><option value="8">8 GB</option><option value="14">14 GB</option><option value="24">24 GB</option><option value="40">40 GB</option></select></label><label className="settings-toggle"><span><strong>Include abliterated</strong><small>Include models explicitly tagged as uncensored or abliterated.</small></span><input type="checkbox" checked={uncensored} onChange={(event) => { setUncensored(event.target.checked); void searchModels(query, event.target.checked); }} /></label><div className="marketplace-filter-footer"><span>{filteredModels.length} matching models</span>{activeModelFilterCount > 0 && <Button variant="ghost" type="button" onClick={() => { setTaskFilter("All tasks"); setProvider("All providers"); setLibraryFilter("All libraries"); setAppFilter("All apps"); setContextFilter("Any context"); setSize("Any size"); setUncensored(false); void searchModels(query, false, "All providers"); }}>Clear filters</Button>}</div></div></details>
     <p className="marketplace-honesty">Task and runtime filters use catalog tags. Context length appears only when the source publishes it. Model file size is not the same as runtime memory; hardware fit also depends on quantization, context length, and available VRAM/RAM.</p>
     {modelError && <p className="marketplace-honesty" role="status">{modelError}</p>}
     {installStatus && <div className="marketplace-honesty marketplace-download-status" role="status"><span>{installStatus}</span>{installing && <Button variant="ghost" type="button" onClick={() => void cancelModelInstall()}>Cancel download</Button>}</div>}
     {reviewModel && <div className="marketplace-install-review marketplace-model-review" role="dialog" aria-label={reviewModel.requiresAirLlm ? "Review AirLLM model route" : "Verify model installation"}><p className="section-kicker">{reviewModel.requiresAirLlm ? "AIRLLM ROUTE REVIEW" : "INSTALLATION REVIEW"}</p><strong>{reviewModel.repository}</strong><span>{reviewModel.source} · {formatSize(reviewModel.sizeBytes)} · {reviewModel.downloads.toLocaleString()} downloads</span><span>{modelFitSummary(reviewModel)}</span><span>{reviewModel.requiresAirLlm ? `This Transformers model will use the optional AirLLM route. ${airLlmReady === true ? "AirLLM is ready." : airLlmReady === false ? "Install AirLLM in Settings before using this route." : "Checking AirLLM readiness…"} Model weights download from Hugging Face on first use and may require substantial disk space. Inference can be much slower than Ollama or LM Studio.` : installRouteAvailable(reviewModel) ? `This uses ${reviewModel.installRoute} with your active ${activeLocalRuntime} runtime. No download starts until you confirm this local installation.` : `This package needs ${reviewModel.installRoute}, but your active runtime is ${activeLocalRuntime}. Switch the local runtime in Settings before installing; this prevents a download request that would fail.`}</span><div className="marketplace-model-actions">{reviewModel.requiresAirLlm && onNavigate && <Button variant="secondary" type="button" onClick={() => { setReviewModel(null); onNavigate("settings"); }}>Manage AirLLM</Button>}<Button variant="ghost" type="button" onClick={() => setReviewModel(null)}>Cancel</Button><Button variant="primary" type="button" disabled={reviewModel.requiresAirLlm ? !onSelectAirLlmModel || airLlmReady !== true : !reviewModel.installable || installing !== null || !installRouteAvailable(reviewModel)} onClick={() => { const model = reviewModel; setReviewModel(null); if (model.requiresAirLlm) useAirLlmModel(model); else void installModel(model); }}>{reviewModel.requiresAirLlm ? "Use with AirLLM" : "Confirm and install locally"}</Button></div></div>}
-    {filteredModels.length === 0 ? <EmptyState title={modelLoading ? "Polling providers…" : "No matching models"} description="Change the search or filters. Unknown sizes are hidden only when a maximum size is selected." /> : <div className="marketplace-model-layout"><div className="marketplace-model-list" aria-label="Marketplace model results">{filteredModels.slice(0, 36).map((model) => <button className={`marketplace-model-row${selectedRemoteModel?.id === model.id ? " is-selected" : ""}`} type="button" key={model.id} aria-pressed={selectedRemoteModel?.id === model.id} onClick={() => setSelectedRemoteModelId(model.id)}><span className="marketplace-row-icon"><NavIcon name="model" /></span><span className="marketplace-model-copy"><strong>{model.repository}</strong><small>{model.source} · {formatSize(model.sizeBytes)} · {model.contextLength ? `${model.contextLength.toLocaleString()} tokens` : "Context unknown"} · {model.downloads.toLocaleString()} downloads · {model.tags.slice(0, 3).join(" · ") || (model.requiresAirLlm ? "Transformers weights" : "GGUF")}</small></span><span className="marketplace-model-actions">{model.requiresAirLlm && <StatusBadge tone="warning">Requires AirLLM</StatusBadge>}{!model.requiresAirLlm && !installRouteAvailable(model) && <StatusBadge tone="warning">Needs {model.installRoute}</StatusBadge>}{model.uncensored && <StatusBadge tone="warning">Abliterated</StatusBadge>}</span></button>)}</div>{selectedRemoteModel && <aside className="marketplace-detail marketplace-model-inspector" aria-label="Selected model details"><div className="marketplace-detail-heading"><div><p className="section-kicker">SELECTED MODEL</p><h3>{selectedRemoteModel.repository}</h3></div><StatusBadge tone={selectedRemoteModel.requiresAirLlm || !installRouteAvailable(selectedRemoteModel) ? "warning" : "success"}>{selectedRemoteModel.requiresAirLlm ? "Requires AirLLM" : installRouteAvailable(selectedRemoteModel) ? "Runtime ready" : `Needs ${selectedRemoteModel.installRoute}`}</StatusBadge></div><p>{selectedRemoteModel.requiresAirLlm ? "Full Transformers weights use the optional AirLLM runtime. The model downloads on first use, so check the listed size and available disk space." : installRouteAvailable(selectedRemoteModel) ? "This model uses your active local runtime. Review the source and size before downloading." : `This model requires ${selectedRemoteModel.installRoute}; your active runtime is ${activeLocalRuntime}. Choose a compatible package or switch runtimes before install.`}</p><div className="marketplace-model-actions">{selectedRemoteModel.requiresAirLlm && onNavigate && <Button variant="secondary" type="button" onClick={() => onNavigate("settings")}>Manage AirLLM</Button>}<Button variant="primary" type="button" disabled={selectedRemoteModel.requiresAirLlm ? !onSelectAirLlmModel || airLlmReady !== true : !selectedRemoteModel.installable || installing !== null} onClick={() => setReviewModel(selectedRemoteModel)}>{selectedRemoteModel.requiresAirLlm ? "Review AirLLM route" : "Review install"}</Button></div><dl className="marketplace-detail-list"><div><dt>Source</dt><dd>{selectedRemoteModel.source}</dd></div><div><dt>Install route</dt><dd>{selectedRemoteModel.requiresAirLlm ? `AirLLM · ${airLlmReady === null ? "checking readiness" : airLlmReady ? "ready" : "setup needed"}` : `${selectedRemoteModel.installRoute} · ${installRouteAvailable(selectedRemoteModel) ? "ready" : `active runtime: ${activeLocalRuntime}`}`}</dd></div><div><dt>Estimated size</dt><dd>{formatSize(selectedRemoteModel.sizeBytes)}</dd></div><div><dt>Device fit · advisory</dt><dd>{modelFitSummary(selectedRemoteModel)}</dd></div><div><dt>License</dt><dd>{selectedRemoteModel.license || "No license metadata published by the catalog. Review the source repository license before use."}</dd></div><div><dt>Context window</dt><dd>{selectedRemoteModel.contextLength ? `${selectedRemoteModel.contextLength.toLocaleString()} tokens (catalog metadata)` : "Not published by catalog"}</dd></div><div><dt>Downloads</dt><dd>{selectedRemoteModel.downloads.toLocaleString()}</dd></div><div><dt>Likes</dt><dd>{selectedRemoteModel.likes.toLocaleString()}</dd></div><div><dt>Next step</dt><dd>{selectedRemoteModel.requiresAirLlm ? "Install the optional runtime in Settings, then choose Use with AirLLM. Weights download when chat first starts." : installRouteAvailable(selectedRemoteModel) ? "Review the local installer before confirming the download." : "Use a package compatible with your active local runtime."}</dd></div></dl></aside>}</div>}
+    {filteredModels.length === 0 ? <EmptyState title={modelLoading ? "Searching model sources…" : modelError ? "Search could not complete" : "No matching models"} description={modelLoading ? "Checking the available catalogs. Results will appear here when the search finishes." : modelError ? "Check your connection, adjust the search, or try again." : "Change the search or filters. Unknown sizes are hidden only when a maximum size is selected."} action={modelError && <Button variant="secondary" type="button" onClick={() => void searchModels()}>{"Try again"}</Button>} /> : <div className="marketplace-model-layout"><div className="marketplace-model-list" aria-label="Marketplace model results">{filteredModels.slice(0, 36).map((model) => <button className={`marketplace-model-row${selectedRemoteModel?.id === model.id ? " is-selected" : ""}`} type="button" key={model.id} aria-pressed={selectedRemoteModel?.id === model.id} onClick={() => setSelectedRemoteModelId(model.id)}><span className="marketplace-row-icon"><NavIcon name="model" /></span><span className="marketplace-model-copy"><strong>{model.repository}</strong><small>{model.source} · {formatSize(model.sizeBytes)} · {model.contextLength ? `${model.contextLength.toLocaleString()} tokens` : "Context unknown"} · {model.downloads.toLocaleString()} downloads · {model.tags.slice(0, 3).join(" · ") || (model.requiresAirLlm ? "Transformers weights" : "GGUF")}</small></span><span className="marketplace-model-actions">{model.requiresAirLlm && <StatusBadge tone="warning">Requires AirLLM</StatusBadge>}{!model.requiresAirLlm && !installRouteAvailable(model) && <StatusBadge tone="warning">Needs {model.installRoute}</StatusBadge>}{model.uncensored && <StatusBadge tone="warning">Abliterated</StatusBadge>}</span></button>)}</div>{selectedRemoteModel && <aside className="marketplace-detail marketplace-model-inspector" aria-label="Selected model details"><div className="marketplace-detail-heading"><div><p className="section-kicker">SELECTED MODEL</p><h3>{selectedRemoteModel.repository}</h3></div><StatusBadge tone={selectedRemoteModel.requiresAirLlm || !installRouteAvailable(selectedRemoteModel) ? "warning" : "success"}>{selectedRemoteModel.requiresAirLlm ? "Requires AirLLM" : installRouteAvailable(selectedRemoteModel) ? "Runtime ready" : `Needs ${selectedRemoteModel.installRoute}`}</StatusBadge></div><p>{selectedRemoteModel.requiresAirLlm ? "Full Transformers weights use the optional AirLLM runtime. The model downloads on first use, so check the listed size and available disk space." : installRouteAvailable(selectedRemoteModel) ? "This model uses your active local runtime. Review the source and size before downloading." : `This model requires ${selectedRemoteModel.installRoute}; your active runtime is ${activeLocalRuntime}. Choose a compatible package or switch runtimes before install.`}</p><div className="marketplace-model-actions">{selectedRemoteModel.requiresAirLlm && onNavigate && <Button variant="secondary" type="button" onClick={() => onNavigate("settings")}>Manage AirLLM</Button>}<Button variant="primary" type="button" disabled={selectedRemoteModel.requiresAirLlm ? !onSelectAirLlmModel || airLlmReady !== true : !selectedRemoteModel.installable || installing !== null} onClick={() => setReviewModel(selectedRemoteModel)}>{selectedRemoteModel.requiresAirLlm ? "Review AirLLM route" : "Review install"}</Button></div><dl className="marketplace-detail-list"><div><dt>Source</dt><dd>{selectedRemoteModel.source}</dd></div><div><dt>Install route</dt><dd>{selectedRemoteModel.requiresAirLlm ? `AirLLM · ${airLlmReady === null ? "checking readiness" : airLlmReady ? "ready" : "setup needed"}` : `${selectedRemoteModel.installRoute} · ${installRouteAvailable(selectedRemoteModel) ? "ready" : `active runtime: ${activeLocalRuntime}`}`}</dd></div><div><dt>Estimated size</dt><dd>{formatSize(selectedRemoteModel.sizeBytes)}</dd></div><div><dt>Device fit · advisory</dt><dd>{modelFitSummary(selectedRemoteModel)}</dd></div><div><dt>License</dt><dd>{selectedRemoteModel.license || "No license metadata published by the catalog. Review the source repository license before use."}</dd></div><div><dt>Context window</dt><dd>{selectedRemoteModel.contextLength ? `${selectedRemoteModel.contextLength.toLocaleString()} tokens (catalog metadata)` : "Not published by catalog"}</dd></div><div><dt>Downloads</dt><dd>{selectedRemoteModel.downloads.toLocaleString()}</dd></div><div><dt>Likes</dt><dd>{selectedRemoteModel.likes.toLocaleString()}</dd></div><div><dt>Next step</dt><dd>{selectedRemoteModel.requiresAirLlm ? "Install the optional runtime in Settings, then choose Use with AirLLM. Weights download when chat first starts." : installRouteAvailable(selectedRemoteModel) ? "Review the local installer before confirming the download." : "Use a package compatible with your active local runtime."}</dd></div></dl></aside>}</div>}
   </section>;
 
   const filteredCategories = categoryCards.filter((category) => {
@@ -547,12 +656,13 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
             <div className="marketplace-detail-heading"><div><p className="section-kicker">INSTALLED ITEM</p><h3>{selectedInstalled.name}</h3></div><StatusBadge tone={selectedInstalled.state === "limited" ? "warning" : "success"}>{selectedInstalled.state}</StatusBadge></div>
             <p>{selectedInstalled.detail}</p>
             <dl className="marketplace-detail-list"><div><dt>Source</dt><dd>{selectedInstalled.source}</dd></div><div><dt>Requirements</dt><dd>{selectedInstalled.requirements}</dd></div><div><dt>Next step</dt><dd>{selectedInstalled.nextStep}</dd></div></dl>
-            <div className="marketplace-model-actions">{selectedInstalled.health && <Button variant="secondary" onClick={selectedInstalled.health}>Check health</Button>}{selectedInstalled.remove && <Button variant="danger" onClick={selectedInstalled.remove}>Remove</Button>}<Button variant="ghost" aria-pressed={pinnedItems.includes(selectedInstalled.id)} onClick={() => setPinnedItems((current) => current.includes(selectedInstalled.id) ? current.filter((id) => id !== selectedInstalled.id) : [...current, selectedInstalled.id])}>{pinnedItems.includes(selectedInstalled.id) ? "Unpin" : "Pin"}</Button></div>
+            {installedActionStatus && selectedInstalled.id.startsWith("model:") && <p className="marketplace-honesty" role="status">{installedActionStatus}</p>}
+            <div className="marketplace-model-actions">{selectedInstalled.health && <Button variant="secondary" onClick={selectedInstalled.health}>Check health</Button>}{selectedInstalled.update && <Button variant="secondary" disabled={installedActionBusy} onClick={selectedInstalled.update}>{installedActionBusy ? "Updating…" : "Update"}</Button>}{selectedInstalled.remove && <Button variant="danger" disabled={installedActionBusy} onClick={selectedInstalled.remove}>{installedActionBusy ? "Working…" : "Remove"}</Button>}<Button variant="ghost" aria-pressed={pinnedItems.includes(selectedInstalled.id)} onClick={() => setPinnedItems((current) => current.includes(selectedInstalled.id) ? current.filter((id) => id !== selectedInstalled.id) : [...current, selectedInstalled.id])}>{pinnedItems.includes(selectedInstalled.id) ? "Unpin" : "Pin"}</Button></div>
           </aside> : <aside className="marketplace-detail marketplace-installed-inspector"><EmptyState title="No installed items" description="Installed inventory will appear here when a local runtime or catalog item is available." /></aside>}
           </div>
         ) : (
           <>
-            <div className="marketplace-toolbar"><div className="marketplace-search-row"><label className="sr-only" htmlFor="marketplace-search">Search {section.toLowerCase()}</label><input id="marketplace-search" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && showModels) void searchModels(); }} placeholder={showModels ? "Search models by name or provider…" : "Search " + section.toLowerCase() + "…"} />{showModels && <Button variant="secondary" disabled={modelLoading} onClick={() => void searchModels()}>{modelLoading ? "Searching…" : "Search providers"}</Button>}<span>{showModels ? models.length + " remote results" : visible.length + " results"}</span></div></div>
+            <div className="marketplace-toolbar"><div className="marketplace-search-row"><label className="sr-only" htmlFor="marketplace-search">Search {section.toLowerCase()}</label><input id="marketplace-search" value={query} maxLength={showModels ? 160 : undefined} onChange={(event) => setQuery(showModels ? normalizeModelSearchQuery(event.target.value) : event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && showModels && !modelLoading) void searchModels(); }} placeholder={showModels ? "Search models by name or provider…" : "Search " + section.toLowerCase() + "…"} />{showModels && query.trim() && <Button variant="ghost" type="button" aria-label="Clear model search" title="Clear search" onClick={() => { setQuery(""); void searchModels("", uncensored, provider, true); }}><NavIcon name="close" /></Button>}{showModels && <Button variant="secondary" type="button" onClick={() => modelLoading ? cancelModelSearch() : void searchModels()}>{modelLoading ? "Cancel search" : "Search models"}</Button>}<span>{showModels ? modelLoading ? "Searching catalogs…" : `${models.length} results` : visible.length + " results"}</span></div></div>
             {showModels ? <div className="marketplace-models-pane">{modelResults}</div> : (
               <div className="marketplace-layout">
                 <div className="marketplace-results" aria-label={section + " results"}>

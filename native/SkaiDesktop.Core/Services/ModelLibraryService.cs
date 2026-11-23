@@ -171,13 +171,17 @@ public sealed partial class ModelLibraryService(HttpClient? httpClient = null, s
         if (!json.RootElement.TryGetProperty("models", out var models) || models.ValueKind != JsonValueKind.Array) return [];
         var installed = models.EnumerateArray()
             .Where(item => item.TryGetProperty("name", out _))
-            .Select(item => new InstalledLocalModel(
-                "Ollama",
-                item.GetProperty("name").GetString() ?? "",
-                endpoint,
-                item.TryGetProperty("details", out var details) && details.TryGetProperty("family", out var family) ? family.GetString() : null,
-                item.TryGetProperty("size", out var size) && size.TryGetInt64(out var bytes) ? bytes : null,
-                null))
+            .Select(item =>
+            {
+                var model = item.GetProperty("name").GetString() ?? "";
+                return new InstalledLocalModel(
+                    "Ollama",
+                    model,
+                    endpoint,
+                    ModelDisplayNameFormatter.Format(model),
+                    item.TryGetProperty("size", out var size) && size.TryGetInt64(out var bytes) ? bytes : null,
+                    null);
+            })
             .Where(model => IsSafeCatalogIdentifier(model.Model))
             .ToArray();
         // Ollama's tags endpoint does not include a model's training context.

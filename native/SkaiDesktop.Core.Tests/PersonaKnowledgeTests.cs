@@ -278,6 +278,9 @@ internal static class PersonaKnowledgeTests
             "generated profile fields are withheld when their supporting source is later than the era");
         Check(!prompt.Contains("Mixed-era synthesis", StringComparison.Ordinal) && prompt.Contains("Temporal evidence filter", StringComparison.Ordinal),
             "mixed-era distillations are withheld and the prompt records excluded temporal evidence");
+        Check(prompt.Contains("Treat any event after 2010-06-01 as unknown and future from your perspective", StringComparison.Ordinal) &&
+              prompt.Contains("do not repeat or elaborate on the post-cutoff event", StringComparison.Ordinal),
+            "persona prompts treat post-cutoff events as unknown even when they are already public in the real world");
 
         var undated = new SavedPersonaSource { Url = "https://example.org/undated", Excerpt = "Undated reference." };
         Check(PersonaKnowledgeCutoffPolicy.IsAvailableByCutoff(undated, persona) &&

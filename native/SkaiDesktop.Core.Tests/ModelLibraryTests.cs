@@ -72,8 +72,11 @@ internal static class ModelLibraryTests
         var discoveredLocalModels = await localInventory.DiscoverLocalModelsAsync("http://localhost:1234/v1", includeHuggingFaceCache: false);
         Check(discoveredLocalModels.Count == 3, "model library finds installed models across multiple local runtimes");
         Check(discoveredLocalModels.Count(model => model.Model == "qwen3:8b") == 2 && discoveredLocalModels.Select(model => model.Endpoint).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 2, "same model ID remains distinguishable when installed in separate runtimes");
-        Check(discoveredLocalModels.Any(model => model.Provider == "LM Studio" && model.IsLoaded == false && model.DisplayName == "Qwen 3 8B") && discoveredLocalModels.Any(model => model.Provider == "Ollama" && model.SizeBytes == 123456789), "runtime-native inventories include installed state and model metadata");
+        Check(discoveredLocalModels.Any(model => model.Provider == "LM Studio" && model.IsLoaded == false && model.DisplayName == "Qwen 3 8B") && discoveredLocalModels.Any(model => model.Provider == "Ollama" && model.SizeBytes == 123456789 && model.DisplayName == "Llama3.2"), "runtime-native inventories include installed state and readable model labels");
         Check(discoveredLocalModels.Where(model => model.Provider == "Ollama").All(model => model.ContextLength == 131072), "Ollama inventory enriches short model lists with bounded context metadata");
+        Check(ModelDisplayNameFormatter.Format("qwen3:14b") == "Qwen3 14B", "Ollama parameter-size tags become readable model labels");
+        Check(ModelDisplayNameFormatter.Format("hf.co/Thaurock/Qwen3-Coder-30B-A3B-Instruct-abliterated-GGUF:Q4_K_M") == "Qwen3 Coder 30B A3B Instruct · Q4_K_M", "Hugging Face Ollama IDs expose the model name and quantization instead of the runtime family alias");
+        Check(ModelDisplayNameFormatter.Format("hf.co/example/model-name:latest") == "Model Name" && ModelDisplayNameFormatter.Format("") == "Unknown model", "generic and empty model IDs receive safe readable labels");
         var resilientInventory = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
         {
             if (request.RequestUri?.Port == 1234 && request.RequestUri.AbsolutePath == "/api/v1/models")

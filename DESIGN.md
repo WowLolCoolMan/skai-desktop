@@ -27,10 +27,17 @@ tokens instead of adding decorative controls or a second UI architecture.
 
 ## Shell and layout
 
-- Keep the narrow global rail for Home, Image Gen, Usage, and Settings.
-- Keep the adjacent sidebar dedicated to workspace identity, projects,
-  conversations, and active sessions. Put secondary tools in the searchable
-  launcher rather than permanently expanding the thread sidebar.
+- Use one persistent workspace sidebar beside the active work surface. Keep
+  Chat, Projects, Coding, the main tools, recent projects, and recent chats
+  visible there so navigation and context remain available on every route.
+- Keep the top bar compact for desktop controls, navigation history, and
+  connection status. Show the active route or thread title once in its work
+  surface; avoid a second global icon rail and duplicate empty-state shortcuts.
+- Put thread-specific model and response controls near the conversation.
+  Keep optional task planning and schedules available from the thread options.
+- Collapse the workspace sidebar on narrow windows and provide a persistent
+  top-bar control to reopen it. Use the same sidebar hierarchy on tool routes
+  instead of removing navigation when the main work surface changes.
 - Main pages fill the remaining viewport. Only Settings and long chat threads
   should need page-level scrolling; use bounded internal regions for long lists,
   diffs, and inspectors.

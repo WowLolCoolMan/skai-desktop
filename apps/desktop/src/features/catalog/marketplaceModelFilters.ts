@@ -27,32 +27,40 @@ export type MarketplaceModelFilters = {
   uncensored: boolean;
 };
 
-const titleCaseTag = (tag: string) => tag.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+const normalizeTag = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-export function marketplaceModelFilterOptions(models: MarketplaceModel[]) {
-  const tags = [...new Set(models.flatMap((model) => model.tags))].sort((left, right) => left.localeCompare(right));
-  const optionsFor = (pattern: RegExp, fallback: string) => [fallback, ...new Set(tags.filter((tag) => pattern.test(tag)).map(titleCaseTag))];
+export function marketplaceModelFilterOptions() {
   return {
-    tasks: optionsFor(/text|chat|code|image|audio|video|vision|speech|embed/i, "All tasks"),
-    libraries: optionsFor(/transformers|gguf|mlx|pytorch|tensorflow|diffusers|safetensors|jax/i, "All libraries"),
-    apps: optionsFor(/ollama|llama\.cpp|lm studio|vllm|jan|localai|airllm/i, "All apps"),
+    tasks: ["All tasks", "Chat", "Code", "Embeddings", "Image", "Audio", "Video", "Vision", "Speech"],
+    libraries: ["All libraries", "GGUF", "Transformers", "MLX", "PyTorch", "TensorFlow", "Safetensors"],
+    apps: ["All apps", "Ollama", "LM Studio", "AirLLM", "llama.cpp", "vLLM", "Jan", "LocalAI"],
   };
 }
 
 export function filterMarketplaceModels(models: MarketplaceModel[], filters: MarketplaceModelFilters) {
   const sizeLimit = filters.size === "Any size" ? Number.POSITIVE_INFINITY : Number(filters.size) * 1024 ** 3;
-  const normalizedTask = filters.task === "All tasks" ? "" : filters.task.toLowerCase();
-  const normalizedLibrary = filters.library === "All libraries" ? "" : filters.library.toLowerCase();
-  const normalizedApp = filters.app === "All apps" ? "" : filters.app.toLowerCase();
+  const normalizedTask = filters.task === "All tasks" ? "" : normalizeTag(filters.task);
+  const normalizedLibrary = filters.library === "All libraries" ? "" : normalizeTag(filters.library);
+  const normalizedApp = filters.app === "All apps" ? "" : normalizeTag(filters.app);
 
   return models.filter((model) => {
     const matchesProvider = filters.provider === "All providers"
       || (filters.provider === "AirLLM" ? model.requiresAirLlm === true : model.source === filters.provider && !model.requiresAirLlm);
     const matchesSize = filters.size === "Any size" || (model.sizeBytes != null && model.sizeBytes <= sizeLimit);
-    const tags = model.tags.map((tag) => tag.toLowerCase());
-    const matchesTask = !normalizedTask || tags.some((tag) => tag.includes(normalizedTask));
+    const tags = model.tags.map(normalizeTag);
+    const taskAliases: Record<string, string[]> = {
+      chat: ["chat", "conversational", "instruct", "text generation"],
+      code: ["code", "coder", "programming"],
+      embeddings: ["embedding", "embeddings"],
+      image: ["image", "images", "text to image"],
+      audio: ["audio", "speech"],
+      video: ["video"],
+      vision: ["vision", "visual question answering"],
+      speech: ["speech", "audio", "text to speech"],
+    };
+    const matchesTask = !normalizedTask || (taskAliases[normalizedTask] ?? [normalizedTask]).some((alias) => tags.some((tag) => tag.includes(normalizeTag(alias))));
     const matchesLibrary = !normalizedLibrary || tags.some((tag) => tag.includes(normalizedLibrary));
-    const matchesApp = !normalizedApp || tags.some((tag) => tag.includes(normalizedApp));
+    const matchesApp = !normalizedApp || normalizeTag(model.source).includes(normalizedApp) || tags.some((tag) => tag.includes(normalizedApp));
     const matchesContext = filters.context === "Any context"
       || (filters.context === "1M-class window" && (model.contextLength ?? 0) >= 900_000);
     return matchesProvider && matchesSize && matchesTask && matchesLibrary && matchesApp && matchesContext;

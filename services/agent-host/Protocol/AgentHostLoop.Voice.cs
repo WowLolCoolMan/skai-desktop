@@ -24,7 +24,7 @@ public static partial class AgentHostLoop
                 name = model.Name,
                 detail = model.Description,
                 size = model.Size,
-                installed = model.Id == "kokoro-82m-onnx" ? KokoroVoiceRuntime.IsInstalled : model.Id == "piper" ? PiperVoiceRuntime.IsInstalled : model.Id == "chatterbox" ? ChatterboxVoiceRuntime.IsInstalled : model.IsInstalled,
+                installed = model.Id == "os-native" ? VoiceRuntimeStatus.IsOsNativeAvailable : model.Id == "kokoro-82m-onnx" ? KokoroVoiceRuntime.IsInstalled : model.Id == "piper" ? PiperVoiceRuntime.IsInstalled : model.Id == "chatterbox" ? ChatterboxVoiceRuntime.IsInstalled : model.IsInstalled,
                 lowResource = model.IsLowResource,
                 adapterAvailable = model.AdapterAvailable || model.Id is "kokoro-82m-onnx" or "piper" or "chatterbox",
                 supportsStreaming = model.SupportsStreaming,

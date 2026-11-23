@@ -297,7 +297,7 @@ async function run() {
   if (!tasks.ok || plannedTask?.title !== "Protocol smoke task" || plannedTask.instruction !== "Review the local task workflow." || plannedTask.responseMode !== "security" || !Array.isArray(plannedTask.artifactLabels) || approvalListed?.requiresApproval !== true) throw new Error("tasks.list did not preserve the task review metadata.");
   const queued = await request("tasks.queue", { id: planned.result.id });
   if (!queued.ok || queued.result?.status !== "queued") throw new Error("tasks.queue did not queue the local task.");
-  const isolatedModelSettings = await request("settings.save", { endpoint: "http://127.0.0.1:1/v1", model: "protocol-smoke-model", provider: "Ollama" });
+  const isolatedModelSettings = await request("settings.save", { endpoint: "http://127.0.0.1:1/v1", model: "protocol-smoke-model", provider: "Local API" });
   if (!isolatedModelSettings.ok) throw new Error("settings.save could not prepare the isolated task execution endpoint.");
   const execution = await request("tasks.execute", { id: planned.result.id });
   if (!execution.ok || execution.result?.id !== planned.result.id || !["running", "queued", "failed"].includes(execution.result?.status)) throw new Error(`tasks.execute did not start a background local execution: ${JSON.stringify(execution)}`);
@@ -314,6 +314,12 @@ async function run() {
   let activeQueueRequests = 0;
   let maxActiveQueueRequests = 0;
   let fencedActionServed = false;
+  let nativeToolRequests = 0;
+  const nativeToolRequestBodies = [];
+  let repairAttempts = 0;
+  const repairRequestBodies = [];
+  let exhaustedRepairAttempts = 0;
+  const exhaustedRepairRequestBodies = [];
   const queueRequestBodies = [];
   const queueModelServer = http.createServer((request, response) => {
     let body = "";
@@ -321,17 +327,36 @@ async function run() {
     request.setEncoding("utf8");
     request.on("data", chunk => { body += chunk; });
     request.on("end", () => {
-      if (request.method === "POST" && body.length > 0) {
+      if (request.method === "POST" && body.length > 0 && request.url === "/api/chat") {
+        nativeToolRequests += 1;
+        nativeToolRequestBodies.push(body.slice(0, 12000));
+      } else if (request.method === "POST" && body.length > 0) {
         requestNumber = ++queueRequests;
         activeQueueRequests += 1;
         maxActiveQueueRequests = Math.max(maxActiveQueueRequests, activeQueueRequests);
+        if (body.includes("malformed action JSON repair smoke")) {
+          repairAttempts += 1;
+          repairRequestBodies.push(body.slice(0, 12000));
+        }
+        if (body.includes("exhausted action JSON repair smoke")) {
+          exhaustedRepairAttempts += 1;
+          exhaustedRepairRequestBodies.push(body.slice(0, 12000));
+        }
       }
       queueRequestBodies.push(body.slice(0, 1200));
       setTimeout(() => {
+        if (request.url === "/api/chat") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ message: { role: "assistant", content: "", tool_calls: [{ id: "native-smoke-done", type: "function", function: { name: "done", arguments: { summary: "Native Ollama tool task completed." } } }] }, done: true }));
+          return;
+        }
         response.writeHead(200, { "content-type": "text/event-stream" });
         const action = JSON.stringify({ action: "done", summary: "Queued smoke task completed." });
         if (requestNumber === 1) fencedActionServed = true;
-        const content = requestNumber === 1 ? `\`\`\`json\n${action}\n\`\`\`` : action;
+        const content = (body.includes("malformed action JSON repair smoke") && repairAttempts === 1)
+          || body.includes("exhausted action JSON repair smoke")
+          ? "```json\n{\"action\":\"done\",\"summary\": }\n```"
+          : requestNumber === 1 ? `\`\`\`json\n${action}\n\`\`\`` : action;
         response.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
         if (request.method === "POST" && body.length > 0) activeQueueRequests -= 1;
       }, 750);
@@ -340,7 +365,9 @@ async function run() {
   pendingSmokeServers.add(queueModelServer);
   await new Promise(resolve => queueModelServer.listen(0, "127.0.0.1", resolve));
   const queueModelPort = queueModelServer.address().port;
-  const queueSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "queue-smoke-model", provider: "Ollama" });
+  // Keep this fixture's capacity decision stable even if host CPU/RAM telemetry
+  // changes while the two queued tasks are waiting for their execution slot.
+  const queueSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "queue-smoke-model", provider: "Local API", localRamBudgetBytes: 1024 * 1024 * 1024 });
   if (!queueSettings.ok) throw new Error("settings.save could not prepare the queued task smoke endpoint.");
   const firstQueued = await request("tasks.plan", { title: "First queued task", instruction: "Complete the first queued smoke task.", environment: "local" });
   const secondQueued = await request("tasks.plan", { title: "Second queued task", instruction: "Complete the second queued smoke task.", environment: "local" });
@@ -365,6 +392,64 @@ async function run() {
   }
   if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || !fencedActionServed || maxActiveQueueRequests < 1 || maxActiveQueueRequests > reportedSlotLimit)
     throw new Error(`Queued task dispatch or fenced-action recovery failed: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, fencedActionServed, maxActiveQueueRequests, reportedSlotLimit, queueRequestBodies })}`);
+  const ollamaSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "native-tools-smoke-model", provider: "Ollama" });
+  if (!ollamaSettings.ok) throw new Error("settings.save could not prepare the native Ollama tool smoke endpoint.");
+  const nativeToolTask = await request("tasks.plan", { title: "Native Ollama tools", instruction: "Review the local task workflow.", environment: "local", projectId: project.result.id });
+  if (!nativeToolTask.ok) throw new Error(`tasks.plan could not create the native Ollama tool task: ${JSON.stringify(nativeToolTask)}`);
+  const nativeToolQueued = await request("tasks.queue", { id: nativeToolTask.result.id });
+  if (!nativeToolQueued.ok || nativeToolQueued.result?.status !== "queued") throw new Error("tasks.queue could not queue the native Ollama tool task.");
+  const nativeToolExecution = await request("tasks.execute", { id: nativeToolTask.result.id });
+  if (!nativeToolExecution.ok) throw new Error(`tasks.execute could not start native Ollama tool execution: ${JSON.stringify(nativeToolExecution)}`);
+  let nativeToolTerminal = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error("tasks.list failed while observing native Ollama tool execution.");
+    nativeToolTerminal = snapshot.result.find(item => item.id === nativeToolTask.result.id) ?? null;
+    if (nativeToolTerminal && ["completed", "failed", "cancelled", "blocked"].includes(nativeToolTerminal.status)) break;
+  }
+  const nativeToolPayload = nativeToolRequestBodies.length === 1 ? JSON.parse(nativeToolRequestBodies[0]) : null;
+  if (!nativeToolTerminal || nativeToolTerminal.status !== "completed" || nativeToolRequests !== 1 || nativeToolPayload?.model !== "native-tools-smoke-model" || !nativeToolPayload?.tools?.some(tool => tool.function?.name === "replace_text"))
+    throw new Error(`Native Ollama coding tools did not complete with the expected local tool schema: ${JSON.stringify({ nativeToolTerminal, nativeToolRequests, nativeToolPayload })}`);
+  const repairSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "action-repair-smoke-model", provider: "Local API" });
+  if (!repairSettings.ok) throw new Error("settings.save could not prepare the malformed-action repair smoke endpoint.");
+  const repairTask = await request("tasks.plan", { title: "Malformed action repair", instruction: "Complete the malformed action JSON repair smoke.", environment: "local" });
+  if (!repairTask.ok) throw new Error(`tasks.plan could not create the malformed-action repair task: ${JSON.stringify(repairTask)}`);
+  const repairQueued = await request("tasks.queue", { id: repairTask.result.id });
+  if (!repairQueued.ok || repairQueued.result?.status !== "queued") throw new Error("tasks.queue could not queue the malformed-action repair task.");
+  const repairExecution = await request("tasks.execute", { id: repairTask.result.id });
+  if (!repairExecution.ok) throw new Error(`tasks.execute could not start malformed-action repair: ${JSON.stringify(repairExecution)}`);
+  let repairTerminal = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error("tasks.list failed while observing malformed-action repair.");
+    repairTerminal = snapshot.result.find(item => item.id === repairTask.result.id) ?? null;
+    if (repairTerminal && ["completed", "failed", "cancelled", "blocked"].includes(repairTerminal.status)) break;
+  }
+  const repairFollowup = repairRequestBodies[1] ? JSON.parse(repairRequestBodies[1]) : null;
+  if (repairTerminal?.status !== "completed" || repairAttempts !== 2 || !repairFollowup?.messages?.some(message => typeof message.content === "string" && message.content.includes("Repeat the action as one valid JSON object"))) {
+    throw new Error(`Coding Agent did not repair one malformed local action within its retry budget: ${JSON.stringify({ repairTerminal, repairAttempts, repairFollowup })}`);
+  }
+  const exhaustedRepairTask = await request("tasks.plan", { title: "Bounded action repair", instruction: "Complete the exhausted action JSON repair smoke.", environment: "local" });
+  if (!exhaustedRepairTask.ok) throw new Error(`tasks.plan could not create the bounded repair task: ${JSON.stringify(exhaustedRepairTask)}`);
+  const exhaustedRepairQueued = await request("tasks.queue", { id: exhaustedRepairTask.result.id });
+  if (!exhaustedRepairQueued.ok || exhaustedRepairQueued.result?.status !== "queued") throw new Error("tasks.queue could not queue the bounded repair task.");
+  const exhaustedRepairExecution = await request("tasks.execute", { id: exhaustedRepairTask.result.id });
+  if (!exhaustedRepairExecution.ok) throw new Error(`tasks.execute could not start bounded repair: ${JSON.stringify(exhaustedRepairExecution)}`);
+  let exhaustedRepairTerminal = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error("tasks.list failed while observing the bounded repair task.");
+    exhaustedRepairTerminal = snapshot.result.find(item => item.id === exhaustedRepairTask.result.id) ?? null;
+    if (exhaustedRepairTerminal && ["completed", "failed", "cancelled", "blocked"].includes(exhaustedRepairTerminal.status)) break;
+  }
+  const finalRepairRequest = exhaustedRepairRequestBodies[3] ? JSON.parse(exhaustedRepairRequestBodies[3]) : null;
+  const repairGuidanceCount = finalRepairRequest?.messages?.filter(message => typeof message.content === "string" && message.content.includes("Repeat the action as one valid JSON object")).length ?? 0;
+  if (exhaustedRepairTerminal?.status !== "failed" || exhaustedRepairAttempts !== 4 || repairGuidanceCount !== 3 || !exhaustedRepairTerminal.resultSummary?.includes("after three repair attempts")) {
+    throw new Error(`Coding Agent did not stop after exactly three malformed-action repairs: ${JSON.stringify({ exhaustedRepairTerminal, exhaustedRepairAttempts, repairGuidanceCount })}`);
+  }
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const capacitySnapshot = await request("system.capacity");
     if (capacitySnapshot.ok && capacitySnapshot.result?.scheduler?.activeTaskCount === 0 && capacitySnapshot.result?.scheduler?.queuedTaskCount === 0) break;
@@ -380,8 +465,9 @@ async function run() {
     const queuedTask = await request("tasks.queue", { id: task.result.id });
     if (!queuedTask.ok || queuedTask.result?.status !== "queued") throw new Error("tasks.queue did not queue the cancellation pair.");
   }
+  const requestsBeforeCancellation = queueRequests;
   const leaderExecution = await request("tasks.execute", { id: cancellationLeader.result.id });
-  for (let attempt = 0; attempt < 30 && queueRequests < 3; attempt += 1) await new Promise(resolve => setTimeout(resolve, 100));
+  for (let attempt = 0; attempt < 30 && queueRequests < requestsBeforeCancellation + 1; attempt += 1) await new Promise(resolve => setTimeout(resolve, 100));
   const waiterExecution = await request("tasks.execute", { id: cancellationWaiter.result.id });
   if (!leaderExecution.ok || !waiterExecution.ok || waiterExecution.result?.status !== "queued") throw new Error("The cancellation waiter did not enter the local queue.");
   const waiterCancelled = await request("tasks.cancel", { id: cancellationWaiter.result.id });
@@ -396,8 +482,8 @@ async function run() {
   }
   await new Promise(resolve => queueModelServer.close(resolve));
   pendingSmokeServers.delete(queueModelServer);
-  if (!cancelledTask || cancelledTask.status !== "cancelled" || queueRequests !== 3)
-    throw new Error(`Queued task cancellation did not stop the waiting task before execution: ${JSON.stringify({ cancelledTask, queueRequests })}`);
+  if (!cancelledTask || cancelledTask.status !== "cancelled" || queueRequests !== requestsBeforeCancellation + 1)
+    throw new Error(`Queued task cancellation did not stop the waiting task before execution: ${JSON.stringify({ cancelledTask, queueRequests, requestsBeforeCancellation })}`);
   const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
   if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Only the Local environment")) throw new Error("tasks.plan accepted an unsupported environment.");
   let scheduledRequests = 0;

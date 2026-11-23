@@ -15,6 +15,7 @@ public sealed class WorkspaceCommandRunner
     public const int MaxOutputCharacters = 30_000;
     public static readonly TimeSpan MaxTimeout = TimeSpan.FromMinutes(2);
     private static readonly Regex TerminalControlSequence = new("\\x1b(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\x07]*(?:\\x07|\\x1b\\\\))", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex NodeRuntimeCommand = new(@"^\s*(?:node(?:\.exe)?|npm(?:\.cmd)?|npx(?:\.cmd)?|pnpm(?:\.cmd)?|yarn(?:\.cmd)?|bun(?:\.exe)?)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly HashSet<string> AllowedCommandEnvironmentNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TERM", "CI",
@@ -60,6 +61,13 @@ public sealed class WorkspaceCommandRunner
         {
             if (AllowedCommandEnvironmentNames.Contains(name) && !IsSensitiveEnvironmentName(name))
                 startInfo.Environment[name] = value;
+        }
+        if (isWindows && NodeRuntimeCommand.IsMatch(command))
+        {
+            // Node's default realpath walk probes the drive root, which the
+            // folder-scoped AppContainer deliberately does not grant. Preserving
+            // symlinks lets Node resolve package and test paths within the grant.
+            startInfo.Environment["NODE_OPTIONS"] = "--preserve-symlinks --preserve-symlinks-main";
         }
         if (OperatingSystem.IsLinux())
         {

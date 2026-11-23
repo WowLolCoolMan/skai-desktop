@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const readline = require("node:readline");
+const http = require("node:http");
 const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
 const root = path.resolve(__dirname, "..");
@@ -57,7 +58,7 @@ function request(method, params, timeoutMs = 45_000) {
 async function run() {
   const health = await request("runtime.health");
   const capabilities = health.result?.capabilities ?? [];
-  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe"]) {
+  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.models.remove", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe"]) {
     if (!health.ok || !capabilities.includes(capability)) throw new Error(`runtime.health did not advertise ${capability}.`);
   }
   const catalog = await request("marketplace.catalog");
@@ -128,6 +129,30 @@ async function run() {
   }
   const revoked = await request("mcp.connection.revoke", { connectionId: filesystem.result.connection.connectionId });
   if (!revoked.ok) throw new Error("Filesystem MCP could not be cleanly stopped after the smoke check.");
+  const filesystemReconnected = await request("mcp.connection.connect", {
+    serverId: "filesystem", transport: "stdio", profileId: "filesystem", folderPath: sharedFolder,
+  }, 7 * 60_000);
+  if (!filesystemReconnected.ok || filesystemReconnected.result?.connection?.state !== "healthy"
+    || filesystemReconnected.result?.connection?.connectionId === filesystem.result.connection.connectionId) {
+    throw new Error(`Filesystem MCP could not establish a fresh connection after revocation: ${JSON.stringify(filesystemReconnected)}`);
+  }
+  const reconnectTools = filesystemReconnected.result?.tools ?? [];
+  const reconnectListTool = reconnectTools.find(tool => tool.toolName === "list_directory");
+  if (!reconnectListTool || reconnectTools.some(tool => ["write_file", "edit_file", "create_directory", "delete_file"].includes(tool.toolName))) {
+    throw new Error(`Filesystem MCP reconnect changed its read-only tool boundary: ${JSON.stringify(filesystemReconnected)}`);
+  }
+  const reconnectRead = await request("mcp.tool.call", {
+    connectionId: filesystemReconnected.result.connection.connectionId,
+    toolName: reconnectListTool.toolName,
+    approvalId: "marketplace-smoke-filesystem-reconnect-read",
+    capabilities: ["mcp.invoke.read"],
+    arguments: { path: sharedFolder },
+  });
+  if (!reconnectRead.ok || reconnectRead.result?.isError || !reconnectRead.result?.text?.includes("sample.txt")) {
+    throw new Error(`Filesystem MCP could not resume approved reads after reconnect: ${JSON.stringify(reconnectRead)}`);
+  }
+  const reconnectRevoked = await request("mcp.connection.revoke", { connectionId: filesystemReconnected.result.connection.connectionId });
+  if (!reconnectRevoked.ok) throw new Error("Filesystem MCP could not be cleanly stopped after reconnect acceptance.");
   const playwright = await request("mcp.connection.connect", {
     serverId: "playwright", transport: "stdio", profileId: "playwright",
   }, 7 * 60_000);
@@ -184,6 +209,47 @@ async function run() {
   const reviewedGemma = gemma.result?.models?.find(model => model.repository === "Kooten/gemma-4-31b-abliterated-v1.1-GGUF");
   if (!gemma.ok || !reviewedGemma || reviewedGemma.installRoute !== "lm-studio" || reviewedGemma.installable !== true || !reviewedGemma.tags?.includes("dense") || !reviewedGemma.tags?.includes("abliterated")) {
     throw new Error(`The reviewed Gemma 4 31B dense abliterated entry is missing or incomplete: ${JSON.stringify(gemma)}`);
+  }
+
+  const ollama = await request("marketplace.models.search", { query: "qwen3 coder", provider: "Ollama", uncensored: false });
+  const curatedModel = ollama.result?.models?.find(model => model.repository === "qwen3-coder:30b-a3b-q4_K_M");
+  if (!ollama.ok || !curatedModel?.installable || curatedModel.installRoute !== "ollama-pull") {
+    throw new Error(`The curated Ollama model does not expose its verified install route: ${JSON.stringify(ollama)}`);
+  }
+
+  // Exercise the exact Marketplace install/remove protocol against a disposable
+  // local Ollama-compatible endpoint. No real model download or deletion occurs.
+  const runtimeRequests = [];
+  const runtime = http.createServer(async (incoming, outgoing) => {
+    const chunks = [];
+    for await (const chunk of incoming) chunks.push(chunk);
+    const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
+    runtimeRequests.push({ method: incoming.method, url: incoming.url, body });
+    outgoing.writeHead(200, { "content-type": incoming.url === "/api/pull" ? "application/x-ndjson" : "application/json" });
+    outgoing.end(incoming.url === "/api/pull" ? '{"status":"success"}\n' : "{}");
+  });
+  await new Promise((resolve, reject) => { runtime.once("error", reject); runtime.listen(0, "127.0.0.1", resolve); });
+  const endpoint = `http://127.0.0.1:${runtime.address().port}`;
+  try {
+    const started = await request("marketplace.models.install.start", { source: "ollama", repository: curatedModel.repository, endpoint });
+    if (!started.ok || !started.result?.id) throw new Error(`The curated model install did not start: ${JSON.stringify(started)}`);
+    let installStatus;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      installStatus = await request("marketplace.models.install.status", { id: started.result.id });
+      if (!installStatus.ok || installStatus.result?.status !== "running") break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    if (!installStatus?.ok || installStatus.result?.status !== "completed") throw new Error(`The curated model install did not complete: ${JSON.stringify(installStatus)}`);
+    const removed = await request("marketplace.models.remove", { endpoint, model: curatedModel.repository });
+    if (!removed.ok || removed.result?.removed !== true || removed.result?.provider !== "Ollama") throw new Error(`The curated model removal did not complete: ${JSON.stringify(removed)}`);
+    if (!runtimeRequests.some(item => item.method === "POST" && item.url === "/api/pull" && item.body.name === curatedModel.repository)
+      || !runtimeRequests.some(item => item.method === "DELETE" && item.url === "/api/delete" && item.body.name === curatedModel.repository)) {
+      throw new Error(`The local runtime did not receive exact install and remove requests: ${JSON.stringify(runtimeRequests)}`);
+    }
+    const remoteRemoval = await request("marketplace.models.remove", { endpoint: "https://example.com", model: curatedModel.repository });
+    if (remoteRemoval.ok || !remoteRemoval.error?.message?.includes("loopback")) throw new Error("Marketplace model removal accepted a hosted endpoint.");
+  } finally {
+    await new Promise(resolve => runtime.close(resolve));
   }
   console.log(`Marketplace host smoke passed (${providers.length} providers, ${search.result.models.length} model results).`);
 }

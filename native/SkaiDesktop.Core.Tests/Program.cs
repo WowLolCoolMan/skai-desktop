@@ -7,6 +7,12 @@ if (args.Length == 1 && args[0].Equals("--model-library", StringComparison.Ordin
     Console.WriteLine("Selected Model Library checks passed.");
     return;
 }
+if (args.Length == 1 && args[0].Equals("--chat-provider", StringComparison.OrdinalIgnoreCase))
+{
+    await ChatProviderTests.RunAsync();
+    Console.WriteLine("Selected chat-provider checks passed.");
+    return;
+}
 if (args.Length == 1 && args[0].Equals("--workspace-sandbox", StringComparison.OrdinalIgnoreCase))
 {
     await LocalStorageAndWorkspaceTests.RunAsync();

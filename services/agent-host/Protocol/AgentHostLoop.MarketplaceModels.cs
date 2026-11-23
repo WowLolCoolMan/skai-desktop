@@ -14,18 +14,26 @@ public static partial class AgentHostLoop
     {
         var query = OptionalString(request, "query") ?? string.Empty;
         var uncensored = request.Params?.TryGetProperty("uncensored", out var uncensoredValue) == true && uncensoredValue.ValueKind == JsonValueKind.True;
+        var providerFilter = (OptionalString(request, "provider") ?? "All providers").Trim();
+        var curatedOnly = OptionalBoolean(request, "curatedOnly");
+        if (providerFilter is not ("All providers" or "Hugging Face" or "ModelScope" or "AirLLM" or "Ollama"))
+            throw new InvalidOperationException("Choose a supported model source.");
+        var includeHuggingFace = !curatedOnly && (providerFilter is "All providers" or "Hugging Face");
+        var includeAirLlm = !curatedOnly && (providerFilter is "All providers" or "AirLLM");
+        var includeModelScope = !curatedOnly && (providerFilter is "All providers" or "ModelScope");
+        var includeOllama = providerFilter is "All providers" or "Ollama";
         var library = new ModelLibraryService();
         // A stalled provider should not leave the Marketplace spinner running
         // for the full per-provider HTTP timeout. Share one bounded search budget
         // across the parallel catalog requests and return any results that did arrive.
         using var searchTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        var huggingFaceTask = library.SearchHuggingFaceAsync(query, uncensored, searchTimeout.Token);
-        var airLlmTask = library.SearchHuggingFaceAirLlmAsync(query, uncensored, searchTimeout.Token);
-        var modelScopeTask = library.SearchModelScopeGgufAsync(query, uncensored, searchTimeout.Token);
+        var huggingFaceTask = includeHuggingFace ? library.SearchHuggingFaceAsync(query, uncensored, searchTimeout.Token) : null;
+        var airLlmTask = includeAirLlm ? library.SearchHuggingFaceAirLlmAsync(query, uncensored, searchTimeout.Token) : null;
+        var modelScopeTask = includeModelScope ? library.SearchModelScopeGgufAsync(query, uncensored, searchTimeout.Token) : null;
         var providers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var models = new List<object>();
 
-        try
+        if (huggingFaceTask is not null) try
         {
             var huggingFace = await huggingFaceTask.ConfigureAwait(false);
             models.AddRange(huggingFace.Select(model => new
@@ -51,7 +59,7 @@ public static partial class AgentHostLoop
             providers["Hugging Face"] = error.Message;
         }
 
-        try
+        if (airLlmTask is not null) try
         {
             var airLlmModels = await airLlmTask.ConfigureAwait(false);
             models.AddRange(airLlmModels.Select(model => new
@@ -78,7 +86,7 @@ public static partial class AgentHostLoop
             providers["Hugging Face · AirLLM"] = error.Message;
         }
 
-        try
+        if (modelScopeTask is not null) try
         {
             var modelScope = await modelScopeTask.ConfigureAwait(false);
             models.AddRange(modelScope.Select(model => new
@@ -118,7 +126,7 @@ public static partial class AgentHostLoop
             });
             ollamaCandidatesAdded = true;
         }
-        if (uncensored && (string.IsNullOrWhiteSpace(query) || query.Contains("gemma", StringComparison.OrdinalIgnoreCase) || query.Contains("31b", StringComparison.OrdinalIgnoreCase)))
+        if (includeHuggingFace && uncensored && (string.IsNullOrWhiteSpace(query) || query.Contains("gemma", StringComparison.OrdinalIgnoreCase) || query.Contains("31b", StringComparison.OrdinalIgnoreCase)))
         {
             // Reviewed GGUF build of the dense Gemma 4 31B abliterated model.
             // Keep this in the uncensored lane and route installation through
@@ -141,11 +149,11 @@ public static partial class AgentHostLoop
                 requiresAirLlm = false,
             });
         }
-        if (string.IsNullOrWhiteSpace(query) || query.Contains("qwen", StringComparison.OrdinalIgnoreCase) || query.Contains("1m", StringComparison.OrdinalIgnoreCase))
+        if (includeOllama && (string.IsNullOrWhiteSpace(query) || query.Contains("qwen", StringComparison.OrdinalIgnoreCase) || query.Contains("1m", StringComparison.OrdinalIgnoreCase)))
             AddOllamaModel("org/qwen2.5-1m:7b", 4_111, 4.7, 986_000, ["text-generation", "qwen2", "1m-context", "ollama"]);
-        if (string.IsNullOrWhiteSpace(query) || query.Contains("code", StringComparison.OrdinalIgnoreCase) || query.Contains("coder", StringComparison.OrdinalIgnoreCase))
+        if (includeOllama && (string.IsNullOrWhiteSpace(query) || query.Contains("code", StringComparison.OrdinalIgnoreCase) || query.Contains("coder", StringComparison.OrdinalIgnoreCase)))
             AddOllamaModel("qwen3-coder:30b-a3b-q4_K_M", 11_100_000, 19, 256_000, ["text-generation", "code", "tools", "qwen3", "ollama"]);
-        if (string.IsNullOrWhiteSpace(query) || query.Contains("omni", StringComparison.OrdinalIgnoreCase))
+        if (includeOllama && (string.IsNullOrWhiteSpace(query) || query.Contains("omni", StringComparison.OrdinalIgnoreCase)))
             AddOllamaModel("lfm3-omni:2b-q4_K_M", 73_000, 2, 125_000, ["text-generation", "vision", "audio", "video", "omni", "ollama"]);
         if (ollamaCandidatesAdded) providers["Ollama"] = "ready";
 
@@ -157,6 +165,14 @@ public static partial class AgentHostLoop
             providers,
             models = models.Take(100).ToArray(),
         });
+    }
+
+    private static AgentResponse RemoveMarketplaceModel(AgentRequest request)
+    {
+        var endpoint = RequiredLocalEndpoint(request, "endpoint", 2_000);
+        var model = RequiredBoundedString(request, "model", 512);
+        new ModelLibraryService().DeleteOllamaAsync(endpoint, model).GetAwaiter().GetResult();
+        return new(ProtocolVersion, request.Id, true, new { removed = true, model, provider = "Ollama" });
     }
 
     private static AgentResponse StartMarketplaceModelInstall(AgentRequest request)

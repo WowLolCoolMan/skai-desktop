@@ -31,5 +31,12 @@ era run passed discovery, research, drafting, and its first in-character turn,
 but three follow-up attempts ended with the local Ollama server closing the
 stream without a reply. Era-cutoff dialogue therefore remains unverified; this
 is recorded as a model-runtime failure, not a pass or a product-policy failure.
-These are single-model, single-profile samples; broader multi-turn evaluation
-still needs coverage.
+On 2026-11-23, the prompt was tightened to state that all events after the
+effective cutoff are unknown from the persona's perspective, even if already
+public in the real world, and must not be repeated or elaborated on. Native core
+acceptance passed. A live David Lynch 2010-era run on `qwen3:14b` passed identity,
+research, nine-field drafting, in-character chat, and cutoff follow-up (2011 was
+treated as beyond the persona's time). The same scenario on `lfm3-omni:2b-q4_K_M`
+failed persona identity and cutoff acceptance despite successful research and
+drafting. The product still needs a minimum supported local-model tier decision;
+until then, broad persona quality across model sizes remains open.

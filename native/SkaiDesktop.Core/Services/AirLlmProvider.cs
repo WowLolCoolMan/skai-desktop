@@ -27,18 +27,23 @@ public sealed class AirLlmProvider
         if (script is null)
             return new(false, false, ResolvePythonPath(settings.AirLlmPythonPath), "worker-missing", "The packaged AirLLM worker is unavailable.");
 
-        var dependenciesAvailable = IsRuntimeAvailable(settings);
-        return dependenciesAvailable
-            ? new(true, true, ResolvePythonPath(settings.AirLlmPythonPath), "ready", "AirLLM is ready for local Hugging Face model execution.")
-            : new(true, false, ResolvePythonPath(settings.AirLlmPythonPath), "dependencies-missing", OperatingSystem.IsWindows()
+        var probe = ProbeRuntime(settings);
+        if (!probe.DependenciesAvailable)
+            return new(true, false, ResolvePythonPath(settings.AirLlmPythonPath), "dependencies-missing", OperatingSystem.IsWindows()
                 ? "Install the local AirLLM runtime with airllm\\install.ps1 (in the Agent Host folder, or services/airllm in a source checkout), then retry the readiness check."
                 : "Install the local AirLLM runtime with airllm/install.sh (in the Agent Host folder, or services/airllm in a source checkout), then retry the readiness check.");
+        return probe.CudaAvailable
+            ? new(true, true, ResolvePythonPath(settings.AirLlmPythonPath), "ready", "AirLLM is ready for local Hugging Face model execution.")
+            : new(true, true, ResolvePythonPath(settings.AirLlmPythonPath), "cpu-fallback", "AirLLM is ready to run on CPU. Inference will be slower without an accelerator; 4-bit and 8-bit compression require CUDA.");
     }
 
     public bool IsRuntimeAvailable(AppSettings settings)
+        => ProbeRuntime(settings).DependenciesAvailable;
+
+    private static (bool DependenciesAvailable, bool CudaAvailable) ProbeRuntime(AppSettings settings)
     {
         var script = ResolveScriptPath();
-        if (script is null) return false;
+        if (script is null) return (false, false);
         try
         {
             var start = new ProcessStartInfo
@@ -51,23 +56,25 @@ public sealed class AirLlmProvider
                 WorkingDirectory = Path.GetDirectoryName(script) ?? AppContext.BaseDirectory,
             };
             start.ArgumentList.Add("-c");
-            start.ArgumentList.Add("import airllm, torch");
+            start.ArgumentList.Add("import airllm, torch; print('cuda-ready' if torch.cuda.is_available() else 'cuda-unavailable')");
             using var process = Process.Start(start);
-            if (process is null) return false;
+            if (process is null) return (false, false);
             if (!process.WaitForExit(10_000))
             {
                 try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-                return false;
+                return (false, false);
             }
-            return process.ExitCode == 0;
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            if (process.ExitCode != 0) return (false, false);
+            return (true, output.Equals("cuda-ready", StringComparison.Ordinal));
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            return false;
+            return (false, false);
         }
         catch (InvalidOperationException)
         {
-            return false;
+            return (false, false);
         }
     }
 

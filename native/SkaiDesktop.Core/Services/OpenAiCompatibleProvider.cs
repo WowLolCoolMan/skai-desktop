@@ -42,6 +42,112 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClient ?? SharedHttp;
 
+    /// <summary>Completes one native Ollama tool-calling turn and returns parsed tool calls.</summary>
+    public async Task<OllamaToolChatResponse> CompleteOllamaToolChatAsync(
+        AppSettings settings,
+        IReadOnlyList<OllamaToolChatMessage> messages,
+        IReadOnlyList<object> tools,
+        CancellationToken cancellationToken,
+        int maxTokens = 2048,
+        string? apiKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(messages);
+        ArgumentNullException.ThrowIfNull(tools);
+        if (!settings.ModelProvider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Native tool calling requires the Ollama provider.");
+        if (!LocalEndpoint.IsLocal(settings.Endpoint))
+            throw new InvalidOperationException("Native Ollama tool calling is limited to a local endpoint.");
+        if (messages.Count is < 1 or > MaxMessages || tools.Count is < 1 or > 32)
+            throw new InvalidOperationException("The Ollama tool request exceeds its bounded message or tool limit.");
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["model"] = settings.Model,
+            ["messages"] = messages.Select(message => BuildOllamaToolMessage(message)).ToArray(),
+            ["tools"] = tools,
+            ["stream"] = false,
+            ["options"] = new Dictionary<string, object?>
+            {
+                ["num_ctx"] = settings.OllamaContextWindowTokens,
+                ["num_predict"] = Math.Clamp(maxTokens, 1, 4096),
+                ["temperature"] = settings.Temperature,
+            },
+        };
+        if (IsQwen3Model(settings.Model)) payload["think"] = false;
+        var requestJson = JsonSerializer.Serialize(payload, JsonOptions);
+        if (Encoding.UTF8.GetByteCount(requestJson) > MaxRequestBytes)
+            throw new InvalidOperationException("The local tool request exceeds the 32 MB payload limit.");
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(5));
+        var endpoint = new Uri(settings.Endpoint.TrimEnd('/') + "/");
+        var chatUri = new UriBuilder(endpoint) { Path = "/api/chat", Query = "", Fragment = "" }.Uri;
+        using var request = new HttpRequestMessage(HttpMethod.Post, chatUri)
+        {
+            Content = new StringContent(requestJson, Encoding.UTF8, "application/json"),
+        };
+        AddApiKey(request, apiKey);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await BoundedHttpContent.ReadTextAsync(response.Content, timeout.Token, "Ollama tool error", BoundedHttpContent.MaxTextBytes).ConfigureAwait(false);
+            throw new HttpRequestException($"Ollama returned {(int)response.StatusCode} {response.ReasonPhrase}. {body}", null, response.StatusCode);
+        }
+        using var document = await BoundedHttpContent.ReadJsonAsync(response.Content, timeout.Token, "Ollama tool response");
+        if (!document.RootElement.TryGetProperty("message", out var messageElement))
+            throw new InvalidDataException("Ollama returned a response without a message.");
+        var content = messageElement.TryGetProperty("content", out var contentElement) && contentElement.ValueKind == JsonValueKind.String
+            ? contentElement.GetString() ?? string.Empty
+            : string.Empty;
+        var toolCalls = new List<OllamaToolFunctionCall>();
+        if (messageElement.TryGetProperty("tool_calls", out var callsElement) && callsElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var call in callsElement.EnumerateArray().Take(32))
+            {
+                if (!call.TryGetProperty("function", out var function)
+                    || !function.TryGetProperty("name", out var nameElement)
+                    || nameElement.ValueKind != JsonValueKind.String
+                    || !function.TryGetProperty("arguments", out var arguments))
+                    throw new InvalidDataException("Ollama returned a tool call with an invalid function payload.");
+                var argumentsJson = arguments.ValueKind == JsonValueKind.String
+                    ? arguments.GetString() ?? "{}"
+                    : arguments.GetRawText();
+                using var argumentDocument = JsonDocument.Parse(argumentsJson);
+                if (argumentDocument.RootElement.ValueKind != JsonValueKind.Object)
+                    throw new InvalidDataException("Ollama returned tool arguments that were not a JSON object.");
+                var id = call.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.String ? idElement.GetString() : null;
+                toolCalls.Add(new OllamaToolFunctionCall(nameElement.GetString()!, argumentsJson, id));
+            }
+        }
+        return new OllamaToolChatResponse(content, toolCalls);
+    }
+
+    private static object BuildOllamaToolMessage(OllamaToolChatMessage message)
+    {
+        var result = new Dictionary<string, object?>
+        {
+            ["role"] = message.Role,
+            ["content"] = message.Content,
+        };
+        if (!string.IsNullOrWhiteSpace(message.Name)) result["name"] = message.Name;
+        if (!string.IsNullOrWhiteSpace(message.ToolCallId)) result["tool_call_id"] = message.ToolCallId;
+        if (message.ToolCalls is { Count: > 0 } calls)
+        {
+            result["tool_calls"] = calls.Select(call =>
+            {
+                using var arguments = JsonDocument.Parse(call.ArgumentsJson);
+                return new
+                {
+                    type = "function",
+                    id = call.Id,
+                    function = new { name = call.Name, arguments = arguments.RootElement.Clone() },
+                };
+            }).ToArray();
+        }
+        return result;
+    }
+
     public async Task StreamChatAsync(
         AppSettings settings,
         IReadOnlyList<ChatMessage> messages,
@@ -236,8 +342,10 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : null;
     }
 
+    // Ollama's downloaded Hugging Face IDs put the model family after a publisher
+    // path (for example hf.co/vendor/Qwen3.8-27B), so do not only inspect a prefix.
     private static bool IsQwen3Model(string model) =>
-        model.Trim().StartsWith("qwen3", StringComparison.OrdinalIgnoreCase);
+        model.Contains("qwen3", StringComparison.OrdinalIgnoreCase);
 
     private static object BuildOllamaNativeMessage(ChatMessage message)
     {
@@ -393,3 +501,17 @@ public sealed class OpenAiCompatibleProvider(HttpClient? httpClient = null)
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", value);
     }
 }
+
+/// <summary>A native Ollama chat message used by bounded local tool-calling turns.</summary>
+public sealed record OllamaToolChatMessage(
+    string Role,
+    string Content,
+    IReadOnlyList<OllamaToolFunctionCall>? ToolCalls = null,
+    string? Name = null,
+    string? ToolCallId = null);
+
+/// <summary>A function call returned by Ollama's native chat API.</summary>
+public sealed record OllamaToolFunctionCall(string Name, string ArgumentsJson, string? Id = null);
+
+/// <summary>Text and function calls returned by one Ollama chat turn.</summary>
+public sealed record OllamaToolChatResponse(string Content, IReadOnlyList<OllamaToolFunctionCall> ToolCalls);

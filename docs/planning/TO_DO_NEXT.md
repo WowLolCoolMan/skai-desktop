@@ -28,52 +28,74 @@ Mark an item done only when the linked workflow has evidence.
    dark, light, system, custom-theme reload/recovery, and narrow-layout states;
    overflow acceptance passes 11 routes at five widths. Remaining work is
    manual visual review of routes and pet animations, full keyboard/focus
-   review, and assistive technology checks. Record screenshots and gaps in
+   review, and assistive technology checks. Packaged checks cannot validate
+   spoken screen-reader output or user-perceived quality across routes. Owner:
+   User. Next action: run Narrator or NVDA, review the remaining themes/routes,
+   and report failures. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
 2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke now
-   records and stops a short microphone clip and confirms local Whisper returns
-   a reviewable transcript on this host. Still verify intelligible speech,
-   permission denial/recovery, cancellation, and hands-free on a local speech
-   pack. Keep the path local. See the
+   starts/stops dictation and reaches transcript creation through the local
+   Whisper path. Kokoro, Piper, and Windows SAPI synthesis probes pass; these
+   confirm audio output but not subjective quality. External acceptance blocker:
+   this host reports the en-US browser speech pack unavailable. Owner: User.
+   Next action: install/enable a local en-US recognition pack, dictate a known
+   sentence, test permission denial then recovery, cancel a recording, and run a
+   hands-free reply/listen cycle. Keep all audio local. See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
-3. **Cross-profile Coding Agent sandbox — In progress · Codex.** Verify Windows
-  PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Windows
-  and Ubuntu 24.04 WSL acceptance now pass filesystem, network, process, memory,
-  timeout, and cancellation checks. Keep failing closed where sandbox setup is
-  unavailable; no macOS command path without a sandbox. See
-  [architecture](../engineering/ARCHITECTURE.md).
-4. **Persona era acceptance — In progress · Unclaimed.** Run multi-turn
-   date-cutoff checks across living and deceased personas and multiple models.
-   A Qwen3 14B David Lynch follow-up completed; 2010-era persona quality was
-   weak, so the evidence and cutoff behavior still need broader acceptance.
-   See the
-   [Smart Personas plan](implementation-plans/smart-personas.md).
-5. **Image runtime coverage — In progress · Unclaimed.** Exercise a live
-   ComfyUI server and GPU/additional hardware; verify truthful progress,
-   cancellation, and recovery. See the
+3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
+   Ubuntu 24.04 WSL acceptance pass filesystem, network, process, memory,
+   timeout, and cancellation checks. Unsupported macOS execution remains
+   fail-closed by design. See [architecture](../engineering/ARCHITECTURE.md).
+4. **Persona era acceptance — In progress · Codex.** Added an explicit prompt
+   rule treating post-cutoff events as unknown even when they are already public.
+   Native core acceptance passes, and a live David Lynch 2010-era multi-turn
+   smoke passes on Qwen3 14B. The same case fails on LFM3 Omni 2B (weak identity
+   and cutoff behavior). Product decision blocker: define the minimum supported
+   local model tier for persona mode. Owner: User. Next action: confirm whether
+   persona acceptance targets 14B-class models or must also pass on 2B-class
+   models; Codex will add model gating or continue low-tier tuning accordingly.
+   See the [Smart Personas plan](implementation-plans/smart-personas.md).
+5. **Image runtime coverage — Blocked on local runtime · Owner: User.** The
+   packaged Diffusers CPU path passes, and this PC has an AMD RX 7900 XTX, but
+   ComfyUI is not running at `127.0.0.1:8188`; GPU acceleration remains
+   unverified. Next action: start a local ComfyUI server with a usable workflow
+   and model, then tell Codex its loopback endpoint so progress, cancellation,
+   and recovery can be accepted. See the
    [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
-6. **Windows update acceptance — In progress · Codex.** The isolated current-
-   source updater smoke now installs a disposable 0.1.3 baseline, verifies and
-   applies the 0.1.4 installer from loopback, preserves a profile marker, and
-   removes the temporary app files. Remaining: published-feed install and
-   rollback acceptance on a release built with current updater support.
-7. **Native Linux release acceptance — In progress · Unclaimed.** Exercise the
-   AppImage, updater, rollback, and window behavior on a supported desktop, not
-   only WSL/Xvfb. See [release readiness](../operations/RELEASE_READINESS.md).
-8. **Credential-store recovery — In progress · Codex.** Test Linux desktop
-   unlock/restart and locked/corrupted keyring recovery; implement and verify a
-   macOS credential adapter before hosted chat routes.
+6. **Windows update acceptance — Blocked on release · Owner: User / release
+   owner.** The current-source loopback install passed. Read-only checks now
+   confirm both public v0.1.4 feeds, SHA-512 metadata, and asset sizes, but that
+   release predates rollback support. Next action: publish an approved release
+   built with current updater and rollback code, then run isolated published-feed
+   install and rollback acceptance.
+7. **Native Linux release acceptance — Blocked on platform · Owner: User.** WSL
+   and Xvfb evidence does not cover a native Linux desktop. Next action: provide
+   a supported Linux desktop or VM where Codex can exercise AppImage install,
+   updater, rollback, and window behavior. See
+   [release readiness](../operations/RELEASE_READINESS.md).
+8. **Credential-store recovery — Blocked on platform sessions · Owner: User.**
+   Windows tests pass; WSL exposes D-Bus and `secret-tool` but has no running
+   GNOME keyring daemon, and no macOS host is available to exercise Keychain.
+   Next action: provide native Linux with an unlockable/lockable Secret Service
+   and a macOS runner/device so the adapters and recovery flow can be verified
+   before hosted chat routes.
 9. **Marketplace end-to-end support — In progress · Codex.** Give every
    advertised entry a verified local install/setup, launch/use, and removal
    path; expose license/runtime requirements and never leave an entry looking
-   usable when its adapter is missing. Saved ComfyUI workflows can now be
-   reviewed and activated inside Marketplace; exact model packages and the
-   remaining MCP/voice adapters still need end-to-end support.
-10. **GitHub workflow acceptance — In progress · Codex.** Core tests now cover
-    permission denial, network failure, request cancellation, pending/slow-down
-    retry, stale branch/conflict detection, and protected-token persistence.
-    Remaining: isolated live acceptance for consent denial, repository access,
-    clone conflicts, cancellation, and retry with a real test credential.
+   usable when its adapter is missing. `npm run smoke:marketplace-host` passes:
+   all 89 listings are accounted for, the 41 backed entries map to real local
+   adapters, and the other 48 expose no install action. Exact model package
+   install/use/removal and remaining MCP/voice adapter journeys are still open.
+   Next: finish exact package lifecycle for curated models and verify remaining
+   adapters one by one against their documented license/runtime requirements.
+   Saved ComfyUI workflows can be reviewed and activated inside Marketplace.
+10. **GitHub workflow acceptance — Blocked on test account · Owner: User.** Core
+    tests cover permission denial, network failure, request cancellation,
+    pending/slow-down retry, stale branch/conflict detection, and protected-token
+    persistence. Next action: provide an isolated test repository and scoped test
+    credential/device authorization for live consent-denial, access, clone
+    conflict, cancellation, and retry acceptance; no production repository will
+    be used as the fixture.
 
 ## Next up
 
@@ -101,17 +123,22 @@ Mark an item done only when the linked workflow has evidence.
     offline-only mode are verified. No silent provider fallback.
 13. **MCP lifecycle — In progress · Codex.** Local-only smoke verifies hosted
     endpoint rejection, read-only Filesystem MCP, Playwright stdio, local
-    PostgreSQL, approved tool calls, health, and revocation. Revoked IDs are
-    immutable. Remaining: verified adapters and setup for the other curated
-    MCP servers, plus reconnect and recovery acceptance across supported
-    transports.
+    PostgreSQL, approved tool calls, health, and revocation. It now reconnects
+    Filesystem MCP after revocation with a fresh immutable connection ID,
+    rechecks its read-only tool set, and performs another approved read.
+    Remaining: verified setup/use/revoke for the other curated MCP servers and
+    recovery acceptance across supported transports.
 14. **Model fit and license guidance — In progress · Codex.** The model
     inspector now compares package size against current free RAM, reports GPU
     memory when telemetry exists, and labels the result as advisory. Hugging
     Face results now surface license metadata from the model card or license
     tag, and clearly prompt source review when neither is published. Remaining:
-    validate across more hardware and compare GPU/offload behavior; this Windows
-    host has no supported NVIDIA memory telemetry.
+    local Model Library acceptance passes (including license metadata, runtime
+    inventories, exact model labels, bounded search/install, and resumable
+    ModelScope downloads). The 32 GiB Windows host has two local model response
+    samples in the feature backtest. Validate across more hardware and compare
+    GPU/offload behavior; this Windows host has no supported NVIDIA memory
+    telemetry.
 15. **Resumable model installs — In progress · Codex.** The Skai-managed
     ModelScope GGUF installer now persists checksum-keyed partial shards,
   resumes with HTTP Range, preserves partial bytes on cancellation, validates
@@ -145,6 +172,15 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** The local Coding Agent now accepts native Ollama tool calls or
+  one bounded JSON action per turn. The isolated Agent Host smoke verifies the
+  native tool schema, fenced-action completion, successful recovery from one
+  malformed JSON action, failure after exactly three repair attempts, terminal
+  failure when the model is unavailable, one-slot queued execution, and
+  cancellation before dispatch. The full plan/verify/iterate/human-pause workflow
+  remains open; see the AI planning mode entry in
+  [Future Features](FUTURE_FEATURES.md).
 
 - **2026-11-23:** Added a pinned Chatterbox Nano Marketplace installer and
   local synthesis adapter. Setup uses an isolated CPU-only Python environment,

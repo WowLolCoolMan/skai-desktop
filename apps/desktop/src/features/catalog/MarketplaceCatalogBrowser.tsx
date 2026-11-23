@@ -55,7 +55,7 @@ export function MarketplaceCatalogBrowser({
   };
 
   return (
-<div className="plugins-browser">
+<div className={`plugins-browser${selected ? " has-selection" : ""}`}>
                 <div className="plugins-catalog" aria-label="Skai capabilities">
                   {groups.map(([category, categoryEntries]) => (
                     <section className="plugins-category" key={category}>
@@ -112,11 +112,10 @@ export function MarketplaceCatalogBrowser({
                     </section>
                   ))}
                 </div>
-                <aside
+                {selected && <aside
                   className="plugins-inspector"
                   aria-label="Marketplace details"
                 >
-                  {selected ? (
                     <Card className="plugins-detail">
                       <div className="plugins-detail-heading">
                         <div>
@@ -279,17 +278,7 @@ export function MarketplaceCatalogBrowser({
                         </div>
                       )}
                     </Card>
-                  ) : (
-                    <div className="plugins-inspector-empty">
-                      <p className="section-kicker">PLUGIN INSPECTOR</p>
-                      <h3>Choose an item to inspect</h3>
-                      <p>
-                        Availability, permissions, compatibility, and next steps
-                        will appear here while the catalog stays in view.
-                      </p>
-                    </div>
-                  )}
-                </aside>
+                </aside>}
               </div>
   );
 }

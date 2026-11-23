@@ -112,6 +112,7 @@ public static partial class AgentHostLoop
         if (!documentsOnly && OptionalResponseSchema(request) is null && !OptionalBoolean(request, "suppressPersonaContinuity")
             && ModelInstructions.UserProfile(storedSettings) is { } userProfile)
             messages.Insert(1, new ChatMessage("system", userProfile));
+        messages = MergeSystemMessagesAtBeginning(messages);
         var completionMaxTokens = OptionalInt(request, "maxTokens");
         if (activePersona is not null)
         {
@@ -204,6 +205,23 @@ public static partial class AgentHostLoop
             fallback = usedFallback,
             content = responseText,
         });
+    }
+
+    private static List<ChatMessage> MergeSystemMessagesAtBeginning(IReadOnlyList<ChatMessage> messages)
+    {
+        var systemMessages = messages.Where(message => message.Role.Equals("system", StringComparison.OrdinalIgnoreCase))
+            .Select(message => message.Content.Trim())
+            .Where(content => content.Length > 0)
+            .ToArray();
+        if (systemMessages.Length <= 1 && (systemMessages.Length == 0 || messages[0].Role.Equals("system", StringComparison.OrdinalIgnoreCase)))
+            return messages.ToList();
+
+        var merged = new List<ChatMessage>(messages.Count - systemMessages.Length + 1)
+        {
+            new("system", string.Join("\n\n", systemMessages)),
+        };
+        merged.AddRange(messages.Where(message => !message.Role.Equals("system", StringComparison.OrdinalIgnoreCase)));
+        return merged;
     }
 
     private static string StripModelReasoningMarkup(string value)

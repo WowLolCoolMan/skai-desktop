@@ -40,6 +40,26 @@ public sealed class WorkspaceFileEditor
         catch (InvalidDataException error) { throw new InvalidOperationException("The existing file is too large or changed while being read.", error); }
     }
 
+    public WorkspaceTextSnapshot ReadTextWithHash(string selectedRoot, string relativePath)
+    {
+        var target = Resolve(selectedRoot, relativePath);
+        var gate = EditGates.GetOrAdd(target, static path => new object());
+        lock (gate)
+        {
+            EnsureNoLinksInPath(selectedRoot, target);
+            if (!File.Exists(target)) throw new FileNotFoundException("The selected project file no longer exists.");
+            try
+            {
+                var bytes = ReadBytesBounded(target, MaxFileBytes);
+                return new WorkspaceTextSnapshot(DecodeText(bytes), Hash(bytes));
+            }
+            catch (InvalidDataException error)
+            {
+                throw new InvalidOperationException("The existing file is too large or changed while being read.", error);
+            }
+        }
+    }
+
     public string? GetCurrentHash(string selectedRoot, string relativePath)
     {
         var target = Resolve(selectedRoot, relativePath);
@@ -166,6 +186,11 @@ public sealed class WorkspaceFileEditor
     public static string ReadTextBounded(string path, int maxBytes)
     {
         var bytes = ReadBytesBounded(path, maxBytes);
+        return DecodeText(bytes);
+    }
+
+    private static string DecodeText(byte[] bytes)
+    {
         try
         {
             using var stream = new MemoryStream(bytes, writable: false);
@@ -199,3 +224,4 @@ public sealed class WorkspaceFileEditor
 }
 
 public sealed record WorkspaceEditReceipt(string TargetPath, byte[]? PreviousContent, string AppliedHash);
+public sealed record WorkspaceTextSnapshot(string Content, string Sha256);

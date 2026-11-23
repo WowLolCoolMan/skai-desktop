@@ -53,6 +53,25 @@ async function evaluate(expression) {
   return result.result?.value;
 }
 
+async function callFunction(functionDeclaration, args = []) {
+  const windowResult = await command("Runtime.evaluate", { expression: "window", returnByValue: false });
+  const objectId = windowResult.result?.objectId;
+  if (!objectId) throw new Error("DevTools did not return a page object for the accessibility probe.");
+  try {
+    const result = await command("Runtime.callFunctionOn", {
+      objectId,
+      functionDeclaration,
+      arguments: args.map((value) => ({ value })),
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    if (result.exceptionDetails) throw new Error(`Accessibility function call failed: ${result.exceptionDetails.text}`);
+    return result.result?.value;
+  } finally {
+    await command("Runtime.releaseObject", { objectId }).catch(() => {});
+  }
+}
+
 async function main() {
   console.log(`Accessibility smoke: launching ${executable}`);
   child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayArgs, `--user-data-dir=${userData}`, `--skai-isolated-smoke-app-data=${appData}`], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -102,7 +121,7 @@ async function main() {
   for (const route of routes) {
     currentPhase = `running WCAG checks on #/${route}`;
     console.log(`Accessibility smoke: ${currentPhase}`);
-    const routeResult = await evaluate(`(async () => { location.hash = '#/${route}'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 350)); const result = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }); const css = getComputedStyle(document.documentElement); const button = document.querySelector('.new-chat-button'); const buttonCss = button ? getComputedStyle(button) : null; return JSON.stringify({ route: location.hash, theme: { scheme: document.documentElement.dataset.scheme, id: document.documentElement.dataset.themeId, accent: css.getPropertyValue('--skai-color-accent').trim(), onAccent: css.getPropertyValue('--skai-color-on-accent').trim(), text: css.getPropertyValue('--skai-color-text').trim(), raised: css.getPropertyValue('--skai-color-surface-raised').trim(), buttonBg: buttonCss?.backgroundColor, buttonText: buttonCss?.color, buttonVars: button ? [getComputedStyle(button).getPropertyValue('--skai-color-accent').trim(), getComputedStyle(button).getPropertyValue('--skai-color-on-accent').trim()] : [] }, violations: result.violations.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 8).map((node) => ({ target: node.target, summary: node.failureSummary?.slice(0, 500) })) })), incomplete: result.incomplete.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 5).map((node) => { const element = document.querySelector(node.target[0]); const backgrounds = []; for (let current = element; current; current = current.parentElement) { const style = getComputedStyle(current); if (style.backgroundImage !== "none" || style.backgroundColor !== "rgba(0, 0, 0, 0)") backgrounds.push({ element: String(current.className || current.tagName).slice(0, 70), color: style.backgroundColor, image: style.backgroundImage }); } return { target: node.target, summary: node.failureSummary?.slice(0, 300), backgrounds: backgrounds.slice(0, 6) }; }) })) }); })()`);
+    const routeResult = await callFunction(async function (route) { location.hash = `#/${route}`; window.dispatchEvent(new PopStateEvent("popstate")); await new Promise((resolve) => setTimeout(resolve, 350)); const result = await axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } }); const css = getComputedStyle(document.documentElement); const button = document.querySelector(".new-chat-button"); const buttonCss = button ? getComputedStyle(button) : null; return JSON.stringify({ route: location.hash, theme: { scheme: document.documentElement.dataset.scheme, id: document.documentElement.dataset.themeId, accent: css.getPropertyValue("--skai-color-accent").trim(), onAccent: css.getPropertyValue("--skai-color-on-accent").trim(), text: css.getPropertyValue("--skai-color-text").trim(), raised: css.getPropertyValue("--skai-color-surface-raised").trim(), buttonBg: buttonCss?.backgroundColor, buttonText: buttonCss?.color, buttonVars: button ? [getComputedStyle(button).getPropertyValue("--skai-color-accent").trim(), getComputedStyle(button).getPropertyValue("--skai-color-on-accent").trim()] : [] }, violations: result.violations.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 8).map((node) => ({ target: node.target, summary: node.failureSummary?.slice(0, 500) })) })), incomplete: result.incomplete.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 5).map((node) => { const element = document.querySelector(node.target[0]); const backgrounds = []; for (let current = element; current; current = current.parentElement) { const style = getComputedStyle(current); if (style.backgroundImage !== "none" || style.backgroundColor !== "rgba(0, 0, 0, 0)") backgrounds.push({ element: String(current.className || current.tagName).slice(0, 70), color: style.backgroundColor, image: style.backgroundImage }); } return { target: node.target, summary: node.failureSummary?.slice(0, 300), backgrounds: backgrounds.slice(0, 6) }; }) })) }); }, [route]);
     results.push(JSON.parse(routeResult));
     console.log(`Finished #/${route}: ${results.at(-1).violations.length} violations, ${results.at(-1).incomplete.length} incomplete checks.`);
   }
@@ -116,7 +135,7 @@ async function main() {
     const inspectPopup = async (selector, expectedRole) => {
       currentPhase = `checking ${selector} accessibility relationship`;
       console.log(`Accessibility smoke: ${currentPhase}`);
-      const result = await evaluate(`(async () => { location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 300)); const trigger = document.querySelector(${JSON.stringify(selector)}); if (!trigger) return JSON.stringify({ selector: ${JSON.stringify(selector)}, exists: false, controlsValid: false }); trigger.click(); await new Promise((resolve) => setTimeout(resolve, 50)); const id = trigger.getAttribute('aria-controls'); const controlled = id ? document.getElementById(id) : null; const inspection = { selector: ${JSON.stringify(selector)}, exists: true, expanded: trigger.getAttribute('aria-expanded') === 'true', popupType: trigger.getAttribute('aria-haspopup'), controlsValid: Boolean(controlled && controlled.getAttribute('role') === ${JSON.stringify(expectedRole)}) }; trigger.click(); return JSON.stringify(inspection); })()`);
+      const result = await callFunction(async function (popupSelector, role) { location.hash = "#/chat"; window.dispatchEvent(new PopStateEvent("popstate")); await new Promise((resolve) => setTimeout(resolve, 300)); const trigger = document.querySelector(popupSelector); if (!trigger) return JSON.stringify({ selector: popupSelector, exists: false, controlsValid: false }); trigger.click(); await new Promise((resolve) => setTimeout(resolve, 50)); const id = trigger.getAttribute("aria-controls"); const controlled = id ? document.getElementById(id) : null; const inspection = { selector: popupSelector, exists: true, expanded: trigger.getAttribute("aria-expanded") === "true", popupType: trigger.getAttribute("aria-haspopup"), controlsValid: Boolean(controlled && controlled.getAttribute("role") === role) }; trigger.click(); return JSON.stringify(inspection); }, [selector, expectedRole]);
       return JSON.parse(result);
     };
     popups = {

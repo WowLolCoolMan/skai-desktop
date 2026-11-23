@@ -55,30 +55,42 @@ export const cloudVoiceProviders = [
   { id: "cartesia" as const, name: "Cartesia Sonic 3.5", model: "sonic-3.5", defaultVoiceId: "f786b574-daa5-4673-aa0c-cbe3e8534c02", detail: "Hosted low-latency speech", supportsStreaming: true },
 ] as const;
 
-export const installedVoiceModels = voiceModels.filter((voice) => voice.installed
-  || (voice.id === "kokoro-82m-onnx" && localStorage.getItem("skai.voice.kokoroInstalled") === "true")
-  || (voice.id === "chatterbox" && localStorage.getItem("skai.voice.chatterboxInstalled") === "true")
-  || (voice.id === "piper" && localStorage.getItem("skai.voice.piperInstalled") === "true"));
+// The Agent Host is authoritative: a persisted browser flag can outlive an
+// uninstall or point at a runtime that is unavailable on this host.
+export const installedVoiceModels: InstalledVoiceModel[] = [];
+
+export async function refreshInstalledVoiceModels() {
+  try {
+    const response = await window.skaiAgent?.request("voice.models");
+    if (!response?.ok) return installedVoiceModels;
+    const result = response.result as { models?: Array<InstalledVoiceModel & { adapterAvailable?: boolean }> };
+    const discovered = (result.models ?? []).filter((voice) => voice.installed && voice.adapterAvailable);
+    const next = discovered.map(({ adapterAvailable: _adapterAvailable, ...voice }) => voice);
+    const changed = JSON.stringify(installedVoiceModels) !== JSON.stringify(next);
+    installedVoiceModels.splice(0, installedVoiceModels.length, ...next);
+    if (changed) window.dispatchEvent(new CustomEvent("skai:voice-models-updated"));
+  } catch {
+    // Leave the inventory empty when the local host cannot be queried.
+  }
+  return installedVoiceModels;
+}
 
 export function registerInstalledVoiceModel(id: string) {
   const voice = voiceModels.find((item) => item.id === id);
   if (!voice || installedVoiceModels.some((item) => item.id === id)) return;
   installedVoiceModels.push({ ...voice, installed: true });
-  if (id === "kokoro-82m-onnx") localStorage.setItem("skai.voice.kokoroInstalled", "true");
-  if (id === "chatterbox") localStorage.setItem("skai.voice.chatterboxInstalled", "true");
-  if (id === "piper") localStorage.setItem("skai.voice.piperInstalled", "true");
+  window.dispatchEvent(new CustomEvent("skai:voice-models-updated"));
 }
 
 export function unregisterInstalledVoiceModel(id: string) {
   const index = installedVoiceModels.findIndex((item) => item.id === id);
   if (index >= 0) installedVoiceModels.splice(index, 1);
-  if (id === "kokoro-82m-onnx") localStorage.removeItem("skai.voice.kokoroInstalled");
-  if (id === "chatterbox") localStorage.removeItem("skai.voice.chatterboxInstalled");
-  if (id === "piper") localStorage.removeItem("skai.voice.piperInstalled");
+  window.dispatchEvent(new CustomEvent("skai:voice-models-updated"));
 }
 
-function resolveInstalledVoiceModel(value: string | null) {
-  return installedVoiceModels.find((voice) => voice.id === value)?.id ?? installedVoiceModels[0]?.id ?? "os-native";
+function resolveInstalledVoiceModel(value: string | null, lowResourceOnly = false) {
+  const candidates = lowResourceOnly ? installedVoiceModels.filter((voice) => voice.lowResource) : installedVoiceModels;
+  return candidates.find((voice) => voice.id === value)?.id ?? candidates[0]?.id ?? "";
 }
 
 const selectedProfileKey = "skai.voice.profile";
@@ -97,8 +109,10 @@ export function selectedVoiceSettings() {
   return {
     profileId: localStorage.getItem(selectedProfileKey) ?? "skai-neutral",
     primaryModelId: resolveInstalledVoiceModel(localStorage.getItem(primaryModelKey)),
-    lowResourceModelId: resolveInstalledVoiceModel(localStorage.getItem(lowResourceModelKey)),
-    lowResourceMode: localStorage.getItem(lowResourceModeKey) === "true",
+    lowResourceModelId: resolveInstalledVoiceModel(localStorage.getItem(lowResourceModelKey), true),
+    lowResourceMode: localStorage.getItem(lowResourceModeKey) === "true"
+      && Boolean(resolveInstalledVoiceModel(localStorage.getItem(lowResourceModelKey), true))
+      && resolveInstalledVoiceModel(localStorage.getItem(lowResourceModelKey), true) !== resolveInstalledVoiceModel(localStorage.getItem(primaryModelKey)),
     voiceOutputEnabled: localStorage.getItem(voiceOutputKey) === "true",
     source: localStorage.getItem(voiceSourceKey) === "cloud" ? "cloud" as VoiceSource : "local" as VoiceSource,
     cloudProvider: selectedProvider.id,
@@ -109,7 +123,7 @@ export function selectedVoiceSettings() {
 
 export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId", value: string | boolean) {
   const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey }[key];
-  const safeValue = key === "primaryModelId" || key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value)) : value;
+  const safeValue = key === "primaryModelId" ? resolveInstalledVoiceModel(String(value)) : key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value), true) : value;
   localStorage.setItem(storageKey, String(safeValue));
 }
 
@@ -145,10 +159,14 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const settings = selectedVoiceSettings();
   if (!force && !settings.voiceOutputEnabled) return false;
   const profile = voiceProfiles.find((item) => item.id === (profileId || settings.profileId)) ?? voiceProfiles[0];
+  const runtimeId = settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId;
+  // Skai profiles control pacing on every engine. Pitch is applied only by the
+  // browser's native fallback; local model runtimes do not expose pitch control.
+  const fallbackPitch = settings.source === "local" && runtimeId === "os-native" ? profile.pitch : 1;
   try {
     const speech = settings.source === "cloud"
       ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId })
-      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, modelId: settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId });
+      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, modelId: runtimeId });
     if (speech?.ok) {
       const audioDataUrl = (speech.result as { audioDataUrl?: unknown } | undefined)?.audioDataUrl;
       if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/")) {
@@ -177,7 +195,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const utterance = new SpeechSynthesisUtterance(safeText.replace(/[`*_>#]/g, "").replace(/\s+/g, " ").trim().slice(0, 4000));
   utterance.voice = localVoice;
   utterance.rate = profile.rate;
-  utterance.pitch = profile.pitch;
+  utterance.pitch = fallbackPitch;
   window.speechSynthesis.speak(utterance);
   return true;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   EmptyState,
@@ -22,7 +22,7 @@ import {
   type MarketplaceEntry,
 } from "./marketplaceEntries";
 import { useMarketplaceMcp, type McpConnection, type McpTool } from "./useMarketplaceMcp";
-import { registerInstalledVoiceModel, unregisterInstalledVoiceModel } from "../../services/nativeTts";
+import { refreshInstalledVoiceModels } from "../../services/nativeTts";
 export { VoiceWorkbench } from "./VoiceWorkbench";
 
 export function PluginsPage({
@@ -115,7 +115,7 @@ export function PluginsPage({
         const state = status.result as { installed?: boolean; status?: string; step?: string; error?: string };
         if (state.installed || state.status === "installed") {
           if (isWhisper) localStorage.setItem("skai.voice.whisperInstalled", "true");
-          else registerInstalledVoiceModel(voiceId);
+          else await refreshInstalledVoiceModels();
           setNotice(`${modelName} is installed, checksum-verified, and ready for ${isWhisper ? "offline transcription" : "local speech"}.`);
           return;
         }
@@ -160,24 +160,13 @@ export function PluginsPage({
     setError(null);
     setNotice(null);
     try {
-      const endpoint = localStorage.getItem("skai.endpoint") ?? "http://localhost:11434/v1";
-      const provider = localStorage.getItem("skai.provider") ?? "Ollama";
-      const [catalogResponse, skillsResponse, connectionsResponse, runtimeResponse, kokoroResponse, piperResponse, chatterboxResponse, whisperResponse] =
+      const [catalogResponse, skillsResponse, connectionsResponse] =
         await Promise.all([
           request("marketplace.catalog"),
           request("skills.list"),
           request("mcp.connections.list"),
-          request("models.list", { endpoint, provider }),
-          request("voice.kokoro.install.status"),
-          request("voice.piper.install.status"),
-          request("voice.chatterbox.install.status"),
-          request("voice.whisper.install.status"),
         ]);
-      if (kokoroResponse.ok && (kokoroResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("kokoro-82m-onnx");
-      if (piperResponse.ok && (piperResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("piper");
-      if (chatterboxResponse.ok && (chatterboxResponse.result as { installed?: boolean }).installed) registerInstalledVoiceModel("chatterbox");
-      else if (chatterboxResponse.ok) unregisterInstalledVoiceModel("chatterbox");
-      if (whisperResponse.ok && (whisperResponse.result as { installed?: boolean }).installed) localStorage.setItem("skai.voice.whisperInstalled", "true");
+      void refreshInstalledVoiceModels();
       if (!catalogResponse.ok)
         throw new Error(
           catalogResponse.error?.message ??
@@ -191,11 +180,6 @@ export function PluginsPage({
       setTools(catalog.tools ?? []);
       setCurated(catalog.catalogEntries ?? []);
       setSkills((skillsResponse.result as Skill[]) ?? []);
-      if (runtimeResponse.ok) {
-        const runtimeModels = (runtimeResponse.result as unknown[]) ?? [];
-        setRuntimeModelCount(runtimeModels.length);
-        setRuntimeStatus("ready");
-      } else setRuntimeStatus("setup required");
       if (connectionsResponse.ok) {
         const nextConnections =
           (connectionsResponse.result as { connections?: McpConnection[] })
@@ -223,6 +207,21 @@ export function PluginsPage({
     void load();
   }, []);
   useEffect(() => {
+    if (view !== "catalog" || loading) return;
+    let active = true;
+    const endpoint = localStorage.getItem("skai.endpoint") ?? "http://localhost:11434/v1";
+    const provider = localStorage.getItem("skai.provider") ?? "Ollama";
+    setRuntimeStatus("Checking");
+    void request("models.list", { endpoint, provider }).then((response) => {
+      if (!active) return;
+      if (response.ok) {
+        setRuntimeModelCount(((response.result as unknown[]) ?? []).length);
+        setRuntimeStatus("ready");
+      } else setRuntimeStatus("setup required");
+    }).catch(() => { if (active) setRuntimeStatus("unavailable"); });
+    return () => { active = false; };
+  }, [loading, view]);
+  useEffect(() => {
     if (view === "catalog")
       localStorage.setItem(
         `skai.marketplace.query.${catalogSection.toLowerCase()}`,
@@ -230,10 +229,10 @@ export function PluginsPage({
       );
   }, [catalogSection, query, view]);
 
-  const entries = createMarketplaceEntries(skills, tools, connections, query, curated);
-  const sectionEntries = filterMarketplaceEntries(entries, catalogSection);
+  const entries = useMemo(() => createMarketplaceEntries(skills, tools, connections, query, curated), [connections, curated, query, skills, tools]);
+  const sectionEntries = useMemo(() => filterMarketplaceEntries(entries, catalogSection), [catalogSection, entries]);
   const selected = sectionEntries.find((entry) => entry.id === selectedId) ?? null;
-  const groupedEntries = groupMarketplaceEntries(sectionEntries);
+  const groupedEntries = useMemo(() => groupMarketplaceEntries(sectionEntries), [sectionEntries]);
   return (
     <div className="feature-page plugins-page">
       <aside
@@ -247,21 +246,23 @@ export function PluginsPage({
             <small>Local capability catalog</small>
           </div>
         </div>
-        <p className="plugins-customize-label">BROWSE</p>
+        <p className="plugins-customize-label">CATEGORIES</p>
         {([
           ["Discover", "sparkle"],
           ["Models", "model"],
           ["Voices", "activity"],
+          ["Skills", "sparkle"],
           ["Tools", "terminal"],
+          ["Installed", "memory"],
           ["Updates", "arrow-up-right"],
         ] as const).map(([item, icon]) => {
           const active = item === "Tools"
-            ? ["MCP Servers", "Skai built-ins", "Compatible plugins", "Installed"].includes(catalogSection)
+            ? ["MCP Servers", "Skai built-ins", "Compatible plugins"].includes(catalogSection)
             : catalogSection === item;
           return <button key={item} type="button" className={active ? "is-active" : ""} aria-current={active ? "page" : undefined} onClick={() => changeCatalogSection(item === "Tools" ? "MCP Servers" : item)}><NavIcon name={icon} /><span>{item}</span>{item === "Models" && <small>Live</small>}{item === "Tools" && <small>{tools.length + skills.length}</small>}</button>;
         })}
-        {["MCP Servers", "Skai built-ins", "Compatible plugins", "Installed"].includes(catalogSection) && <div className="plugins-tool-subnav" role="tablist" aria-label="Tools categories">
-          {(["MCP Servers", "Skai built-ins", "Compatible plugins", "Installed"] as const).map((item) => <button key={item} type="button" role="tab" aria-selected={catalogSection === item} className={catalogSection === item ? "is-active" : ""} onClick={() => changeCatalogSection(item)}>{item === "MCP Servers" ? "MCP servers" : item}</button>)}
+        {["MCP Servers", "Skai built-ins", "Compatible plugins"].includes(catalogSection) && <div className="plugins-tool-subnav" role="tablist" aria-label="Tools categories">
+          {(["MCP Servers", "Skai built-ins", "Compatible plugins"] as const).map((item) => <button key={item} type="button" role="tab" aria-selected={catalogSection === item} className={catalogSection === item ? "is-active" : ""} onClick={() => changeCatalogSection(item)}>{item === "MCP Servers" ? "MCP servers" : item}</button>)}
         </div>}
         <div className="plugins-nav-note">
           <span className="plugins-nav-note-dot" aria-hidden="true" />
@@ -333,16 +334,6 @@ export function PluginsPage({
                 <div className="plugins-start-actions"><Button variant="primary" type="button" onClick={() => changeCatalogSection("Models")}>Search models</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("MCP Servers")}>Connect MCP</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("Installed")}>Open installed</Button><Button variant="ghost" type="button" onClick={() => changeCatalogSection("Updates")}>Check updates</Button></div>
               </section>
             )}
-            {catalogSection === "Discover" && !query.trim() && <nav className="marketplace-category-filters" aria-label="Filter by category">
-              <span>Browse by category</span>
-              {([
-                ["Voice", "Voices", "activity", undefined],
-                ["Coding", "Models", "model", "code"],
-                ["Chat", "Models", "model", "chat"],
-                ["Image", "Models", "image", "image"],
-                ["MCP", "MCP Servers", "terminal", undefined],
-              ] as const).map(([label, section, icon, term]) => <button key={label} type="button" onClick={() => changeCatalogSection(section, term)}><NavIcon name={icon} /><span>{label}</span></button>)}
-            </nav>}
             {error ? (
               <div className="surface-error" role="alert">
                 <strong>Marketplace is unavailable</strong>

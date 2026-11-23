@@ -46,9 +46,7 @@ export type DesktopWorkspace = {
   setAgentMode: (mode: "ChatBot" | "Coding Agent") => void;
   conversationQuery: string;
   setConversationQuery: (query: string) => void;
-  sidebarCollapsed: boolean;
   sidebarWidth: number;
-  toggleSidebar: () => void;
   resizeSidebar: (width: number) => void;
   commandOpen: boolean;
   openCommandPalette: () => void;
@@ -83,7 +81,7 @@ const defaultModel = preferredChatModel?.model ?? localStorage.getItem("skai.mod
 const defaultProvider = localProviderOrFallback(preferredChatModel?.provider ?? localStorage.getItem("skai.provider"));
 const SIDEBAR_WIDTH_KEY = "skai.sidebar.width";
 const DEFAULT_SIDEBAR_WIDTH = 276;
-const MIN_SIDEBAR_WIDTH = 220;
+const MIN_SIDEBAR_WIDTH = 248;
 const MAX_SIDEBAR_WIDTH = 360;
 function readAgentMode(): "ChatBot" | "Coding Agent" {
   return localStorage.getItem("skai.agentMode") === "Coding Agent" ? "Coding Agent" : "ChatBot";
@@ -123,7 +121,6 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const workspaceSessionRestoreStartedRef = useRef(false);
   const [navigation, setNavigation] = useState<NavigationState>(() => readNavigationState(routeFromLocation()));
   const [commandOpen, setCommandOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(localStorage.getItem("skai.sidebar.collapsed") === "true");
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const [conversationQuery, setConversationQuery] = useState("");
   const [agentMode, setAgentModeState] = useState(readAgentMode);
@@ -216,7 +213,6 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const chat = useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata: models.find((entry) => entry.model === model), mode: agentMode, project: route === "coding" ? coding.selectedProject : null, onConversationModelRestore: (savedModel, savedProvider) => { if (savedModel) setModel(savedModel); if (savedProvider) setProvider(localProviderOrFallback(savedProvider)); }, onError: setError });
   const openCommandPalette = useCallback(() => setCommandOpen(true), []);
   const closeCommandPalette = useCallback(() => setCommandOpen(false), []);
-  const toggleSidebar = useCallback(() => setSidebarCollapsed((value) => !value), []);
   const resizeSidebar = useCallback((width: number) => setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)))), []);
   const setAgentMode = useCallback((mode: "ChatBot" | "Coding Agent") => {
     if (mode === agentMode) return;
@@ -405,7 +401,6 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   useEffect(() => { window.requestAnimationFrame(() => document.getElementById("main-content")?.focus()); }, [route]);
   useThemeEngine(request, themeMode);
   useEffect(() => { document.title = `${PRODUCT_DISPLAY_NAME} · ${route}`; document.documentElement.dataset.theme = themeMode; document.documentElement.dataset.accent = accentColor; document.documentElement.dataset.density = density; document.documentElement.dataset.backdrop = backdrop; document.documentElement.dataset.reduceMotion = reduceMotion ? "true" : "false"; }, [route, themeMode, accentColor, density, backdrop, reduceMotion]);
-  useEffect(() => { localStorage.setItem("skai.sidebar.collapsed", String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); }, [sidebarWidth]);
   useEffect(() => { localStorage.setItem("skai.pet.visible", String(petVisible)); }, [petVisible]);
   useEffect(() => { localStorage.setItem("skai.pet.wander", String(petWander)); }, [petWander]);
@@ -421,7 +416,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     return removeVisibility;
   }, [petVisible, petWander, petInteractionDemo, reduceMotion]);
   useEffect(() => { window.skaiAgent?.pet?.setState(taskBusy ? "coding" : chat.busy ? "thinking" : "idle"); }, [taskBusy, chat.busy]);
-  useEffect(() => { const onShortcut = (event: KeyboardEvent) => { const modifier = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase(); if (modifier && key === "k") { event.preventDefault(); openCommandPalette(); return; } if (event.key === "Escape") { closeCommandPalette(); return; } if (!modifier) return; if (key === "n") { event.preventDefault(); startNewChat(); return; } if (key === ",") { event.preventDefault(); onNavigate("settings"); return; } if (key === "b") { event.preventDefault(); toggleSidebar(); return; } if (key === "1") { event.preventDefault(); onNavigate("chat"); return; } if (key === "2") { event.preventDefault(); onNavigate("coding"); return; } if (key === "3" || (event.shiftKey && key === "l")) { event.preventDefault(); onNavigate("terminal"); } }; window.addEventListener("keydown", onShortcut); return () => window.removeEventListener("keydown", onShortcut); }, [closeCommandPalette, openCommandPalette, onNavigate, startNewChat, toggleSidebar]);
+  useEffect(() => { const onShortcut = (event: KeyboardEvent) => { const modifier = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase(); if (modifier && key === "k") { event.preventDefault(); openCommandPalette(); return; } if (event.key === "Escape") { closeCommandPalette(); return; } if (!modifier) return; if (key === "n") { event.preventDefault(); startNewChat(); return; } if (key === ",") { event.preventDefault(); onNavigate("settings"); return; } if (key === "1") { event.preventDefault(); onNavigate("chat"); return; } if (key === "2") { event.preventDefault(); onNavigate("coding"); return; } if (key === "3" || (event.shiftKey && key === "l")) { event.preventDefault(); onNavigate("terminal"); } }; window.addEventListener("keydown", onShortcut); return () => window.removeEventListener("keydown", onShortcut); }, [closeCommandPalette, openCommandPalette, onNavigate, startNewChat]);
   const retryConnection = useCallback(() => { setConnection("checking"); setError(null); void request("runtime.health").then((response: AgentResponse) => { if (!response.ok) { setConnection("error"); setError(response.error?.message ?? "Agent host unavailable."); return; } setHealth(response.result as RuntimeHealth); setConnection("ready"); }).catch((requestError: unknown) => { setConnection("error"); setError(requestError instanceof Error ? requestError.message : "Agent host unavailable."); }); }, [request]);
   useEffect(() => { retryConnection(); }, [retryConnection]);
   useEffect(() => {
@@ -549,5 +544,5 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   routeActions.onDiscoverModels = discoverModels;
   routeActions.onImportWorkflow = importImageWorkflow;
   routeActions.onCancelImageGeneration = cancelImageGeneration;
-  return { routeState, routeActions, route, settingsReturnRoute, workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, selectWorkspaceTab, closeWorkspaceTab, restoreWorkspaceTab, connection, health, error, dismissError, retryConnection, conversations: chat.conversations, agentMode, setAgentMode, conversationQuery, setConversationQuery, sidebarCollapsed, sidebarWidth, toggleSidebar, resizeSidebar, commandOpen, openCommandPalette, closeCommandPalette, startNewChat, selectConversation, updateConversationMetadata: (id, patch) => chat.updateConversationMetadata(patch, id), onNavigate, canGoBack: navigation.index > 0, canGoForward: navigation.index < navigation.length - 1, goBack, goForward, petVisible, petWander, petInteractionDemo, setPetVisible, setPetWander };
+  return { routeState, routeActions, route, settingsReturnRoute, workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, selectWorkspaceTab, closeWorkspaceTab, restoreWorkspaceTab, connection, health, error, dismissError, retryConnection, conversations: chat.conversations, agentMode, setAgentMode, conversationQuery, setConversationQuery, sidebarWidth, resizeSidebar, commandOpen, openCommandPalette, closeCommandPalette, startNewChat, selectConversation, updateConversationMetadata: (id, patch) => chat.updateConversationMetadata(patch, id), onNavigate, canGoBack: navigation.index > 0, canGoForward: navigation.index < navigation.length - 1, goBack, goForward, petVisible, petWander, petInteractionDemo, setPetVisible, setPetWander };
 }

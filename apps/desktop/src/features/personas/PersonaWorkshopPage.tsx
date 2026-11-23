@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DesktopConversation, DesktopPersona, DesktopPersonaSource } from "../../../shared/contracts";
+import type { AgentResponse, DesktopConversation, DesktopPersona, DesktopPersonaSource } from "../../../shared/contracts";
 import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 import { navigatePersonaWorkshop, personaWorkshopLocation, type PersonaWorkshopPage as WorkshopPage } from "../../app/navigation";
 import { voiceProfiles, speakNativeResponse, waitForLocalSpeechToFinish, selectedVoiceSettings } from "../../services/nativeTts";
@@ -33,7 +33,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
   const [retentionSaving, setRetentionSaving] = useState(false);
   const [retentionStatus, setRetentionStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const request = useCallback((method: string, params?: Record<string, unknown>) => window.skaiAgent.request(method, params), []);
+  const request = useCallback((method: string, params?: Record<string, unknown>): Promise<AgentResponse> => window.skaiAgent?.request(method, params) ?? Promise.resolve({ v: 1, id: `persona-${method}`, ok: false, error: { code: "BRIDGE_UNAVAILABLE", message: "The Electron agent bridge is unavailable." } }), []);
   const refreshPersonas = useCallback(async () => {
     setPersonasLoading(true);
     try {

@@ -40,11 +40,11 @@ product decisions. A request-size limit does not prove 1M-token execution.
 - [ ] Parallel sub-agent delegation.
 - [x] Scheduled automations. (Open-host local scheduled runs now claim due entries, execute through the configured loopback model, persist bounded success/failure outcomes, and reschedule successful recurrences; restart recovery and cloud scheduling remain intentionally out of scope.)
 - [x] Structured task lists. (Persisted local agent task plans with dependency-aware readiness, queue, search, cancellation, and conversation-linked status cards; the originating thread is the user-facing review surface.)
-- [x] MCP tools over Streamable HTTP and stdio. (Explicit grants, revocation, read-only defaults, protocol smoke coverage, and a Marketplace lifecycle inspector with connection health, manifest freshness, grouped tool risk, and approval-boundary messaging are implemented.)
+- [x] MCP tools over Streamable HTTP and stdio. (Explicit grants, revocation, read-only defaults, protocol smoke coverage, and a Marketplace lifecycle inspector with connection health, manifest freshness, grouped tool risk, and approval-boundary messaging are implemented. Packaged-host acceptance also reconnects Filesystem MCP after revocation with a fresh connection ID, confirms read-only tools, and completes another approved read.)
 - [x] OpenAPI tool auto-discovery. (Bounded local discovery is implemented; authenticated retrieval and broader schema coverage remain open.)
 - [x] Git panel for stage, commit, push, and pull requests. (Guarded local project workflow is implemented; richer selective staging and live permission/error acceptance remain open.)
 - [ ] Coding-agent model integrations, including Claude Code and Codex.
-- [ ] AI planning mode: plan, execute, verify, iterate, retry, and pause for human decisions.
+- [ ] AI planning mode: plan, execute, verify, iterate, retry, and pause for human decisions. (Accepted first Coding Agent execution slice: local Ollama native tools or bounded JSON actions, fenced-JSON normalization, up to three malformed-action repairs, and fail-closed completion after exhausted repairs or failed verification. `npm run smoke:agent-host` covers native tool schema, fenced-action completion, one-repair recovery, the exact retry cap, model-unavailable failure, one-slot queueing, and cancellation. Multi-step planning, full verify/iterate behavior, and explicit human decision pauses remain open.)
 - [ ] Auto mode for unattended agent execution.
 - [x] Background tasks. (Queued local coding tasks now auto-dispatch through a conservative single-run scheduler, preserve queued/running/cancelled state, and start the next task when the current one finishes. Capacity-derived parallel execution remains open.)
 - [ ] Learning loop from past interactions.
@@ -122,6 +122,7 @@ product decisions. A request-size limit does not prove 1M-token execution.
 - [x] Dynamic variables such as `{{USER_NAME}}` and `{{DATE}}`.
 - [x] Lazy-loaded Markdown instruction-pack skills with `$` mentions. (Built-in and enabled local Markdown skills resolve only when explicitly mentioned in a chat request; instructions are bounded and never grant permissions.)
 - [x] Local model runner support for Ollama and LM Studio. (Loopback discovery, selection, model-library inventory, and bounded install/load paths are implemented.)
+- [x] Marketplace model-fit and license guidance. (Model details compare package size with available RAM, report GPU memory only when telemetry exists, mark device fit as advisory, display published license metadata, and prompt users to review the source when license data is absent. Native Model Library acceptance covers license/context metadata, runtime inventory labels, bounded search/install, and resumable ModelScope transfers. Cross-hardware/offload accuracy remains open in `TO_DO_NEXT.md`.)
 - [ ] Offline-capable operation.
 - [x] OpenAI-compatible API for local servers. (Loopback-compatible local endpoints are supported. Cloud endpoints and hosted API keys remain unavailable until the provider gateway is implemented.)
 - [ ] Plugin and pipeline framework.
