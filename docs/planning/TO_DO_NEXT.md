@@ -106,8 +106,13 @@ Mark an item done only when the linked workflow has evidence.
    `npm run smoke:marketplace-real-ollama` passed a real install, `chat.complete`
    inference, Marketplace removal, and post-removal inventory check against a
    temporary Ollama server and model directory; the normal user Ollama model
-   inventory was unchanged afterward. Remaining: verify the remaining MCP and
-   voice adapters against their documented license/runtime requirements.
+   inventory was unchanged afterward. `npm run smoke:rea-mcp` now installs
+   pinned `rea-agents@6.7.0` into a disposable npm cache, connects through the
+   Skai Agent Host, validates its 207-tool manifest, invokes one explicitly
+   read-only tool, revokes the process, and confirms the revoked connection is
+   unusable. REA data and npm cache are isolated from the normal user profile.
+   Remaining: verify the other MCP and voice adapters against their documented
+   license/runtime requirements.
    Saved ComfyUI workflows can be reviewed and activated inside Marketplace.
 10. **GitHub workflow acceptance — Blocked on test account · Owner: User.** Core
     tests cover permission denial, network failure, request cancellation,

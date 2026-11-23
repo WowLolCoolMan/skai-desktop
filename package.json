@@ -53,6 +53,7 @@
     "smoke:agent-host": "node scripts/smoke-agent-host.cjs",
     "smoke:marketplace-host": "node scripts/smoke-marketplace-host.cjs",
     "smoke:marketplace-real-ollama": "node scripts/smoke-marketplace-host.cjs --real-local-ollama",
+    "smoke:rea-mcp": "node scripts/smoke-rea-mcp.cjs",
     "smoke:conversation-import": "node scripts/smoke-conversation-import.cjs",
     "smoke:project-browser": "node scripts/smoke-project-browser.cjs",
     "smoke:project-terminal": "node scripts/smoke-project-terminal.cjs",
