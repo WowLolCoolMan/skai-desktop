@@ -207,6 +207,38 @@ internal static class ModelLibraryTests
         }
         finally { if (Directory.Exists(resumeDirectory)) Directory.Delete(resumeDirectory, recursive: true); }
 
+        var cancelDirectory = Path.Combine(Path.GetTempPath(), "skai-modelscope-cancel-test-" + Guid.NewGuid().ToString("N"));
+        var cancelStream = new CancellablePrefixStream(ggufBytes, 4);
+        var cancellableImport = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
+        {
+            if (request.Method == HttpMethod.Get)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(cancelStream) });
+            throw new Exception("Cancelled ModelScope download must not upload a model blob.");
+        })), cancelDirectory);
+        try
+        {
+            using (var cancelDownload = new CancellationTokenSource())
+            {
+                var firstBytesWritten = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var downloadTask = cancellableImport.DownloadAndImportModelScopeGgufAsync("http://localhost:11434/v1", resumablePackage,
+                    onProgress: _ => firstBytesWritten.TrySetResult(), cancellationToken: cancelDownload.Token);
+                try
+                {
+                    await firstBytesWritten.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                    cancelDownload.Cancel();
+                    await downloadTask;
+                    throw new Exception("Expected the ModelScope transfer to cancel.");
+                }
+                catch (OperationCanceledException)
+                {
+                    var savedPartial = Directory.GetFiles(cancelDirectory, "*.partial", SearchOption.AllDirectories).SingleOrDefault();
+                    Check(savedPartial is not null && new FileInfo(savedPartial).Length == 4,
+                        "Cancelling a ModelScope transfer preserves only its verified local partial for retry");
+                }
+            }
+        }
+        finally { if (Directory.Exists(cancelDirectory)) Directory.Delete(cancelDirectory, recursive: true); }
+
         var rejectedImportHandler = new StubHandler((request, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(ggufBytes) }));
         var rejectedImport = new ModelLibraryService(new HttpClient(rejectedImportHandler));
         try
@@ -277,6 +309,33 @@ internal sealed class PrefixThenThrowStream(byte[] bytes, int prefixLength) : St
         bytes.AsMemory(_position, read).CopyTo(buffer);
         _position += read;
         return ValueTask.FromResult(read);
+    }
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+}
+
+internal sealed class CancellablePrefixStream(byte[] bytes, int prefixLength) : Stream
+{
+    private int _position;
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override void Flush() { }
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        if (_position >= prefixLength)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+        var read = Math.Min(buffer.Length, prefixLength - _position);
+        bytes.AsMemory(_position, read).CopyTo(buffer);
+        _position += read;
+        return read;
     }
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
     public override void SetLength(long value) => throw new NotSupportedException();

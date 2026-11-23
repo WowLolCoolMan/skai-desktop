@@ -81,10 +81,9 @@ Mark an item done only when the linked workflow has evidence.
     validate fit against real models and runtimes.
 15. **Resumable model installs — In progress · Codex.** The Skai-managed
     ModelScope GGUF installer now persists checksum-keyed partial shards,
-    resumes with HTTP Range, validates the complete size/hash/signature, and
-    removes its cache only after successful Ollama import. Remaining:
-    acceptance of cancellation and retries, plus retry behavior delegated to
-    Ollama/LM Studio.
+  resumes with HTTP Range, preserves partial bytes on cancellation, validates
+  the complete size/hash/signature, and removes its cache only after successful
+  Ollama import. Remaining: retry behavior delegated to Ollama/LM Studio.
 16. **Legacy conversation import.** Add preview, cancel-without-writing,
     duplicate protection, restart recovery, and preservation of edited chats.
 17. **Scanned documents and data files.** Add local OCR for scanned PDFs and
@@ -132,6 +131,8 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   upload; interrupted transfers preserve their partial for retry, invalid
   content is removed, and successful import cleans the resume cache. Ollama
   and LM Studio still own their respective upstream download and retry state.
+  A cancellation check confirms ModelScope preserves only the downloaded local
+  partial and does not upload the cancelled model.
 
 - **2026-11-22:** Windows Coding Agent Job Object acceptance and the full native
   core suite pass when the sandbox stress group runs before longer test groups.
