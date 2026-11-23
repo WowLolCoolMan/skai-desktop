@@ -2,7 +2,7 @@
 
 ## Goal
 
-Turn Skai’s existing hands-free dictation/reply loop into an explicit Voice Mode that is easy to understand while it is active. The session remains local-first: the browser/Electron on-device speech recognizer captures turns, the selected local model answers, and the existing local speech output reads the reply. This slice improves discoverability and control without pretending that the current runtime provides ChatGPT-style cloud streaming or acoustic barge-in.
+Turn Skai’s existing hands-free dictation/reply loop into an explicit Voice Mode that is easy to understand while it is active. The session remains local-first: Skai's installed Whisper runtime captures and transcribes turns, the selected model answers, and the existing local speech output reads the reply. This is turn-based and does not claim ChatGPT-style streaming or acoustic barge-in.
 
 ## Integration plan
 
@@ -10,8 +10,9 @@ Turn Skai’s existing hands-free dictation/reply loop into an explicit Voice Mo
 2. Add an in-composer Voice Mode panel with live state (listening, waiting for the local reply, or ready to listen again).
 3. Provide a direct End voice mode control in that panel.
 4. Preserve one-shot Voice dictation as a separate control and preserve Documents-only requirements.
-5. Keep existing speech-pack setup, native fallback, cleanup, and reply playback behavior. The current implementation stays on-device; a future explicit cloud voice provider must be separately selected and disclosed.
-6. Update the backlog to record the improved session UX while leaving true streaming/barge-in acceptance open.
+5. Use installed local Whisper for hands-free capture; preserve one-shot dictation and audio-file transcription behavior.
+6. Pause microphone capture during transcription and model speech, and cancel transcription when Voice Mode ends.
+7. Keep true streaming/barge-in acceptance open.
 
 ## Context map
 

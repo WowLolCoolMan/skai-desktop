@@ -39,11 +39,17 @@ Mark an item done only when the linked workflow has evidence.
    attachment matching the expected phrase without logging transcript text.
    Kokoro, Piper, and Windows SAPI synthesis probes pass; they confirm audio
    output, not subjective quality. Chromium's native offline `en-US`
-   recognition remains unavailable, so hands-free acceptance is still open.
+   recognition remains unavailable. Hands-free Voice Mode now uses local
+   Whisper with pause-segmented microphone turns, reports live mic activity,
+   stops capture while the model speaks, and cancels transcription when ended.
+   Packaged acceptance now confirms a spoken fixture is transcribed and
+   submitted through Voice Mode with a measurable input signal, and that End
+   closes the session cleanly. Cancellation during an in-flight Voice Mode
+   transcription still needs a direct packaged assertion.
    Packaged acceptance now also verifies the denied-permission message and a
    successful retry. The local Whisper adapter smoke confirms an active Python
    transcription is terminated by the cancel request and returns no transcript.
-   Keep the path local. Hands-free and streamed voice acceptance remain open.
+   Keep the path local. Streamed voice and barge-in acceptance remain open.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and

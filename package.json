@@ -41,6 +41,7 @@
     "smoke:voice:acceptance": "node scripts/smoke-voice-acceptance.cjs",
     "smoke:voice:pocket-tts": "node scripts/smoke-pocket-tts.cjs",
     "smoke:voice:workbench": "node scripts/smoke-voice-workbench.cjs",
+    "test:voice:activity": "node scripts/test-voice-activity.cjs",
     "smoke:chatterbox-adapter": "node scripts/smoke-chatterbox-adapter.cjs",
     "smoke:airllm": "node scripts/smoke-airllm.cjs",
     "smoke:electron:accessibility": "node scripts/smoke-electron-accessibility.cjs",

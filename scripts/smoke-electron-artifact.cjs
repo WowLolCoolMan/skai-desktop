@@ -154,75 +154,16 @@ async function main() {
   console.log(`Packaged Percy target: ${JSON.stringify({ url: petTarget.url, type: petTarget.type, websocket: Boolean(petTarget.webSocketDebuggerUrl) })}`);
   // The page target can appear before React mounts (slow CI runners); wait for the app shell before reading it.
   const mainResult = await evaluate(mainTarget, "(async () => { const settingsControl = () => Boolean(document.querySelector('[aria-label=\\\"Settings\\\"], [title=\\\"Settings\\\"]')) || document.body.innerText.includes('Settings'); const ready = () => Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]')) && settingsControl(); for (let waited = 0; !ready() && waited < 15000; waited += 100) await new Promise((resolve) => setTimeout(resolve, 100)); return JSON.stringify({ title: document.title, settings: settingsControl(), navigation: Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]')) }); })()");
-  const videoFixtureResult = await evaluate(mainTarget, "(async () => { if (!globalThis.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return JSON.stringify({ supported: false }); const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 180; const context = canvas.getContext('2d'); const stream = canvas.captureStream(8); let recorder; try { recorder = new MediaRecorder(stream); } catch { stream.getTracks().forEach((track) => track.stop()); return JSON.stringify({ supported: false }); } const chunks = []; const stopped = new Promise((resolve) => { recorder.addEventListener('dataavailable', (event) => { if (event.data.size) chunks.push(event.data); }); recorder.addEventListener('stop', () => resolve(new Blob(chunks, { type: recorder.mimeType || 'video/webm' })), { once: true }); }); recorder.start(); let frame = 0; const paint = setInterval(() => { context.fillStyle = ['#e5484d', '#2e90fa', '#30a46c'][frame++ % 3]; context.fillRect(0, 0, canvas.width, canvas.height); }, 120); await new Promise((resolve) => setTimeout(resolve, 1800)); clearInterval(paint); recorder.stop(); const blob = await stopped; stream.getTracks().forEach((track) => track.stop()); if (!blob.size) return JSON.stringify({ supported: true, recorded: false }); const bytes = new Uint8Array(await blob.arrayBuffer()); let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte); const bridge = window.skaiAgent?.media; if (!bridge) return JSON.stringify({ supported: true, recorded: true, dropped: false, error: 'local media bridge unavailable' }); const localUrl = await bridge.createLocalUrl(\"video/webm\", btoa(binary)); const probe = document.createElement('video'); probe.preload = 'metadata'; probe.src = localUrl; const probeResult = await new Promise((resolve) => { const timeout = setTimeout(() => resolve('timeout'), 5000); probe.addEventListener('loadedmetadata', () => { clearTimeout(timeout); resolve('metadata'); }, { once: true }); probe.addEventListener('error', () => { clearTimeout(timeout); resolve(`error-${probe.error?.code ?? 'unknown'}`); }, { once: true }); }); const probeDetails = { mime: blob.type, probeResult, duration: probe.duration, readyState: probe.readyState, error: probe.error?.message ?? '', magic: [...new Uint8Array(await blob.slice(0, 8).arrayBuffer())] }; probe.removeAttribute('src'); probe.load(); await bridge.revokeLocalUrl(localUrl); const file = new File([blob], 'smoke-video.webm', { type: blob.type }); const data = new DataTransfer(); data.items.add(file); const zone = document.querySelector('.composer-card'); if (!zone) return JSON.stringify({ supported: true, recorded: true, dropped: false, probeDetails }); zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data })); zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data })); return JSON.stringify({ supported: true, recorded: true, dropped: true, bytes: blob.size, probeDetails }); })()");
-  const videoFixture = JSON.parse(videoFixtureResult);
-  let videoResult = JSON.stringify({ frames: [], errors: [] });
-  if (videoFixture.dropped) {
-    const deadline = Date.now() + 15_000;
-    while (Date.now() < deadline) {
-      videoResult = await evaluate(mainTarget, "(() => JSON.stringify({ frames: [...document.querySelectorAll('.attachment-list-composer .attachment-card')].map((card) => ({ name: card.querySelector('strong')?.textContent ?? '', kind: card.querySelector('small')?.textContent ?? '' })), errors: [...document.querySelectorAll('[role=\\\"alert\\\"]')].map((item) => item.textContent ?? '') }))()");
-      if (JSON.parse(videoResult).frames.length || JSON.parse(videoResult).errors.some(Boolean)) break;
-      await sleep(100);
-    }
-  }
-  await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
-  await sleep(150);
-  const mp4DropResult = await evaluate(mainTarget, `(() => { const binary = atob('${mp4FixtureBase64}'); const bytes = new Uint8Array(binary.length); for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index); const file = new File([bytes], 'smoke-video.mp4', { type: 'video/mp4' }); const data = new DataTransfer(); data.items.add(file); const zone = document.querySelector('.composer-card'); if (!zone) return 'missing-drop-zone'; zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data })); zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data })); return 'dropped'; })()`);
-  let mp4VideoResult = JSON.stringify({ frames: [], errors: [] });
-  if (mp4DropResult === "dropped") {
-    const deadline = Date.now() + 15_000;
-    while (Date.now() < deadline) {
-      mp4VideoResult = await evaluate(mainTarget, "(() => JSON.stringify({ frames: [...document.querySelectorAll('.attachment-list-composer .attachment-card')].map((card) => ({ name: card.querySelector('strong')?.textContent ?? '', kind: card.querySelector('small')?.textContent ?? '' })), errors: [...document.querySelectorAll('[role=\\\"alert\\\"]')].map((item) => item.textContent ?? '') }))()");
-      if (JSON.parse(mp4VideoResult).frames.length || JSON.parse(mp4VideoResult).errors.some(Boolean)) break;
-      await sleep(100);
-    }
-  }
-  console.log(`Packaged local WebM sampling: ${videoFixtureResult} ${videoResult}`);
-  console.log(`Packaged local H.264 MP4 sampling: drop=${mp4DropResult} ${mp4VideoResult}`);
   const voiceResult = await evaluate(mainTarget, "(async () => { const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition; if (!Recognition) return JSON.stringify({ api: false, processLocally: false, install: false, availability: 'unsupported' }); const recognition = new Recognition(); let availability = 'not-reported'; if (typeof Recognition.available === 'function') { try { availability = await Recognition.available({ langs: [navigator.language || 'en-US'], processLocally: true, quality: 'dictation' }); } catch (error) { availability = `error: ${error instanceof Error ? error.message : String(error)}`; } } return JSON.stringify({ api: true, processLocally: 'processLocally' in recognition, install: typeof Recognition.install === 'function', availability, language: navigator.language }); })()");
-  console.log(`Packaged local voice capability: ${voiceResult}`);
   const localVoiceState = JSON.parse(voiceResult);
-  const audioInputStarted = await evaluate(mainTarget, "(() => { const input = document.querySelector('input[accept^=\\\".mp3\\\"]'); if (!input) return 'missing'; const sampleRate = 16000; const buffer = new ArrayBuffer(44 + sampleRate * 2); const bytes = new Uint8Array(buffer); const view = new DataView(buffer); const write = (offset, value) => { for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index); }; write(0, 'RIFF'); view.setUint32(4, buffer.byteLength - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, sampleRate * 2, true); const data = new DataTransfer(); data.items.add(new File([buffer], 'smoke-silence.wav', { type: 'audio/wav' })); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); return 'selected'; })()");
-  let localAudioResult = JSON.stringify({ input: audioInputStarted === "selected", transcribing: false, transcript: false, error: "" });
-  if (audioInputStarted === "selected") {
-    // The local Whisper path loads a multi-gigabyte model on CPU. Give the
-    // packaged worker enough time to report a transcript or a real error.
-    const audioDeadline = Date.now() + 60_000;
-    while (Date.now() < audioDeadline) {
-      localAudioResult = await evaluate(mainTarget, "(() => JSON.stringify({ input: Boolean(document.querySelector('input[accept^=\\\".mp3\\\"]')), transcribing: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Transcribing the selected audio')), transcript: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Local transcript added')), error: document.querySelector('.composer-voice-error')?.textContent ?? '' }))()");
-      const audioState = JSON.parse(localAudioResult);
-      if (!audioState.transcribing && (audioState.transcript || audioState.error)) break;
-      await sleep(100);
-    }
-  }
-  console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}`);
-  const pdfOcrRaw = await evaluate(mainTarget, `(async () => JSON.stringify(await window.skaiAgent.request('workspace.attachment.extract', { fileName: 'scanned-text-smoke.pdf', content: '${scannedPdfFixtureBase64}' })))()`);
-  const pdfOcrResponse = JSON.parse(pdfOcrRaw);
-  const pdfOcrState = { ok: pdfOcrResponse.ok === true, ocr: pdfOcrResponse.result?.ocr === true, recognizedFixtureText: String(pdfOcrResponse.result?.content ?? "").includes("Skai offline OCR proof 12345"), error: pdfOcrResponse.error?.message ?? "" };
-  console.log(`Packaged local scanned-PDF OCR: ${JSON.stringify(pdfOcrState)}`);
-  const mixedPdfFixtureBase64 = createMixedPdfFixture();
-  const mixedPdfRaw = await evaluate(mainTarget, `(async () => JSON.stringify(await window.skaiAgent.request('workspace.attachment.extract', { fileName: 'mixed-text-scanned-smoke.pdf', content: '${mixedPdfFixtureBase64}' })))()`);
-  const mixedPdfResponse = JSON.parse(mixedPdfRaw);
-  const mixedPdfState = {
-    ok: mixedPdfResponse.ok === true,
-    ocrPages: mixedPdfResponse.result?.ocrPages ?? [],
-    selectableText: String(mixedPdfResponse.result?.content ?? "").includes("Selectable PDF page one proof."),
-    scannedText: String(mixedPdfResponse.result?.content ?? "").includes("Mixed PDF scanned page OCR proof 67890"),
-    error: mixedPdfResponse.error?.message ?? "",
-  };
-  console.log(`Packaged mixed-PDF text and OCR: ${JSON.stringify(mixedPdfState)}`);
-  await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
-  // Remount ChatComposer so the earlier audio-file transcript status cannot be
-  // mistaken for a result from the microphone recording below.
-  await evaluate(mainTarget, "location.hash = '#/usage'; window.dispatchEvent(new PopStateEvent('popstate')); 'usage'");
-  await sleep(250);
-  await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
-  const remountedChat = await evaluate(mainTarget, "(async () => { for (let waited = 0; waited < 10000; waited += 100) { if (document.querySelector('.composer-card') && document.querySelector('button[aria-label=\"Start voice input\"]')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
-  if (remountedChat !== true) throw new Error("Chat composer did not remount before microphone acceptance.");
-  await sleep(150);
   const whisperStatusRaw = await evaluate(mainTarget, "(async () => JSON.stringify(await window.skaiAgent.request('voice.whisper.install.status')))()");
   const whisperStatus = JSON.parse(whisperStatusRaw);
   const whisperInstalled = whisperStatus.ok === true && whisperStatus.result?.installed === true;
+
+  await evaluate(mainTarget, "location.hash = '#/usage'; window.dispatchEvent(new PopStateEvent('popstate')); 'usage'");
+  await sleep(250);
+  await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
+  await evaluate(mainTarget, "(async () => { for (let waited = 0; waited < 10000; waited += 100) { if (document.querySelector('button[aria-label=\\\"Start voice input\\\"]')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
   const microphoneDenialResult = await evaluate(mainTarget, `(async () => {
     const devices = navigator.mediaDevices;
     const originalDescriptor = Object.getOwnPropertyDescriptor(devices, 'getUserMedia');
@@ -291,6 +232,73 @@ async function main() {
     await sleep(50);
   }
   console.log(`Packaged dictation outcome: ${dictationResult}`);
+  await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+
+  const videoFixtureResult = await evaluate(mainTarget, "(async () => { if (!globalThis.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return JSON.stringify({ supported: false }); const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 180; const context = canvas.getContext('2d'); const stream = canvas.captureStream(8); let recorder; try { recorder = new MediaRecorder(stream); } catch { stream.getTracks().forEach((track) => track.stop()); return JSON.stringify({ supported: false }); } const chunks = []; const stopped = new Promise((resolve) => { recorder.addEventListener('dataavailable', (event) => { if (event.data.size) chunks.push(event.data); }); recorder.addEventListener('stop', () => resolve(new Blob(chunks, { type: recorder.mimeType || 'video/webm' })), { once: true }); }); recorder.start(); let frame = 0; const paint = setInterval(() => { context.fillStyle = ['#e5484d', '#2e90fa', '#30a46c'][frame++ % 3]; context.fillRect(0, 0, canvas.width, canvas.height); }, 120); await new Promise((resolve) => setTimeout(resolve, 1800)); clearInterval(paint); recorder.stop(); const blob = await stopped; stream.getTracks().forEach((track) => track.stop()); if (!blob.size) return JSON.stringify({ supported: true, recorded: false }); const bytes = new Uint8Array(await blob.arrayBuffer()); let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte); const bridge = window.skaiAgent?.media; if (!bridge) return JSON.stringify({ supported: true, recorded: true, dropped: false, error: 'local media bridge unavailable' }); const localUrl = await bridge.createLocalUrl(\"video/webm\", btoa(binary)); const probe = document.createElement('video'); probe.preload = 'metadata'; probe.src = localUrl; const probeResult = await new Promise((resolve) => { const timeout = setTimeout(() => resolve('timeout'), 5000); probe.addEventListener('loadedmetadata', () => { clearTimeout(timeout); resolve('metadata'); }, { once: true }); probe.addEventListener('error', () => { clearTimeout(timeout); resolve(`error-${probe.error?.code ?? 'unknown'}`); }, { once: true }); }); const probeDetails = { mime: blob.type, probeResult, duration: probe.duration, readyState: probe.readyState, error: probe.error?.message ?? '', magic: [...new Uint8Array(await blob.slice(0, 8).arrayBuffer())] }; probe.removeAttribute('src'); probe.load(); await bridge.revokeLocalUrl(localUrl); const file = new File([blob], 'smoke-video.webm', { type: blob.type }); const data = new DataTransfer(); data.items.add(file); const zone = document.querySelector('.composer-card'); if (!zone) return JSON.stringify({ supported: true, recorded: true, dropped: false, probeDetails }); zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data })); zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data })); return JSON.stringify({ supported: true, recorded: true, dropped: true, bytes: blob.size, probeDetails }); })()");
+  const videoFixture = JSON.parse(videoFixtureResult);
+  let videoResult = JSON.stringify({ frames: [], errors: [] });
+  if (videoFixture.dropped) {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      videoResult = await evaluate(mainTarget, "(() => JSON.stringify({ frames: [...document.querySelectorAll('.attachment-list-composer .attachment-card')].map((card) => ({ name: card.querySelector('strong')?.textContent ?? '', kind: card.querySelector('small')?.textContent ?? '' })), errors: [...document.querySelectorAll('[role=\\\"alert\\\"]')].map((item) => item.textContent ?? '') }))()");
+      if (JSON.parse(videoResult).frames.length || JSON.parse(videoResult).errors.some(Boolean)) break;
+      await sleep(100);
+    }
+  }
+  await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+  await sleep(150);
+  const mp4DropResult = await evaluate(mainTarget, `(() => { const binary = atob('${mp4FixtureBase64}'); const bytes = new Uint8Array(binary.length); for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index); const file = new File([bytes], 'smoke-video.mp4', { type: 'video/mp4' }); const data = new DataTransfer(); data.items.add(file); const zone = document.querySelector('.composer-card'); if (!zone) return 'missing-drop-zone'; zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data })); zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data })); return 'dropped'; })()`);
+  let mp4VideoResult = JSON.stringify({ frames: [], errors: [] });
+  if (mp4DropResult === "dropped") {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      mp4VideoResult = await evaluate(mainTarget, "(() => JSON.stringify({ frames: [...document.querySelectorAll('.attachment-list-composer .attachment-card')].map((card) => ({ name: card.querySelector('strong')?.textContent ?? '', kind: card.querySelector('small')?.textContent ?? '' })), errors: [...document.querySelectorAll('[role=\\\"alert\\\"]')].map((item) => item.textContent ?? '') }))()");
+      if (JSON.parse(mp4VideoResult).frames.length || JSON.parse(mp4VideoResult).errors.some(Boolean)) break;
+      await sleep(100);
+    }
+  }
+  console.log(`Packaged local WebM sampling: ${videoFixtureResult} ${videoResult}`);
+  console.log(`Packaged local H.264 MP4 sampling: drop=${mp4DropResult} ${mp4VideoResult}`);
+  console.log(`Packaged local voice capability: ${voiceResult}`);
+  const audioInputStarted = await evaluate(mainTarget, "(() => { const input = document.querySelector('input[accept^=\\\".mp3\\\"]'); if (!input) return 'missing'; const sampleRate = 16000; const buffer = new ArrayBuffer(44 + sampleRate * 2); const bytes = new Uint8Array(buffer); const view = new DataView(buffer); const write = (offset, value) => { for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index); }; write(0, 'RIFF'); view.setUint32(4, buffer.byteLength - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, sampleRate * 2, true); const data = new DataTransfer(); data.items.add(new File([buffer], 'smoke-silence.wav', { type: 'audio/wav' })); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); return 'selected'; })()");
+  let localAudioResult = JSON.stringify({ input: audioInputStarted === "selected", transcribing: false, transcript: false, error: "" });
+  if (audioInputStarted === "selected") {
+    // The local Whisper path loads a multi-gigabyte model on CPU. Give the
+    // packaged worker enough time to report a transcript or a real error.
+    const audioDeadline = Date.now() + 60_000;
+    while (Date.now() < audioDeadline) {
+      localAudioResult = await evaluate(mainTarget, "(() => JSON.stringify({ input: Boolean(document.querySelector('input[accept^=\\\".mp3\\\"]')), transcribing: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Transcribing the selected audio')), transcript: [...document.querySelectorAll('[role=\\\"status\\\"]')].some((item) => item.textContent?.includes('Local transcript added')), error: document.querySelector('.composer-voice-error')?.textContent ?? '' }))()");
+      const audioState = JSON.parse(localAudioResult);
+      if (!audioState.transcribing && (audioState.transcript || audioState.error)) break;
+      await sleep(100);
+    }
+  }
+  console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}`);
+  const pdfOcrRaw = await evaluate(mainTarget, `(async () => JSON.stringify(await window.skaiAgent.request('workspace.attachment.extract', { fileName: 'scanned-text-smoke.pdf', content: '${scannedPdfFixtureBase64}' })))()`);
+  const pdfOcrResponse = JSON.parse(pdfOcrRaw);
+  const pdfOcrState = { ok: pdfOcrResponse.ok === true, ocr: pdfOcrResponse.result?.ocr === true, recognizedFixtureText: String(pdfOcrResponse.result?.content ?? "").includes("Skai offline OCR proof 12345"), error: pdfOcrResponse.error?.message ?? "" };
+  console.log(`Packaged local scanned-PDF OCR: ${JSON.stringify(pdfOcrState)}`);
+  const mixedPdfFixtureBase64 = createMixedPdfFixture();
+  const mixedPdfRaw = await evaluate(mainTarget, `(async () => JSON.stringify(await window.skaiAgent.request('workspace.attachment.extract', { fileName: 'mixed-text-scanned-smoke.pdf', content: '${mixedPdfFixtureBase64}' })))()`);
+  const mixedPdfResponse = JSON.parse(mixedPdfRaw);
+  const mixedPdfState = {
+    ok: mixedPdfResponse.ok === true,
+    ocrPages: mixedPdfResponse.result?.ocrPages ?? [],
+    selectableText: String(mixedPdfResponse.result?.content ?? "").includes("Selectable PDF page one proof."),
+    scannedText: String(mixedPdfResponse.result?.content ?? "").includes("Mixed PDF scanned page OCR proof 67890"),
+    error: mixedPdfResponse.error?.message ?? "",
+  };
+  console.log(`Packaged mixed-PDF text and OCR: ${JSON.stringify(mixedPdfState)}`);
+  await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+  // Remount ChatComposer so the earlier audio-file transcript status cannot be
+  // mistaken for a result from the microphone recording below.
+  await evaluate(mainTarget, "location.hash = '#/usage'; window.dispatchEvent(new PopStateEvent('popstate')); 'usage'");
+  await sleep(250);
+  await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
+  const remountedChat = await evaluate(mainTarget, "(async () => { for (let waited = 0; waited < 10000; waited += 100) { if (document.querySelector('.composer-card') && document.querySelector('button[aria-label=\"Start voice input\"]')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
+  if (remountedChat !== true) throw new Error("Chat composer did not remount before microphone acceptance.");
+  await sleep(150);
+
   const settingsResult = await evaluate(mainTarget, "(async () => { location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 250)); const settingsNav = document.querySelector('.settings-nav'); const tabs = [...(settingsNav?.querySelectorAll('button') ?? [])]; const tab = tabs.find((button) => button.textContent?.trim() === 'Models & Providers'); if (!tab) return JSON.stringify({ route: location.hash, tab: false, airLlmCheck: false, petControls: false }); tab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); const airLlmCheck = [...document.querySelectorAll('.settings-content button')].some((button) => button.textContent?.trim() === 'Check readiness'); const petTab = [...(settingsNav?.querySelectorAll('button') ?? [])].find((button) => button.textContent?.trim() === 'Pet'); if (!petTab) return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: false }); petTab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: document.body.innerText.includes('Show all pets') && document.body.innerText.includes('Let the active pet walk around') }); })()");
   const marketplaceResult = await evaluate(mainTarget, "(async () => { const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)); const buttonIn = (root, labels) => root ? [...root.querySelectorAll('button')].find((button) => labels.includes(button.textContent?.trim())) : null; location.hash = '#/marketplace'; window.dispatchEvent(new PopStateEvent('popstate')); await wait(300); const nav = () => document.querySelector('.plugins-customize-nav'); const heading = document.querySelector('.plugins-topbar h2')?.textContent?.trim() || ''; const search = Boolean(document.querySelector('.plugins-search input, #marketplace-search')); const modelsLink = [...(nav()?.querySelectorAll('button') ?? [])].find((button) => button.querySelector('span')?.textContent?.trim() === 'Models'); if (!modelsLink) return JSON.stringify({ route: location.hash, catalog: Boolean(nav()), heading, search, modelsLink: false, modelHub: false, searchProviders: false, backToCatalog: false }); modelsLink.click(); await wait(300); const modelsRoute = location.hash; const modelHeading = document.querySelector('.marketplace-header h2')?.textContent?.trim() || ''; const modelHub = Boolean(document.querySelector('.marketplace-page') && modelHeading === 'Local models'); const searchProviders = Boolean(document.querySelector('.marketplace-toolbar #marketplace-search') && document.querySelector('.marketplace-toolbar button')); const back = buttonIn(document.querySelector('.marketplace-header'), ['Marketplace']); back?.click(); await wait(300); return JSON.stringify({ route: location.hash, catalog: true, heading, search, modelsLink: true, modelsRoute, modelHub, searchProviders, backToCatalog: Boolean(document.querySelector('.plugins-customize-nav')) }); })()");
   const toolsInstalledResult = await evaluate(mainTarget, "(async () => { const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)); const nav = document.querySelector('.plugins-customize-nav'); const installed = [...(nav?.querySelectorAll('button') ?? [])].find((button) => button.querySelector('span')?.textContent?.trim() === 'Installed'); if (!installed) return JSON.stringify({ inTools: Boolean(nav), installedTab: false, inventoryVisible: false }); installed.click(); await wait(300); return JSON.stringify({ inTools: Boolean(document.querySelector('.plugins-customize-nav')), installedTab: installed.getAttribute('aria-current') === 'page', inventoryVisible: document.body.innerText.includes('Installed and connected') }); })()" );
@@ -328,8 +336,34 @@ async function main() {
     && mp4DropResult === "dropped" && mp4VideoState.frames.length === 4 && mp4VideoState.frames.every((frame) => frame.kind.startsWith("Video frame"));
   const localAudioHandled = audioInputStarted === "selected" && localAudioState.input && !localAudioState.transcribing
     && (localAudioState.transcript || localAudioState.error.toLowerCase().includes("on-device speech pack") || localAudioState.error.toLowerCase().includes("no speech was recognized"));
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
+  await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
+  await sleep(250);
+  let handsFreeState = { available: whisperInstalled && microphoneFixtureReady, started: false, listening: false, transcribing: false, submitted: false, ended: false, peakInputLevel: 0 };
+  if (handsFreeState.available) {
+    await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+    const beforeTurns = await evaluate(mainTarget, "document.querySelectorAll('.chat-message.user').length");
+    const startHandsFree = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice mode'); if (!button) return false; button.click(); return true; })()");
+    handsFreeState.started = startHandsFree === true;
+    const handsFreeDeadline = Date.now() + 60_000;
+    while (Date.now() < handsFreeDeadline && handsFreeState.started && !handsFreeState.submitted) {
+      const current = JSON.parse(await evaluate(mainTarget, `(() => JSON.stringify({ modal: Boolean(document.querySelector('.voice-mode-dialog')), state: document.querySelector('.voice-mode-state')?.textContent ?? '', detail: document.querySelector('.voice-mode-detail')?.textContent ?? '', level: Number(document.querySelector('.voice-mode-session')?.dataset.inputLevel ?? 0), turns: [...document.querySelectorAll('.chat-message.user')].slice(${beforeTurns}).map((item) => item.innerText.toLowerCase()).join(' ') }))()`));
+      handsFreeState.peakInputLevel = Math.max(handsFreeState.peakInputLevel, current.level);
+      handsFreeState.listening ||= current.state.includes("Listening");
+      handsFreeState.transcribing ||= current.state.includes("Transcribing");
+      handsFreeState.submitted = current.turns.includes("voice fixture");
+      if (!current.modal && (current.detail.includes("Whisper") || current.turns)) break;
+      await sleep(100);
+    }
+    if (handsFreeState.started) {
+      const ended = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'End voice mode'); if (!button) return false; button.click(); return true; })()");
+      handsFreeState.ended = ended === true && await evaluate(mainTarget, "!document.querySelector('.voice-mode-dialog')") === true;
+    }
+    console.log(`Packaged local Whisper hands-free Voice Mode: ${JSON.stringify(handsFreeState)}`);
+  } else {
+    console.log(`Packaged local Whisper hands-free Voice Mode skipped: ${JSON.stringify(handsFreeState)}`);
+  }
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || (handsFreeState.available && (!handsFreeState.started || !handsFreeState.listening || !handsFreeState.transcribing || !handsFreeState.submitted || !handsFreeState.ended)) || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, handsFreeState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }

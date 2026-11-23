@@ -46,6 +46,7 @@ archive a plan when scope or implementation changes.
 - [Omni-modal input menu](omni-modal-input-menu.md)
 - [Voice mode](voice-mode.md)
 - [Voice mode session](voice-mode-session.md)
+- [Local Whisper hands-free Voice Mode](local-whisper-handsfree.md)
 - [Voice engine marketplace](voice-engine-marketplace.md)
 - [Voice Workbench clip library](voice-workbench-clip-library.md)
 - [Smart Personas](smart-personas.md)

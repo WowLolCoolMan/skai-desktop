@@ -9,6 +9,7 @@ import { AttachmentList } from "./AttachmentList";
 import { composerCommands, type ComposerCommand } from "./composerCommands";
 import { stopNativeSpeech, waitForLocalSpeechToFinish } from "../../services/nativeTts";
 import { isLocalAudioFile, transcribeLocalAudioFile } from "./localAudioTranscription";
+import { audioRms } from "./voiceActivity";
 import { isLocalEndpoint } from "../../services/localOnly";
 
 type ChatComposerProps = {
@@ -62,6 +63,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [voicePackNeeded, setVoicePackNeeded] = useState(false);
   const [voicePackInstalling, setVoicePackInstalling] = useState(false);
   const [audioTranscribing, setAudioTranscribing] = useState(false);
+  const [voiceTurnTranscribing, setVoiceTurnTranscribing] = useState(false);
   const [audioTranscriptReady, setAudioTranscriptReady] = useState(false);
   const [omniOpen, setOmniOpen] = useState(false);
   const [computerOpen, setComputerOpen] = useState(false);
@@ -79,6 +81,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const audioAbortRef = useRef<AbortController | null>(null);
   const whisperRecorderRef = useRef<{ recorder: MediaRecorder; stream: MediaStream; chunks: Blob[] } | null>(null);
   const whisperRecorderTimerRef = useRef<number | null>(null);
+  const handsFreeCaptureRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number } | null>(null);
+  const handsFreeAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const handsFreeRef = useRef(false);
   const awaitingResponseRef = useRef(false);
@@ -101,6 +105,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   useEffect(() => () => {
     handsFreeRef.current = false;
     audioAbortRef.current?.abort();
+    handsFreeAbortRef.current?.abort();
+    stopHandsFreeCapture(false);
     if (whisperRecorderTimerRef.current !== null) window.clearTimeout(whisperRecorderTimerRef.current);
     const recorder = whisperRecorderRef.current;
     whisperRecorderRef.current = null;
@@ -261,13 +267,16 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       stopNativeSpeech();
       if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
       recognitionRef.current?.stop();
+      handsFreeAbortRef.current?.abort();
+      stopHandsFreeCapture(false);
+      setVoiceTurnTranscribing(false);
       return;
     }
     if (busyRef.current || voiceListening) return;
     handsFreeRef.current = true;
     awaitingResponseRef.current = false;
     setHandsFreeActive(true);
-    void startVoiceRecognition(true);
+    void startHandsFreeListening();
   };
 
   const endVoiceMode = () => {
@@ -278,6 +287,129 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     stopNativeSpeech();
     if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
     recognitionRef.current?.stop();
+    handsFreeAbortRef.current?.abort();
+    stopHandsFreeCapture(false);
+    setVoiceTurnTranscribing(false);
+  };
+
+  const stopHandsFreeCapture = (finishUtterance: boolean) => {
+    const capture = handsFreeCaptureRef.current;
+    if (!capture) return;
+    handsFreeCaptureRef.current = null;
+    window.clearInterval(capture.frame);
+    capture.stream.getTracks().forEach((track) => track.stop());
+    void capture.context.close().catch(() => {});
+    if (capture.recorder && capture.recorder.state !== "inactive") {
+      capture.recorder.onstop = finishUtterance ? capture.recorder.onstop : null;
+      try { capture.recorder.stop(); } catch { /* It may already have stopped. */ }
+    }
+  };
+
+  const startHandsFreeListening = async () => {
+    if (!handsFreeRef.current || busyRef.current || awaitingResponseRef.current || handsFreeCaptureRef.current || handsFreeAbortRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined" || typeof AudioContext === "undefined") {
+      setVoiceError("This desktop runtime cannot capture local Voice Mode audio.");
+      endVoiceMode();
+      return;
+    }
+    let pendingStream: MediaStream | null = null;
+    let pendingContext: AudioContext | null = null;
+    try {
+      const whisper = await window.skaiAgent?.request("voice.whisper.install.status");
+      if (!handsFreeRef.current) return;
+      if (!whisper?.ok || !(whisper.result as { installed?: boolean } | undefined)?.installed) {
+        setVoiceError("Install the local Whisper voice runtime before starting hands-free Voice Mode. Speech is never sent to a remote service.");
+        endVoiceMode();
+        return;
+      }
+      const stream = pendingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!handsFreeRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
+      const context = pendingContext = new AudioContext();
+      await context.resume();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      const silentMonitor = context.createGain();
+      analyser.fftSize = 1024;
+      silentMonitor.gain.value = 0;
+      source.connect(analyser);
+      analyser.connect(silentMonitor);
+      silentMonitor.connect(context.destination);
+      const samples = new Float32Array(analyser.fftSize);
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error("This desktop runtime cannot record a supported local audio format.");
+      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001 };
+      handsFreeCaptureRef.current = capture;
+      capture.recorder = new MediaRecorder(stream, { mimeType });
+      capture.recorder.ondataavailable = (event) => { if (event.data.size) capture.chunks.push(event.data); };
+      capture.recorder.start(250);
+      setVoiceError(null);
+      setVoiceListening(true);
+      const finalize = () => {
+        const recorder = capture.recorder;
+        if (!recorder || recorder.state === "inactive") return;
+        window.clearInterval(capture.frame);
+        handsFreeCaptureRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
+        void context.close().catch(() => {});
+        recorder.onstop = () => {
+          if (!handsFreeRef.current) return;
+          const blob = new Blob(capture.chunks, { type: mimeType });
+          if (!blob.size || blob.size > 20 * 1024 * 1024) {
+            if (blob.size > 20 * 1024 * 1024) setVoiceError("That voice turn exceeded the 20 MB local transcription limit. Try a shorter turn.");
+            setVoiceListening(false);
+            window.setTimeout(() => void startHandsFreeListening(), 400);
+            return;
+          }
+          setVoiceListening(false);
+          setVoiceTurnTranscribing(true);
+          awaitingResponseRef.current = true;
+          sawBusyRef.current = false;
+          const controller = new AbortController();
+          handsFreeAbortRef.current = controller;
+          void transcribeLocalAudioFile(new File([blob], `voice-turn-${Date.now()}.webm`, { type: "audio/webm" }), controller.signal).then((transcript) => {
+            if (!handsFreeRef.current || controller.signal.aborted) return;
+            if (!onVoiceTranscript(transcript)) {
+              awaitingResponseRef.current = false;
+              setVoiceError("Add a document before speaking a Documents-only request.");
+              window.setTimeout(() => void startHandsFreeListening(), 400);
+            }
+          }).catch((error) => {
+            if (!handsFreeRef.current || controller.signal.aborted) return;
+            const message = error instanceof Error ? error.message : "Local Whisper could not transcribe that voice turn.";
+            if (!message.includes("did not recognize speech")) setVoiceError(message);
+            awaitingResponseRef.current = false;
+            window.setTimeout(() => void startHandsFreeListening(), 500);
+          }).finally(() => {
+            if (handsFreeAbortRef.current === controller) handsFreeAbortRef.current = null;
+            setVoiceTurnTranscribing(false);
+          });
+        };
+        recorder.stop();
+      };
+      const inspect = () => {
+        if (!handsFreeRef.current || handsFreeCaptureRef.current !== capture) return;
+        analyser.getFloatTimeDomainData(samples);
+        const level = audioRms(samples);
+        document.querySelector(".voice-mode-session")?.setAttribute("data-input-level", level.toFixed(6));
+        const now = performance.now();
+        const threshold = Math.max(0.0006, capture.noiseFloor * 1.6);
+        if (!capture.speechDetected && now - capture.calibrationStartedAt < 350) capture.noiseFloor = Math.min(0.02, capture.noiseFloor * 0.9 + level * 0.1);
+        if (level > threshold) {
+          capture.speechDetected = true;
+          capture.lastSpeechAt = now;
+          if (!capture.speechStartedAt) capture.speechStartedAt = now;
+        }
+        if (now - capture.startedAt > 30_000 || (capture.speechDetected && now - capture.lastSpeechAt > 900 && now - capture.speechStartedAt > 300)) { finalize(); return; }
+        if (capture.context.state !== "running") void capture.context.resume();
+      };
+      capture.frame = window.setInterval(inspect, 40);
+    } catch (error) {
+      pendingStream?.getTracks().forEach((track) => track.stop());
+      if (pendingContext && pendingContext.state !== "closed") await pendingContext.close().catch(() => {});
+      setVoiceListening(false);
+      setVoiceError(error instanceof Error && error.name === "NotAllowedError" ? "Microphone access was denied. Allow it in desktop app permissions and try again." : error instanceof Error ? error.message : "Local microphone capture failed.");
+      endVoiceMode();
+    }
   };
 
   const openFilePickerFromOmni = () => {
@@ -335,6 +467,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       awaitingResponseRef.current = true;
       sawBusyRef.current = true;
       recognitionRef.current?.stop();
+      stopHandsFreeCapture(false);
     } else if (busy) {
       sawBusyRef.current = true;
     }
@@ -347,7 +480,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       awaitingResponseRef.current = false;
       sawBusyRef.current = false;
       if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
-      void startVoiceRecognition(true);
+      void startHandsFreeListening();
     });
     return () => { cancelled = true; };
   }, [busy]);
@@ -508,6 +641,6 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy || rewriteBusy} aria-pressed={documentsOnly} aria-label={documentsOnly ? "Documents only is on" : "Use documents only"} title={documentsOnly ? "Documents only: on" : "Use only attached documents as evidence"}><NavIcon name="document" /></Button><Button variant="ghost" type="button" onClick={() => setOmniOpen(true)} disabled={rewriteBusy || (attachments.length >= 5 && !audioTranscribing)} aria-haspopup="dialog" aria-expanded={omniOpen} aria-label="Add files or audio" aria-describedby="attachment-help" title="Add files, folders, or audio"><NavIcon name="plus" /></Button><Button variant={audioTranscribing ? "secondary" : "ghost"} type="button" onClick={() => audioAbortRef.current ? audioAbortRef.current.abort() : audioPickerRef.current?.click()} disabled={busy || rewriteBusy || voiceListening || handsFreeActive} aria-label={audioTranscribing ? "Stop audio transcription" : "Transcribe an audio file"} title={audioTranscribing ? "Stop audio transcription" : "Transcribe MP3, M4A, OGG, WAV, or WebM locally"}><NavIcon name={audioTranscribing ? "stop" : "audio"} /></Button>{!hasMessageContent && <Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"} title={voiceListening ? "Stop voice input and transcribe locally" : "Record a local Whisper dictation"}><NavIcon name={voiceListening && !handsFreeActive ? "stop" : "microphone"} /></Button>}{!hasMessageContent && <Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={rewriteBusy || (voiceListening && !handsFreeActive) || audioTranscribing} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title="Start a local turn-based voice conversation"><NavIcon name={handsFreeActive ? "stop" : "headset"} /></Button>}<div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span>{hasMessageContent && <Button variant={busy ? "secondary" : "primary"} disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{rewriteBusy ? "Rewriting…" : busy ? "Queue ↗" : "Send ↗"}</Button>}</div></div>
     <ModalDialog open={omniOpen} onClose={() => setOmniOpen(false)} titleId="omni-input-title" className="ui-dialog omni-input-dialog"><div className="dialog-heading"><div><p className="section-kicker">ADD TO THIS MESSAGE</p><h3 id="omni-input-title">Choose an input</h3><p>Attach local media or start a private voice turn. You can review attachments before sending.</p></div><button type="button" onClick={() => setOmniOpen(false)} aria-label="Close input menu">×</button></div><div className="omni-input-options"><button type="button" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><strong>Files and folders</strong><span>Images, documents, PDFs, and videos</span><small>{attachments.length}/5 attachments</small></button><button type="button" onClick={openAudioPickerFromOmni} disabled={busy || voiceListening || handsFreeActive}><strong>Audio file</strong><span>Transcribe MP3, M4A, OGG, or WAV on this device</span><small>No raw audio is sent</small></button><button type="button" onClick={startVoiceFromOmni} disabled={rewriteBusy || handsFreeActive || audioTranscribing}><strong>Voice input</strong><span>Dictate one message into the composer</span><small>On-device speech recognition</small></button><button type="button" onClick={startHandsFreeFromOmni} disabled={rewriteBusy || voiceListening || audioTranscribing}><strong>Voice Mode</strong><span>Have a turn-based hands-free conversation</span><small>End anytime</small></button><button type="button" onClick={() => { setOmniOpen(false); setComputerOpen(true); void captureComputerScreens(); }}><strong>Computer use</strong><span>View a screen, attach it for model context, or send direct mouse and keyboard input</span><small>Local display capture · Windows input</small></button></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setOmniOpen(false)}>Cancel</Button></div></ModalDialog>
     <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL COMPUTER CONTROL</p><h3 id="computer-use-title">Computer use</h3><p>Ask the local vision model to act on this display, or use the direct controls. Each action is shown below; stop ends the session after the current model response.</p></div><button type="button" onClick={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} aria-label="Close computer use">×</button></div>{computerScreens.length > 1 && <label className="computer-screen-picker">Display<select value={computerScreenId} onChange={(event) => { setComputerScreenId(event.target.value); setComputerPoint(null); }} aria-label="Select display">{computerScreens.map((screen) => <option value={screen.id} key={screen.id}>{screen.name}</option>)}</select></label>}{selectedComputerScreen && <button type="button" className="computer-screen-preview" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); const imageRatio = selectedComputerScreen.previewWidth / selectedComputerScreen.previewHeight; const boxRatio = rect.width / rect.height; const imageWidth = boxRatio > imageRatio ? rect.height * imageRatio : rect.width; const imageHeight = boxRatio > imageRatio ? rect.height : rect.width / imageRatio; const offsetX = (rect.width - imageWidth) / 2; const offsetY = (rect.height - imageHeight) / 2; setComputerPoint({ x: Math.max(0, Math.min(1, (event.clientX - rect.left - offsetX) / imageWidth)), y: Math.max(0, Math.min(1, (event.clientY - rect.top - offsetY) / imageHeight)) }); }} aria-label="Choose a point on the captured display"><img src={`data:image/png;base64,${selectedComputerScreen.content}`} alt={`Captured display: ${selectedComputerScreen.name}`} />{computerPoint && <span className="computer-point-marker" style={{ left: `${computerPoint.x * 100}%`, top: `${computerPoint.y * 100}%` }} />}</button>}{!selectedComputerScreen && <p className="settings-help">Capture a display to begin.</p>}<div className="computer-use-controls computer-use-agent"><input value={computerTask} onChange={(event) => setComputerTask(event.target.value)} maxLength={2000} placeholder="Describe what you want the local model to do…" aria-label="Computer-use task" /><Button variant={computerBusy ? "secondary" : "primary"} type="button" disabled={!selectedComputerScreen || !computerTask.trim()} onClick={() => computerBusy ? stopComputerTask() : void startComputerTask()}>{computerBusy ? "Stop session" : "Start session"}</Button><Button variant="secondary" type="button" disabled={computerBusy} onClick={() => void captureComputerScreens()}>Refresh screen</Button><Button variant="secondary" type="button" disabled={!selectedComputerScreen || attachments.length >= 5 || computerBusy} onClick={attachComputerScreenshot}>Attach screenshot</Button></div><div className="computer-use-controls"><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "left" })}>Click point</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "right" })}>Right click</Button><input value={computerText} onChange={(event) => setComputerText(event.target.value)} maxLength={2000} placeholder="Text to type into the selected app" aria-label="Text to type" /><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerText || computerBusy} onClick={() => void runComputerAction({ action: "type", text: computerText })}>Type text</Button><select value={computerKey} onChange={(event) => setComputerKey(event.target.value)} aria-label="Key to press">{["Enter", "Tab", "Escape", "Backspace", "Delete", "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown", "Space"].map((key) => <option key={key}>{key}</option>)}</select><Button variant="secondary" type="button" disabled={!selectedComputerScreen || computerBusy} onClick={() => void runComputerAction({ action: "key", key: computerKey })}>Press key</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: 480 })}>Scroll up</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: -480 })}>Scroll down</Button></div>{computerSteps.length > 0 && <ol className="computer-use-steps" aria-label="Computer-use actions">{computerSteps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>}{computerStatus && <p className="computer-use-status" role="status">{computerBusy ? "Working… " : ""}{computerStatus}</p>}<div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setComputerOpen(false)}>Close</Button></div></ModalDialog>
-    <ModalDialog open={handsFreeActive} onClose={endVoiceMode} titleId="voice-mode-title" className="ui-dialog voice-mode-dialog"><div className="voice-mode-session"><div className={`voice-mode-orb ${voiceListening ? "is-listening" : busy ? "is-speaking" : "is-preparing"}`} aria-hidden="true"><span /><span /><span /></div><p className="section-kicker">LOCAL VOICE MODE</p><h3 id="voice-mode-title">Voice conversation</h3><p className="voice-mode-state">{voiceListening ? "Listening on this device" : busy ? "Skai is responding" : "Preparing the next turn"}</p><p className="voice-mode-detail">{voiceListening ? "Speak naturally, then pause. Your words are transcribed locally before they are sent." : busy ? "The microphone is paused while the local model responds." : "The next listening turn will start after local speech finishes."}</p><div className="voice-mode-session-actions">{busy && <Button variant="ghost" type="button" onClick={stopNativeSpeech}>Stop speaking</Button>}<Button variant="secondary" type="button" onClick={endVoiceMode}>End voice mode</Button></div></div></ModalDialog>
+    <ModalDialog open={handsFreeActive} onClose={endVoiceMode} titleId="voice-mode-title" className="ui-dialog voice-mode-dialog"><div className="voice-mode-session"><div className={`voice-mode-orb ${voiceListening ? "is-listening" : busy ? "is-speaking" : "is-preparing"}`} aria-hidden="true"><span /><span /><span /></div><p className="section-kicker">LOCAL VOICE MODE</p><h3 id="voice-mode-title">Voice conversation</h3><p className="voice-mode-state">{voiceTurnTranscribing ? "Transcribing on this device" : voiceListening ? "Listening on this device" : busy ? "Skai is responding" : "Preparing the next turn"}</p><p className="voice-mode-detail">{voiceTurnTranscribing ? "Your microphone is paused while local Whisper transcribes this turn." : voiceListening ? "Speak naturally, then pause. Local Whisper transcribes your words before they are sent." : busy ? "The microphone is paused while the local model responds." : "The next listening turn will start after local speech finishes."}</p>{voiceError && <p className="composer-voice-error" role="status">{voiceError}</p>}<div className="voice-mode-session-actions">{busy && <Button variant="ghost" type="button" onClick={stopNativeSpeech}>Stop speaking</Button>}<Button variant="secondary" type="button" onClick={endVoiceMode}>End voice mode</Button></div></div></ModalDialog>
   </section>;
 }
