@@ -162,6 +162,10 @@ Mark an item done only when the linked workflow has evidence.
     synthesis, and the clean smoke interrupts a long utterance then verifies a
     later utterance succeeds. Focused `--voice-models` tests cover the
     isolated root and reject unregistered runtime directories.
+    `npm run smoke:voice:kokoro` also installs the pinned Kokoro runtime and
+    model files into a disposable root, verifies Marketplace readiness, and
+    synthesizes a valid WAV through the Agent Host. Its subprocess closes
+    inherited stdin to prevent protocol-pipe stalls.
     Cross-device speech quality and clean installs on other operating systems
     remain unverified.
     The isolated Voice Workbench UI smoke now builds its renderer before
@@ -310,6 +314,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   A follow-up acceptance interrupts a long Piper utterance through Stop and
   confirms a subsequent utterance succeeds. Focused voice root tests and
   `node --check` for the smoke script pass.
+
+- **2026-11-23:** Added clean isolated Kokoro Marketplace installation and
+  speech acceptance. The disposable Windows profile installed the pinned
+  runtime and verified model files, showed Kokoro as available in Marketplace,
+  and synthesized a valid 118,924-byte WAV through the Agent Host. Closed
+  stdin for Kokoro subprocesses to avoid inheriting the Agent Host protocol
+  pipe; its smoke script removes the disposable profile after success.
 
 - **2026-11-23:** Added a pinned Chatterbox Nano Marketplace installer and
   local synthesis adapter. Setup uses an isolated CPU-only Python environment,

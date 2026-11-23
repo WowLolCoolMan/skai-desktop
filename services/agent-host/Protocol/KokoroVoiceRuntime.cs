@@ -124,9 +124,10 @@ internal static class KokoroVoiceRuntime
 
     private static async Task<string> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout)
     {
-        using var process = new Process { StartInfo = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true } };
+        using var process = new Process { StartInfo = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true } };
         foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
         if (!process.Start()) throw new InvalidOperationException("The local Kokoro runtime could not start.");
+        process.StandardInput.Close();
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         using var cancellation = new CancellationTokenSource(timeout);
