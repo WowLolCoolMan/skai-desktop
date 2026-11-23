@@ -103,6 +103,7 @@ const cloudProviderKey = "skai.voice.cloudProvider";
 const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
 const cloudModelIdKey = "skai.voice.cloudModelId";
 let activeCloudAudio: HTMLAudioElement | null = null;
+let speechGeneration = 0;
 function setVoicePlaybackActive(active: boolean) {
   window.dispatchEvent(new CustomEvent("skai:voice-playback", { detail: active }));
 }
@@ -131,12 +132,16 @@ export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResou
 }
 
 export function stopNativeSpeech() {
+  speechGeneration += 1;
   void window.skaiAgent?.request("voice.stop");
   activeCloudAudio?.pause();
   activeCloudAudio = null;
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   setVoicePlaybackActive(false);
+  window.dispatchEvent(new CustomEvent("skai:voice-playback-stopped"));
 }
+
+export function currentSpeechGeneration() { return speechGeneration; }
 
 export async function waitForLocalSpeechToFinish(maxWaitMs = 120_000) {
   const deadline = Date.now() + maxWaitMs;
@@ -163,6 +168,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const settings = selectedVoiceSettings();
   if (!force && !settings.voiceOutputEnabled) return false;
   const profile = voiceProfiles.find((item) => item.id === (profileId || settings.profileId)) ?? voiceProfiles[0];
+  const generation = speechGeneration;
   const runtimeId = settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId;
   // Skai profiles control pacing on every engine. Pitch is applied only by the
   // browser's native fallback; local model runtimes do not expose pitch control.
@@ -172,14 +178,18 @@ export async function speakNativeResponse(text: string, force = false, profileId
       ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId })
       : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, modelId: runtimeId });
     if (speech?.ok) {
+      if (generation !== speechGeneration) return false;
       const audioDataUrl = (speech.result as { audioDataUrl?: unknown } | undefined)?.audioDataUrl;
       if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/")) {
         activeCloudAudio?.pause();
         activeCloudAudio = new Audio(audioDataUrl);
         const audio = activeCloudAudio;
+        let finishPlayback!: () => void;
+        const playbackFinished = new Promise<void>((resolve) => { finishPlayback = resolve; });
         const playbackEnded = () => {
           if (activeCloudAudio === audio) activeCloudAudio = null;
           setVoicePlaybackActive(false);
+          finishPlayback();
         };
         audio.addEventListener("playing", () => setVoicePlaybackActive(true), { once: true });
         audio.addEventListener("ended", playbackEnded, { once: true });
@@ -190,9 +200,10 @@ export async function speakNativeResponse(text: string, force = false, profileId
           audio.playbackRate = profile.rate;
         }
         await audio.play();
+        await playbackFinished;
       } else {
         setVoicePlaybackActive(true);
-        void waitForLocalSpeechToFinish().finally(() => setVoicePlaybackActive(false));
+        await waitForLocalSpeechToFinish().finally(() => setVoicePlaybackActive(false));
       }
       return true;
     }
@@ -200,6 +211,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   } catch {
     window.dispatchEvent(new CustomEvent("skai:voice-fallback", { detail: { message: "The selected voice model failed to load. Using the native fallback voice." } }));
   }
+  if (generation !== speechGeneration) return false;
   if (!("speechSynthesis" in window)) return false;
   const localVoice = window.speechSynthesis.getVoices().find((voice) => voice.localService);
   if (!localVoice) {
@@ -212,8 +224,11 @@ export async function speakNativeResponse(text: string, force = false, profileId
   utterance.rate = profile.rate;
   utterance.pitch = fallbackPitch;
   utterance.onstart = () => setVoicePlaybackActive(true);
-  utterance.onend = () => setVoicePlaybackActive(false);
-  utterance.onerror = () => setVoicePlaybackActive(false);
+  const browserPlaybackFinished = new Promise<void>((resolve) => {
+    utterance.onend = () => { setVoicePlaybackActive(false); resolve(); };
+    utterance.onerror = () => { setVoicePlaybackActive(false); resolve(); };
+  });
   window.speechSynthesis.speak(utterance);
+  await browserPlaybackFinished;
   return true;
 }

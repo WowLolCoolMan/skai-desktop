@@ -10,6 +10,65 @@ namespace SkaiDesktop.AgentHost.Protocol;
 
 public static partial class AgentHostLoop
 {
+    private sealed class ChatProgressFilter
+    {
+        private string pending = string.Empty;
+        private bool insideReasoning;
+
+        public string Push(string chunk)
+        {
+            pending += chunk;
+            var visible = new System.Text.StringBuilder();
+            while (pending.Length > 0)
+            {
+                var marker = insideReasoning ? "</think>" : "<think";
+                var markerIndex = pending.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (markerIndex < 0)
+                {
+                    var safeLength = pending.Length - (marker.Length - 1);
+                    if (safeLength <= 0) break;
+                    if (!insideReasoning) visible.Append(pending.AsSpan(0, safeLength));
+                    pending = pending[safeLength..];
+                    break;
+                }
+                if (markerIndex > 0)
+                {
+                    if (!insideReasoning) visible.Append(pending.AsSpan(0, markerIndex));
+                    pending = pending[markerIndex..];
+                }
+                if (insideReasoning)
+                {
+                    pending = pending[marker.Length..];
+                    insideReasoning = false;
+                    continue;
+                }
+                var tagEnd = pending.IndexOf('>');
+                if (tagEnd < 0) break;
+                pending = pending[(tagEnd + 1)..];
+                insideReasoning = true;
+            }
+            return visible.ToString();
+        }
+
+        public string Complete()
+        {
+            if (insideReasoning) return string.Empty;
+            const string marker = "<think";
+            var visibleLength = pending.Length;
+            for (var suffixLength = Math.Min(marker.Length - 1, pending.Length); suffixLength > 0; suffixLength--)
+            {
+                if (pending.EndsWith(marker[..suffixLength], StringComparison.OrdinalIgnoreCase))
+                {
+                    visibleLength -= suffixLength;
+                    break;
+                }
+            }
+            var visible = pending[..visibleLength];
+            pending = string.Empty;
+            return visible;
+        }
+    }
+
     private static async Task<AgentResponse> CompleteChatAsync(AgentRequest request, CancellationToken cancellationToken = default)
     {
         var endpoint = RequiredLocalEndpoint(request, "endpoint", 2_000);
@@ -122,17 +181,12 @@ public static partial class AgentHostLoop
             completionMaxTokens = asksForDepth ? 2_048 : Math.Clamp(completionMaxTokens ?? 450, 256, 700);
         }
         var text = new System.Text.StringBuilder();
-        var streamVisibleText = true;
-        var streamMarkerTail = string.Empty;
+        var progressFilter = new ChatProgressFilter();
         void AppendModelChunk(string chunk)
         {
             text.Append(chunk);
-            // Do not stream any output once a reasoning-channel marker appears;
-            // the final response is still scrubbed by the existing filter.
-            var markerProbe = streamMarkerTail + chunk;
-            if (markerProbe.Contains("<think", StringComparison.OrdinalIgnoreCase)) streamVisibleText = false;
-            streamMarkerTail = markerProbe.Length <= 6 ? markerProbe : markerProbe[^6..];
-            if (streamVisibleText) ChatProgress.Value?.Invoke(chunk, false);
+            var visible = progressFilter.Push(chunk);
+            if (visible.Length > 0) ChatProgress.Value?.Invoke(visible, false);
         }
         var evidenceSummary = activePersona is { SourceMode: "public-research" } ? TryBuildPersonaEvidenceSummary(activePersona, personaQuery) : null;
         if (evidenceSummary is not null) text.Append(evidenceSummary);
@@ -180,6 +234,7 @@ public static partial class AgentHostLoop
                     usedFallback = true;
                     ChatProgress.Value?.Invoke(string.Empty, true);
                     text.Clear();
+                    progressFilter = new ChatProgressFilter();
                     settings.ModelProvider = "AirLLM";
                     try
                     {
@@ -206,6 +261,8 @@ public static partial class AgentHostLoop
         {
             throw new TimeoutException($"The local model did not complete within {timeoutSeconds} seconds.");
         }
+        var finalVisibleTail = progressFilter.Complete();
+        if (finalVisibleTail.Length > 0) ChatProgress.Value?.Invoke(finalVisibleTail, false);
         var responseText = StripModelReasoningMarkup(text.ToString());
         if (activePersona is { SourceMode: "public-research" } && evidenceSummary is null && ContainsUnverifiedQuotation(activePersona, responseText))
             responseText = "I can't verify that quoted wording in the selected evidence, so I won't present it as a real line. I can summarize what the sources establish instead.";

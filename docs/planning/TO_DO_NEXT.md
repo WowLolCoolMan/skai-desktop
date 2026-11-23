@@ -60,10 +60,16 @@ Mark an item done only when the linked workflow has evidence.
    of the follow-up to the model. Local model text now streams through the
    Agent Host protocol, request-scoped Electron IPC, and the active chat view;
    provider fallback clears partial text before showing fallback output, and
-   interim deltas stop if a reasoning marker appears. The local protocol smoke
-   confirms ordered token delivery. Speech playback still waits for the full
-   response because current voice adapters return whole audio clips; incremental
-   speech/audio streaming remains open. Keep the path local.
+   interim deltas filter reasoning tags across chunk boundaries and stop if a
+   reasoning block is still open at completion. The local protocol smoke
+   confirms ordered token delivery with hidden reasoning excluded. Voice Mode
+   now queues sentence-sized text chunks for the selected speech engine while
+   the model is still generating; playback is serialized, awaits each chunk,
+   and invalidates queued chunks on interruption. The fresh packaged Windows
+   acceptance passed the full microphone, local Whisper, long-reply playback,
+   barge-in, and follow-up flow with this implementation. Speech engines still
+   synthesize a whole audio clip per text chunk; actual incremental audio-frame
+   streaming remains open. Keep the path local.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and

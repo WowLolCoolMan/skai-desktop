@@ -92,7 +92,7 @@ async function run() {
     request.on("end", () => {
       capturedModelRequest = JSON.parse(body);
       response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end('data: {"choices":[{"delta":{"content":"mode "}}]}\n\ndata: {"choices":[{"delta":{"content":"smoke reply"}}]}\n\ndata: [DONE]\n\n');
+      response.end('data: {"choices":[{"delta":{"content":"mode "}}]}\n\ndata: {"choices":[{"delta":{"content":"<think>hidden reasoning</think>"}}]}\n\ndata: {"choices":[{"delta":{"content":"smoke reply"}}]}\n\ndata: [DONE]\n\n');
     });
   });
   pendingSmokeServers.add(modelServer);

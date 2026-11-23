@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AgentRequest } from "../../services/agentClient";
 import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage } from "../../../shared/contracts";
 import type { Message } from "../../app/types";
-import { speakNativeResponse, stopNativeSpeech } from "../../services/nativeTts";
+import { currentSpeechGeneration, speakNativeResponse, stopNativeSpeech } from "../../services/nativeTts";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR } from "../../services/localOnly";
 import { extractVideoFrameAttachments, isVideoAttachment, videoMediaType } from "./videoFrameExtractor";
 
@@ -67,6 +67,30 @@ function skillMentions(messages: Array<{ content: string }>) {
     for (const match of message.content.matchAll(/\$([A-Za-z0-9._-]{1,80})\b/g)) ids.add(match[1]);
   }
   return [...ids].slice(0, 4);
+}
+
+function takeSpeakableText(buffer: string, flush = false) {
+  const chunks: string[] = [];
+  let remaining = buffer;
+  while (remaining.trim()) {
+    const sentence = /^([\s\S]{1,700}?[.!?])\s+/.exec(remaining);
+    if (sentence) {
+      chunks.push(sentence[1].trim());
+      remaining = remaining.slice(sentence[0].length);
+      continue;
+    }
+    if (remaining.length > 900) {
+      const boundary = remaining.lastIndexOf(" ", 900);
+      if (boundary > 200) {
+        chunks.push(remaining.slice(0, boundary).trim());
+        remaining = remaining.slice(boundary + 1);
+        continue;
+      }
+    }
+    break;
+  }
+  if (flush && remaining.trim()) { chunks.push(remaining.trim()); remaining = ""; }
+  return { chunks, remaining };
 }
 
 export function useChatWorkspace({ request, connection, provider, endpoint, model, modelMetadata, mode, project, onConversationModelRestore, onError }: ChatWorkspaceOptions) {
@@ -159,11 +183,35 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const responseModel = hasImageAttachment ? readPreferredModel("vision", model) : model;
     const progressChannel = crypto.randomUUID();
     let streamedText = "";
+    let speechBuffer = "";
+    let speechCancelled = false;
+    let speechQueued = false;
+    let speechQueue = Promise.resolve();
+    const enqueueSpeech = (chunk: string) => {
+      if (!speakReply || speechCancelled || !chunk.trim()) return;
+      speechQueued = true;
+      const generation = currentSpeechGeneration();
+      speechQueue = speechQueue.then(() => generation === currentSpeechGeneration() && !speechCancelled ? speakNativeResponse(chunk, true) : false).then(() => undefined).catch(() => undefined);
+    };
+    const handleSpeechStopped = () => { speechCancelled = true; };
+    if (speakReply) window.addEventListener("skai:voice-playback-stopped", handleSpeechStopped);
     const unsubscribe = window.skaiAgent.onProgress?.(({ channel, delta, reset }) => {
       if (channel !== progressChannel || typeof delta !== "string") return;
-      if (reset) streamedText = "";
+      if (reset) {
+        streamedText = "";
+        speechBuffer = "";
+        stopNativeSpeech();
+        speechCancelled = false;
+        speechQueued = false;
+        speechQueue = Promise.resolve();
+      }
       streamedText += delta;
       setMessages([...next, { role: "assistant", content: streamedText }]);
+      if (speakReply && !speechCancelled) {
+        const drained = takeSpeakableText((speechBuffer += delta));
+        speechBuffer = drained.remaining;
+        drained.chunks.forEach(enqueueSpeech);
+      }
     });
     let response: Awaited<ReturnType<typeof request>>;
     try {
@@ -171,14 +219,21 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     } catch (error) {
       setBusy(false);
       onError(error instanceof Error ? error.message : "The model request failed.");
+      if (speakReply) { stopNativeSpeech(); window.removeEventListener("skai:voice-playback-stopped", handleSpeechStopped); }
       return;
     } finally {
       unsubscribe?.();
     }
-    if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
+    if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); if (speakReply) { stopNativeSpeech(); window.removeEventListener("skai:voice-playback-stopped", handleSpeechStopped); } return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
-    await speakNativeResponse(completed.at(-1)?.content ?? "", speakReply);
+    if (speakReply) {
+      const drained = takeSpeakableText(speechBuffer, true);
+      drained.chunks.forEach(enqueueSpeech);
+      if (speechQueued) await speechQueue;
+      else await speakNativeResponse(completed.at(-1)?.content ?? "", true);
+      window.removeEventListener("skai:voice-playback-stopped", handleSpeechStopped);
+    } else await speakNativeResponse(completed.at(-1)?.content ?? "", false);
     setBusy(false);
   };
 
