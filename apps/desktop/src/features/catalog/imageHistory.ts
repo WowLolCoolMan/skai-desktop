@@ -4,6 +4,7 @@ export type ImageHistoryEntry = {
   createdAt: string;
   provider: "comfyui" | "diffusers";
   prompt: string;
+  mediaType?: "image" | "video" | "audio";
 };
 
 const databaseName = "skai-image-history";

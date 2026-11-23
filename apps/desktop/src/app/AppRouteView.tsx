@@ -83,7 +83,7 @@ export type AppRouteState = {
   imageBusy: boolean;
   imageCancelRequested: boolean;
   imageProgress: string[];
-  generatedImages: Array<{ url: string; fileName: string }>;
+  generatedImages: Array<{ url: string; fileName: string; mediaType?: "image" | "video" | "audio"; provider?: "comfyui" | "diffusers"; prompt?: string; createdAt?: string }>;
   tasks: DesktopTask[];
   scheduledTasks: DesktopScheduledTask[];
   taskBusy: string | null;
@@ -154,7 +154,7 @@ export type AppRouteActions = {
   onImageChange: (key: "endpoint" | "prompt" | "workflow" | "provider", value: string) => void;
   onImportWorkflow?: () => Promise<{ name: string; workflow: string } | null>;
   onSelectModel: (model: Model) => void;
-  onGenerateImage: (source?: ChatAttachment) => void;
+  onGenerateImage: (source?: ChatAttachment, options?: { provider: "comfyui" | "diffusers"; prompt: string }) => void;
   onCancelImageGeneration?: () => Promise<boolean>;
   onPickImageSource?: () => Promise<ChatAttachment | null>;
   onRetryWorkbench: () => void;

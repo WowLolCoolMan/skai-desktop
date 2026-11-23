@@ -109,6 +109,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const [rewriteBusy, setRewriteBusy] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<{ original: string; candidate: string } | null>(null);
   const [showCodingWorkflowTools, setShowCodingWorkflowTools] = useState(false);
+  const [showProjectTaskPlanner, setShowProjectTaskPlanner] = useState(false);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
@@ -284,6 +285,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
       <div className="chat-header-actions">
         {!isCodingAgent && <div className="chat-response-mode" role="group" aria-label="Response mode"><div className="chat-response-mode-options">{([{ id: "think", label: "Chat" }, { id: "coding", label: "Coding" }, { id: "security", label: "Security" }] as Array<{ id: ChatResponseMode; label: string }>).map((item) => <button type="button" key={item.id} className={responseMode === item.id ? "is-active" : ""} aria-pressed={responseMode === item.id} onClick={() => onResponseModeChange(item.id)}>{item.label}</button>)}</div></div>}
         {isCodingAgent && <span className="coding-mode-badge">CODING AGENT</span>}
+        {workspaceMode === "project" && <Button className="project-task-plan-trigger" variant={showProjectTaskPlanner ? "secondary" : "ghost"} type="button" aria-expanded={showProjectTaskPlanner} onClick={() => setShowProjectTaskPlanner((open) => !open)}>{showProjectTaskPlanner ? "Close planner" : "Plan task"}</Button>}
         <ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} />
         <ChatCapacityPopover capacity={capacity} model={selectedModel} modelName={model} />
         <Button variant={temporaryChat ? "primary" : "ghost"} type="button" onClick={() => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); }}>{temporaryChat ? "Temporary · On" : "Temporary"}</Button>
@@ -303,7 +305,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
             <><div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={index} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>{showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>Jump to latest ↓</Button></div>}</>
           )}
         </section>
-        {(workspaceMode === "project" || showCodingWorkflowTools) && <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment, requiresApproval) => onPlanTask(title, instruction, environment, conversationId, requiresApproval)} />}
+        {workspaceMode === "project" ? <div className="project-task-planner-slot" hidden={!showProjectTaskPlanner}><ChatTaskComposer initialOpen busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment, requiresApproval) => onPlanTask(title, instruction, environment, conversationId, requiresApproval)} /></div> : showCodingWorkflowTools && <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment, requiresApproval) => onPlanTask(title, instruction, environment, conversationId, requiresApproval)} />}
         {draftPersistenceWarning && <p className="chat-draft-save-warning" role="status">{draftPersistenceWarning}</p>}
         <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={updateDraft} onSubmit={submit} onQueueRemove={onRemoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} onAudioTranscript={(fileName, transcript) => onSetAttachments([...attachments, { fileName: `${fileName}.audio-transcript.txt`, mediaType: "text/plain", content: transcript }].slice(0, 5))} onSetAttachments={onSetAttachments} provider={provider} endpoint={endpoint} model={model} />
       </main>

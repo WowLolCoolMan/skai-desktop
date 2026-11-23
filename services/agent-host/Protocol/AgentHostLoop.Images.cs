@@ -72,7 +72,7 @@ public static partial class AgentHostLoop
             reportProgress?.Invoke("Running Stable Diffusion Turbo locally…");
             var generated = await new DiffusersImageProvider().GenerateAsync(prompt, diffusersSourceImage, diffusersSourceMediaType, reportProgress, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            return new(ProtocolVersion, request.Id, true, new { prompt, progress = "Generated locally with Stable Diffusion Turbo.", images = new[] { new { url = generated.DataUrl, fileName = generated.FileName } } });
+            return new(ProtocolVersion, request.Id, true, new { prompt, progress = "Generated locally with Stable Diffusion Turbo.", images = new[] { new { url = generated.DataUrl, fileName = generated.FileName, mediaType = "image" } } });
         }
         if (!provider.Equals("comfyui", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Choose a supported local image provider.");
         var endpoint = RequiredLocalEndpoint(request, "endpoint", 512);
@@ -96,7 +96,7 @@ public static partial class AgentHostLoop
         {
             prompt,
             progress,
-            images = images.Select(image => new { url = image.Url.ToString(), fileName = image.FileName }).ToArray(),
+            images = images.Select(image => new { url = image.Url.ToString(), fileName = image.FileName, mediaType = image.MediaType }).ToArray(),
         });
     }
 

@@ -25,11 +25,12 @@ function consumeTaskPrefill(): TaskPrefill | null {
   }
 }
 
-export function ChatTaskComposer({ busy, onPlanTask }: {
+export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false }: {
   busy: boolean;
   onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, requiresApproval: boolean) => Promise<boolean>;
+  initialOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [title, setTitle] = useState("");
   const [instruction, setInstruction] = useState("");
   const [environment, setEnvironment] = useState<TaskEnvironment>("local");

@@ -8,7 +8,7 @@ using SkaiDesktop.Core.Infrastructure;
 
 namespace SkaiDesktop.Core.Services;
 
-public sealed record ComfyGeneratedImage(Uri Url, string FileName);
+public sealed record ComfyGeneratedImage(Uri Url, string FileName, string MediaType = "image");
 
 /// <summary>Queues an explicitly configured workflow on a local ComfyUI server.</summary>
 public sealed class ComfyImageProvider(HttpClient? httpClient = null)
@@ -49,7 +49,7 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
     {
         var root = ValidateEndpoint(endpoint);
         if (string.IsNullOrWhiteSpace(prompt) || prompt.Length > MaxPromptCharacters)
-            throw new ArgumentException($"Enter an image prompt up to {MaxPromptCharacters:N0} characters.", nameof(prompt));
+            throw new ArgumentException($"Enter a prompt up to {MaxPromptCharacters:N0} characters.", nameof(prompt));
         if (string.IsNullOrWhiteSpace(workflowTemplate) || workflowTemplate.Length > MaxWorkflowCharacters || !workflowTemplate.Contains("{{prompt}}", StringComparison.Ordinal))
             throw new ArgumentException("Add a ComfyUI API workflow up to 1 MB and put {{prompt}} inside its prompt text value.", nameof(workflowTemplate));
 
@@ -86,7 +86,7 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
         try { using var document = JsonDocument.Parse(workflowSource.Replace("{{prompt}}", escapedPrompt, StringComparison.Ordinal)); workflow = document.RootElement.Clone(); }
         catch (JsonException error) { throw new ArgumentException("The ComfyUI workflow is not valid JSON after the prompt was inserted.", nameof(workflowTemplate), error); }
 
-        progress?.Invoke("Queueing image with local ComfyUI…");
+        progress?.Invoke("Queueing media workflow with local ComfyUI…");
         using var queueResponse = await _http.PostAsJsonAsync(new Uri(root, "prompt"), new { prompt = workflow, client_id = Guid.NewGuid().ToString("N") }, cancellationToken).ConfigureAwait(false);
         // Once ComfyUI has accepted the POST, finish reading its bounded queue
         // receipt even if the caller cancels. We need the returned prompt ID to
@@ -99,32 +99,41 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
 
         try
         {
-            for (var attempt = 0; attempt < 180; attempt++)
+            // Video and music workflows can take substantially longer than a still image.
+            for (var attempt = 0; attempt < 1800; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                progress?.Invoke($"Generating image locally… {attempt + 1}s");
+                progress?.Invoke($"Generating media locally… {attempt + 1}s");
                 await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
                 using var historyResponse = await _http.GetAsync(new Uri(root, "history/" + Uri.EscapeDataString(promptId)), cancellationToken).ConfigureAwait(false);
                 if (!historyResponse.IsSuccessStatusCode) continue;
                 using var history = await BoundedHttpContent.ReadJsonAsync(historyResponse.Content, cancellationToken, "ComfyUI history").ConfigureAwait(false);
                 if (!history.RootElement.TryGetProperty(promptId, out var job) || !job.TryGetProperty("outputs", out var outputs)) continue;
-                var images = new List<ComfyGeneratedImage>();
+                var media = new List<ComfyGeneratedImage>();
                 foreach (var output in outputs.EnumerateObject())
                 {
-                    if (!output.Value.TryGetProperty("images", out var values) || values.ValueKind != JsonValueKind.Array) continue;
-                    foreach (var image in values.EnumerateArray())
+                    if (output.Value.ValueKind != JsonValueKind.Object) continue;
+                    foreach (var resultSet in output.Value.EnumerateObject())
                     {
-                        var file = image.TryGetProperty("filename", out var name) ? name.GetString() : null;
-                        if (string.IsNullOrWhiteSpace(file) || file.Length > 512 || file.Contains('/') || file.Contains('\\')) continue;
-                        var subfolder = image.TryGetProperty("subfolder", out var sub) ? sub.GetString() ?? "" : "";
-                        if (subfolder.Contains("..", StringComparison.Ordinal) || subfolder.Contains('\\')) continue;
-                        var type = image.TryGetProperty("type", out var kind) ? kind.GetString() ?? "output" : "output";
-                        var query = $"view?filename={Uri.EscapeDataString(file)}&subfolder={Uri.EscapeDataString(subfolder)}&type={Uri.EscapeDataString(type)}";
-                        images.Add(new ComfyGeneratedImage(new Uri(root, query), file));
+                        if (resultSet.Name is not ("images" or "audio" or "videos" or "gifs") || resultSet.Value.ValueKind != JsonValueKind.Array) continue;
+                        foreach (var result in resultSet.Value.EnumerateArray())
+                        {
+                            if (result.ValueKind != JsonValueKind.Object) continue;
+                            var file = result.TryGetProperty("filename", out var name) ? name.GetString() : null;
+                            if (string.IsNullOrWhiteSpace(file) || file.Length > 512 || file.Contains('/') || file.Contains('\\')) continue;
+                            var mediaType = ClassifyMedia(file);
+                            if (mediaType is null) continue;
+                            var subfolder = result.TryGetProperty("subfolder", out var sub) ? sub.GetString() ?? "" : "";
+                            if (subfolder.Length > 512 || subfolder.Contains("..", StringComparison.Ordinal) || subfolder.Contains('\\')) continue;
+                            var type = result.TryGetProperty("type", out var kind) ? kind.GetString() ?? "output" : "output";
+                            if (type is not ("output" or "temp" or "input")) continue;
+                            var query = $"view?filename={Uri.EscapeDataString(file)}&subfolder={Uri.EscapeDataString(subfolder)}&type={Uri.EscapeDataString(type)}";
+                            media.Add(new ComfyGeneratedImage(new Uri(root, query), file, mediaType));
+                        }
                     }
                 }
-                if (images.Count > 0) return images;
-                throw new InvalidOperationException("ComfyUI finished without returning an image output.");
+                if (media.Count > 0) return media;
+                throw new InvalidOperationException("ComfyUI finished without a supported image, video, or audio output.");
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -132,7 +141,16 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
             await CancelQueuedPromptAsync(root, promptId).ConfigureAwait(false);
             throw;
         }
-        throw new TimeoutException("Timed out waiting for ComfyUI after 3 minutes.");
+        throw new TimeoutException("Timed out waiting for ComfyUI after 30 minutes.");
+    }
+
+    private static string? ClassifyMedia(string fileName)
+    {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        if (extension is ".png" or ".jpg" or ".jpeg" or ".webp" or ".gif" or ".avif") return "image";
+        if (extension is ".mp4" or ".webm" or ".mov" or ".m4v") return "video";
+        if (extension is ".wav" or ".mp3" or ".flac" or ".ogg" or ".opus" or ".m4a") return "audio";
+        return null;
     }
 
     private async Task CancelQueuedPromptAsync(Uri root, string promptId)
