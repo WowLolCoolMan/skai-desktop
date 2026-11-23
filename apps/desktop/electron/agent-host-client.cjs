@@ -77,6 +77,11 @@ function createAgentHostClient(options) {
 
     host.stdin.on("error", () => {
       settlePending({ v: 1, ok: false, error: { code: "HOST_WRITE_FAILED", message: "The local agent host closed its request pipe." } });
+      if (host === startedHost) {
+        host = undefined;
+        restartOnNextRequest = !isQuitting();
+        if (startedHost.exitCode === null && !startedHost.killed) startedHost.kill();
+      }
     });
 
     hostReader = createLineReader(host.stdout);

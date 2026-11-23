@@ -82,8 +82,16 @@ async function run() {
   assert.throws(() => fakeProcess.stdout.emit("error", new Error("unexpected console stream failure")), /unexpected console stream failure/);
 
   const failedPipeRequest = client.request("settings.get", {});
-  host.stdin.emit("error", new Error("simulated broken pipe"));
+  const brokenPipeHost = host;
+  brokenPipeHost.stdin.emit("error", new Error("simulated broken pipe"));
   assert.equal((await failedPipeRequest).error.code, "HOST_WRITE_FAILED");
+  assert.equal(brokenPipeHost.killed, true, "the unusable child is retired after its request pipe breaks");
+  const launchesBeforePipeRecovery = launches.length;
+  const pipeRecoveryPromise = client.request("settings.get", {});
+  assert.equal(launches.length, launchesBeforePipeRecovery + 1, "a request after a broken pipe relaunches the host");
+  const pipeRecoveryRequest = requests.at(-1);
+  host.stdout.write(`${JSON.stringify({ v: 1, id: pipeRecoveryRequest.id, ok: true, result: "pipe-recovered" })}\n`);
+  assert.equal((await pipeRecoveryPromise).result, "pipe-recovered", "the next request succeeds on the replacement host");
 
   let stopped = false;
   client.stop(() => { stopped = true; });

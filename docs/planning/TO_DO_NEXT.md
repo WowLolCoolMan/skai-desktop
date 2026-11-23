@@ -142,11 +142,11 @@ Mark an item done only when the linked workflow has evidence.
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 
-- **2026-11-23:** If the local Agent Host exits unexpectedly, Electron now
-  relaunches it on the next request so Retry can recover Marketplace and other
-  host-backed screens. Intentional shutdown and initial startup failure still
-  remain stopped/offline. The Agent Host client test verifies a request succeeds
-  after an unexpected exit.
+- **2026-11-23:** If the local Agent Host exits or its request pipe breaks
+  unexpectedly, Electron now retires the unusable child and relaunches on the
+  next request so Retry can recover Marketplace and other host-backed screens.
+  Intentional shutdown and initial startup failure still remain stopped/offline.
+  The Agent Host client test verifies recovery after both exit and pipe failure.
 
 - **2026-11-23:** MCP connection IDs are now immutable. A revoked ID cannot be
   overwritten through `mcp.connection.connect` to restore access; reconnecting
