@@ -25,12 +25,19 @@ keep this queue focused on unfinished work.
 | Image runtime coverage | In progress · Unclaimed | Exercise a live ComfyUI server and validate GPU or additional hardware. | Show only runtime-reported progress; cancellation must stop the job and leave the page usable. | [Image guide](../guides/LOCAL_IMAGE_GENERATION.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Release validation | In progress · Unclaimed | Complete published-feed and native desktop updater acceptance. | Headless Ubuntu 24.04/WSL2 acceptance now covers AppImage update and in-app rollback from synthetic 0.1.3 to 0.1.4 and back, preserving user data. Published feed, signed metadata, and native Linux desktop acceptance remain open. Production signing is deferred by the owner. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
 | Persona research and chat | In progress · Unclaimed | Resolve the local-model stream disconnect in the second turn of living-person era acceptance, then broaden multi-turn cutoff checks across persona types. | Dated source filtering applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. The live smoke now supports `--era-date`, filters research before drafting, and persists the date. The Joe Rogan 2010 run passed identity, research, card drafting, and its first reply, but Ollama closed all three cutoff follow-up streams without a response; do not count this as cutoff acceptance. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
-| Local, cloud, and hybrid gateway | In progress · Codex | Continue the provider and secret-store contracts; add a supported provider only after consent and credential handling are ready. | Require explicit routing, OS-protected secrets, clear data-destination disclosure, and a working offline-only mode. No silent fallback. | [Provider gateway plan](implementation-plans/provider-gateway.md) |
+| Local, cloud, and hybrid gateway | In progress · Codex | Add unavailable/corrupted keyring recovery coverage and implement the macOS credential adapter before starting a cloud chat provider. | Require explicit routing, OS-protected secrets, clear data-destination disclosure, and a working offline-only mode. No silent fallback. Windows DPAPI and Linux GNOME Keyring round-trip/isolation are verified; unavailable-store recovery and macOS storage remain open. | [Provider gateway plan](implementation-plans/provider-gateway.md) |
 
 ## Recently completed
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
+  real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
+  missing lookup, save/read, per-connection and per-service isolation, removal,
+  and unsafe identifier checks. The tests skip on Linux hosts without
+  `secret-tool` or an active D-Bus session; native desktop unlock/recovery and
+  macOS storage remain open.
 
 - **2026-11-22:** Extended the Persona live smoke with strict `--era-date`
   validation, era-filtered research before drafting, persisted era metadata,

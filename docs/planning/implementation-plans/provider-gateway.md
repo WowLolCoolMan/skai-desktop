@@ -23,6 +23,12 @@ complete, enforceable operating mode.
 - Chat prompt compaction and several internal completion helpers call provider
   code directly; they must use the same selected connection and cancellation
   rules as the visible chat turn.
+- Linux Core acceptance now exercises the real GNOME Keyring Secret Service in
+  an isolated D-Bus session on Ubuntu 24.04/WSL2. It verifies missing-key
+  lookup, credential round-trip, per-connection and per-service isolation,
+  removal, and unsafe-ID rejection. The checks skip when `secret-tool` or a
+  session bus is absent; this does not establish native desktop startup/unlock
+  guidance, unavailable/corrupted keyring recovery, or macOS storage.
 
 ## Architecture
 

@@ -6,8 +6,41 @@ internal static class CloudVoiceCredentialTests
 {
     public static async Task RunAsync()
     {
-        if (!OperatingSystem.IsWindows()) return;
         var directory = Path.Combine(Path.GetTempPath(), "skai-voice-credentials-" + Guid.NewGuid().ToString("N"));
+        if (OperatingSystem.IsLinux())
+        {
+            var service = "skaidesktop-test-" + Guid.NewGuid().ToString("N");
+            var store = new PlatformSecretStore(service, "provider acceptance", directory);
+            if (!store.IsAvailable)
+            {
+                Console.WriteLine("SKIP Linux Secret Service integration checks (secret-tool or an active D-Bus session is unavailable).");
+                return;
+            }
+            const string key = "linux-keyring-acceptance-secret-123";
+            var isolatedStore = new PlatformSecretStore("skaidesktop-test-isolated-" + Guid.NewGuid().ToString("N"), "provider acceptance", directory);
+            try
+            {
+                Check(await store.GetAsync("connection-01") is null, "Linux Secret Service reports a missing provider credential");
+                await store.SetAsync("connection-01", key);
+                Check(await store.GetAsync("connection-01") == key, "Linux Secret Service round-trips a credential");
+                Check(await store.GetAsync("connection-02") is null, "Linux Secret Service isolates credentials by connection");
+                Check(await isolatedStore.GetAsync("connection-01") is null, "Linux Secret Service isolates credentials by service namespace");
+                await store.RemoveAsync("connection-01");
+                Check(await store.GetAsync("connection-01") is null, "Linux Secret Service removes a credential");
+                try
+                {
+                    await store.SetAsync("../outside", key);
+                    throw new Exception("Expected unsafe Linux secret-store identifiers to be rejected.");
+                }
+                catch (ArgumentException) { Check(true, "Linux secret store rejects path-shaped identifiers"); }
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            }
+            return;
+        }
+        if (!OperatingSystem.IsWindows()) return;
         try
         {
             var store = new CloudVoiceCredentialStore(directory);
