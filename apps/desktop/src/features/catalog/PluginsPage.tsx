@@ -28,9 +28,13 @@ export { VoiceWorkbench } from "./VoiceWorkbench";
 export function PluginsPage({
   onNavigate,
   onSelectAirLlmModel,
+  onImageChange,
+  onImportWorkflow,
 }: {
   onNavigate?: (route: Route) => void;
   onSelectAirLlmModel?: (model: Model) => void;
+  onImageChange?: (key: "endpoint" | "prompt" | "workflow" | "provider", value: string) => void;
+  onImportWorkflow?: () => Promise<{ name: string; workflow: string } | null>;
 } = {}) {
   const [view, setView] = useState<"catalog" | "models" | "voices" | "installed" | "updates">("catalog");
   const [catalogSection, setCatalogSection] = useState<MarketplaceCatalogSection>("Discover");
@@ -270,6 +274,8 @@ export function PluginsPage({
             onSectionChange={(section) => changeCatalogSection(section as MarketplaceCatalogSection)}
             onNavigate={onNavigate}
             onSelectAirLlmModel={onSelectAirLlmModel}
+            onImageChange={onImageChange}
+            onImportWorkflow={onImportWorkflow}
           />
         ) : (
           <>

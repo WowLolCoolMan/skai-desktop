@@ -15,7 +15,6 @@ type MarketplaceCatalog = { providers: Array<{ id: string; name: string; kinds: 
 
 const items: CatalogItem[] = [
   { id: "local-models", title: "Local models", filter: "Local models", description: "Search Hugging Face and ModelScope for local GGUF models.", detail: "Remote catalog discovery is separated from inference. Every result shows its provider, provenance, safety label, size when available, and the verified local install route.", icon: "model", status: "ready", tone: "success", publisher: "Hugging Face · ModelScope", version: "Catalog search", compatibility: "Local runtime required", nextStep: "Search, filter, inspect the source, then start a verified local download.", installable: false },
-  { id: "image-workflows", title: "Image workflows", filter: "Image workflows", description: "Reuse reviewed ComfyUI workflows from Image Studio.", detail: "Workflow JSON is kept in the local profile. Marketplace does not download or activate remote image packages.", icon: "image", status: "unavailable", tone: "warning", publisher: "Local profile", version: "User-managed", compatibility: "ComfyUI API workflow", nextStep: "Open Image Studio and save a workflow for reuse.", installable: false },
   { id: "mcp:rea", title: "REA · Reverse Engineering Agent", filter: "Tools", description: "A local MCP server for reverse engineering software and application behavior.", detail: "REA is published by morluto as the rea-agents npm package. Skai can download the pinned package or launch its MCP server locally over stdio. Tool actions remain subject to Skai's per-tool approval gate.", icon: "terminal", status: "ready", tone: "success", publisher: "morluto · github.com/morluto/rea", version: "rea-agents 6.7.0", compatibility: "Node.js 22.19.0+, 24.11.0+, or 26.0.0+", nextStep: "Download the verified package or start REA in Skai after reviewing the local runtime requirement.", installable: true },
 ];
 
@@ -42,7 +41,7 @@ function marketplacePreference<T>(key: string, fallback: T): T {
 
 // Embedded in the unified Marketplace catalog (PluginsPage) for the hub sections that catalog
 // does not cover itself: remote model search/install, Diffusers LoRAs and the local inventory.
-const EMBEDDED_SECTIONS: Section[] = ["Models", "Voices", "Installed"];
+const EMBEDDED_SECTIONS: Section[] = ["Models", "Voices", "Image workflows", "Installed"];
 const sectionIcons: Record<Section, NavIconName> = {
   Discover: "sparkle",
   Models: "model",
@@ -55,7 +54,16 @@ const sectionIcons: Record<Section, NavIconName> = {
   Updates: "arrow-up-right",
 };
 
-export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSection = "Discover", onBack, onSectionChange, initialQuery }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; initialSection?: Section; onBack?: () => void; onSectionChange?: (section: Section) => void; initialQuery?: string }) {
+type SavedImageWorkflow = { name: string; workflow: string };
+
+function readSavedImageWorkflows(): SavedImageWorkflow[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem("skai.image.workflows") ?? "[]");
+    return Array.isArray(value) ? value.filter((item): item is SavedImageWorkflow => Boolean(item && typeof item === "object" && typeof (item as SavedImageWorkflow).name === "string" && typeof (item as SavedImageWorkflow).workflow === "string")).slice(0, 12) : [];
+  } catch { return []; }
+}
+
+export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange, onImportWorkflow, initialSection = "Discover", onBack, onSectionChange, initialQuery }: { onSelectAirLlmModel?: (model: Model) => void; onNavigate?: (route: Route) => void; onImageChange?: (key: "endpoint" | "prompt" | "workflow" | "provider", value: string) => void; onImportWorkflow?: () => Promise<{ name: string; workflow: string } | null>; initialSection?: Section; onBack?: () => void; onSectionChange?: (section: Section) => void; initialQuery?: string }) {
   const [section, setSection] = useState<Section>(initialSection);
   const [query, setQuery] = useState(() => initialQuery ?? marketplacePreference(`query.${initialSection.toLowerCase()}`, ""));
   const [selectedId, setSelectedId] = useState(items[0].id);
@@ -94,6 +102,10 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   const [airLlmReady, setAirLlmReady] = useState<boolean | null>(null);
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
   const [updateChecking, setUpdateChecking] = useState(false);
+  const [savedImageWorkflows, setSavedImageWorkflows] = useState<SavedImageWorkflow[]>(readSavedImageWorkflows);
+  const [activeImageWorkflow, setActiveImageWorkflow] = useState(() => localStorage.getItem("skai.imageWorkflow") ?? "");
+  const [imageWorkflowStatus, setImageWorkflowStatus] = useState<string | null>(null);
+  const [imageWorkflowImporting, setImageWorkflowImporting] = useState(false);
 
   useEffect(() => { localStorage.setItem(`skai.marketplace.query.${section.toLowerCase()}`, JSON.stringify(query)); }, [query, section]);
   useEffect(() => { localStorage.setItem("skai.marketplace.installed.pinned", JSON.stringify(pinnedItems)); }, [pinnedItems]);
@@ -248,8 +260,32 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
   }), [appFilter, contextFilter, libraryFilter, models, provider, size, taskFilter, uncensored]);
   const selectedRemoteModel = filteredModels.find((model) => model.id === selectedRemoteModelId) ?? filteredModels[0] ?? null;
   const activeModelFilterCount = countActiveMarketplaceModelFilters({ provider, size, task: taskFilter, library: libraryFilter, app: appFilter, context: contextFilter, uncensored });
+  const filteredSavedImageWorkflows = savedImageWorkflows.filter((workflow) => `${workflow.name} ${workflow.workflow}`.toLowerCase().includes(query.trim().toLowerCase()));
   const activeLocalRuntime = localStorage.getItem("skai.provider") ?? "Ollama";
   const installRouteAvailable = (model: MarketplaceModel) => isMarketplaceModelInstallRouteAvailable(model, activeLocalRuntime);
+
+  const activateImageWorkflow = (workflow: SavedImageWorkflow) => {
+    localStorage.setItem("skai.imageWorkflow", workflow.workflow);
+    setActiveImageWorkflow(workflow.workflow);
+    onImageChange?.("workflow", workflow.workflow);
+    setImageWorkflowStatus(`“${workflow.name}” is now the active local workflow. It is ready in Image Studio.`);
+  };
+
+  const importImageWorkflow = async () => {
+    if (!onImportWorkflow || imageWorkflowImporting) return;
+    setImageWorkflowImporting(true);
+    setImageWorkflowStatus(null);
+    try {
+      const imported = await onImportWorkflow();
+      if (!imported) return;
+      const next = [{ name: imported.name, workflow: imported.workflow }, ...savedImageWorkflows.filter((item) => item.name !== imported.name)].slice(0, 12);
+      localStorage.setItem("skai.image.workflows", JSON.stringify(next));
+      setSavedImageWorkflows(next);
+      activateImageWorkflow(imported);
+    } catch (error) {
+      setImageWorkflowStatus(error instanceof Error ? error.message : "The local workflow could not be imported.");
+    } finally { setImageWorkflowImporting(false); }
+  };
 
   async function searchModels(nextQuery = query, nextUncensored = uncensored) {
     const requestId = ++modelSearchRequestRef.current;
@@ -435,6 +471,22 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, initialSectio
           </div>
         ) : section === "Updates" ? (
           <section className="marketplace-installed-pane marketplace-updates-pane"><div className="panel-heading"><div><p className="section-kicker">LOCAL UPDATE CHANNEL</p><h3>Keep Skai current</h3><p className="panel-subtitle">Check the configured release source and review the version before downloading anything. Update checks use the app's own signed release channel.</p></div><Button variant="primary" disabled={updateChecking || !window.skaiAgent?.updates} onClick={() => void checkForUpdates()}>{updateChecking ? "Checking." : "Check for updates"}</Button></div>{updateResult ? <div className="marketplace-update-result" role="status"><StatusBadge tone={updateResult.status === "error" ? "danger" : updateResult.available ? "success" : "neutral"}>{updateResult.status === "error" ? "Check failed" : updateResult.available ? `Update ${updateResult.version ?? "available"}` : "Up to date"}</StatusBadge><div><strong>{updateResult.available ? `Version ${updateResult.version ?? "available"} is ready to review.` : `Skai ${updateResult.currentVersion} is the current known version.`}</strong><span>{updateResult.status === "error" ? updateResult.message : updateResult.available ? "A download or install has not started. Review the release details in Settings before applying it." : "No verified release newer than this installation was reported."}</span></div>{updateResult.available && onNavigate && <Button variant="secondary" type="button" onClick={() => onNavigate("settings")}>Review in Settings</Button>}</div> : <EmptyState title="No update check run yet" description="Run a check when you want to verify the release channel. Nothing is downloaded automatically from this page." />}</section>
+        ) : section === "Image workflows" ? (
+          <section className="marketplace-installed-pane marketplace-image-workflows-pane">
+            <div className="panel-heading"><div><p className="section-kicker">LOCAL WORKFLOW LIBRARY</p><h3>ComfyUI workflows</h3><p className="panel-subtitle">Manage workflows already saved on this device. Marketplace never downloads workflow code or contacts a remote workflow service.</p></div><div className="marketplace-model-actions">{onImportWorkflow && <Button variant="primary" type="button" disabled={imageWorkflowImporting} onClick={() => void importImageWorkflow()}>{imageWorkflowImporting ? "Importing…" : "Import local workflow"}</Button>}<Button variant="secondary" type="button" onClick={() => { setSavedImageWorkflows(readSavedImageWorkflows()); setImageWorkflowStatus(null); }}>Refresh library</Button></div></div>
+            <div className="marketplace-search-row"><label className="sr-only" htmlFor="marketplace-image-workflow-search">Search saved workflows</label><input id="marketplace-image-workflow-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search saved workflows…" /><span>{filteredSavedImageWorkflows.length} local workflows</span></div>
+            {imageWorkflowStatus && <p className="marketplace-install-status" role="status">{imageWorkflowStatus}</p>}
+            {savedImageWorkflows.length === 0 ? <EmptyState title="No saved workflows yet" description="Import a ComfyUI API workflow file here. It will be checked by Image Studio when used and stored in this app profile." action={onImportWorkflow ? <Button variant="primary" type="button" disabled={imageWorkflowImporting} onClick={() => void importImageWorkflow()}>{imageWorkflowImporting ? "Importing…" : "Import local workflow"}</Button> : undefined} /> : (
+              <div className="marketplace-workflow-list" aria-label="Saved local image workflows">
+                {filteredSavedImageWorkflows.map((workflow) => {
+                  const active = workflow.workflow === activeImageWorkflow;
+                  const nodes = (() => { try { const json: unknown = JSON.parse(workflow.workflow); return json && typeof json === "object" ? Object.keys(json).length : 0; } catch { return 0; } })();
+                  return <article className="marketplace-workflow-card" key={workflow.name}><div><p className="section-kicker">LOCAL COMFYUI API WORKFLOW</p><h4>{workflow.name}</h4><p>{nodes ? `${nodes} workflow nodes · stored in this app profile` : "Saved local workflow · stored in this app profile"}</p></div><StatusBadge tone={active ? "success" : "neutral"}>{active ? "Active" : "Saved locally"}</StatusBadge><Button variant={active ? "secondary" : "primary"} type="button" disabled={active} onClick={() => activateImageWorkflow(workflow)}>{active ? "Active in Image Studio" : "Set active"}</Button></article>;
+                })}
+                {filteredSavedImageWorkflows.length === 0 && <EmptyState title="No matching workflows" description="Try a different search term." action={<Button variant="ghost" onClick={() => setQuery("")}>Clear search</Button>} />}
+              </div>
+            )}
+          </section>
         ) : section === "Image models" ? (
           <section className="marketplace-installed-pane"><div className="panel-heading"><div><p className="section-kicker">DIFFUSERS IMAGE ASSETS</p><h3>LoRAs</h3><p className="panel-subtitle">Search Hugging Face safetensors LoRAs, then install or remove them from Skai’s local Diffusers asset folder. Downloads are capped at 8 GB.</p></div><Button variant="secondary" onClick={() => void searchImageAssets()} disabled={imageAssetsLoading}>{imageAssetsLoading ? "Searching…" : "Search LoRAs"}</Button></div>
             <div className="marketplace-search-row"><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void searchImageAssets(); }} placeholder="Search LoRAs by style or subject…" aria-label="Search image LoRAs" /></div>

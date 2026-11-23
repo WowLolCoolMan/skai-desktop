@@ -1512,6 +1512,12 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .marketplace-installed-pane .section-kicker { margin-bottom: 5px; }
 .marketplace-installed-pane .panel-heading h3 { margin: 0; font-size: calc(var(--skai-text-2xl) * var(--skai-heading-scale)); letter-spacing: -.02em; }
 .marketplace-installed-pane .panel-subtitle { margin: 5px 0 0; max-width: 48ch; line-height: 1.5; }
+.marketplace-workflow-list { display: grid; gap: 10px; }
+.marketplace-workflow-card { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
+.marketplace-workflow-card h4 { margin: 0; font-size: var(--skai-text-lg); }
+.marketplace-workflow-card p:not(.section-kicker) { margin: 5px 0 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+.marketplace-workflow-card .section-kicker { margin-bottom: 5px; }
+.marketplace-image-workflows-pane .marketplace-install-status { margin: 0; }
 .marketplace-installed-search input { min-height: 40px; border-radius: var(--skai-radius-lg); }
 .marketplace-installed-list { gap: 8px; padding: 2px; }
 .marketplace-tools-subnav { display: flex; gap: 6px; padding: 8px 0 12px; border-bottom: 1px solid var(--skai-color-border); }
@@ -1573,6 +1579,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .marketplace-update-result { grid-template-columns: 1fr; align-items: start; }
   .marketplace-installed-pane > .panel-heading { align-items: flex-start; flex-direction: column; }
   .marketplace-installed-pane .panel-heading > .marketplace-model-actions { width: 100%; justify-content: space-between; }
+  .marketplace-workflow-card { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 12px; }
+  .marketplace-workflow-card > div:first-child { grid-column: 1 / -1; }
+  .marketplace-workflow-card > .status-badge { justify-self: start; }
   .marketplace-installed-model { grid-template-columns: 34px minmax(0, 1fr); padding: 11px; }
   .marketplace-installed-model .status-badge { grid-column: 2; justify-self: start; }
   .marketplace-installed-model-icon { width: 32px; height: 32px; }
