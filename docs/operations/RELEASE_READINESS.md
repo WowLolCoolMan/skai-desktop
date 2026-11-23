@@ -2,7 +2,7 @@
 
 Last audited: 2026-11-22
 
-Target release: **0.1.4**. Status: **not ready to publish**.
+Target release: **0.1.4**. Status: **published as an unsigned testing release; not ready for a broad production rollout**.
 
 ## Ready now
 
@@ -19,6 +19,7 @@ Target release: **0.1.4**. Status: **not ready to publish**.
 - The portable Electron artifact now bundles the renderer, Electron runtime, and a self-contained Agent Host; its startup smoke verifies the rendered settings and pet surfaces.
 - The Windows x64 NSIS package was built locally in unsigned validation mode on 2026-11-16. Its `latest.yml` was checked against the installer’s actual size and SHA-512, and the packaged startup smoke passed with `electron-updater` and `app-update.yml` staged inside the app.
 - Linux x64 Electron artifact and unsigned 0.1.4 AppImage were built in Ubuntu 24.04 on WSL2. The AppImage builder verified `latest-linux.yml` against the artifact. The staged Electron app and the extracted payload from the actual AppImage both passed the packaged UI smoke as an unprivileged user under Xvfb, including Marketplace → Tools → Installed, Percy, MP4 frame sampling, and AirLLM worker staging. The local-feed updater smoke passed both directions: a synthetic 0.1.3 AppImage downloaded and verified the actual 0.1.4 artifact, installed it, retained a profile marker, and reopened 0.1.4; the in-app rollback then restored and relaunched 0.1.3 while preserving the same marker. This is headless WSL acceptance; native Linux desktop/compositor behavior and published-feed behavior remain unverified.
+- On 2026-11-22, the published GitHub `latest.yml` and `latest-linux.yml` were fetched over HTTPS. Both advertise version 0.1.4, include SHA-512 and byte-size metadata, and their referenced Windows installer and Linux AppImage returned HTTP 200 with sizes matching the feeds. This verifies live feed metadata and asset availability, not an installed app updating through the published feed.
 - Packaged Windows production dependencies are installed from the pinned lockfile; build tools and renderer libraries are no longer shipped as runtime dependencies.
 - Automatic update checks, background downloads, progress reporting, a persistent opt-out, retry, verified staging, and an explicit restart action are wired for packaged Windows NSIS and Linux AppImage builds.
 - `npm run check:release-readiness` verifies that the release workflow still contains the signing, Windows lifecycle, Linux AppImage, exact-artifact, and updater-metadata gates.
@@ -40,9 +41,9 @@ documentation link after commit `21cb70f8` was pushed to `main`. See
 
 ## Release blockers
 
-1. The Windows installer produced here is unsigned and local-only. The owner has deferred certificates. A production release still needs trusted Authenticode and Linux signing keys, followed by signed artifact and clean-machine lifecycle validation.
+1. Code signing is intentionally deferred by the owner until the app is more complete. The published 0.1.4 installers are unsigned testing artifacts; trusted Authenticode and Linux signing keys plus signed-artifact lifecycle validation remain future production work.
 2. Add a fail-closed cryptographic signature for update metadata; currently the binary digest is checked against metadata delivered over GitHub HTTPS, while GPG signatures are not checked by the app's updater.
-3. Exercise the Linux AppImage updater on a supported desktop and published feed. The isolated loopback-feed smoke validates a synthetic 0.1.3 baseline using current updater-enabled code downloading and verifying the actual 0.1.4 AppImage, installing it, retaining the disposable profile marker, reopening 0.1.4, and using Settings rollback to restore/relaunch 0.1.3 with the marker intact. This does not validate a published GitHub feed, a historical 0.1.3 updater (which did not exist), signed artifacts, or native Linux desktop behavior.
+3. Exercise the Linux AppImage updater on a supported desktop and through the published feed. The isolated loopback-feed smoke validates a synthetic 0.1.3 baseline using current updater-enabled code downloading and verifying the actual 0.1.4 AppImage, installing it, retaining the disposable profile marker, reopening 0.1.4, and using Settings rollback to restore/relaunch 0.1.3 with the marker intact. Published 0.1.4 metadata and asset availability now pass read-only checks, but no installed app has updated through GitHub; a historical 0.1.3 updater did not exist, and native Linux desktop behavior remains unverified.
 4. Complete exact-artifact keyboard, accessibility, contrast, Linux compositor, and platform acceptance. Cloud model routing is deliberately outside the product boundary and is not a release blocker.
 
 The Windows smoke suite, pet-focused checks, packaged UI matrix, unsigned installer lifecycle, local-feed Windows and Linux in-app update/install/rollback smokes, and headless Linux AppImage smoke pass. Release 0.1.4 remains a local validation build; production readiness still needs signing, signed updater metadata, published-channel acceptance, native Linux desktop/updater acceptance, and remaining live platform/accessibility review. The packaged Linux voice smoke also found no installed on-device `en-US` speech pack; recognition correctly stayed local and reported unavailable.
