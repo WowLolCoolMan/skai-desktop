@@ -100,22 +100,25 @@ export function PluginsPage({
     const isPiper = entry.adapter === "local-voice-piper";
     const isWhisper = entry.adapter === "local-voice-whisper";
     const isChatterbox = entry.adapter === "local-voice-chatterbox";
-    const method = isWhisper ? "whisper" : isChatterbox ? "chatterbox" : isPiper ? "piper" : "kokoro";
-    const modelName = isWhisper ? "Whisper large-v3" : isChatterbox ? "Chatterbox Nano" : isPiper ? "Piper" : "Kokoro";
-    const voiceId = isChatterbox ? "chatterbox" : isPiper ? "piper" : "kokoro-82m-onnx";
+    const isPocketTts = entry.adapter === "local-voice-pocket-tts";
+    const method = isWhisper ? "whisper" : isChatterbox ? "chatterbox" : isPocketTts ? "pocket" : isPiper ? "piper" : "kokoro";
+    const modelName = isWhisper ? "Whisper large-v3" : isChatterbox ? "Chatterbox Nano" : isPocketTts ? "Pocket TTS" : isPiper ? "Piper" : "Kokoro";
     setVoiceBusy(true);
     setNotice(`Preparing an isolated local ${modelName} runtime…`);
     try {
       const started = await request(`voice.${method}.install.start`);
       if (!started.ok) throw new Error(started.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation could not start.`);
-      const deadline = Date.now() + (isChatterbox ? 45 : isWhisper ? 60 : 10) * 60_000;
+      const deadline = Date.now() + (isPocketTts ? 35 : isChatterbox ? 45 : isWhisper ? 60 : 10) * 60_000;
       while (Date.now() < deadline) {
         const status = await request(`voice.${method}.install.status`);
         if (!status.ok) throw new Error(status.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation status could not be read.`);
         const state = status.result as { installed?: boolean; status?: string; step?: string; error?: string };
         if (state.installed || state.status === "installed") {
           if (isWhisper) localStorage.setItem("skai.voice.whisperInstalled", "true");
-          else await refreshInstalledVoiceModels();
+          else {
+            if (isPocketTts) localStorage.setItem("skai.voice.pocketTtsInstalled", "true");
+            await refreshInstalledVoiceModels();
+          }
           setNotice(`${modelName} is installed, checksum-verified, and ready for ${isWhisper ? "offline transcription" : "local speech"}.`);
           return;
         }

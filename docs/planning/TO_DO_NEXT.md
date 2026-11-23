@@ -107,21 +107,22 @@ Mark an item done only when the linked workflow has evidence.
 
 ## Next up
 
-11. **Requested voice engines.** Marketplace currently has verified install/use
-    paths for Kokoro and Piper; Whisper large-v3 covers local transcription.
+11. **Requested voice engines.** Marketplace now has verified install/use
+    paths for Kokoro, Piper, Chatterbox Nano, and Pocket TTS; Whisper large-v3
+    covers local transcription.
     User-provided working-pipeline reference: isolated Python 3.12.15 (~21 MB),
     speech packages (~319.5 MB), Whisper base.en (~140.9 MB), Kyutai Pocket TTS
     English (~208.9 MB), and the `alba` voice (~5.9 MB), each with its role and
     local footprint visible. Use it as the acceptance shape for a coherent
     voice setup and use flow; it does not by itself establish Skai compatibility.
     The Marketplace voice inspector now shows the verified pipeline roles for
-    Whisper, Kokoro, Piper, and Chatterbox (private runtime, recognition or
+    Whisper, Kokoro, Piper, Chatterbox, and Pocket TTS (private runtime, recognition or
     synthesis component, and local output/playback) beside each install action.
     The catalog smoke checks those role markers, while
     `npm run smoke:voice:acceptance` passes local Kokoro and Piper WAV
     container/non-silent signal checks. These are runtime and signal checks,
     not subjective speech-quality or live microphone acceptance.
-    41 of 89 curated entries now have real adapters, and the catalog smoke
+    42 of 90 curated entries now have real adapters, and the catalog smoke
     asserts that boundary. Chatterbox Nano has a pinned isolated CPU installer,
     verified model downloads, a resident worker, and Marketplace/voice
     selection wiring. The end-to-end smoke passed install, hash checks, and

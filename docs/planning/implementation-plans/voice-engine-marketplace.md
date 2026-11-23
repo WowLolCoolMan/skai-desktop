@@ -21,6 +21,13 @@
 - Persona Groups can read turns aloud sequentially, selecting each speaker's
   assigned voice profile and waiting for speech to finish before the next
   speaker starts.
+- Pocket TTS now has a real Windows x64 Marketplace installer and local speech
+  adapter. Skai verifies the official runtime archive and executable hashes,
+  installs the pinned English standard and low-resource weights, attributes the
+  built-in `alba` voice, and binds its local server only to `127.0.0.1`. A
+  Marketplace-driven acceptance installs both model variants and confirms a
+  valid WAV response through `voice.speak`. This adapter does not expose custom
+  voice cloning, streamed playback, or effect cues.
 - Structured effect tags such as `[cough]` and `[laugh]` are removed at the
   native fallback boundary when the current engine cannot render them. The
   fallback never says the tag aloud.
@@ -28,11 +35,13 @@
 ## Honest remaining integration work
 
 The catalog is intentionally capability metadata, not a claim that every
-upstream project is already bundled. The next vertical slices must add:
+upstream project is already bundled. The remaining work includes:
 
-1. Adapter-first installation records and verified model downloads.
-2. A local adapter protocol for streaming audio, cancellation, cloning, and
-   typed prosody/effect cues.
+1. Adapter-first installation and verified model downloads for the other
+   catalog entries that can be supported in Skai.
+2. A common local adapter protocol for streaming playback, cancellation,
+   cloning, and typed prosody/effect cues. Pocket TTS currently returns a
+   complete WAV and can cancel generation by stopping its local worker.
 3. Voice Workbench clip storage, one-time rights notice, incremental rebuild
    state, and profile assignment UI.
 4. Secure persistent keyring storage for cloud voice keys; the current slice

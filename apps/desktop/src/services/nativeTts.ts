@@ -45,8 +45,8 @@ export const voiceModels: InstalledVoiceModel[] = [
   { id: "qwen3-tts", name: "Qwen3-TTS", detail: "Multilingual local voice design, cloning, and streaming", size: "0.6B or 1.7B model", installed: false, lowResource: false },
   { id: "omnivoice", name: "OmniVoice", detail: "Omnilingual zero-shot local speech", size: "Model-dependent", installed: false, lowResource: false },
   { id: "higgs-audio-v2", name: "Higgs Audio v2", detail: "Expressive local multi-speaker audio generation", size: "3B model", installed: false, lowResource: false },
-  { id: "pocket-tts", name: "Pocket TTS", detail: "CPU-first streaming voice runtime", size: "Model-dependent", installed: false, lowResource: false },
-  { id: "pocket-tts-low-resource", name: "Pocket TTS Low Resource", detail: "Small CPU-first English runtime", size: "Small model", installed: false, lowResource: true },
+  { id: "pocket-tts", name: "Pocket TTS", detail: "CPU-first offline English runtime", size: "~209 MB model + shared runtime", installed: false, lowResource: false },
+  { id: "pocket-tts-low-resource", name: "Pocket TTS Low Resource", detail: "Small CPU-first English runtime", size: "~20 MB model", installed: false, lowResource: true },
 ];
 
 export const cloudVoiceProviders = [
@@ -172,7 +172,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
       if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/")) {
         activeCloudAudio?.pause();
         activeCloudAudio = new Audio(audioDataUrl);
-        if ((speech.result as { engine?: unknown }).engine === "chatterbox-nano-local") {
+        if (["chatterbox-nano-local", "pocket-tts-local"].includes((speech.result as { engine?: unknown }).engine as string)) {
           activeCloudAudio.preservesPitch = true;
           activeCloudAudio.playbackRate = profile.rate;
         }

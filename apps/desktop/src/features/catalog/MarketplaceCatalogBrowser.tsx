@@ -43,6 +43,12 @@ function voicePipelineParts(entry: MarketplaceEntry) {
         ["Speech output", "Pinned Chatterbox Nano checkpoint"],
         ["Playback", "Resident local worker with built-in voice"],
       ];
+    case "local-voice-pocket-tts":
+      return [
+        ["Private runtime", "Pinned Kyutai Windows x64 CPU binary"],
+        ["Speech output", "Pinned English weights and built-in CC BY 4.0 voice"],
+        ["Playback", "Local audio from a 127.0.0.1-only worker"],
+      ];
     default:
       return null;
   }
@@ -211,6 +217,10 @@ export function MarketplaceCatalogBrowser({
                           {selected.adapter === "local-voice-chatterbox" && (() => {
                             const installed = localStorage.getItem("skai.voice.chatterboxInstalled") === "true";
                             return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? "Installed · Chatterbox Nano ready" : voiceBusy ? "Preparing about 2 GB of local weights…" : "Install Chatterbox Nano · ~1.9 GB"}</Button></div>;
+                          })()}
+                          {selected.adapter === "local-voice-pocket-tts" && (() => {
+                            const installed = localStorage.getItem("skai.voice.pocketTtsInstalled") === "true";
+                            return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? "Installed · Pocket TTS ready" : voiceBusy ? "Preparing about 250 MB of local voice files…" : "Install Pocket TTS · ~250 MB"}</Button></div>;
                           })()}
                           {voicePipelineParts(selected) && <div className="plugins-voice-pipeline" aria-label="Local voice pipeline">
                             <strong>Local pipeline</strong>

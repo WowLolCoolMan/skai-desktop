@@ -69,13 +69,13 @@ public static class VoiceModelCatalog
             SupportsVoiceCloning = true, SupportsEmotion = true, SupportsAudioEffects = true,
             AvailabilityNote = "Cataloged for local setup; the v2 runtime requires a compatible Python/PyTorch environment."
         },
-        new("pocket-tts", "Pocket TTS", "CPU-first streaming speech with voice cloning support.", "Pocket TTS", "MIT", "Model-dependent", false, false, "https://github.com/kyutai-labs/pocket-tts")
+        new("pocket-tts", "Pocket TTS", "CPU-first English speech through Skai's verified local adapter, using Kyutai's built-in English voice.", "Pocket TTS 3.3.0 Rust runtime", "MIT runtime / CC BY 4.0 voice", "~209 MB English model + shared runtime", false, false, "https://github.com/kyutai-labs/pocket-tts")
         {
-            SupportsStreaming = true, SupportsVoiceCloning = true, AvailabilityNote = "Model cataloged; local adapter and model install are not connected yet."
+            AdapterAvailable = true, AvailabilityNote = "Windows x64 installer verifies the official runtime and loads pinned English weights. Uses the built-in alba voice; custom reference clips are not exposed yet."
         },
-        new("pocket-tts-low-resource", "Pocket TTS Low Resource", "Small CPU-first English voice for constrained laptops.", "Pocket TTS", "MIT", "Small English model", false, true, "https://github.com/kyutai-labs/pocket-tts")
+        new("pocket-tts-low-resource", "Pocket TTS Low Resource", "Small CPU-first English voice for constrained laptops.", "Pocket TTS 3.3.0 Rust runtime", "MIT runtime / CC BY 4.0 voice", "~20 MB English model + shared runtime", false, true, "https://github.com/kyutai-labs/pocket-tts")
         {
-            SupportsStreaming = true, SupportsVoiceCloning = true, AvailabilityNote = "Model cataloged; local adapter and model install are not connected yet."
+            AdapterAvailable = true, AvailabilityNote = "Installed with Pocket TTS from Marketplace; uses its separately pinned small English weights and the built-in alba voice."
         },
         new("f5-tts", "F5-TTS", "Local flow-matching speech with reference-audio voice cloning.", "PyTorch", "CC-BY-NC-4.0 / model-specific", "Model-dependent", false, false, "https://github.com/SWivid/F5-TTS")
         {

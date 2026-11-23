@@ -58,14 +58,14 @@ function request(method, params, timeoutMs = 45_000) {
 async function run() {
   const health = await request("runtime.health");
   const capabilities = health.result?.capabilities ?? [];
-  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.models.remove", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel"]) {
+  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.models.remove", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.pocket.install.start", "voice.pocket.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel"]) {
     if (!health.ok || !capabilities.includes(capability)) throw new Error(`runtime.health did not advertise ${capability}.`);
   }
   const catalog = await request("marketplace.catalog");
   const providers = catalog.result?.providers ?? [];
   if (!catalog.ok || !providers.some(provider => provider.id === "huggingface") || !providers.some(provider => provider.id === "modelscope") || !Array.isArray(catalog.result?.skills) || !Array.isArray(catalog.result?.tools)) throw new Error("marketplace.catalog did not return the provider and capability catalog.");
   const curated = catalog.result?.catalogEntries ?? [];
-  if (curated.length !== 89) throw new Error(`Expected the 89 requested curated entries, got ${curated.length}.`);
+  if (curated.length !== 90) throw new Error(`Expected the 90 requested curated entries, got ${curated.length}.`);
   for (const entry of curated) {
     const expectedAdapter = entry.id === "filesystem-mcp"
       ? "local-mcp-filesystem"
@@ -75,6 +75,7 @@ async function run() {
       : entry.id === "supabase-mcp" ? "local-mcp-supabase"
       : entry.id === "kokoro-82m" ? "local-voice-kokoro"
       : entry.id === "chatterbox" ? "local-voice-chatterbox"
+      : entry.id === "pocket-tts" ? "local-voice-pocket-tts"
       : entry.id === "piper" ? "local-voice-piper"
       : entry.id === "whisper-large-v3" ? "local-voice-whisper"
       : entry.category === "Coding" || entry.category === "Chat / General LLM" ? "local-model-search" : "none";
@@ -83,11 +84,12 @@ async function run() {
     }
   }
   const backedEntries = curated.filter(entry => entry.installable === true);
-  if (backedEntries.length !== 41) throw new Error(`Expected 41 entries with real local adapters; found ${backedEntries.length}.`);
+  if (backedEntries.length !== 42) throw new Error(`Expected 42 entries with real local adapters; found ${backedEntries.length}.`);
   const voicePipelines = [
     ["kokoro-82m", "isolated Python", "INT8 Kokoro ONNX"],
     ["piper", "isolated Python", "pinned English voice"],
     ["chatterbox", "isolated Python", "Chatterbox-TTS source"],
+    ["pocket-tts", "official v4.0.1 release", "built-in alba voice"],
     ["whisper-large-v3", "isolated Python", "faster-whisper"],
   ];
   for (const [id, runtimeMarker, componentMarker] of voicePipelines) {
@@ -107,6 +109,10 @@ async function run() {
   const chatterboxStatus = await request("voice.chatterbox.install.status");
   if (!chatterboxStatus.ok || typeof chatterboxStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(chatterboxStatus.result?.status)) {
     throw new Error(`Chatterbox local runtime status is incomplete: ${JSON.stringify(chatterboxStatus)}`);
+  }
+  const pocketStatus = await request("voice.pocket.install.status");
+  if (!pocketStatus.ok || typeof pocketStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed", "unavailable"].includes(pocketStatus.result?.status)) {
+    throw new Error(`Pocket TTS local runtime status is incomplete: ${JSON.stringify(pocketStatus)}`);
   }
   const whisperStatus = await request("voice.whisper.install.status");
   if (!whisperStatus.ok || typeof whisperStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(whisperStatus.result?.status)) {

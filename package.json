@@ -39,6 +39,7 @@
     "smoke:published-update-feed": "node scripts/smoke-published-update-feed.cjs",
     "smoke:electron:artifact": "node scripts/smoke-electron-artifact.cjs",
     "smoke:voice:acceptance": "node scripts/smoke-voice-acceptance.cjs",
+    "smoke:voice:pocket-tts": "node scripts/smoke-pocket-tts.cjs",
     "smoke:chatterbox-adapter": "node scripts/smoke-chatterbox-adapter.cjs",
     "smoke:airllm": "node scripts/smoke-airllm.cjs",
     "smoke:electron:accessibility": "node scripts/smoke-electron-accessibility.cjs",

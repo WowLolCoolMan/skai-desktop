@@ -11,15 +11,18 @@ React renderer
   └─ window.skaiAgent.request("voice.*")
        └─ Electron main-process IPC allowlist
             └─ Skai Desktop C# agent host
-                 └─ Windows Speech or Linux espeak-ng, espeak, or spd-say
+                 ├─ Windows Speech or Linux espeak-ng, espeak, or spd-say
+                 └─ Verified Pocket TTS worker on Windows x64 (loopback only)
 ```
 
 The C# host provides:
 
 - `voice.models` — the installed OS-native default and catalog entries for
   optional Kokoro and Pocket TTS model packs.
-- `voice.speak` — begins OS-native, interruptible speech for bounded text.
-- `voice.stop` — immediately ends the current native speech process.
+- `voice.speak` — generates bounded OS-native speech or requests a complete WAV
+  from an installed local adapter.
+- `voice.stop` — stops native speech and terminates Pocket TTS generation when
+  it is active.
 - `voice.status` — reports whether the OS-native speech process is still active,
   so hands-free chat can wait before reopening the microphone.
 
@@ -36,6 +39,10 @@ microphone recording/transcription, cancellation, and device-error acceptance
 remain open. Barge-in and streamed speech are not implemented.
 
 The renderer owns the selected voice profile, primary model, and low-resource
-model. OS-native speech ships as the installed default. Kokoro and Pocket TTS
-can be presented in Marketplace, but remain unavailable until their model-pack
-runtime and verified download adapter are implemented in C#.
+model. OS-native speech ships as the installed default. Pocket TTS is
+Marketplace-installable on Windows x64; it verifies a pinned standalone
+runtime, warms both English model variants, uses the built-in attributed
+`alba` voice, and returns local WAV audio. Its resident worker binds only to
+`127.0.0.1`. Custom voice clips and streamed playback are not integrated.
+Kokoro and other catalog entries have separate install and runtime coverage;
+availability is reported per adapter rather than inferred from a listing.

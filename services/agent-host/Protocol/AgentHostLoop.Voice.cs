@@ -24,14 +24,16 @@ public static partial class AgentHostLoop
                 name = model.Name,
                 detail = model.Description,
                 size = model.Size,
-                installed = model.Id == "os-native" ? VoiceRuntimeStatus.IsOsNativeAvailable : model.Id == "kokoro-82m-onnx" ? KokoroVoiceRuntime.IsInstalled : model.Id == "piper" ? PiperVoiceRuntime.IsInstalled : model.Id == "chatterbox" ? ChatterboxVoiceRuntime.IsInstalled : model.IsInstalled,
+                installed = model.Id == "os-native" ? VoiceRuntimeStatus.IsOsNativeAvailable : model.Id == "kokoro-82m-onnx" ? KokoroVoiceRuntime.IsInstalled : model.Id == "piper" ? PiperVoiceRuntime.IsInstalled : model.Id == "chatterbox" ? ChatterboxVoiceRuntime.IsInstalled : model.Id is "pocket-tts" or "pocket-tts-low-resource" ? PocketTtsRuntime.IsInstalled : model.IsInstalled,
                 lowResource = model.IsLowResource,
-                adapterAvailable = model.AdapterAvailable || model.Id is "kokoro-82m-onnx" or "piper" or "chatterbox",
+                adapterAvailable = (model.AdapterAvailable || model.Id is "kokoro-82m-onnx" or "piper" or "chatterbox" or "pocket-tts" or "pocket-tts-low-resource") && (model.Id is not ("pocket-tts" or "pocket-tts-low-resource") || PocketTtsRuntime.IsSupported),
                 supportsStreaming = model.SupportsStreaming,
                 supportsVoiceCloning = model.SupportsVoiceCloning,
                 supportsEmotion = model.SupportsEmotion,
                 supportsAudioEffects = model.SupportsAudioEffects,
-                availabilityNote = model.AvailabilityNote,
+                availabilityNote = (model.Id is "pocket-tts" or "pocket-tts-low-resource") && !PocketTtsRuntime.IsSupported
+                    ? "Skai's verified Pocket TTS adapter currently supports Windows x64 only."
+                    : model.AvailabilityNote,
             }).ToArray(),
         });
 
@@ -94,6 +96,11 @@ public static partial class AgentHostLoop
             var audio = ChatterboxVoiceRuntime.SynthesizeDataUrlAsync(text, rate).GetAwaiter().GetResult();
             return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "chatterbox-nano-local", interruptible = true, audioDataUrl = audio });
         }
+        if (selectedModelId is not null && (selectedModelId.Equals("pocket-tts", StringComparison.OrdinalIgnoreCase) || selectedModelId.Equals("pocket-tts-low-resource", StringComparison.OrdinalIgnoreCase)))
+        {
+            var audio = PocketTtsRuntime.SynthesizeDataUrlAsync(text, selectedModelId).GetAwaiter().GetResult();
+            return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "pocket-tts-local", interruptible = true, audioDataUrl = audio });
+        }
         var engine = voice.Speak(text, rate);
         return new(ProtocolVersion, request.Id, true, new { spoken = true, engine, interruptible = true });
     }
@@ -123,6 +130,7 @@ public static partial class AgentHostLoop
     private static AgentResponse StopVoice(AgentRequest request, OsNativeTtsService voice)
     {
         voice.Stop();
+        PocketTtsRuntime.StopGeneration();
         return new(ProtocolVersion, request.Id, true, new { stopped = true });
     }
 

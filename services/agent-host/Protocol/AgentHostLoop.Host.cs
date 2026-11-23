@@ -92,6 +92,6 @@ public static partial class AgentHostLoop
     }
 
     internal static bool RunsInBackground(string method) => method is "chat.complete" or "persona.group.complete" or "persona.discover"
-        or "persona.research" or "persona.research.force" or "persona.draft" or "image.generate" or "marketplace.models.search" or "voice.whisper.transcribe";
+        or "persona.research" or "persona.research.force" or "persona.draft" or "image.generate" or "marketplace.models.search" or "voice.whisper.transcribe" or "voice.speak";
 
 }

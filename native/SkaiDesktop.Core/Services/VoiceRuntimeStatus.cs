@@ -1,8 +1,19 @@
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+
 namespace SkaiDesktop.Core.Services;
 
 /// <summary>Shared installed-state checks for Marketplace voice adapters.</summary>
 public static class VoiceRuntimeStatus
 {
+    public const string PocketTtsExecutableSha256 = "813cabfc2f8fc7a4e5310deda6025426b3164610dd9f3c3098a6078e5cc1895a";
+    private static readonly object PocketTtsIntegrityGate = new();
+    private static long pocketTtsCheckedLength = -1;
+    private static long pocketTtsCheckedWriteTicks = -1;
+    private static bool pocketTtsIntegrityValid;
+
+    public static bool IsPocketTtsSupported => OperatingSystem.IsWindows() && RuntimeInformation.ProcessArchitecture == Architecture.X64;
+
     /// <summary>Reports whether the OS speech adapter can start on this host.</summary>
     public static bool IsOsNativeAvailable
     {
@@ -53,6 +64,32 @@ public static class VoiceRuntimeStatus
                 && new[] { "added_tokens.json", "conds.pt", "merges.txt", "s3gen_meanflow.safetensors", "special_tokens_map.json", "t3_nano_v1.safetensors", "tokenizer_config.json", "ve.safetensors", "vocab.json" }
                     .All(file => File.Exists(Path.Combine(root, file)))
                 && File.Exists(Path.Combine(root, "installed.json"));
+        }
+    }
+
+    public static bool IsPocketTtsInstalled
+    {
+        get
+        {
+            if (!IsPocketTtsSupported) return false;
+            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "PocketTTS");
+            var binaryPath = Path.Combine(root, "pocket-tts.exe");
+            if (!File.Exists(Path.Combine(root, "installed.json")) || !File.Exists(binaryPath)) return false;
+            var info = new FileInfo(binaryPath);
+            lock (PocketTtsIntegrityGate)
+            {
+                if (info.Length == pocketTtsCheckedLength && info.LastWriteTimeUtc.Ticks == pocketTtsCheckedWriteTicks)
+                    return pocketTtsIntegrityValid;
+                try
+                {
+                    using var stream = File.OpenRead(binaryPath);
+                    pocketTtsIntegrityValid = Convert.ToHexString(SHA256.HashData(stream)).Equals(PocketTtsExecutableSha256, StringComparison.OrdinalIgnoreCase);
+                }
+                catch (IOException) { pocketTtsIntegrityValid = false; }
+                pocketTtsCheckedLength = info.Length;
+                pocketTtsCheckedWriteTicks = info.LastWriteTimeUtc.Ticks;
+                return pocketTtsIntegrityValid;
+            }
         }
     }
 }
