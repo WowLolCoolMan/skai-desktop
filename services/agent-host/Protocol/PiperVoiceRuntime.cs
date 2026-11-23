@@ -8,6 +8,8 @@ namespace SkaiDesktop.AgentHost.Protocol;
 /// <summary>Installs a pinned, local-only Piper 1.5 voice and synthesizes WAV audio.</summary>
 internal static class PiperVoiceRuntime
 {
+    private static readonly object SpeechGate = new();
+    private static readonly HashSet<Process> ActiveSpeechProcesses = [];
     private const string Revision = "cf910fb59f1d79ab3b625a63993a108751c6c25d";
     private const string VoiceName = "en_US-hifi_tts_92-medium";
     private const string ModelFile = VoiceName + ".onnx";
@@ -52,10 +54,23 @@ internal static class PiperVoiceRuntime
         const string script = "import sys, wave\nfrom piper import PiperVoice, SynthesisConfig\nmodel, text, output, rate = sys.argv[1:]\nvoice = PiperVoice.load(model)\nwith wave.open(output, 'wb') as wav:\n voice.synthesize_wav(text, wav, syn_config=SynthesisConfig(length_scale=1.0 / float(rate)))\n";
         try
         {
-            await RunAsync(PythonPath, ["-c", script, ModelPath, text, output, rate.ToString(System.Globalization.CultureInfo.InvariantCulture)], TimeSpan.FromMinutes(3)).ConfigureAwait(false);
+            await RunAsync(PythonPath, ["-c", script, ModelPath, text, output, rate.ToString(System.Globalization.CultureInfo.InvariantCulture)], TimeSpan.FromMinutes(3), trackSpeech: true).ConfigureAwait(false);
             return "data:audio/wav;base64," + Convert.ToBase64String(await File.ReadAllBytesAsync(output).ConfigureAwait(false));
         }
         finally { try { File.Delete(output); } catch { } }
+    }
+
+    public static bool StopGeneration()
+    {
+        Process[] active;
+        lock (SpeechGate) active = ActiveSpeechProcesses.ToArray();
+        foreach (var process in active)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { }
+            catch (System.ComponentModel.Win32Exception) { }
+        }
+        return active.Length > 0;
     }
 
     private static async Task InstallAsync()
@@ -120,17 +135,19 @@ internal static class PiperVoiceRuntime
 
     private static void SetStep(string step) { lock (Gate) installStep = step; }
 
-    private static async Task<string> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout)
+    private static async Task<string> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, bool trackSpeech = false)
     {
         using var process = new Process { StartInfo = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true } };
         foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
         if (!process.Start()) throw new InvalidOperationException("The local Piper runtime could not start.");
+        if (trackSpeech) lock (SpeechGate) ActiveSpeechProcesses.Add(process);
         process.StandardInput.Close();
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         using var timeoutSource = new CancellationTokenSource(timeout);
         try { await process.WaitForExitAsync(timeoutSource.Token).ConfigureAwait(false); }
         catch (OperationCanceledException) { try { process.Kill(entireProcessTree: true); } catch { } throw new TimeoutException("A Piper setup or speech step timed out."); }
+        finally { if (trackSpeech) lock (SpeechGate) ActiveSpeechProcesses.Remove(process); }
         var result = await stdout.ConfigureAwait(false);
         var error = await stderr.ConfigureAwait(false);
         if (process.ExitCode != 0) throw new InvalidOperationException($"The Piper local step failed: {new string(error.Where(c => !char.IsControl(c)).Take(1_000).ToArray())}");

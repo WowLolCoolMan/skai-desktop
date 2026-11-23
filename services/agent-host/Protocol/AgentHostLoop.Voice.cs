@@ -130,6 +130,7 @@ public static partial class AgentHostLoop
     private static AgentResponse StopVoice(AgentRequest request, OsNativeTtsService voice)
     {
         voice.Stop();
+        PiperVoiceRuntime.StopGeneration();
         PocketTtsRuntime.StopGeneration();
         return new(ProtocolVersion, request.Id, true, new { stopped = true });
     }

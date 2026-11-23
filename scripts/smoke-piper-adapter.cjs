@@ -72,7 +72,15 @@ async function run() {
   const models = await request("voice.models");
   const piper = models.result?.models?.find(model => model.id === "piper");
   if (!models.ok || !piper?.installed || !piper.adapterAvailable) throw new Error(`Installed Piper was not exposed as ready: ${JSON.stringify(models)}`);
-  const speech = await request("voice.speak", { text: "Skai local Piper acceptance passed.", modelId: "piper", rate: 1 }, 5 * 60_000);
+  const longSpeech = request("voice.speak", { text: "Piper cancellation acceptance. ".repeat(100), modelId: "piper", rate: 1 }, 60_000)
+    .then(response => ({ response }), error => ({ error }));
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const stopped = await request("voice.stop");
+  if (!stopped.ok || stopped.result?.stopped !== true) throw new Error(`Piper stop request failed: ${JSON.stringify(stopped)}`);
+  const interrupted = await longSpeech;
+  if (!interrupted.response || interrupted.response.ok) throw new Error("Piper speech did not report interruption after Stop.");
+
+  const speech = await request("voice.speak", { text: "Skai local Piper acceptance passed.", modelId: "piper", rate: 1 }, 60_000);
   const dataUrl = speech.result?.audioDataUrl;
   if (!speech.ok || speech.result?.engine !== "piper-local" || typeof dataUrl !== "string" || !dataUrl.startsWith("data:audio/wav;base64,")) {
     throw new Error(`Piper local synthesis failed: ${JSON.stringify(speech)}`);

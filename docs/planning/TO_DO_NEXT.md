@@ -158,8 +158,10 @@ Mark an item done only when the linked workflow has evidence.
     readiness, synthesizes a nonempty WAV through the Agent Host, and removes
     the temporary profile after success. The Piper child process explicitly
     receives closed stdin so it cannot inherit and wait on the Agent Host's
-    protocol pipe. Focused `--voice-models` tests cover the isolated root and
-    reject unregistered runtime directories.
+    protocol pipe. The shared voice Stop action now kills active Piper
+    synthesis, and the clean smoke interrupts a long utterance then verifies a
+    later utterance succeeds. Focused `--voice-models` tests cover the
+    isolated root and reject unregistered runtime directories.
     Cross-device speech quality and clean installs on other operating systems
     remain unverified.
     The isolated Voice Workbench UI smoke now builds its renderer before
@@ -303,9 +305,11 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 - **2026-11-23:** Added a clean isolated Piper Marketplace installation and
   Agent Host speech acceptance. On Windows x64, Piper 1.5.0 and its pinned
   English voice installed in a disposable root, appeared available in the
-  catalog, and synthesized a valid 96,812-byte WAV. Fixed stdin inheritance
-  that caused the Agent Host synthesis subprocess to stall. Focused voice root
-  tests and `node --check` for the smoke script pass.
+  catalog, and synthesized a valid 97,324-byte WAV after cancellation. Fixed
+  stdin inheritance that caused the Agent Host synthesis subprocess to stall.
+  A follow-up acceptance interrupts a long Piper utterance through Stop and
+  confirms a subsequent utterance succeeds. Focused voice root tests and
+  `node --check` for the smoke script pass.
 
 - **2026-11-23:** Added a pinned Chatterbox Nano Marketplace installer and
   local synthesis adapter. Setup uses an isolated CPU-only Python environment,
