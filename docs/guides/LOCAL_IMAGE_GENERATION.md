@@ -27,8 +27,8 @@ Reported progress matched the runtime's effective scheduler steps (4/4 for
 text-to-image and 2/2 for editing). The `smoke:image:workflow` acceptance path
 uses cached weights and Hugging Face offline mode. The packaged
 `smoke:image:runtime-unavailable` and `smoke:image:model-unavailable` recovery
-checks also pass. Generation used CPU; GPU and live ComfyUI behavior remain
-unverified.
+checks also pass. Generation used CPU; the separate ComfyUI GPU execution path
+has only the partial live acceptance described below.
 
 `npm run smoke:image:model-unavailable` verifies the packaged offline cache-miss
 path. The UI explains that SD-Turbo is not cached, offers one-time internet
@@ -41,9 +41,16 @@ native tests cover this case and ordinary first-line worker errors.
 The Electron client can connect to a user-configured local ComfyUI server,
 discover installed checkpoints, create built-in text-to-image and image-edit
 workflows, import and save workflows, upload a source image, and queue and poll
-local jobs. Live generation acceptance against a running ComfyUI instance is
-still open. ComfyUI is a separate local service; it is not required for the
-built-in Diffusers path.
+local jobs. Live generation acceptance against a running ComfyUI instance
+passed on 2026-11-23. Skai discovered the locally installed
+`Juggernaut-XL_v9.safetensors` checkpoint, submitted a text-to-image workflow,
+reported queue/progress updates, retrieved the generated 512×512 PNG from the
+local ComfyUI endpoint, and validated the payload (438,972 bytes). The server
+reported an AMD Radeon RX 7900 XTX with 23.8 GiB free VRAM at the start of the
+check; ComfyUI's own execution logs were not inspected, so this does not yet
+confirm which device performed inference. The live check did not exercise
+cancellation or image-to-image editing through ComfyUI. ComfyUI remains a
+separate local service and is not required for the built-in Diffusers path.
 
 ## Current boundaries and next work
 

@@ -67,13 +67,13 @@ Mark an item done only when the linked workflow has evidence.
    persona acceptance targets 14B-class models or must also pass on 2B-class
    models; Codex will add model gating or continue low-tier tuning accordingly.
    See the [Smart Personas plan](implementation-plans/smart-personas.md).
-5. **Image runtime coverage — Blocked on local runtime · Owner: User.** The
-   packaged Diffusers CPU path passes, and this PC has an AMD RX 7900 XTX, but
-   ComfyUI is not running at `127.0.0.1:8188`; GPU acceleration remains
-   unverified. Next action: start a local ComfyUI server with a usable workflow
-   and model, then tell Codex its loopback endpoint so progress, cancellation,
-   and recovery can be accepted. See the
-   [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
+5. **Image runtime coverage — In progress · Codex.** Packaged Diffusers CPU
+   acceptance passes. On 2026-11-23, live ComfyUI acceptance on this PC also
+   passed checkpoint discovery, workflow submission, progress polling, PNG
+   retrieval, and payload validation using `Juggernaut-XL_v9.safetensors` on
+   the RX 7900 XTX. Remaining: exercise cancellation and image-to-image through
+   the ComfyUI path and confirm GPU execution from ComfyUI's own device logs.
+   See the [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
 6. **Windows update acceptance — Blocked on release · Owner: User / release
    owner.** The current-source loopback install passed. Read-only checks now
    confirm both public v0.1.4 feeds, SHA-512 metadata, and asset sizes, but that
