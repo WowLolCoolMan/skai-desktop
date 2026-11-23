@@ -179,10 +179,13 @@ instance remained open. The popup probe uses a short timer rather than
   item can close.
 - The current packaged Electron artifact smoke passed the Percy companion
   renderer checks, including advancing animation frames and a static sprite under
-  `prefers-reduced-motion`. It also completed the one-shot dictation interaction
-  through start, stop, and transcript creation; the host's local browser speech
-  pack still reports unavailable, so this does not validate intelligible speech
-  or hands-free turn quality.
+  `prefers-reduced-motion`. For voice input, it routed a Windows System.Speech
+  phrase through Chromium microphone capture, recorded/stopped it, and confirmed
+  the installed local Whisper path created a transcript attachment whose
+  preview matched the expected phrase. Transcript contents are not printed.
+  Chromium's native offline `en-US` recognition remains unavailable on this
+  host, so hands-free turn quality, permission recovery, and cancellation still
+  need focused acceptance.
 
 ## Known boundaries
 

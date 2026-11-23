@@ -30,11 +30,13 @@ Mark an item done only when the linked workflow has evidence.
    manual visual review of routes and pet animations, full keyboard/focus
    review, and assistive technology checks. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
-2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke now
-   records and stops a short microphone clip and confirms local Whisper returns
-   a reviewable transcript on this host. Still verify intelligible speech,
-   permission denial/recovery, cancellation, and hands-free on a local speech
-   pack. Keep the path local. See the
+2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke
+   feeds a deterministic spoken fixture through Chromium microphone capture,
+   records/stops it, and verifies installed local Whisper creates a transcript
+   attachment matching the expected phrase without logging transcript text.
+   Chromium's native offline `en-US` recognition remains unavailable, so
+   hands-free acceptance is still open. Also verify permission denial/recovery
+   and cancellation. Keep the path local. See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — In progress · Codex.** Verify Windows
   PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Windows
