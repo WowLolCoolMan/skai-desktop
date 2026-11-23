@@ -320,6 +320,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .persona-picker select { width: 100%; min-height: 30px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font: inherit; font-size: var(--skai-text-xs); text-transform: none; letter-spacing: normal; }
 @media (max-width: 900px) { .persona-builder-grid { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .persona-card-fields { grid-template-columns: 1fr; } .persona-card-fields .settings-field:first-child { grid-column: auto; } .persona-context-strip { align-items: stretch; } .persona-picker { flex: 1 1 100%; }.persona-research-counts { grid-template-columns: repeat(2, minmax(0,1fr)); }.persona-research-steps { gap: 5px; }.persona-research-steps > div { gap: 4px; font-size: var(--skai-text-xs); }.persona-research-steps > i { min-width: 8px; }.persona-match-confirm { grid-template-columns: 1fr; }.persona-match-confirm > .ui-button { grid-column: 1; grid-row: auto; justify-self: start; } }
+
+
 @media (max-width: 760px) { .persona-workshop-page { overflow: auto; }.persona-workshop-header { padding: 14px; }.persona-workshop-layout { grid-template-columns: minmax(0, 1fr); }.persona-workshop-nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--skai-color-border); overflow-x: auto; padding: 8px; }.persona-workshop-nav button { width: auto; min-width: max-content; }.persona-workshop-nav p { display: none; }.persona-workshop-content { padding: 16px; }.persona-knowledge-grid { grid-template-columns: 1fr; }.persona-chat-content { height: auto; }.persona-chat-message { max-width: 94%; } }
 
 .settings-callout { display: grid; gap: 5px; margin-top: 18px; padding: 13px 14px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 20%, transparent); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 6%, transparent); }.settings-callout strong { color: var(--skai-color-text); font-size: var(--skai-text-base); }.settings-callout span, .settings-help, .settings-model-actions span { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.5; }.settings-help { margin: 16px 0 0; }.settings-model-actions { display: flex; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--skai-color-border); }.settings-provider-list { display: grid; gap: 0; }.settings-provider-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--skai-color-border); }.settings-provider-row > span:first-child { display: grid; gap: 5px; }.settings-provider-row strong { color: var(--skai-color-text); font-size: var(--skai-text-md); }.settings-provider-row small { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.4; }.settings-inline-action { display: flex; align-items: center; justify-content: flex-end; gap: 7px; padding-top: 18px; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
@@ -3121,4 +3123,66 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .visuals-composer-options { flex-wrap: wrap; }
   .visuals-composer-action .ui-button { min-height: 38px; padding-inline: 10px; }
   .visuals-output-caption { align-items: flex-start; flex-direction: column; }
+}
+
+/* Keep the project file workbench inside the viewport and let the editor use it. */
+.app-content-coding:has(.coding-session-grid.is-files) { min-height: 0; overflow: hidden; padding-top: 12px; padding-bottom: 12px; }
+.app-content-coding .coding-page-active:has(.coding-session-grid.is-files) { height: 100%; min-height: 0; flex: 1 1 0; overflow: hidden; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files { height: 100%; min-height: 0; flex: 1 1 0; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files > .coding-project-browser { width: 100%; height: 100%; min-height: 0; flex: 1 1 0; padding: 14px; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files .project-file-layout { min-height: 0; flex: 1 1 0; grid-template-columns: minmax(210px, 260px) minmax(0, 1fr); gap: 12px; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files .project-file-explorer { display: flex; min-height: 0; flex-direction: column; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files .project-file-list { min-height: 0; max-height: none; flex: 1 1 0; overflow: auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files .file-editor-panel { display: flex; min-height: 0; flex-direction: column; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files .monaco-editor-shell,
+.app-content-coding .coding-page-active .coding-session-grid.is-files .monaco-diff-shell,
+.app-content-coding .coding-page-active .coding-session-grid.is-files .project-file-preview { min-height: 0; flex: 1 1 0; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files .file-tabs { flex: 0 0 auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files .file-editor-heading { flex: 0 0 auto; }
+
+/* A calmer project chat: active runs stay visible; old plans tuck into a summary. */
+.app-content-coding .coding-page-active .project-thread-panel { overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
+.app-content-coding .coding-page-active .project-thread-panel .chat-context-bar { min-height: 48px; margin: 0; padding: 7px 14px; border-bottom: 1px solid var(--skai-color-border); background: transparent; }
+.app-content-coding .coding-page-active .project-thread-panel .chat-heading-copy { display: flex; align-items: baseline; gap: 9px; }
+.app-content-coding .coding-page-active .project-thread-panel .chat-heading-copy .section-kicker { margin: 0; font-size: var(--skai-text-3xs); }
+.app-content-coding .coding-page-active .project-thread-panel .chat-heading-copy strong { max-width: min(38vw, 440px); font-size: var(--skai-text-sm); font-weight: 560; }
+.app-content-coding .coding-page-active .project-thread-panel .chat-header-actions { gap: 6px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-plan-trigger { min-height: 30px; padding: 5px 9px; font-size: var(--skai-text-xs); }
+.app-content-coding .coding-page-active .project-thread-panel .model-picker { min-width: 150px; }
+.app-content-coding .coding-page-active .project-thread-panel .chat-layout { width: 100%; max-width: 1280px; min-height: 0; padding: 0 14px 12px; }
+.app-content-coding .coding-page-active .project-thread-panel .conversation-surface { width: 100%; min-height: 0; flex: 1 1 0; border: 0; background: transparent; }
+.app-content-coding .coding-page-active .project-thread-panel .conversation-surface .message-list { width: min(100%, 960px); padding: 14px 4px 20px; }
+.app-content-coding .coding-page-active .project-thread-panel .composer-card { width: min(100%, 960px); border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-raised); box-shadow: 0 5px 18px color-mix(in srgb, var(--skai-color-shadow) 12%, transparent); }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-card { width: min(100%, 960px); margin: 8px auto 0; padding: 9px 12px; border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-heading { font-size: var(--skai-text-sm); }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-heading > span { font-size: var(--skai-text-xs); }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-card > p { margin-top: 5px; font-size: var(--skai-text-xs); }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-actions { margin-top: 3px; }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-history { width: min(100%, 960px); max-height: min(32vh, 250px); margin: 8px auto 0; overflow: auto; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: color-mix(in srgb, var(--skai-color-surface-soft) 70%, transparent); }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-history > summary { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 7px 11px; color: var(--skai-color-text); background: var(--skai-color-surface); cursor: pointer; list-style-position: inside; }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-history > summary strong { font-size: var(--skai-text-xs); font-weight: 560; }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-history > summary span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-history[open] { flex: 0 1 auto; }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-history .thread-run-card { margin: 0; border: 0; border-top: 1px solid var(--skai-color-border); border-radius: 0; background: transparent; }
+.app-content-coding .coding-page-active .project-thread-panel .thread-run-history .thread-run-card + .thread-run-card { border-top: 1px solid var(--skai-color-border); }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .chat-task-composer { padding: 9px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-heading { align-items: center; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-heading h3 { font-size: var(--skai-text-sm); }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-heading p:not(.section-kicker) { display: none; }
+@media (max-width: 900px) {
+  .app-content-coding:has(.coding-session-grid.is-files) { overflow: auto; }
+  .app-content-coding .coding-page-active:has(.coding-session-grid.is-files) { height: auto; min-height: 100%; flex: 0 0 auto; overflow: visible; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-files { min-height: 560px; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-files > .coding-project-browser { min-height: 560px; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-files .project-file-layout { grid-template-columns: minmax(190px, .34fr) minmax(0, .66fr); }
+  .app-content-coding .coding-page-active .project-thread-panel .chat-heading-copy { align-items: flex-start; flex-direction: column; gap: 2px; }
+}
+@media (max-width: 640px) {
+  .app-content-coding .coding-page-active .coding-session-grid.is-files { min-height: 760px; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-files > .coding-project-browser { min-height: 760px; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-files .project-file-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(140px, .34fr) minmax(360px, .66fr); }
+  .app-content-coding .coding-page-active .project-thread-panel .chat-layout { padding: 0 8px 8px; }
+  .app-content-coding .coding-page-active .project-thread-panel .chat-context-bar { align-items: flex-start; }
+  .app-content-coding .coding-page-active .project-thread-panel .chat-heading-copy strong { max-width: 75vw; }
+  .app-content-coding .coding-page-active .project-thread-panel .model-picker { min-width: 120px; max-width: 42vw; }
 }

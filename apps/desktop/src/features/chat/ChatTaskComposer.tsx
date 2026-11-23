@@ -25,12 +25,16 @@ function consumeTaskPrefill(): TaskPrefill | null {
   }
 }
 
-export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false }: {
+export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expanded, showToggle = true, onExpand }: {
   busy: boolean;
   onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, requiresApproval: boolean) => Promise<boolean>;
   initialOpen?: boolean;
+  expanded?: boolean;
+  showToggle?: boolean;
+  onExpand?: () => void;
 }) {
-  const [open, setOpen] = useState(initialOpen);
+  const [localOpen, setLocalOpen] = useState(initialOpen);
+  const open = expanded ?? localOpen;
   const [title, setTitle] = useState("");
   const [instruction, setInstruction] = useState("");
   const [environment, setEnvironment] = useState<TaskEnvironment>("local");
@@ -44,7 +48,8 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false }: {
       setTitle(prefill.title);
       setInstruction(prefill.instruction);
       setEnvironment(prefill.environment);
-      setOpen(true);
+      if (expanded === undefined) setLocalOpen(true);
+      else onExpand?.();
       setStatus("");
     };
     const onStorage = (event: StorageEvent) => { if (event.key === PREFILL_KEY) applyPrefill(); };
@@ -71,7 +76,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false }: {
   return <section className={`task-composer chat-task-composer${open ? " is-open" : ""}`} aria-label="Plan a local task">
     <div className="task-composer-heading">
       <div><p className="section-kicker">LOCAL TASK</p><h3>Turn this into a task</h3><p>Save a reviewable plan in this conversation. Planning does not start execution.</p></div>
-      <Button variant="secondary" type="button" aria-expanded={open} aria-controls="chat-task-composer-fields" onClick={() => setOpen((value) => !value)}>{open ? "Hide planner" : "Plan a task"}</Button>
+      {showToggle && <Button variant="secondary" type="button" aria-expanded={open} aria-controls="chat-task-composer-fields" onClick={() => setLocalOpen((value) => !value)}>{open ? "Hide planner" : "Plan a task"}</Button>}
     </div>
     {open && <form id="chat-task-composer-fields" onSubmit={(event) => void submit(event)}>
       <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={5} onChange={(event) => setInstruction(event.target.value)} required /></label></div>
