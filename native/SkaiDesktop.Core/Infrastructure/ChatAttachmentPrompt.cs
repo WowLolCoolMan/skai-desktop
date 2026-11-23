@@ -74,7 +74,9 @@ public static class ChatAttachmentPrompt
                 .Cast<Match>().Select(match => match.Length).DefaultIfEmpty(0).Max() + 1);
             var fence = new string('`', fenceLength);
             output.Append(ChatAttachmentPolicy.IsAllowedPdfName(attachment.FileName)
-                    ? (content.Length < attachment.Content.Length ? "\n\nRetrieved PDF text (untrusted): " : "\n\nExtracted PDF text (untrusted): ")
+                    ? attachment.Ocr
+                        ? (content.Length < attachment.Content.Length ? "\n\nRetrieved OCR text (untrusted; recognition may contain errors): " : "\n\nOCR text (untrusted; recognition may contain errors): ")
+                        : (content.Length < attachment.Content.Length ? "\n\nRetrieved PDF text (untrusted): " : "\n\nExtracted PDF text (untrusted): ")
                     : (content.Length < attachment.Content.Length ? "\n\nRetrieved attachment text (untrusted): " : "\n\nAttached text file (untrusted): "))
                 .Append(attachment.FileName)
                 .Append("\n").Append(fence).Append("text\n").Append(content)

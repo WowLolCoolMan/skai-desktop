@@ -95,10 +95,11 @@ Mark an item done only when the linked workflow has evidence.
     reassigns colliding IDs, strips legacy project context, and leaves existing
     conversations intact. Verified by the disposable Agent Host smoke; see
     [conversation import](../guides/CONVERSATION_IMPORT.md).
-17. **Scanned documents and data files — In progress · Codex.** `.xlsx`
-    attachments now extract bounded cached cell values locally without running
-    formulas. Remaining: add and verify a packaged local OCR engine for scanned
-    PDFs; OCR is still unavailable and disclosed to users.
+17. **Scanned documents and data files — Done · Codex.** `.xlsx` attachments
+    extract bounded cached cell values locally without running formulas.
+    Packaged English OCR handles image-only scanned PDFs locally, up to 20 pages;
+    the attachment is labeled as OCR and its text remains untrusted. Mixed PDFs
+    with both selectable text and scanned pages are not OCRed page by page.
 18. **Packaged media coverage.** Verify real WebM and audio fixtures in the
     packaged app; make format and model capability errors clear.
 19. **Context and run capacity.** Verify actual 1M-token execution with a
@@ -183,8 +184,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   reads bounded Open XML workbook, relationship, shared-string, and worksheet
   parts locally; it includes sheet names and cell references, never executes
   formulas, and returns at most the normal per-file text budget. CSV remains a
-  plain local text attachment. Scanned PDF OCR still needs an installable local
-  runtime and acceptance coverage.
+  plain local text attachment.
+
+- **2026-11-23:** Packaged Windows smoke confirmed the bundled local PDF.js and
+  Tesseract.js runtime rendered an image-only PDF and recovered its known English
+  text without a hosted OCR route. OCR is limited to the first 20 pages and
+  16,000 characters; resulting text is labeled OCR and untrusted. Mixed
+  selectable/scanned PDFs and other OCR languages remain unsupported.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed

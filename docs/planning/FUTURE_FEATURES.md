@@ -17,7 +17,7 @@ product decisions. A request-size limit does not prove 1M-token execution.
 - [x] Visible user-selected Chat/Think, Coding, and Security/Risky modes. The active mode is selectable in the conversation header, persists with chats and forks, and is passed as local model context in chat and coding-task requests. Skai does not classify prompts, filter topics, or add mode-specific refusals.
 - [x] Multi-model picker supporting any compatible provider.
 - [x] Side-by-side model comparison.
-- [x] File, image, and PDF upload with bounded local retrieval-augmented context. (Selectable-text PDFs, supported images, and text attachments are policy-checked; broader extraction and semantic retrieval remain open.)
+- [x] File, image, and PDF upload with bounded local retrieval-augmented context. (Selectable-text PDFs, image-only scanned PDFs via bundled local English OCR, supported images, XLSX cached-cell extraction, and text attachments are policy-checked; mixed scanned/selectable PDFs and semantic retrieval remain open.)
 - [x] Web search with citations.
 - [x] Persistent memory with a view/edit management UI.
 - [x] Message queueing while the AI is responding.

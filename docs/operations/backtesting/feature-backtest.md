@@ -21,6 +21,7 @@ worktree.
 | Chat queue, conversation search, metadata, fork/export/archive | `smoke-chat-queue`, `smoke-conversation-search`, `smoke-conversation-metadata` |
 | Memory workflows | `smoke-memory` |
 | PDF attachment policy | `smoke-pdf-attachment` |
+| Scanned PDF OCR | Packaged Windows smoke confirms a generated image-only PDF is locally rendered and the fixture text is recognized with the bundled English OCR runtime. Mixed PDFs and non-English OCR remain unsupported. |
 | Local voice engines | Kokoro and Piper generated valid WAV audio through Skai's Agent Host; Whisper large-v3 transcribed a Piper-generated local audio fixture. |
 | Installed AirLLM sidecar preflight | `npm run smoke:airllm` |
 | Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, one-shot microphone capture/stop/Whisper completion, and unavailable-language browser speech pack behavior | `smoke:electron:artifact` |

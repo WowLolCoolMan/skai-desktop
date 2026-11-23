@@ -1,4 +1,5 @@
 // Local workspace file selection and Agent Host request IPC.
+const { extractScannedPdfText } = require("./pdf-ocr.cjs");
 
 function registerWorkspaceIpc({
   ipcMain, BrowserWindow, dialog, fs, path, attachmentTextExtensions,
@@ -6,6 +7,20 @@ function registerWorkspaceIpc({
   themeService, nativeTheme, requestAgent,
 }) {
   ipcMain.handle("agent:request", async (event, method, params) => {
+    if (method === "workspace.attachment.extract") {
+      const response = await requestAgent(method, params);
+      if (response?.ok || !/no selectable text was found in this pdf/i.test(response?.error?.message ?? "")) return response;
+      try {
+        const content = await extractScannedPdfText({
+          fileName: params?.fileName,
+          content: params?.content,
+          dependenciesPath: path.resolve(__dirname, "..", "node_modules"),
+        });
+        return { ...response, ok: true, error: undefined, result: { fileName: params.fileName, mediaType: null, content, ocr: true } };
+      } catch (error) {
+        return { ...response, error: { code: "OCR_FAILED", message: error instanceof Error ? error.message : "Local PDF OCR failed." } };
+      }
+    }
     if (method === "appearance.getThemes" || method === "appearance.saveThemeSelection" || method === "appearance.openThemesFolder" || method === "appearance.editTheme" || method === "appearance.duplicateTheme" || method === "appearance.importBase16" || method === "appearance.exportTheme" || method === "appearance.saveFonts" || method === "appearance.listFonts" || method === "appearance.readCustomFont" || method === "appearance.openFontsFolder" || method === "appearance.saveAppearanceOptions" || method === "appearance.saveThemeGradient" || method === "appearance.resetAppearance") return themeService.handle(method, params);
     // Theme: follow the app's Light/Dark/System choice instead of the OS, so native
     // pieces (select popups, scrollbars, file dialogs, tray menu, window frame) match.

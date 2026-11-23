@@ -11,7 +11,7 @@ function attachmentKind(attachment: ChatAttachment) {
   if (videoTime) return `Video frame · ${videoTime[1]}:${videoTime[2]}`;
   if (attachment.fileName.toLowerCase().endsWith(".audio-transcript.txt")) return "Audio transcript · processed locally";
   if (isImage(attachment)) return "Image";
-  if (attachment.fileName.toLowerCase().endsWith(".pdf")) return "PDF · text extracted locally";
+  if (attachment.fileName.toLowerCase().endsWith(".pdf")) return attachment.ocr ? "PDF · English OCR · processed locally" : "PDF · text extracted locally";
   return attachment.mediaType || "Local file";
 }
 

@@ -179,7 +179,7 @@ export type DesktopPersona = {
   updatedAtUtc: string;
 };
 
-export type ChatAttachment = { fileName: string; content: string; mediaType?: string | null };
+export type ChatAttachment = { fileName: string; content: string; mediaType?: string | null; ocr?: boolean };
 
 export type DesktopConversationSearchResult = DesktopConversation & {
   display: string;

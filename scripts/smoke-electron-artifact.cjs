@@ -14,6 +14,7 @@ const artifactRoot = path.dirname(executable);
 const port = 19321;
 const timeoutMs = 20_000;
 const mp4FixtureBase64 = fs.readFileSync(path.join(__dirname, "fixtures", "video-frame-smoke.mp4")).toString("base64");
+const scannedPdfFixtureBase64 = fs.readFileSync(path.join(__dirname, "fixtures", "scanned-text-smoke.pdf")).toString("base64");
 
 if (!fs.existsSync(executable)) {
   console.error(`Electron artifact does not exist: ${executable}`);
@@ -137,6 +138,10 @@ async function main() {
     }
   }
   console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}`);
+  const pdfOcrRaw = await evaluate(mainTarget, `(async () => JSON.stringify(await window.skaiAgent.request('workspace.attachment.extract', { fileName: 'scanned-text-smoke.pdf', content: '${scannedPdfFixtureBase64}' })))()`);
+  const pdfOcrResponse = JSON.parse(pdfOcrRaw);
+  const pdfOcrState = { ok: pdfOcrResponse.ok === true, ocr: pdfOcrResponse.result?.ocr === true, recognizedFixtureText: String(pdfOcrResponse.result?.content ?? "").includes("Skai offline OCR proof 12345"), error: pdfOcrResponse.error?.message ?? "" };
+  console.log(`Packaged local scanned-PDF OCR: ${JSON.stringify(pdfOcrState)}`);
   await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
   await sleep(150);
   const dictationStarted = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
@@ -198,8 +203,8 @@ async function main() {
   if (webmProbeBlockedByHarness) console.warn("WebM decode was blocked by the packaged smoke harness URL safety policy; MP4 sampling is still required and verified.");
   const localAudioHandled = audioInputStarted === "selected" && localAudioState.input && !localAudioState.transcribing
     && (localAudioState.transcript || localAudioState.error.toLowerCase().includes("on-device speech pack") || localAudioState.error.toLowerCase().includes("no speech was recognized"));
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, localAudioState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, localAudioState, pdfOcrState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }

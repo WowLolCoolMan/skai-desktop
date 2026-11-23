@@ -101,6 +101,9 @@ internal static class AttachmentTests
             && fencedPrompt.Contains("Extracted PDF text (untrusted): brief.pdf", StringComparison.Ordinal)
             && !fencedPrompt.Contains("photo.png", StringComparison.Ordinal),
             "attachment prompt uses a fence longer than any backtick run, labels PDFs, and skips images");
+        var ocrPrompt = ChatAttachmentPrompt.AppendTo("Read this scan", [new ChatAttachment("scan.pdf", "Skai OCR text", Ocr: true)]);
+        Check(ocrPrompt.Contains("OCR text (untrusted; recognition may contain errors): scan.pdf", StringComparison.Ordinal),
+            "OCR-derived PDF text is identified as locally recognized untrusted text");
         var videoFramePrompt = ChatAttachmentPrompt.PrepareMessagesForModel([
             new ChatMessage("user", "Summarize this clip", [new ChatAttachment("sample.frame-02-at-00-13.jpg", "iVBORw0KGgo=", "image/jpeg")])]);
         var videoFrameUserMessage = videoFramePrompt.Single(message => message.Role == "user");

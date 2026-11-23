@@ -14,8 +14,12 @@
     "start": "node scripts/launch-electron.cjs"
   },
   "dependencies": {
+    "@napi-rs/canvas": "1.2.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "builder-util-runtime": "9.7.0",
-    "electron-updater": "6.8.11"
+    "electron-updater": "6.8.11",
+    "pdfjs-dist": "6.5.438",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@monaco-editor/react": "4.7.0",
