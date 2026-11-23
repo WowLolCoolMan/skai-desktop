@@ -158,9 +158,11 @@ Mark an item done only when the linked workflow has evidence.
     endpoint rejection, read-only Filesystem MCP, Playwright stdio, local
     PostgreSQL, approved tool calls, health, and revocation. It now reconnects
     Filesystem MCP after revocation with a fresh immutable connection ID,
-    rechecks its read-only tool set, and performs another approved read.
-    Remaining: verified setup/use/revoke for the other curated MCP servers and
-    recovery acceptance across supported transports.
+   rechecks its read-only tool set, and performs another approved read. The
+   smoke also exercises loopback Streamable HTTP session negotiation, protocol
+   header continuity, approved reads, denied writes, revocation, and fresh
+   session recovery. Remaining: verify setup/use/revoke for additional curated
+   MCP server adapters.
 14. **Model fit and license guidance — In progress · Codex.** The model
     inspector now compares package size against current free RAM, reports GPU
     memory when telemetry exists, and labels the result as advisory. Hugging

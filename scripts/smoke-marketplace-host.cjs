@@ -64,6 +64,98 @@ async function getFreeLoopbackPort() {
   return port;
 }
 
+async function runMcpHttpLifecycleAcceptance() {
+  const requests = [];
+  let nextSession = 0;
+  let currentSession = "";
+  const fixture = http.createServer(async (incoming, response) => {
+    const chunks = [];
+    for await (const chunk of incoming) chunks.push(chunk);
+    let body;
+    try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+    catch { response.writeHead(400).end(); return; }
+    const method = body.method;
+    const session = incoming.headers["mcp-session-id"] ?? "";
+    requests.push({ method, session, protocol: incoming.headers["mcp-protocol-version"] ?? "" });
+    if (method === "initialize") {
+      currentSession = `mcp-smoke-session-${++nextSession}`;
+      response.setHeader("Mcp-Session-Id", currentSession);
+      response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({
+        jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "Skai local MCP smoke", version: "1" } },
+      }));
+      return;
+    }
+    if (session !== currentSession) {
+      response.writeHead(400, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "missing or stale MCP session" }));
+      return;
+    }
+    const result = method === "tools/list"
+      ? { tools: [
+        { name: "read_fixture", description: "Read a fixture value.", inputSchema: { type: "object", properties: {} }, annotations: { readOnlyHint: true } },
+        { name: "write_fixture", description: "Mutate fixture state.", inputSchema: { type: "object", properties: {} }, annotations: { readOnlyHint: false } },
+      ] }
+      : method === "tools/call"
+        ? { content: [{ type: "text", text: `fixture read using ${session}` }] }
+        : null;
+    if (!result) {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", id: body.id, result }));
+  });
+  await new Promise((resolve, reject) => { fixture.once("error", reject); fixture.listen(0, "127.0.0.1", resolve); });
+  const endpoint = `http://127.0.0.1:${fixture.address().port}/mcp`;
+  try {
+    const connect = () => request("mcp.connection.connect", { serverId: "streamable-http-smoke", transport: "streamable-http", endpoint });
+    const first = await connect();
+    const firstTools = first.result?.tools ?? [];
+    const read = firstTools.find(tool => tool.toolName === "read_fixture");
+    const write = firstTools.find(tool => tool.toolName === "write_fixture");
+    const firstId = first.result?.connection?.connectionId;
+    if (!first.ok || first.result?.connection?.state !== "healthy" || !read || read.isMutating || !write?.isMutating)
+      throw new Error(`Loopback Streamable HTTP MCP did not connect with classified tools: ${JSON.stringify(first)}`);
+    const readCall = () => request("mcp.tool.call", {
+      connectionId: firstId, toolName: read.toolName, approvalId: "mcp-http-smoke-read",
+      capabilities: ["mcp.invoke.read"], arguments: {},
+    });
+    const readResult = await readCall();
+    if (!readResult.ok || readResult.result?.isError || !readResult.result?.text?.includes("mcp-smoke-session-1"))
+      throw new Error(`Loopback Streamable HTTP MCP did not execute the approved read: ${JSON.stringify(readResult)}`);
+    const beforeDenied = requests.length;
+    const deniedWrite = await request("mcp.tool.call", {
+      connectionId: firstId, toolName: write.toolName, approvalId: "mcp-http-smoke-read-only",
+      capabilities: ["mcp.invoke.read"], arguments: {},
+    });
+    if (deniedWrite.ok || requests.length !== beforeDenied)
+      throw new Error("Loopback Streamable HTTP MCP sent a write after the user granted read-only access.");
+    const revoked = await request("mcp.connection.revoke", { connectionId: firstId });
+    if (!revoked.ok) throw new Error("Loopback Streamable HTTP MCP could not be revoked cleanly.");
+    const beforeRevokedCall = requests.length;
+    const afterRevoke = await readCall();
+    if (afterRevoke.ok || requests.length !== beforeRevokedCall)
+      throw new Error("A revoked Streamable HTTP MCP connection still reached its server.");
+
+    const second = await connect();
+    const secondId = second.result?.connection?.connectionId;
+    if (!second.ok || second.result?.connection?.state !== "healthy" || secondId === firstId)
+      throw new Error(`Streamable HTTP MCP did not recover with a new connection after revoke: ${JSON.stringify(second)}`);
+    const secondRead = await request("mcp.tool.call", {
+      connectionId: secondId, toolName: "read_fixture", approvalId: "mcp-http-smoke-reconnect-read",
+      capabilities: ["mcp.invoke.read"], arguments: {},
+    });
+    if (!secondRead.ok || secondRead.result?.isError || !secondRead.result?.text?.includes("mcp-smoke-session-2"))
+      throw new Error(`Reconnected Streamable HTTP MCP did not use its fresh negotiated session: ${JSON.stringify(secondRead)}`);
+    const protocolRequests = requests.filter(item => item.method !== "initialize");
+    if (protocolRequests.some(item => !item.protocol || !item.session) || nextSession !== 2)
+      throw new Error(`Streamable HTTP MCP did not preserve protocol/session headers across reconnect: ${JSON.stringify(requests)}`);
+    const secondRevoked = await request("mcp.connection.revoke", { connectionId: secondId });
+    if (!secondRevoked.ok) throw new Error("Reconnected Streamable HTTP MCP could not be revoked cleanly.");
+    console.log("MCP Streamable HTTP lifecycle passed: negotiated session, read-only grant, denied write, revoke, and fresh-session recovery.");
+  } finally {
+    await new Promise(resolve => fixture.close(resolve));
+  }
+}
+
 async function waitForOllama(endpoint, server, getStderr) {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
@@ -229,6 +321,7 @@ async function run() {
   if (hostedMcp.ok || !hostedMcp.error?.message?.includes("local server")) {
     throw new Error("Marketplace accepted a hosted MCP endpoint despite its local-only boundary.");
   }
+  await runMcpHttpLifecycleAcceptance();
   const sharedFolder = path.join(profileRoot, "filesystem-mcp-share");
   fs.mkdirSync(sharedFolder);
   fs.writeFileSync(path.join(sharedFolder, "sample.txt"), "read-only MCP smoke\n");
