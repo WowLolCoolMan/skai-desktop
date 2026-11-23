@@ -214,6 +214,14 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   remains open; see the AI planning mode entry in
   [Future Features](FUTURE_FEATURES.md).
 
+- **2026-11-23:** Re-ran the focused Coding Agent sandbox acceptance on native
+  Windows 11 and Ubuntu 24.04 under WSL. Windows passed PSEC/AppContainer
+  project-only filesystem access, denied neighboring-file reads/writes and
+  loopback networking, bounded process/memory use, timeout, and cancellation.
+  Ubuntu WSL passed Bubblewrap/cgroup project filesystem isolation, network
+  denial, 256 MiB memory and 128-process limits, timeout, and cancellation.
+  Native Linux desktop and additional Windows profiles remain open.
+
 - **2026-11-23:** Added a pinned Chatterbox Nano Marketplace installer and
   local synthesis adapter. Setup uses an isolated CPU-only Python environment,
   verifies every downloaded model file, and checks local speech before marking
