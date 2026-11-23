@@ -71,9 +71,11 @@ Mark an item done only when the linked workflow has evidence.
     offline-only mode are verified. No silent provider fallback.
 13. **MCP lifecycle.** Finish server setup, permission review/revocation,
     health reporting, and recovery for supported stdio/HTTP servers.
-14. **Model fit and license guidance.** Show hardware suitability, capabilities,
-    license restrictions, runtime requirements, and expected download size
-    before install.
+14. **Model fit and license guidance — In progress · Codex.** The model
+    inspector now compares package size against current free RAM, reports GPU
+    memory when telemetry exists, and labels the result as advisory. Remaining:
+    surface trustworthy license metadata and validate fit against real models
+    and runtimes.
 15. **Resumable model installs.** Resume interrupted downloads with integrity
     checks, safe cleanup, progress, cancellation, and retry.
 16. **Legacy conversation import.** Add preview, cancel-without-writing,
@@ -104,6 +106,12 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   accepted by the existing offline Whisper path. A live microphone acceptance
   run is still required; hands-free mode continues to require local browser
   speech recognition.
+
+- **2026-11-22:** Marketplace model details now include a device-fit advisory
+  based on the live local RAM/GPU capacity probe and catalog package size. It
+  clearly reports when memory telemetry is missing, warns when package size is
+  larger than current free RAM, and explains runtime/context overhead. It does
+  not claim package size guarantees that a model will fit.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
