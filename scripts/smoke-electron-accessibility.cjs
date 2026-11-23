@@ -1,7 +1,6 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { randomInt } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
 
@@ -14,10 +13,11 @@ const requestedRoutes = process.env.ACCESSIBILITY_ROUTES?.split(",").map((route)
 const routes = requestedRoutes?.length ? requestedRoutes : defaultRoutes;
 const unknownRoutes = routes.filter((route) => !defaultRoutes.includes(route));
 if (unknownRoutes.length) throw new Error(`Unknown accessibility route(s): ${unknownRoutes.join(", ")}`);
-const port = randomInt(20_000, 60_000);
+const port = 0;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-accessibility-smoke-"));
 const userData = path.join(temp, "electron-profile");
-const env = { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", APPDATA: path.join(temp, "appdata"), LOCALAPPDATA: path.join(temp, "localappdata"), XDG_CONFIG_HOME: path.join(temp, "config"), XDG_DATA_HOME: path.join(temp, "data"), XDG_CACHE_HOME: path.join(temp, "cache") };
+const appData = path.join(temp, "appdata");
+const env = { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", APPDATA: appData, LOCALAPPDATA: path.join(temp, "localappdata"), XDG_CONFIG_HOME: path.join(temp, "config"), XDG_DATA_HOME: path.join(temp, "data"), XDG_CACHE_HOME: path.join(temp, "cache") };
 const display = resolveDisplayBackend({ argv: [] });
 const displayArgs = display.switchValue ? [`--ozone-platform=${display.switchValue}`] : [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,17 +55,22 @@ async function evaluate(expression) {
 
 async function main() {
   console.log(`Accessibility smoke: launching ${executable}`);
-  child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayArgs, `--user-data-dir=${userData}`], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayArgs, `--user-data-dir=${userData}`, `--skai-isolated-smoke-app-data=${appData}`], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout.on("data", (chunk) => { output += chunk.toString(); });
   child.stderr.on("data", (chunk) => { output += chunk.toString(); });
   let target;
+  let debugPort;
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    try {
-      const pages = (await fetchJson(`http://127.0.0.1:${port}/json/list`)).filter((item) => item.type === "page");
-      target = pages.find((item) => item.title?.includes("Skai Desktop") && !item.url?.includes("?pet=1"));
-      if (target) break;
-    } catch { /* The Electron main window is still starting. */ }
+    const endpoint = output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//);
+    if (endpoint) debugPort = Number(endpoint[1]);
+    if (debugPort) {
+      try {
+        const pages = (await fetchJson(`http://127.0.0.1:${debugPort}/json/list`)).filter((item) => item.type === "page");
+        target = pages.find((item) => item.title?.includes("Skai Desktop") && !item.url?.includes("?pet=1"));
+        if (target) break;
+      } catch { /* The Electron main window is still starting. */ }
+    }
     if (child.exitCode !== null) throw new Error(`Packaged Electron exited before the accessibility connection was ready. ${output.slice(-2000)}`);
     await sleep(200);
   }

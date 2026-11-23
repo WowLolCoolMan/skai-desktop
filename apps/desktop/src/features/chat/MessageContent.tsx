@@ -13,7 +13,7 @@ export function MessageContent({ content }: { content: string }) {
   if (!blocks.length) return <p className="message-content"><br /></p>;
   return <div className="message-content">{blocks.map((block, index) => {
     const code = block.match(/^```([^\n]*)\n([\s\S]*?)\n```$/);
-    if (code) return <pre key={index}><code data-language={code[1] || undefined}>{code[2]}</code></pre>;
+    if (code) return <pre key={index} tabIndex={0}><code data-language={code[1] || undefined}>{code[2]}</code></pre>;
     const heading = block.match(/^(#{1,3})\s+(.+)$/);
     if (heading) {
       const level = heading[1].length;

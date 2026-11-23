@@ -122,13 +122,12 @@ Additional evidence commands:
 ### 2026-11-23 packaged accessibility smoke
 
 The freshly staged Windows Electron package passed the automated accessibility
-smoke across all 14 routes: zero WCAG A/AA violations, a working skip link and
-main landmark, and valid expanded-popup relationships for the model picker and
-overflow menu. Axe reported 14 inconclusive color-contrast checks, grouped into
-8 unique gradient-backed patterns; those still need visual review. The smoke
-now logs its current route/check and waits for popup rendering with a short
-timer rather than `requestAnimationFrame`, so headless or throttled windows do
-not stall the popup assertions.
+smoke across all 14 routes: zero WCAG A/AA violations, zero incomplete checks,
+a working skip link and main landmark, and valid expanded-popup relationships
+for the model picker and overflow menu. The run also verified the smoke-only
+isolated instance profile and OS-assigned DevTools port while the regular Skai
+instance remained open. The popup probe uses a short timer rather than
+`requestAnimationFrame`, so hidden or throttled windows do not stall it.
 - `npm run audit:local-only` — local transport boundary.
 
 ### Accessibility semantic follow-up — 2026-11-23
@@ -140,25 +139,30 @@ not stall the popup assertions.
 - Fixed the Model Picker's popup role, omitted `aria-controls` while popups are
   closed, and gave labeled thread/model/recipe/frame groups semantic region
   roles. Tab control icons are decorative SVGs rather than visible text glyphs.
-- Axe now has 14 inconclusive color-contrast checks across eight unique
-  patterns; it cannot compute contrast against the app's gradient backgrounds.
-  These need visual/manual review. Zero violations is not full accessibility
-  acceptance; assistive-technology and route-by-route visual reviews remain open.
+- The follow-up packaged scan now reports zero violations and zero incomplete
+  checks, including contrast checks. Zero automated findings is not full
+  accessibility acceptance; assistive-technology and route-by-route visual
+  reviews remain open.
 - A live 1440×900 dark-theme spot check covered Chat and Marketplace. Text and
   controls looked readable in the inspected areas. Marketplace was showing its
-  Agent Host unavailable recovery state, so this is limited visual evidence;
-  it does not clear the eight gradient contrast patterns or the remaining route
-  and theme review.
+  Agent Host unavailable recovery state, so this remains limited visual
+  evidence; manual route, theme, and pet-motion review is still open.
 
 ### Packaged UI and accessibility rerun — 2026-11-23
 
 - The packaged route matrix passed: 17 routes × 5 window sizes × 4 theme/sidebar
   variants, with no reported layout failures or renderer runtime errors.
+- Follow-up packaged acceptance passed the theme/contrast sweep for dark, light,
+  system, custom-theme live reload/recovery, and constrained width. Packaged
+  overflow acceptance also passed 11 routes × 5 viewport widths. The contrast
+  probe now excludes text under effectively transparent ancestor states, such
+  as assistant message actions hidden until hover or keyboard focus.
 - The full Axe scan passed on 14 routes with zero WCAG A/AA violations, zero
   serious/critical findings, zero inconclusive checks, a working skip link and
   main landmark, and valid expanded Model Picker (`dialog`) and overflow-menu
-  (`menu`) relationships. The scan found 846 focusable controls across its
-  audited route state.
+  (`menu`) relationships. The latest packaged rerun also verified keyboard
+  focus for scrollable message code blocks and found 907 focusable controls
+  across its audited route state.
 - The interaction probe originally waited on nested animation frames and could
   time out when the Electron renderer was not presenting frames. It now waits
   on short timers after opening and closing the popups; the full interaction

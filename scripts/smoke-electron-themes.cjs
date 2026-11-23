@@ -20,7 +20,9 @@ if (!fs.existsSync(executable)) {
 
 // Isolated profile: a running Skai instance would otherwise take the single-instance lock and the smoke launch would exit.
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", SRAI_PROJECTS_PATH: path.join(smokeUserDataDir, "projects.json"), SRAI_UNDO_PATH: path.join(smokeUserDataDir, "undo.json") }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const smokeAppDataDir = path.join(smokeUserDataDir, "appdata");
+fs.mkdirSync(smokeAppDataDir, { recursive: true });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", APPDATA: smokeAppDataDir, SRAI_PROJECTS_PATH: path.join(smokeUserDataDir, "projects.json"), SRAI_UNDO_PATH: path.join(smokeUserDataDir, "undo.json") }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
@@ -217,6 +219,7 @@ async function main() {
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || Number(cs.opacity) < 0.1) continue;
     let opacity = 1; for (let n = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+    if (opacity < 0.1) continue;
     const fg = parse(cs.color); if (!fg) continue;
     const bg = bgOf(el); if (bg.gradient) continue;
     const disabled = el.closest('button:disabled, [aria-disabled="true"], input:disabled');

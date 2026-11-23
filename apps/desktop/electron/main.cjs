@@ -28,6 +28,13 @@ const { createTrayController } = require("./tray-controller.cjs");
 const { createPetWindowController } = require("./pet-window.cjs");
 const { createSingleInstanceLease } = require("./single-instance-lease.cjs");
 
+// Packaged smoke tests need an isolated cross-build instance lease as well as an
+// isolated Chromium profile, so they never collide with the user's open app.
+const smokeAppDataPath = app.commandLine.getSwitchValue("skai-isolated-smoke-app-data");
+if (process.env.SKAI_ELECTRON_SMOKE === "true" && smokeAppDataPath) {
+  app.setPath("appData", path.resolve(smokeAppDataPath));
+}
+
 // Electron's lock is scoped to userData and, on Windows, the executable name.
 // The shared per-user lease also covers dev, packaged, and side-by-side builds.
 const electronSingleInstanceLock = app.requestSingleInstanceLock();

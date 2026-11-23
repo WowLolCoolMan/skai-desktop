@@ -80,7 +80,9 @@ if (artifactManifest.executable !== path.basename(executable) || artifactManifes
 }
 
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const smokeAppDataDir = path.join(smokeUserDataDir, "appdata");
+fs.mkdirSync(smokeAppDataDir, { recursive: true });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 let childExit = null;
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });

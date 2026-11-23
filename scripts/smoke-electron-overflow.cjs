@@ -12,7 +12,9 @@ const routes = ["chat", "coding", "settings", "models", "images", "marketplace",
 const widths = [1920, 1440, 1280, 960, 640];
 // Isolated profile: a running Skai instance would otherwise take the single-instance lock and the smoke launch would exit.
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`], { cwd: path.dirname(executable), windowsHide: true, stdio: "ignore" });
+const smokeAppDataDir = path.join(smokeUserDataDir, "appdata");
+fs.mkdirSync(smokeAppDataDir, { recursive: true });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", APPDATA: smokeAppDataDir }, windowsHide: true, stdio: "ignore" });
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 async function fetchJson(url) { const response = await fetch(url); if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }
 function connect(target) {
