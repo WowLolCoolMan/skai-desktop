@@ -112,14 +112,17 @@ Mark an item done only when the linked workflow has evidence.
     [conversation import](../guides/CONVERSATION_IMPORT.md).
 17. **Scanned documents and data files — Done · Codex.** `.xlsx` attachments
     extract bounded cached cell values locally without running formulas.
-    Packaged English OCR handles image-only scanned PDFs locally, up to 20 pages;
-    the attachment is labeled as OCR and its text remains untrusted. Mixed PDFs
-    with both selectable text and scanned pages are not OCRed page by page.
+    Packaged English OCR handles PDFs locally, preserving selectable text and
+    OCRing only image-only pages in mixed documents. It is limited to 20 pages
+    and 16,000 characters; OCR text remains labeled and untrusted. The packaged
+    Windows smoke verifies both selectable-text preservation and scanned-page
+    recognition.
 18. **Packaged media coverage — Done · Codex.** The packaged Windows smoke
-    records and decodes VP8 WebM through the same local file bridge used by the
-    app, samples it into four timestamped frames, and also samples the H.264
-    MP4 fixture. WAV reaches local Whisper; spoken-word quality remains tracked
-    under item 2.
+    records and decodes VP8 WebM through the local file bridge and verifies its
+    four extracted frame attachments. This Chromium-generated WebM reports a
+    near-zero duration, so only the H.264 MP4 fixture currently verifies
+    timestamped frame labels. WAV reaches local Whisper; spoken-word quality
+    remains tracked under item 2.
 19. **Context and run capacity.** Verify actual 1M-token execution with a
     compatible model; improve runtime-aware estimates and safe concurrency.
 20. **Production update trust.** Add signed update metadata and prepare trusted
@@ -229,8 +232,9 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
 - **2026-11-23:** Packaged Windows smoke confirmed the bundled local PDF.js and
   Tesseract.js runtime rendered an image-only PDF and recovered its known English
   text without a hosted OCR route. OCR is limited to the first 20 pages and
-  16,000 characters; resulting text is labeled OCR and untrusted. Mixed
-  selectable/scanned PDFs and other OCR languages remain unsupported.
+  16,000 characters; resulting text is labeled OCR and untrusted. Page-level
+  extraction now also preserves selectable text and OCRs only scanned pages in
+  mixed PDFs. Other OCR languages remain unsupported.
 
 - **2026-11-23:** Packaged Windows media smoke now stores a generated VP8 WebM
   through Skai's scoped local media bridge, decodes its metadata, and samples

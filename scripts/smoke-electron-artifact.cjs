@@ -16,6 +16,48 @@ const timeoutMs = 20_000;
 const mp4FixtureBase64 = fs.readFileSync(path.join(__dirname, "fixtures", "video-frame-smoke.mp4")).toString("base64");
 const scannedPdfFixtureBase64 = fs.readFileSync(path.join(__dirname, "fixtures", "scanned-text-smoke.pdf")).toString("base64");
 
+function makePdfStream(dictionary, bytes) {
+  return Buffer.concat([Buffer.from(`<< ${dictionary} /Length ${bytes.length} >>\nstream\n`), bytes, Buffer.from("\nendstream")]);
+}
+
+function createMixedPdfFixture() {
+  const canvasPackage = path.join(artifactRoot, "resources", "app", "node_modules", "@napi-rs", "canvas");
+  const { createCanvas } = require(canvasPackage);
+  const canvas = createCanvas(1400, 180);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, 1400, 180);
+  context.fillStyle = "#000";
+  context.font = "bold 56px Arial";
+  context.fillText("Mixed PDF scanned page OCR proof 67890", 35, 110);
+  const image = canvas.toBuffer("image/jpeg");
+
+  const objects = [];
+  objects[1] = Buffer.from("<< /Type /Catalog /Pages 2 0 R >>");
+  objects[2] = Buffer.from("<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>");
+  objects[3] = Buffer.from("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 6 0 R >> >> /Contents 4 0 R >>");
+  objects[4] = makePdfStream("", Buffer.from("BT /F1 24 Tf 60 700 Td (Selectable PDF page one proof.) Tj ET", "ascii"));
+  objects[5] = Buffer.from("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im1 8 0 R >> >> /Contents 7 0 R >>");
+  objects[6] = Buffer.from("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  objects[7] = makePdfStream("", Buffer.from("q 500 0 0 90 56 610 cm /Im1 Do Q", "ascii"));
+  objects[8] = makePdfStream("/Type /XObject /Subtype /Image /Width 1400 /Height 180 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", image);
+
+  const parts = [Buffer.from("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", "binary")];
+  const offsets = [0];
+  let length = parts[0].length;
+  for (let number = 1; number < objects.length; number += 1) {
+    offsets[number] = length;
+    const part = Buffer.concat([Buffer.from(`${number} 0 obj\n`), objects[number], Buffer.from("\nendobj\n")]);
+    parts.push(part);
+    length += part.length;
+  }
+  const xrefOffset = length;
+  let xref = `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let number = 1; number < objects.length; number += 1) xref += `${String(offsets[number]).padStart(10, "0")} 00000 n \n`;
+  parts.push(Buffer.from(`${xref}trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
+  return Buffer.concat(parts).toString("base64");
+}
+
 if (!fs.existsSync(executable)) {
   console.error(`Electron artifact does not exist: ${executable}`);
   process.exit(1);
@@ -142,6 +184,17 @@ async function main() {
   const pdfOcrResponse = JSON.parse(pdfOcrRaw);
   const pdfOcrState = { ok: pdfOcrResponse.ok === true, ocr: pdfOcrResponse.result?.ocr === true, recognizedFixtureText: String(pdfOcrResponse.result?.content ?? "").includes("Skai offline OCR proof 12345"), error: pdfOcrResponse.error?.message ?? "" };
   console.log(`Packaged local scanned-PDF OCR: ${JSON.stringify(pdfOcrState)}`);
+  const mixedPdfFixtureBase64 = createMixedPdfFixture();
+  const mixedPdfRaw = await evaluate(mainTarget, `(async () => JSON.stringify(await window.skaiAgent.request('workspace.attachment.extract', { fileName: 'mixed-text-scanned-smoke.pdf', content: '${mixedPdfFixtureBase64}' })))()`);
+  const mixedPdfResponse = JSON.parse(mixedPdfRaw);
+  const mixedPdfState = {
+    ok: mixedPdfResponse.ok === true,
+    ocrPages: mixedPdfResponse.result?.ocrPages ?? [],
+    selectableText: String(mixedPdfResponse.result?.content ?? "").includes("Selectable PDF page one proof."),
+    scannedText: String(mixedPdfResponse.result?.content ?? "").includes("Mixed PDF scanned page OCR proof 67890"),
+    error: mixedPdfResponse.error?.message ?? "",
+  };
+  console.log(`Packaged mixed-PDF text and OCR: ${JSON.stringify(mixedPdfState)}`);
   await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
   await sleep(150);
   const dictationStarted = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
@@ -196,13 +249,15 @@ async function main() {
   const error = dictationState.error.toLowerCase();
   const dictationFailClosed = dictationState.button && dictationState.started && dictationState.stopped && dictationState.settled
     && (dictationState.transcript || !error.includes("remote"));
-  const webmSamplingWorked = !videoFixture.supported || (videoFixture.recorded && videoFixture.dropped && videoState.frames.length === 4 && videoState.frames.every((frame) => frame.kind.startsWith("Video frame")));
+  const webmHasUsableDuration = Number(videoFixture.probeDetails?.duration) > 0.1;
+  const webmSamplingWorked = !videoFixture.supported || (videoFixture.recorded && videoFixture.dropped && videoState.frames.length === 4
+    && videoState.frames.every((frame) => webmHasUsableDuration ? frame.kind.startsWith("Video frame") : frame.name.includes(".frame-")));
   const videoSamplingWorked = webmSamplingWorked
     && mp4DropResult === "dropped" && mp4VideoState.frames.length === 4 && mp4VideoState.frames.every((frame) => frame.kind.startsWith("Video frame"));
   const localAudioHandled = audioInputStarted === "selected" && localAudioState.input && !localAudioState.transcribing
     && (localAudioState.transcript || localAudioState.error.toLowerCase().includes("on-device speech pack") || localAudioState.error.toLowerCase().includes("no speech was recognized"));
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, localAudioState, pdfOcrState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !dictationFailClosed || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }

@@ -48,6 +48,15 @@ internal static class AttachmentTests
         var generatedPdf = pdfBuilder.Build();
         var extractedPdfText = PdfAttachmentTextExtractor.Extract(generatedPdf, 1200);
         Check(PdfAttachmentTextExtractor.HasPdfSignature(generatedPdf) && extractedPdfText.Contains("Local PDF text stays on this device.", StringComparison.Ordinal), "PDF attachment extractor reads selectable text locally");
+        var mixedPdfBuilder = new PdfDocumentBuilder();
+        var textPage = mixedPdfBuilder.AddPage(PageSize.A4);
+        mixedPdfBuilder.AddPage(PageSize.A4);
+        var mixedFont = mixedPdfBuilder.AddStandard14Font(Standard14Font.Helvetica);
+        textPage.AddText("Selectable page retained in a mixed PDF.", 12, new PdfPoint(25, 700), mixedFont);
+        var mixedPdf = PdfAttachmentTextExtractor.ExtractWithPageStatus(mixedPdfBuilder.Build(), 1200);
+        Check(mixedPdf.Content.Contains("Selectable page retained in a mixed PDF.", StringComparison.Ordinal)
+            && mixedPdf.PageCount == 2 && mixedPdf.RequiresOcr && mixedPdf.PagesWithoutSelectableText.SequenceEqual([2]),
+            "PDF attachment extraction identifies scanned pages without discarding selectable page text");
         var truncatedPdfText = PdfAttachmentTextExtractor.Extract(generatedPdf, 96);
         Check(truncatedPdfText.Length <= 96 && truncatedPdfText.Contains("omitted", StringComparison.Ordinal), "PDF extraction stays within its requested text bound and marks truncation");
         try

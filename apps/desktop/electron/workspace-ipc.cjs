@@ -1,5 +1,5 @@
 // Local workspace file selection and Agent Host request IPC.
-const { extractScannedPdfText } = require("./pdf-ocr.cjs");
+const { extractPdfAttachmentText } = require("./pdf-ocr.cjs");
 
 function registerWorkspaceIpc({
   ipcMain, BrowserWindow, dialog, fs, path, attachmentTextExtensions,
@@ -9,16 +9,30 @@ function registerWorkspaceIpc({
   ipcMain.handle("agent:request", async (event, method, params) => {
     if (method === "workspace.attachment.extract") {
       const response = await requestAgent(method, params);
-      if (response?.ok || !/no selectable text was found in this pdf/i.test(response?.error?.message ?? "")) return response;
+      const needsOcr = (response?.ok && response.result?.ocrRequired === true)
+        || (!response?.ok && /no selectable text was found in this pdf/i.test(response?.error?.message ?? ""));
+      if (!needsOcr) return response;
       try {
-        const content = await extractScannedPdfText({
+        const extraction = await extractPdfAttachmentText({
           fileName: params?.fileName,
           content: params?.content,
           dependenciesPath: path.resolve(__dirname, "..", "node_modules"),
         });
-        return { ...response, ok: true, error: undefined, result: { fileName: params.fileName, mediaType: null, content, ocr: true } };
+        return {
+          ...response,
+          ok: true,
+          error: undefined,
+          result: {
+            fileName: params.fileName,
+            mediaType: null,
+            content: extraction.content,
+            ocr: extraction.ocrPages.length > 0,
+            ocrPages: extraction.ocrPages,
+            pageCount: extraction.pageCount,
+          },
+        };
       } catch (error) {
-        return { ...response, error: { code: "OCR_FAILED", message: error instanceof Error ? error.message : "Local PDF OCR failed." } };
+        return { ...response, ok: false, error: { code: "OCR_FAILED", message: error instanceof Error ? error.message : "Local PDF OCR failed." } };
       }
     }
     if (method === "appearance.getThemes" || method === "appearance.saveThemeSelection" || method === "appearance.openThemesFolder" || method === "appearance.editTheme" || method === "appearance.duplicateTheme" || method === "appearance.importBase16" || method === "appearance.exportTheme" || method === "appearance.saveFonts" || method === "appearance.listFonts" || method === "appearance.readCustomFont" || method === "appearance.openFontsFolder" || method === "appearance.saveAppearanceOptions" || method === "appearance.saveThemeGradient" || method === "appearance.resetAppearance") return themeService.handle(method, params);

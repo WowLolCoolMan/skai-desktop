@@ -7,6 +7,11 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace SkaiDesktop.Core.Infrastructure;
 
+public sealed record PdfAttachmentExtraction(string Content, int PageCount, IReadOnlyList<int> PagesWithoutSelectableText)
+{
+    public bool RequiresOcr => PagesWithoutSelectableText.Count > 0;
+}
+
 /// <summary>Extracts bounded, page-ordered text from a PDF selected by the user.</summary>
 public static class PdfAttachmentTextExtractor
 {
@@ -18,18 +23,32 @@ public static class PdfAttachmentTextExtractor
 
     public static string Extract(ReadOnlyMemory<byte> bytes, int maxCharacters)
     {
+        var result = ExtractWithPageStatus(bytes, maxCharacters);
+        if (result.Content.Length == 0)
+            throw new InvalidDataException("No selectable text was found in this PDF. Scanned documents need OCR before they can be read as text.");
+        return result.Content;
+    }
+
+    public static PdfAttachmentExtraction ExtractWithPageStatus(ReadOnlyMemory<byte> bytes, int maxCharacters)
+    {
         if (!HasPdfSignature(bytes.Span))
             throw new InvalidDataException("This file does not have a valid PDF signature.");
-        if (maxCharacters <= 0) return string.Empty;
+        if (maxCharacters <= 0) return new PdfAttachmentExtraction(string.Empty, 0, []);
 
         using var stream = new MemoryStream(bytes.ToArray(), writable: false);
         using var document = PdfDocument.Open(stream);
         var output = new StringBuilder(Math.Min(maxCharacters, 4096));
+        var pagesWithoutSelectableText = new List<int>();
         var pageLimit = Math.Min(document.NumberOfPages, MaxPages);
         for (var pageNumber = 1; pageNumber <= pageLimit; pageNumber++)
         {
             var text = ContentOrderTextExtractor.GetText(document.GetPage(pageNumber)).Trim();
-            if (text.Length == 0) continue;
+            if (text.Length == 0)
+            {
+                if (output.Length < maxCharacters) pagesWithoutSelectableText.Add(pageNumber);
+                continue;
+            }
+            if (output.Length >= maxCharacters) continue;
             var pagePrefix = $"\n\n[Page {pageNumber}]\n";
             var required = pagePrefix.Length + text.Length;
             var remaining = maxCharacters - output.Length;
@@ -45,7 +64,6 @@ public static class PdfAttachmentTextExtractor
                 output.Append(pagePrefix.AsSpan(0, Math.Min(pagePrefix.Length, remaining - markerLength)))
                     .Append(text.AsSpan(0, Math.Min(text.Length, textRoom)))
                     .Append(TruncationNotice.AsSpan(0, markerLength));
-            break;
         }
 
         if (document.NumberOfPages > MaxPages && output.Length < maxCharacters)
@@ -54,8 +72,7 @@ public static class PdfAttachmentTextExtractor
             output.Append(marker.AsSpan(0, Math.Min(marker.Length, maxCharacters - output.Length)));
         }
         var extracted = output.ToString().Trim();
-        if (extracted.Length == 0)
-            throw new InvalidDataException("No selectable text was found in this PDF. Scanned documents need OCR before they can be read as text.");
-        return extracted.Length <= maxCharacters ? extracted : extracted[..maxCharacters];
+        if (extracted.Length > maxCharacters) extracted = extracted[..maxCharacters];
+        return new PdfAttachmentExtraction(extracted, document.NumberOfPages, pagesWithoutSelectableText);
     }
 }

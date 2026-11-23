@@ -163,8 +163,18 @@ public static partial class AgentHostLoop
         catch (FormatException exception) { throw new InvalidDataException("The PDF attachment encoding is invalid.", exception); }
         if (bytes.Length > ChatAttachmentPolicy.MaxPdfBytes)
             throw new InvalidDataException("The PDF attachment exceeds the size limit.");
-        var content = PdfAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
-        return new(ProtocolVersion, request.Id, true, new { fileName, mediaType = (string?)null, content });
+        var extraction = PdfAttachmentTextExtractor.ExtractWithPageStatus(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
+        if (extraction.Content.Length == 0)
+            throw new InvalidDataException("No selectable text was found in this PDF. Scanned documents need OCR before they can be read as text.");
+        return new(ProtocolVersion, request.Id, true, new
+        {
+            fileName,
+            mediaType = (string?)null,
+            content = extraction.Content,
+            ocrRequired = extraction.RequiresOcr,
+            pageCount = extraction.PageCount,
+            pagesWithoutSelectableText = extraction.PagesWithoutSelectableText,
+        });
     }
 
     private static AgentResponse ExtractSpreadsheetAttachment(AgentRequest request)
