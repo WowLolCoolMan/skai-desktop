@@ -15,6 +15,10 @@ Skai Desktop is an Electron + React desktop application with a persistent .NET A
 
 > **Status:** active development · current release line: `0.1.x` · Electron is the only desktop product surface. Capability claims below describe this project snapshot; unfinished ideas remain in the [future feature backlog](docs/planning/FUTURE_FEATURES.md). See the [Skai Desktop project site](https://wowlolcoolman.github.io/skai-desktop/) for the public overview and documentation index.
 
+Version `0.1.4` is available as an unsigned testing release. Code signing is
+deferred until the app is more complete; see the [release readiness report](docs/operations/RELEASE_READINESS.md)
+for verified update feeds and remaining installation/update acceptance.
+
 ## Local-first by design
 
 The current `0.1.x` release supports local model inference only. The planned

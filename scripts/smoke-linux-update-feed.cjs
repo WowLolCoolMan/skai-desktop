@@ -1,31 +1,37 @@
 #!/usr/bin/env node
 
-/* Exercises electron-updater's AppImage flow against a disposable loopback feed. */
+/* Exercises electron-updater's AppImage flow against a disposable loopback or published feed. */
 const fs = require("node:fs");
 const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 const net = require("node:net");
 const { spawn, spawnSync } = require("node:child_process");
-const yaml = require(require.resolve("js-yaml", { paths: [path.join(__dirname, "..", "apps", "desktop")] }));
+const desktopRoot = path.join(__dirname, "..", "apps", "desktop");
+const yaml = require(require.resolve("js-yaml", { paths: [desktopRoot] }));
+const WebSocketClient = globalThis.WebSocket ?? require(require.resolve("ws", { paths: [desktopRoot] }));
 
 if (process.platform !== "linux") throw new Error("The Linux updater feed smoke must run on Linux.");
 const [packagedArg, currentArg] = process.argv.slice(2);
+const usePublishedFeed = process.argv.includes("--published-feed");
+const keepScratch = process.argv.includes("--keep-temp");
 const packagedApp = path.resolve(packagedArg || path.join(__dirname, "..", "dist", "electron", "linux-x64"));
 const currentAppImage = path.resolve(currentArg || path.join(__dirname, "..", "dist", "installer", "linux-x64", "Skai-Desktop-0.1.4-x64.AppImage"));
 if (!fs.existsSync(path.join(packagedApp, "Skai Desktop")) || !fs.existsSync(path.join(packagedApp, "resources", "app", "package.json"))) throw new Error(`Packaged app directory is incomplete: ${packagedApp}`);
-if (!fs.existsSync(currentAppImage)) throw new Error(`Current AppImage not found: ${currentAppImage}`);
+if (!usePublishedFeed && !fs.existsSync(currentAppImage)) throw new Error(`Current AppImage not found: ${currentAppImage}`);
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "skai-linux-update-feed-"));
 const feed = path.join(scratch, "feed");
 const installed = path.join(scratch, "installed");
 const configHome = path.join(scratch, "profile", "config");
+const homeDir = path.join(scratch, "profile", "home");
 const marker = path.join(configHome, "skai-desktop", "update-feed-marker.json");
 const userDataDir = path.join(scratch, "profile", "chromium");
 let devtoolsPort;
 const currentVersion = "0.1.4";
 const previousVersion = "0.1.3";
 let server;
+let feedUrl;
 let serverRequests = 0;
 let appProcess;
 let installedAppImage;
@@ -79,7 +85,7 @@ function extractAppImage(appImage, destination, label) {
 }
 
 async function evaluate(expression) {
-  const socket = new WebSocket(mainTarget.webSocketDebuggerUrl);
+  const socket = new WebSocketClient(mainTarget.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     socket.addEventListener("open", resolve, { once: true });
     socket.addEventListener("error", () => reject(new Error(`DevTools websocket unavailable during '${stage}'.`)), { once: true });
@@ -124,7 +130,7 @@ async function readUpdateState() {
 }
 
 async function closeCurrentPage() {
-  const socket = new WebSocket(mainTarget.webSocketDebuggerUrl);
+  const socket = new WebSocketClient(mainTarget.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     socket.addEventListener("open", resolve, { once: true });
     socket.addEventListener("error", () => reject(new Error("DevTools websocket unavailable while closing the rollback smoke app.")), { once: true });
@@ -156,6 +162,10 @@ function stopProcessesUsingAppImage(appImage) {
 function linkPackageDirectory(source, destination, feedUrl) {
   fs.mkdirSync(destination, { recursive: true });
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    // An extracted AppImage already contains root icon integration entries.
+    // electron-builder regenerates them for the new AppImage and fails with
+    // EEXIST if those source root entries are copied into its staging directory.
+    if (entry.name === ".DirIcon" || entry.name === "skai-desktop.png") continue;
     const from = path.join(source, entry.name);
     const to = path.join(destination, entry.name);
     if (entry.isSymbolicLink()) {
@@ -186,47 +196,60 @@ function linkPackageDirectory(source, destination, feedUrl) {
 }
 
 async function main() {
-  stage = "prepare isolated profile and loopback feed";
+  stage = usePublishedFeed ? "prepare isolated profile and published feed" : "prepare isolated profile and loopback feed";
   fs.mkdirSync(feed, { recursive: true });
   fs.mkdirSync(installed, { recursive: true });
   fs.mkdirSync(path.dirname(marker), { recursive: true });
   fs.writeFileSync(marker, JSON.stringify({ purpose: "isolated AppImage update data-retention smoke", version: previousVersion }));
 
-  server = http.createServer((request, response) => {
-    serverRequests++;
-    let name;
-    try { name = decodeURIComponent(new URL(request.url, "http://127.0.0.1").pathname).replace(/^\/+/, ""); }
-    catch { response.writeHead(400).end(); return; }
-    if (!name || name.includes("..") || name.includes("/") || name.includes("\\")) { response.writeHead(404).end(); return; }
-    const file = path.join(feed, name);
-    if (!fs.existsSync(file)) { response.writeHead(404).end(); return; }
-    const stat = fs.statSync(file);
-    const range = request.headers.range?.match(/^bytes=(\d+)-(\d*)$/);
-    if (range) {
-      const start = Number(range[1]);
-      const end = Math.min(range[2] ? Number(range[2]) : stat.size - 1, stat.size - 1);
-      if (start > end || start >= stat.size) { response.writeHead(416, { "Content-Range": `bytes */${stat.size}` }).end(); return; }
-      response.writeHead(206, { "Accept-Ranges": "bytes", "Content-Length": end - start + 1, "Content-Range": `bytes ${start}-${end}/${stat.size}` });
-      fs.createReadStream(file, { start, end }).pipe(response);
-      return;
-    }
-    response.writeHead(200, { "Accept-Ranges": "bytes", "Content-Length": stat.size, "Content-Type": name.endsWith(".yml") ? "text/yaml" : "application/octet-stream" });
-    if (request.method === "HEAD") response.end();
-    else fs.createReadStream(file).pipe(response);
-  });
-  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-  const feedUrl = `http://127.0.0.1:${server.address().port}/`;
+  if (usePublishedFeed) {
+    feedUrl = "https://github.com/WowLolCoolMan/skai-desktop/releases/download/v0.1.4/";
+  } else {
+    server = http.createServer((request, response) => {
+      serverRequests++;
+      let name;
+      try { name = decodeURIComponent(new URL(request.url, "http://127.0.0.1").pathname).replace(/^\/+/, ""); }
+      catch { response.writeHead(400).end(); return; }
+      if (!name || name.includes("..") || name.includes("/") || name.includes("\\")) { response.writeHead(404).end(); return; }
+      const file = path.join(feed, name);
+      if (!fs.existsSync(file)) { response.writeHead(404).end(); return; }
+      const stat = fs.statSync(file);
+      const range = request.headers.range?.match(/^bytes=(\d+)-(\d*)$/);
+      if (range) {
+        const start = Number(range[1]);
+        const end = Math.min(range[2] ? Number(range[2]) : stat.size - 1, stat.size - 1);
+        if (start > end || start >= stat.size) { response.writeHead(416, { "Content-Range": `bytes */${stat.size}` }).end(); return; }
+        response.writeHead(206, { "Accept-Ranges": "bytes", "Content-Length": end - start + 1, "Content-Range": `bytes ${start}-${end}/${stat.size}` });
+        fs.createReadStream(file, { start, end }).pipe(response);
+        return;
+      }
+      response.writeHead(200, { "Accept-Ranges": "bytes", "Content-Length": stat.size, "Content-Type": name.endsWith(".yml") ? "text/yaml" : "application/octet-stream" });
+      if (request.method === "HEAD") response.end();
+      else fs.createReadStream(file).pipe(response);
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    feedUrl = `http://127.0.0.1:${server.address().port}/`;
+  }
   devtoolsPort = await getUnusedPort();
 
   stage = "validate and stage 0.1.4 feed artifact";
   const metadataPath = path.join(path.dirname(currentAppImage), "latest-linux.yml");
-  if (!fs.existsSync(metadataPath)) throw new Error(`Current Linux update metadata is missing: ${metadataPath}`);
-  const metadata = yaml.load(fs.readFileSync(metadataPath, "utf8"));
+  let metadataText;
+  if (usePublishedFeed) {
+    const response = await fetch(`${feedUrl}latest-linux.yml`, { signal: AbortSignal.timeout(30_000) });
+    if (!response.ok) throw new Error(`Published latest-linux.yml returned HTTP ${response.status}.`);
+    metadataText = await response.text();
+  } else {
+    if (!fs.existsSync(metadataPath)) throw new Error(`Current Linux update metadata is missing: ${metadataPath}`);
+    metadataText = fs.readFileSync(metadataPath, "utf8");
+  }
+  const metadata = yaml.load(metadataText);
   if (metadata.version !== currentVersion) throw new Error(`Expected the feed target to be ${currentVersion}, found ${metadata.version}.`);
-  const currentName = path.basename(currentAppImage);
-  const metadataEntry = metadata.files?.find(item => item.url === currentName);
-  if (!metadataEntry) throw new Error(`latest-linux.yml does not describe ${currentName}.`);
-  if (fs.statSync(currentAppImage).size !== metadataEntry.size) throw new Error("Current AppImage size differs from latest-linux.yml.");
+  const metadataEntry = metadata.files?.[0];
+  const currentName = path.basename(metadataEntry?.url ?? "");
+  if (!metadataEntry || !currentName || currentName !== metadataEntry.url) throw new Error(`latest-linux.yml contains an invalid AppImage path: ${metadataEntry?.url ?? "missing"}.`);
+  if (!usePublishedFeed && path.basename(currentAppImage) !== currentName) throw new Error(`Current AppImage name does not match latest-linux.yml: ${currentName}.`);
+  if (!usePublishedFeed && fs.statSync(currentAppImage).size !== metadataEntry.size) throw new Error("Current AppImage size differs from latest-linux.yml.");
   const baselinePackage = path.join(scratch, "baseline-package");
   linkPackageDirectory(packagedApp, baselinePackage, feedUrl);
   const baselineImageDirectory = path.join(scratch, "baseline-image");
@@ -241,22 +264,26 @@ async function main() {
   fs.copyFileSync(baselineAppImage, installedAppImage);
   fs.chmodSync(installedAppImage, 0o755);
   const baselineExecutable = extractAppImage(installedAppImage, path.join(scratch, "baseline-extracted"), "Extract the synthetic baseline AppImage");
-  try { fs.linkSync(currentAppImage, path.join(feed, currentName)); }
-  catch (error) {
-    if (error.code !== "EXDEV" && error.code !== "EPERM" && error.code !== "EACCES") throw error;
-    fs.copyFileSync(currentAppImage, path.join(feed, currentName));
+  if (!usePublishedFeed) {
+    try { fs.linkSync(currentAppImage, path.join(feed, currentName)); }
+    catch (error) {
+      if (error.code !== "EXDEV" && error.code !== "EPERM" && error.code !== "EACCES") throw error;
+      fs.copyFileSync(currentAppImage, path.join(feed, currentName));
+    }
+    fs.writeFileSync(path.join(feed, "latest-linux.yml"), metadataText);
+    const feedCopy = path.join(feed, currentName);
+    if (fs.statSync(feedCopy).size !== metadataEntry.size) throw new Error("Staged update size differs from latest-linux.yml.");
+    const latestHash = require("node:crypto").createHash("sha512").update(fs.readFileSync(feedCopy)).digest("base64");
+    if (latestHash !== metadataEntry.sha512) throw new Error("Staged update SHA-512 differs from latest-linux.yml.");
   }
-  fs.writeFileSync(path.join(feed, "latest-linux.yml"), fs.readFileSync(metadataPath));
-  const feedCopy = path.join(feed, currentName);
-  if (fs.statSync(feedCopy).size !== metadataEntry.size) throw new Error("Staged update size differs from latest-linux.yml.");
-  const latestHash = require("node:crypto").createHash("sha512").update(fs.readFileSync(feedCopy)).digest("base64");
-  if (latestHash !== metadataEntry.sha512) throw new Error("Staged update SHA-512 differs from latest-linux.yml.");
 
   stage = `launch synthetic ${previousVersion} AppImage`;
   const env = {
     ...process.env,
     APPIMAGE: installedAppImage,
     APPIMAGE_EXTRACT_AND_RUN: "1",
+    HOME: homeDir,
+    XDG_CACHE_HOME: path.join(homeDir, ".cache"),
     SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
     XDG_CONFIG_HOME: configHome,
     XDG_DATA_HOME: path.join(scratch, "profile", "data"),
@@ -272,6 +299,8 @@ async function main() {
   appProcess.on("error", error => { processOutput += `\n[app-spawn-error ${error.message}]`; });
   appProcess.on("exit", (code, signal) => { processOutput += `\n[app-exit code=${code} signal=${signal}]`; });
   await waitForTarget();
+  const baselineState = await readUpdateState();
+  if (baselineState?.currentVersion !== previousVersion) throw new Error(`The synthetic baseline opened as ${baselineState?.currentVersion ?? "unknown"}, expected ${previousVersion}.`);
 
   stage = "wait for verified 0.1.4 AppImage download";
   const deadline = Date.now() + 10 * 60_000;
@@ -283,7 +312,7 @@ async function main() {
     await sleep(1_000);
   }
   if (state?.status !== "downloaded") throw new Error(`The updater did not stage ${currentVersion}; last state: ${JSON.stringify(state)}. ${processOutput.slice(-2_000)}`);
-  if (serverRequests < 2) throw new Error(`The app did not contact the isolated update feed; requests=${serverRequests}.`);
+  if (!usePublishedFeed && serverRequests < 2) throw new Error(`The app did not contact the isolated update feed; requests=${serverRequests}.`);
   if (!state.message?.includes("verified")) throw new Error(`The update was not reported as verified: ${JSON.stringify(state)}`);
 
   stage = "invoke explicit in-app AppImage install";
@@ -321,37 +350,42 @@ async function main() {
   if (updatedVersion !== currentVersion) throw new Error(`The installed AppImage opened as version ${updatedVersion}, expected ${currentVersion}.`);
   if (!fs.existsSync(marker)) throw new Error("The update marker was lost when reopening the new AppImage.");
   const rollbackImage = path.join(installed, `.skai-desktop-rollback-${previousVersion}.AppImage`);
-  if (!fs.existsSync(rollbackImage)) throw new Error("The update did not preserve the previous AppImage for rollback.");
-  if (!reopenedState.rollbackAvailable || reopenedState.rollbackVersion !== previousVersion) throw new Error(`The updated app did not advertise the matching rollback image: ${JSON.stringify(reopenedState)}.`);
-
-  stage = `restore and reopen ${previousVersion} AppImage`;
-  await evaluate("window.skaiAgent.updates.setEnabled(false).then(value => String(value))");
-  const rollbackCall = await evaluate("window.skaiAgent.updates.rollback().then(value => String(value))");
-  if (rollbackCall !== "true") throw new Error(`The in-app rollback action was rejected: ${rollbackCall}`);
-  await waitForDevtoolsClosed();
-  appProcess = undefined;
-  const restoredExecutable = extractAppImage(installedAppImage, path.join(scratch, "rollback-extracted"), `Extract the restored ${previousVersion} AppImage`);
-  const restoredMetadata = JSON.parse(fs.readFileSync(path.join(path.dirname(restoredExecutable), "resources", "app", "package.json"), "utf8"));
-  if (restoredMetadata.version !== previousVersion) throw new Error(`The restored AppImage contains version ${restoredMetadata.version}, expected ${previousVersion}.`);
-  const restoredLaunchDeadline = Date.now() + 30_000;
-  let restoredProcesses = [];
-  while (Date.now() < restoredLaunchDeadline) {
-    restoredProcesses = processesUsingAppImage(installedAppImage) ?? [];
-    if (restoredProcesses.length) break;
-    await sleep(250);
+  let rollback = { available: false, note: "This published updater predates in-app rollback." };
+  if (reopenedState.rollbackAvailable) {
+    if (reopenedState.rollbackVersion !== previousVersion || !fs.existsSync(rollbackImage)) throw new Error(`The updated app did not preserve and advertise the matching rollback image. Expected ${rollbackImage}; installed files: ${fs.readdirSync(installed).join(", ")}; state: ${JSON.stringify(reopenedState)}.`);
+    stage = `restore and reopen ${previousVersion} AppImage`;
+    await evaluate("window.skaiAgent.updates.setEnabled(false).then(value => String(value))");
+    const rollbackCall = await evaluate("window.skaiAgent.updates.rollback().then(value => String(value))");
+    if (rollbackCall !== "true") throw new Error(`The in-app rollback action was rejected: ${rollbackCall}`);
+    await waitForDevtoolsClosed();
+    appProcess = undefined;
+    const restoredExecutable = extractAppImage(installedAppImage, path.join(scratch, "rollback-extracted"), `Extract the restored ${previousVersion} AppImage`);
+    const restoredMetadata = JSON.parse(fs.readFileSync(path.join(path.dirname(restoredExecutable), "resources", "app", "package.json"), "utf8"));
+    if (restoredMetadata.version !== previousVersion) throw new Error(`The restored AppImage contains version ${restoredMetadata.version}, expected ${previousVersion}.`);
+    const restoredLaunchDeadline = Date.now() + 30_000;
+    let restoredProcesses = [];
+    while (Date.now() < restoredLaunchDeadline) {
+      restoredProcesses = processesUsingAppImage(installedAppImage) ?? [];
+      if (restoredProcesses.length) break;
+      await sleep(250);
+    }
+    if (!restoredProcesses.length) throw new Error(`The rollback restored ${previousVersion} but did not relaunch its AppImage. ${processOutput.slice(-2_000)}`);
+    if (!fs.existsSync(marker)) throw new Error("The rollback changed or removed the user profile marker.");
+    rollback = { available: true, previousVersion, restoredToOriginalPath: true, restoredPackageVersion: restoredMetadata.version, relaunchProcessIds: restoredProcesses, previousAppImageReopened: true };
+  } else if (!usePublishedFeed) {
+    throw new Error(`The candidate updater did not advertise rollback. Installed files: ${fs.readdirSync(installed).join(", ")}; state: ${JSON.stringify(reopenedState)}.`);
   }
-  if (!restoredProcesses.length) throw new Error(`The rollback restored ${previousVersion} but did not relaunch its AppImage. ${processOutput.slice(-2_000)}`);
-  if (!fs.existsSync(marker)) throw new Error("The rollback changed or removed the user profile marker.");
 
   console.log(JSON.stringify({
     result: "passed",
-    baseline: `${previousVersion} synthetic AppImage using current updater code`,
+    baseline: `${previousVersion} synthetic version from the published ${currentVersion} AppImage payload`,
     updated: updatedVersion,
+    feed: usePublishedFeed ? "published GitHub v0.1.4" : "isolated loopback",
     feedRequests: serverRequests,
     stagedUpdateStatus: state.status,
     userDataMarkerRetained: true,
     updatedAppImageReopened: true,
-    rollback: { previousVersion, restoredToOriginalPath: true, restoredPackageVersion: restoredMetadata.version, relaunchProcessIds: restoredProcesses, previousAppImageReopened: true },
+    rollback,
   }, null, 2));
 }
 
@@ -364,6 +398,7 @@ main().catch(error => { console.error(`Linux updater smoke failed during '${stag
   if (server) await new Promise(resolve => server.close(resolve));
   const resolved = path.resolve(scratch);
   if (!resolved.startsWith(path.resolve(os.tmpdir()) + path.sep)) throw new Error(`Refusing to remove a path outside the temporary directory: ${resolved}`);
+  if (keepScratch) { console.log(`Disposable updater smoke files retained at ${resolved}`); return; }
   try { fs.rmSync(resolved, { recursive: true, force: true, maxRetries: 12, retryDelay: 500 }); }
   catch (error) { console.warn(`Disposable Linux update test files remain at ${resolved}: ${error.message}`); }
 });

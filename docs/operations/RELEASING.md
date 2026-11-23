@@ -1,14 +1,17 @@
 # Skai Desktop release guide
 
 This is the operational source of truth for preparing a public Skai Desktop
-release. The release workflow is fail-closed; a green local build does not mean
-the signed public release is ready.
+release. A green local build does not establish that an installed app can update
+through the published feed or that every desktop platform is accepted.
 
 ## 0.1.4 targets
 
-- Windows 11 x64: per-user NSIS installer, Authenticode signed.
-- Ubuntu 24.04 x64: AppImage, with detached GPG signature and SHA-256 checksum.
+- Windows 11 x64: unsigned per-user NSIS installer for testing.
+- Ubuntu 24.04 x64: unsigned AppImage for testing, with SHA-256 checksum.
 - macOS and other Linux distributions are not release targets for 0.1.4.
+
+The owner has deferred code signing until the app is more complete. Do not
+describe the 0.1.4 test artifacts as signed or as a trusted production release.
 
 The Windows installer and Linux AppImage are the auto-update packages. Their
 electron-builder metadata (`latest.yml` and `latest-linux.yml`) must be
@@ -16,7 +19,7 @@ published with the exact files those manifests reference. A portable ZIP or
 tarball may be offered as a supplementary download, but it is not the in-app
 update path.
 
-## Before tagging
+## Before tagging a future version
 
 1. Set the matching `0.1.4` version in the root and desktop package metadata.
 2. Run `npm ci`, `npm ci --prefix apps/desktop`, `npm run check:syntax`,
@@ -31,10 +34,9 @@ update path.
 5. Confirm the repository Actions variables and secrets listed in
    [Windows installer release evidence](WINDOWS_INSTALLER.md) are configured.
 
-The 0.1.4 tag must not be created while any required workflow gate or acceptance
-item is unresolved. The `v0.1.4` workflow currently requires signing,
-packaged-smoke, and Electron-packaging readiness variables, plus clean Windows
-install/upgrade/uninstall evidence.
+Do not tag a future version while its required workflow gates or acceptance
+items are unresolved. Keep the unsigned testing path explicit; production
+signing is deferred by the owner.
 
 ## Update publishing contract
 
@@ -56,8 +58,11 @@ restart. Release tags and update files must remain immutable after publication.
 
 ## Current status
 
-As of 2026-11-16, no public GitHub Release exists. The app update client and
-release packaging are being prepared, but release readiness still depends on
-trusted signing credentials and the exact-artifact/platform acceptance evidence
-above. See [release readiness](RELEASE_READINESS.md) for current evidence and
-open blockers.
+Version 0.1.4 was published on 2026-11-22 as an unsigned testing release. The
+published Windows and Linux feeds and their referenced installer/AppImage sizes
+pass `npm run smoke:published-update-feed`. In an isolated WSL2/Xvfb profile,
+the published Linux feed also downloaded, verified, installed, and reopened the
+actual 0.1.4 AppImage from a synthetic 0.1.3 baseline. The public 0.1.4 updater
+predates in-app rollback; current-source Linux rollback is separately covered
+by the loopback smoke. See [release readiness](RELEASE_READINESS.md) for exact-
+artifact evidence and remaining platform and updater gaps.
