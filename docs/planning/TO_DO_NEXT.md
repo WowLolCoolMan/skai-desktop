@@ -22,7 +22,8 @@ Mark an item done only when the linked workflow has evidence.
 
 1. **UI and accessibility acceptance — In progress · Codex.** The packaged
    audit covers 14 routes with zero automated WCAG violations; 29 checks remain
-   incomplete and require manual review. Review the 17-route matrix,
+   incomplete and require manual review. Responsive overflow now passes 11
+   routes at five widths after fixing the Settings footer. Review the 17-route matrix,
    keyboard/focus behavior, assistive technology, narrow layouts, and pet
    animations. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
@@ -116,6 +117,10 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   skip link, and a working main landmark. Twenty-nine checks remain incomplete
   for manual review; this does not close the 17-route visual and assistive
   technology acceptance item.
+
+- **2026-11-23:** Fixed the Settings footer extending beyond the content panel
+  at wide and narrow widths. Rebuilt the Windows artifact; responsive overflow
+  passed 11 routes × 5 widths, and the full packaged artifact smoke passed.
 
 - **2026-11-22:** Marketplace now lists saved local ComfyUI workflows, identifies
   the active workflow, and lets users activate one without leaving Marketplace.

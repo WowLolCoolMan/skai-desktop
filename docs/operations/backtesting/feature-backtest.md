@@ -1,6 +1,6 @@
 # Skai Desktop feature backtest
 
-Updated: 2026-11-22
+Updated: 2026-11-23
 
 This is the living acceptance matrix for the feature backtest goal. “Pass” means
 the current repository check or packaged smoke test produced evidence for the
@@ -23,9 +23,9 @@ worktree.
 | PDF attachment policy | `smoke-pdf-attachment` |
 | Local voice engines | Kokoro and Piper generated valid WAV audio through Skai's Agent Host; Whisper large-v3 transcribed a Piper-generated local audio fixture. |
 | Installed AirLLM sidecar preflight | `npm run smoke:airllm` |
-| Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, and unavailable-language dictation behavior | `smoke:electron:artifact` |
-| Accessibility | 14 routes, 0 WCAG violations in `smoke:electron:accessibility` |
-| Responsive overflow | 11 routes × 5 viewport widths |
+| Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, one-shot microphone capture/stop/Whisper completion, and unavailable-language browser speech pack behavior | `smoke:electron:artifact` |
+| Accessibility | 14 routes, 0 WCAG violations in `smoke:electron:accessibility`; 29 checks require manual review |
+| Responsive overflow | 11 routes × 5 viewport widths; fixed the Settings footer overflowing its panel |
 | UI matrix | 17 routes × 5 sizes × 4 theme/sidebar variants |
 | Published update feeds | `npm run smoke:published-update-feed -- --version 0.1.4` validates both public metadata files, SHA-512 values, and referenced installer/AppImage HTTP status and byte sizes. `npm run smoke:linux:update-feed:published` additionally downloaded, verified, installed, and reopened the actual published 0.1.4 AppImage from an isolated synthetic 0.1.3 baseline and retained a disposable profile marker. The published 0.1.4 updater predates in-app rollback. |
 | Themes and live reload | `smoke:electron:themes` |
@@ -43,7 +43,7 @@ worktree.
 | Area | Current evidence and next validation |
 | --- | --- |
 | AirLLM inference | AirLLM and Torch import successfully from `%LOCALAPPDATA%\\Skai\\AirLLM\\venv`; the worker’s CUDA preflight and malformed-input paths return structured errors. A real model run still requires an NVIDIA GPU and CUDA-capable PyTorch, plus a compatible Hugging Face model and enough disk/RAM/VRAM. |
-| Microphone dictation and hands-free voice mode | Packaged Electron reports the `en-US` on-device speech pack unavailable and refuses remote recognition. Install the OS speech capability with elevation, then verify real microphone capture, one-shot dictation, live hands-free turns, cancellation, and device-error recovery. |
+| Microphone dictation and hands-free voice mode | Packaged Electron reports the `en-US` on-device browser speech pack unavailable and refuses remote recognition. The separate one-shot local Whisper route captured/stopped a microphone clip and completed a reviewable transcript. Intelligible spoken-word quality, permission denial/recovery, and live hands-free turns still need acceptance. |
 | Packaged Marketplace workflow | `smoke:electron:artifact` passes Models search/review and explicitly verifies Tools → Installed inventory in the packaged app. |
 | Persona model quality | Qwen3 14B completed David Lynch identity, death-date, research, attributed-turn, nine-field draft, initial chat, and posthumous follow-up without a stream disconnect. The follow-up explicitly declined knowledge beyond its future boundary. A 2010-era run returned a generic opening persona reply and missed the quality bar. These checks do not establish semantic fidelity or cutoff truthfulness across multiple turns and subjects. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |

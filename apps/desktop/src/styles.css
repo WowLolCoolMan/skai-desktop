@@ -2250,7 +2250,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .settings-overlay-panel .settings-callout strong, .settings-overlay-panel .settings-about-you h3 { color: var(--skai-color-text); font-size: var(--skai-text-md); font-weight: 600; }
 .settings-overlay-panel .settings-callout span, .settings-overlay-panel .settings-about-you-note { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.5; }
 .settings-overlay-panel .settings-provider-row { padding: 14px 15px; border-color: var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }
-.settings-overlay-panel .settings-footer { position: relative; z-index: 2; display: flex; flex: 0 0 auto; align-items: center; gap: 16px; margin: 0 calc(clamp(24px, 5vw, 70px) * -1); padding: 13px clamp(24px, 5vw, 70px); border-top: 1px solid var(--skai-color-border); background: var(--skai-color-canvas); }
+.settings-overlay-panel .settings-footer { position: relative; z-index: 2; display: flex; flex: 0 0 auto; align-items: center; gap: 16px; margin: 0; padding: 13px clamp(24px, 5vw, 70px); border-top: 1px solid var(--skai-color-border); background: var(--skai-color-canvas); }
 .settings-overlay-panel .settings-footer > span { flex: 1; font-size: var(--skai-text-sm); }
 .settings-overlay-panel .settings-footer .btn { min-width: 128px; }
 .settings-overlay-panel .settings-footer .settings-save-saved { color: var(--skai-color-success-text, var(--skai-color-accent-text)); }
@@ -2262,7 +2262,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .settings-category-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 7px; max-height: 118px; overflow-y: auto; }
   .settings-category-list button { min-height: 35px; }
   .settings-overlay-panel .settings-content-scroll { padding: 25px 22px 20px; }
-  .settings-overlay-panel .settings-footer { margin: 0 -22px; padding: 12px 22px; }
+  .settings-overlay-panel .settings-footer { margin: 0; padding: 12px 22px; }
 }
 @media (max-width: 480px) {
   .settings-overlay-header { padding: 0 16px !important; }
@@ -2271,7 +2271,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
   .settings-category-list { grid-template-columns: minmax(0, 1fr); max-height: 148px; }
   .settings-overlay-panel .settings-content-scroll { padding: 21px 16px 18px; }
   .settings-overlay-panel .settings-field, .settings-overlay-panel .settings-about-you-fields { grid-template-columns: minmax(0, 1fr); }
-  .settings-overlay-panel .settings-footer { margin: 0 -16px; padding: 11px 16px; }
+  .settings-overlay-panel .settings-footer { margin: 0; padding: 11px 16px; }
   .settings-overlay-panel .settings-footer > span { font-size: var(--skai-text-xs); }
   .settings-overlay-panel .settings-footer .btn { min-width: 112px; }
 }
