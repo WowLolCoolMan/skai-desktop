@@ -29,6 +29,14 @@
   Marketplace-driven acceptance installs both model variants and confirms a
   valid WAV response through `voice.speak`. This adapter does not expose custom
   voice cloning, streamed playback, or effect cues.
+- Qwen3-TTS 0.6B CustomVoice now has a pinned Windows x64 CPU installer and a
+  resident local worker. Marketplace installs an isolated Python 3.12 runtime,
+  CPU PyTorch 2.6, and `qwen-tts==0.1.1`; the model revision and all 11 model
+  files are pinned and verified. It supports nine preset speakers and Skai
+  voice-style instructions, returning complete offline WAV audio. It does not
+  expose reference-voice cloning, audio-frame streaming, or cough/laugh effect
+  cues. The clean-profile Agent Host acceptance passed installation, two
+  English speakers, cancellation with recovery, and isolated uninstall.
 - Voice Workbench now keeps audio bytes in local IndexedDB and profile metadata
   in localStorage. Users can add clips incrementally, preview saved recordings,
   and remove individual clips. Duplicate filenames remain distinct; each
@@ -45,7 +53,8 @@ The catalog is intentionally capability metadata, not a claim that every
 upstream project is already bundled. The remaining work includes:
 
 1. Adapter-first installation and verified model downloads for the other
-   catalog entries that can be supported in Skai.
+   catalog entries that can be supported in Skai; Qwen3-TTS is now one verified
+   Windows x64 adapter.
 2. A common local adapter protocol for streaming playback, cancellation,
    cloning, and typed prosody/effect cues. Pocket TTS currently returns a
    complete WAV and can cancel generation by stopping its local worker.

@@ -12,17 +12,18 @@ React renderer
        └─ Electron main-process IPC allowlist
             └─ Skai Desktop C# agent host
                  ├─ Windows Speech or Linux espeak-ng, espeak, or spd-say
-                 └─ Verified Pocket TTS worker on Windows x64 (loopback only)
+                 ├─ Verified Pocket TTS worker on Windows x64 (loopback only)
+                 └─ Qwen3-TTS 0.6B CPU worker on Windows x64
 ```
 
 The C# host provides:
 
 - `voice.models` — the installed OS-native default and catalog entries for
-  optional Kokoro and Pocket TTS model packs.
+  optional Kokoro, Pocket TTS, and Qwen3-TTS model packs.
 - `voice.speak` — generates bounded OS-native speech or requests a complete WAV
   from an installed local adapter.
-- `voice.stop` — stops native speech and terminates Pocket TTS generation when
-  it is active.
+- `voice.stop` — stops native speech and terminates active Pocket TTS or
+  Qwen3-TTS generation.
 - `voice.status` — reports whether the OS-native speech process is still active,
   so hands-free chat can wait before reopening the microphone.
 
@@ -45,6 +46,9 @@ model. OS-native speech ships as the installed default. Pocket TTS is
 Marketplace-installable on Windows x64; it verifies a pinned standalone
 runtime, warms both English model variants, uses the built-in attributed
 `alba` voice, and returns local WAV audio. Its resident worker binds only to
-`127.0.0.1`. Custom voice clips and streamed playback are not integrated.
+`127.0.0.1`. Qwen3-TTS is Marketplace-installable on Windows x64 with an
+isolated CPU runtime, pinned model-file digests, nine preset speakers, and
+local WAV output; it does not support voice cloning or audio-frame streaming.
+Custom voice clips and streamed playback are not integrated.
 Kokoro and other catalog entries have separate install and runtime coverage;
 availability is reported per adapter rather than inferred from a listing.

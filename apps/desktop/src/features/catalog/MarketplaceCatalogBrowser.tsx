@@ -49,6 +49,12 @@ function voicePipelineParts(entry: MarketplaceEntry) {
         ["Speech output", "Pinned English weights and built-in CC BY 4.0 voice"],
         ["Playback", "Local audio from a 127.0.0.1-only worker"],
       ];
+    case "local-voice-qwen3-tts":
+      return [
+        ["Private runtime", "Pinned Python 3.12 + CPU PyTorch environment"],
+        ["Speech output", "Qwen3-TTS 0.6B CustomVoice · 9 preset speakers"],
+        ["Playback", "Offline complete WAV synthesis · no cloning or audio streaming"],
+      ];
     default:
       return null;
   }
@@ -221,6 +227,10 @@ export function MarketplaceCatalogBrowser({
                           {selected.adapter === "local-voice-pocket-tts" && (() => {
                             const installed = localStorage.getItem("skai.voice.pocketTtsInstalled") === "true";
                             return <div className="plugins-detail-actions"><Button variant="primary" type="button" disabled={voiceBusy || installed} onClick={() => onInstallVoice(selected)}>{installed ? "Installed · Pocket TTS ready" : voiceBusy ? "Preparing about 250 MB of local voice files…" : "Install Pocket TTS · ~250 MB"}</Button></div>;
+                          })()}
+                          {selected.adapter === "local-voice-qwen3-tts" && (() => {
+                            const installed = localStorage.getItem("skai.voice.qwen3TtsInstalled") === "true";
+                            return <div className="plugins-detail-actions"><Button variant={installed ? "secondary" : "primary"} type="button" disabled={voiceBusy} onClick={() => onInstallVoice(selected)}>{installed ? voiceBusy ? "Removing Qwen3-TTS…" : "Remove Qwen3-TTS and free local storage" : voiceBusy ? "Preparing about 2.5 GB of model files and local runtime…" : "Install Qwen3-TTS 0.6B · ~2.5 GB"}</Button></div>;
                           })()}
                           {voicePipelineParts(selected) && <div className="plugins-voice-pipeline" aria-label="Local voice pipeline">
                             <strong>Local pipeline</strong>

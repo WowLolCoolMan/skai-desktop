@@ -51,13 +51,13 @@ public static class VoiceModelCatalog
         },
         new("chatterbox", "Chatterbox Nano", "English expressive speech using its built-in voice. The upstream supports reference-voice cloning, but Skai does not expose custom reference audio yet.", "Chatterbox-TTS 0.1.7 · PyTorch 2.6 CPU", "MIT model / MIT runtime", "~1.9 GB weights; 6 GB free disk recommended", false, false, "https://huggingface.co/ResembleAI/chatterbox-nano")
         {
-            AdapterAvailable = true, SupportsVoiceCloning = true, SupportsEmotion = true, SupportsAudioEffects = true,
+            AdapterAvailable = true, SupportsVoiceCloning = true, SupportsEmotion = true,
             AvailabilityNote = "Installed through Skai's isolated CPU runtime with pinned and verified local weights. The warm worker remains resident while Skai runs; custom reference audio is not exposed yet."
         },
-        new("qwen3-tts", "Qwen3-TTS", "Multilingual local speech with voice design, cloning, and streaming generation.", "PyTorch", "Apache-2.0 / model-specific", "0.6B or 1.7B model", false, false, "https://github.com/QwenLM/Qwen3-TTS")
+        new("qwen3-tts", "Qwen3-TTS 0.6B CustomVoice", "Offline multilingual speech with nine preset speakers and expressive style instructions. This Skai adapter synthesizes complete audio clips; it does not expose cloning or audio streaming.", "qwen-tts 0.1.1 · PyTorch 2.6 CPU", "Apache-2.0 model / Apache-2.0 runtime", "~2.5 GB weights + isolated Python runtime; 8 GB free disk recommended", false, false, "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice")
         {
-            SupportsStreaming = true, SupportsVoiceCloning = true, SupportsEmotion = true,
-            AvailabilityNote = "Cataloged for local setup; Qwen3-TTS Python runtime and weights are not installed by Skai yet."
+            AdapterAvailable = true, SupportsEmotion = true,
+            AvailabilityNote = "Skai installs a pinned CPU runtime and verifies the immutable 0.6B CustomVoice model files. Nine preset speakers are supported. Each request returns a complete WAV; reference-voice cloning and audio-frame streaming are not available in this adapter."
         },
         new("omnivoice", "OmniVoice", "Omnilingual zero-shot speech synthesis with broad language coverage.", "PyTorch", "Upstream model terms", "Model-dependent", false, false, "https://github.com/k2-fsa/OmniVoice")
         {

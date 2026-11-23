@@ -255,7 +255,7 @@ async function runRealOllamaMarketplaceAcceptance(model) {
 async function run() {
   const health = await request("runtime.health");
   const capabilities = health.result?.capabilities ?? [];
-  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.models.remove", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.pocket.install.start", "voice.pocket.install.status", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel"]) {
+  for (const capability of ["marketplace.catalog", "marketplace.models.search", "marketplace.models.install.start", "marketplace.models.install.status", "marketplace.models.install.cancel", "marketplace.models.remove", "voice.kokoro.install.start", "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status", "voice.pocket.install.start", "voice.pocket.install.status", "voice.qwen3.install.start", "voice.qwen3.install.status", "voice.qwen3.remove", "voice.whisper.install.start", "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel"]) {
     if (!health.ok || !capabilities.includes(capability)) throw new Error(`runtime.health did not advertise ${capability}.`);
   }
   const catalog = await request("marketplace.catalog");
@@ -273,6 +273,7 @@ async function run() {
       : entry.id === "kokoro-82m" ? "local-voice-kokoro"
       : entry.id === "chatterbox" ? "local-voice-chatterbox"
       : entry.id === "pocket-tts" ? "local-voice-pocket-tts"
+      : entry.id === "qwen3-tts" ? (process.platform === "win32" && process.arch === "x64" ? "local-voice-qwen3-tts" : "none")
       : entry.id === "piper" ? "local-voice-piper"
       : entry.id === "whisper-large-v3" ? "local-voice-whisper"
       : entry.category === "Coding" || entry.category === "Chat / General LLM" ? "local-model-search" : "none";
@@ -281,7 +282,8 @@ async function run() {
     }
   }
   const backedEntries = curated.filter(entry => entry.installable === true);
-  if (backedEntries.length !== 42) throw new Error(`Expected 42 entries with real local adapters; found ${backedEntries.length}.`);
+  const expectedBackedEntries = process.platform === "win32" && process.arch === "x64" ? 43 : 42;
+  if (backedEntries.length !== expectedBackedEntries) throw new Error(`Expected ${expectedBackedEntries} entries with real local adapters; found ${backedEntries.length}.`);
   const figma = curated.find(entry => entry.id === "figma-mcp");
   if (figma?.adapter !== "local-mcp-figma" || !figma.installable
     || !figma.description?.includes("Dev or Full seat")
@@ -300,6 +302,7 @@ async function run() {
     ["piper", "isolated Python", "pinned English voice"],
     ["chatterbox", "isolated Python", "Chatterbox-TTS source"],
     ["pocket-tts", "official v4.0.1 release", "built-in alba voice"],
+    ["qwen3-tts", "CPU-only PyTorch 2.6", "immutable revision"],
     ["whisper-large-v3", "isolated Python", "faster-whisper"],
   ];
   for (const [id, runtimeMarker, componentMarker] of voicePipelines) {
@@ -323,6 +326,10 @@ async function run() {
   const pocketStatus = await request("voice.pocket.install.status");
   if (!pocketStatus.ok || typeof pocketStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed", "unavailable"].includes(pocketStatus.result?.status)) {
     throw new Error(`Pocket TTS local runtime status is incomplete: ${JSON.stringify(pocketStatus)}`);
+  }
+  const qwenStatus = await request("voice.qwen3.install.status");
+  if (!qwenStatus.ok || typeof qwenStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed", "unavailable"].includes(qwenStatus.result?.status)) {
+    throw new Error(`Qwen3-TTS local runtime status is incomplete: ${JSON.stringify(qwenStatus)}`);
   }
   const whisperStatus = await request("voice.whisper.install.status");
   if (!whisperStatus.ok || typeof whisperStatus.result?.installed !== "boolean" || !["not-installed", "installing", "installed", "failed"].includes(whisperStatus.result?.status)) {

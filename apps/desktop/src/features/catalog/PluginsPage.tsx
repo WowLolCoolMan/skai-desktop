@@ -101,14 +101,25 @@ export function PluginsPage({
     const isWhisper = entry.adapter === "local-voice-whisper";
     const isChatterbox = entry.adapter === "local-voice-chatterbox";
     const isPocketTts = entry.adapter === "local-voice-pocket-tts";
-    const method = isWhisper ? "whisper" : isChatterbox ? "chatterbox" : isPocketTts ? "pocket" : isPiper ? "piper" : "kokoro";
-    const modelName = isWhisper ? "Whisper large-v3" : isChatterbox ? "Chatterbox Nano" : isPocketTts ? "Pocket TTS" : isPiper ? "Piper" : "Kokoro";
+    const isQwen3 = entry.adapter === "local-voice-qwen3-tts";
+    const method = isWhisper ? "whisper" : isChatterbox ? "chatterbox" : isPocketTts ? "pocket" : isQwen3 ? "qwen3" : isPiper ? "piper" : "kokoro";
+    const modelName = isWhisper ? "Whisper large-v3" : isChatterbox ? "Chatterbox Nano" : isPocketTts ? "Pocket TTS" : isQwen3 ? "Qwen3-TTS 0.6B CustomVoice" : isPiper ? "Piper" : "Kokoro";
+    const removingQwen3 = isQwen3 && localStorage.getItem("skai.voice.qwen3TtsInstalled") === "true";
     setVoiceBusy(true);
-    setNotice(`Preparing an isolated local ${modelName} runtime…`);
+    setNotice(removingQwen3 ? `Removing ${modelName} and its local runtime…` : `Preparing an isolated local ${modelName} runtime…`);
     try {
+      if (removingQwen3) {
+        const removed = await request("voice.qwen3.remove");
+        const state = removed.result as { removed?: boolean; error?: string } | undefined;
+        if (!removed.ok || !state?.removed) throw new Error(state?.error ?? removed.error?.message ?? `${modelName} could not be removed.`);
+        localStorage.removeItem("skai.voice.qwen3TtsInstalled");
+        await refreshInstalledVoiceModels();
+        setNotice(`${modelName} and its local runtime were removed from this device.`);
+        return;
+      }
       const started = await request(`voice.${method}.install.start`);
       if (!started.ok) throw new Error(started.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation could not start.`);
-      const deadline = Date.now() + (isPocketTts ? 35 : isChatterbox ? 45 : isWhisper ? 60 : 10) * 60_000;
+      const deadline = Date.now() + (isQwen3 ? 90 : isPocketTts ? 35 : isChatterbox ? 45 : isWhisper ? 60 : 10) * 60_000;
       while (Date.now() < deadline) {
         const status = await request(`voice.${method}.install.status`);
         if (!status.ok) throw new Error(status.error?.message ?? `${isPiper ? "Piper" : "Kokoro"} installation status could not be read.`);
@@ -117,6 +128,7 @@ export function PluginsPage({
           if (isWhisper) localStorage.setItem("skai.voice.whisperInstalled", "true");
           else {
             if (isPocketTts) localStorage.setItem("skai.voice.pocketTtsInstalled", "true");
+            if (isQwen3) localStorage.setItem("skai.voice.qwen3TtsInstalled", "true");
             await refreshInstalledVoiceModels();
           }
           setNotice(`${modelName} is installed, checksum-verified, and ready for ${isWhisper ? "offline transcription" : "local speech"}.`);

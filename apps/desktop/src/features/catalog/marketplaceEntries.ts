@@ -104,7 +104,7 @@ export function createMarketplaceEntries(
   const curatedEntries: MarketplaceEntry[] = curated.filter((item) => item.localOnly && item.installable && item.adapter !== "none").map((item) => {
     const restrictedLicense = /non[- ]commercial|\bresearch\b|\bNC\b|BY-NC|CC-BY|Llama License|GPL-3\.0|\bcustom\b|OpenRAIL|CPML|modified MIT/i.test(item.license);
     const localNpmPackage = ["local-mcp-filesystem", "local-mcp-playwright", "local-mcp-postgres"].includes(item.adapter);
-    const voiceStorageKey = item.adapter === "local-voice-kokoro" ? "skai.voice.kokoroInstalled" : item.adapter === "local-voice-piper" ? "skai.voice.piperInstalled" : item.adapter === "local-voice-chatterbox" ? "skai.voice.chatterboxInstalled" : item.adapter === "local-voice-pocket-tts" ? "skai.voice.pocketTtsInstalled" : "skai.voice.whisperInstalled";
+    const voiceStorageKey = item.adapter === "local-voice-kokoro" ? "skai.voice.kokoroInstalled" : item.adapter === "local-voice-piper" ? "skai.voice.piperInstalled" : item.adapter === "local-voice-chatterbox" ? "skai.voice.chatterboxInstalled" : item.adapter === "local-voice-pocket-tts" ? "skai.voice.pocketTtsInstalled" : item.adapter === "local-voice-qwen3-tts" ? "skai.voice.qwen3TtsInstalled" : "skai.voice.whisperInstalled";
     const localVoiceInstalled = item.adapter?.startsWith("local-voice-") && localStorage.getItem(voiceStorageKey) === "true";
     const statusLabel = item.adapter === "local-model-search" ? "Local model search" : item.adapter?.startsWith("local-voice-") ? "Local voice" : "Local MCP";
     return {

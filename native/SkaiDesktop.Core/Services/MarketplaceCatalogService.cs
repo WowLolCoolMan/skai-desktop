@@ -25,7 +25,7 @@ public static class MarketplaceCatalogService
         Add("Voice (TTS/STT)", "Resemble AI", "MIT", "Chatterbox-TTS 0.1.7 · PyTorch 2.6 CPU · pinned Hugging Face checkpoint", "text-to-speech|offline|english|emotion-tags|cpu", ("chatterbox", "Chatterbox Nano", "Local English speech with its built-in speaker and expressive cues. Skai's current voice controls do not yet accept custom reference audio.", "https://huggingface.co/ResembleAI/chatterbox-nano"));
         Add("Voice (TTS/STT)", "Kyutai", "MIT runtime and model / CC BY 4.0 built-in voice", "Pocket TTS 3.3.0 · verified Windows x64 runtime · pinned CPU model", "text-to-speech|offline|english|cpu|attribution", ("pocket-tts", "Pocket TTS", "CPU-first offline English speech through a verified loopback-only local adapter. Skai uses Kyutai's built-in attributed voice; custom voice clips are not exposed in this adapter.", "https://github.com/kyutai-labs/pocket-tts"));
         Add("Voice (TTS/STT)", "hexgrad", "Apache-2.0 model / MIT runtime", "Pinned kokoro-onnx 0.6.1 · isolated Python · local ONNX", "text-to-speech|offline|english", ("kokoro-82m", "Kokoro-82M", "English offline neural speech synthesis with a Skai installer and local playback adapter.", "https://huggingface.co/hexgrad/Kokoro-82M"));
-        Add("Voice (TTS/STT)", "Alibaba", "Apache-2.0", "Local Python/PyTorch; installer not connected", "text-to-speech|voice-design|voice-cloning|streaming", ("qwen3-tts", "Qwen3-TTS", "Multilingual local speech with voice design and cloning.", "https://github.com/QwenLM/Qwen3-TTS"));
+        Add("Voice (TTS/STT)", "Alibaba", "Apache-2.0", "Pinned qwen-tts 0.1.1 · isolated Python · PyTorch 2.6 CPU · immutable model files", "text-to-speech|offline|multilingual|preset-speakers|style-control|cpu", ("qwen3-tts", "Qwen3-TTS 0.6B CustomVoice", "Offline multilingual speech with nine preset speakers and expressive style instructions. Skai returns complete WAV clips; this adapter does not expose voice cloning or audio-frame streaming.", "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"));
         Add("Voice (TTS/STT)", "Fish Audio", "Research NC", "Local runtime; verify model terms", "text-to-speech|voice-cloning|emotion", ("fish-audio-s2-pro", "Fish Audio S2 Pro", "Expressive speech generation; research non-commercial terms apply.", "https://github.com/fishaudio/fish-speech"));
         Add("Voice (TTS/STT)", "BreezeBlue", "Research NC", "Local runtime; verify model terms", "text-to-speech", ("breeze-tts-2", "Breeze TTS 2", "Local speech synthesis; research non-commercial terms apply.", "https://huggingface.co/BreezeBlue"));
         Add("Voice (TTS/STT)", "StepFun", "Apache-2.0", "Local runtime; setup not connected", "speech-editing|audio", ("step-audio-editx", "Step Audio EditX", "Local speech and audio editing model.", "https://huggingface.co/stepfun-ai"));
@@ -108,16 +108,16 @@ public static class MarketplaceCatalogService
             runtime = voice.Runtime,
             license = voice.License,
             size = voice.Size,
-            installed = voice.Id == "kokoro-82m-onnx" ? VoiceRuntimeStatus.IsKokoroInstalled : voice.Id == "piper" ? VoiceRuntimeStatus.IsPiperInstalled : voice.Id == "chatterbox" ? VoiceRuntimeStatus.IsChatterboxInstalled : voice.Id is "pocket-tts" or "pocket-tts-low-resource" ? VoiceRuntimeStatus.IsPocketTtsInstalled : voice.IsInstalled,
+            installed = voice.Id == "kokoro-82m-onnx" ? VoiceRuntimeStatus.IsKokoroInstalled : voice.Id == "piper" ? VoiceRuntimeStatus.IsPiperInstalled : voice.Id == "chatterbox" ? VoiceRuntimeStatus.IsChatterboxInstalled : voice.Id is "pocket-tts" or "pocket-tts-low-resource" ? VoiceRuntimeStatus.IsPocketTtsInstalled : voice.Id == "qwen3-tts" ? VoiceRuntimeStatus.IsQwen3TtsInstalled : voice.IsInstalled,
             lowResource = voice.IsLowResource,
             sourceUrl = voice.SourceUrl,
-            adapterAvailable = (voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper" or "chatterbox" or "pocket-tts" or "pocket-tts-low-resource") && (voice.Id is not ("pocket-tts" or "pocket-tts-low-resource") || VoiceRuntimeStatus.IsPocketTtsSupported),
+            adapterAvailable = (voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper" or "chatterbox" or "pocket-tts" or "pocket-tts-low-resource" or "qwen3-tts") && (voice.Id is not ("pocket-tts" or "pocket-tts-low-resource") || VoiceRuntimeStatus.IsPocketTtsSupported) && (voice.Id != "qwen3-tts" || VoiceRuntimeStatus.IsQwen3TtsSupported),
             supportsStreaming = voice.SupportsStreaming,
             supportsVoiceCloning = voice.SupportsVoiceCloning,
             supportsEmotion = voice.SupportsEmotion,
             supportsAudioEffects = voice.SupportsAudioEffects,
             availabilityNote = voice.AvailabilityNote,
-            installable = (voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper" or "chatterbox" or "pocket-tts" or "pocket-tts-low-resource") && (voice.Id is not ("pocket-tts" or "pocket-tts-low-resource") || VoiceRuntimeStatus.IsPocketTtsSupported) && !string.IsNullOrWhiteSpace(voice.SourceUrl) && !(voice.Id == "kokoro-82m-onnx" && VoiceRuntimeStatus.IsKokoroInstalled) && !(voice.Id == "piper" && VoiceRuntimeStatus.IsPiperInstalled) && !(voice.Id == "chatterbox" && VoiceRuntimeStatus.IsChatterboxInstalled) && !((voice.Id is "pocket-tts" or "pocket-tts-low-resource") && VoiceRuntimeStatus.IsPocketTtsInstalled),
+            installable = (voice.AdapterAvailable || voice.Id is "kokoro-82m-onnx" or "piper" or "chatterbox" or "pocket-tts" or "pocket-tts-low-resource" or "qwen3-tts") && (voice.Id is not ("pocket-tts" or "pocket-tts-low-resource") || VoiceRuntimeStatus.IsPocketTtsSupported) && (voice.Id != "qwen3-tts" || VoiceRuntimeStatus.IsQwen3TtsSupported) && !string.IsNullOrWhiteSpace(voice.SourceUrl) && !(voice.Id == "kokoro-82m-onnx" && VoiceRuntimeStatus.IsKokoroInstalled) && !(voice.Id == "piper" && VoiceRuntimeStatus.IsPiperInstalled) && !(voice.Id == "chatterbox" && VoiceRuntimeStatus.IsChatterboxInstalled) && !((voice.Id is "pocket-tts" or "pocket-tts-low-resource") && VoiceRuntimeStatus.IsPocketTtsInstalled) && !(voice.Id == "qwen3-tts" && VoiceRuntimeStatus.IsQwen3TtsInstalled),
         }).ToArray(),
         skills = SkillCatalogService.BuiltIns.Select(skill => new
         {
@@ -160,7 +160,7 @@ public static class MarketplaceCatalogService
             license = entry.License, description = entry.Description, runtime = entry.Runtime,
             capabilities = entry.Capabilities, source = entry.Source, localOnly = true,
             adapter = ResolveAdapter(entry),
-            installable = ResolveAdapter(entry) != "none" && (ResolveAdapter(entry) != "local-voice-pocket-tts" || VoiceRuntimeStatus.IsPocketTtsSupported),
+            installable = ResolveAdapter(entry) != "none" && (ResolveAdapter(entry) != "local-voice-pocket-tts" || VoiceRuntimeStatus.IsPocketTtsSupported) && (ResolveAdapter(entry) != "local-voice-qwen3-tts" || VoiceRuntimeStatus.IsQwen3TtsSupported),
             installReview = ResolveAdapter(entry) == "local-model-search"
                 ? "Search supported local GGUF packages, confirm the exact repository and active runtime, then install after reviewing the license and hardware fit. This does not imply the named upstream weights are directly downloadable."
                 : ResolveAdapter(entry) == "local-voice-kokoro"
@@ -171,6 +171,8 @@ public static class MarketplaceCatalogService
                     ? "Skai installs CPU-only PyTorch and the Chatterbox-TTS source at a pinned commit in an isolated Python environment, then downloads about 1.9 GB of required Nano checkpoint files from a fixed Hugging Face revision. File hashes are verified before local synthesis. Allow at least 6 GB free for setup. The 110M-parameter English model is MIT licensed; initial model loading is memory and disk intensive."
                 : ResolveAdapter(entry) == "local-voice-pocket-tts"
                     ? "Windows x64 only. Skai downloads Kyutai's Pocket TTS 3.3.0 runtime from the official v4.0.1 release and verifies the published archive digest plus the extracted executable hash. It warms full and low-resource English models from immutable upstream revisions, using Kyutai's built-in alba voice. Runtime service binds only to 127.0.0.1; synthesis stays on this device. Runtime and models are MIT; the built-in voice is CC BY 4.0 and attribution is stored with the install. Custom reference clips are not exposed in Skai yet."
+                : ResolveAdapter(entry) == "local-voice-qwen3-tts"
+                    ? "Skai installs qwen-tts 0.1.1 with CPU-only PyTorch 2.6 into an isolated Python 3.12 environment, then downloads the 0.6B CustomVoice model at immutable revision f3d1af06e4eaefac12b1ffa6726f9eef674a6f02. Every model file is checked against pinned SHA-256 or Git blob digests before use. The model and runtime are Apache-2.0. Expect about 2.5 GB of model data plus runtime dependencies and at least 8 GB free disk for setup. The adapter offers nine preset speakers and style instructions; it returns complete WAV clips and does not expose voice cloning or true audio streaming."
                 : ResolveAdapter(entry) == "local-voice-whisper"
                     ? "Skai installs faster-whisper 1.2.1 into an isolated Python environment and downloads the 3.09 GB Systran large-v3 conversion at a pinned Hugging Face revision. SHA-256 hashes are verified for every model file. Transcription uses CPU int8, runs offline, and sends no audio to a service. Keep at least 4 GB free for download and additional RAM for inference."
                 : ResolveAdapter(entry) == "local-mcp-playwright"
@@ -195,6 +197,7 @@ public static class MarketplaceCatalogService
             "piper" => "local-voice-piper",
             "chatterbox" => "local-voice-chatterbox",
             "pocket-tts" => "local-voice-pocket-tts",
+            "qwen3-tts" => "local-voice-qwen3-tts",
             "whisper-large-v3" => "local-voice-whisper",
             "filesystem-mcp" => "local-mcp-filesystem",
             "playwright-mcp" => "local-mcp-playwright",

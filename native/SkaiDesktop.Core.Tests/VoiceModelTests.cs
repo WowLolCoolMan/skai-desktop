@@ -19,6 +19,7 @@ internal static class VoiceModelTests
             Environment.SetEnvironmentVariable("SKAI_VOICE_ROOT", Path.Combine(Path.GetTempPath(), "skai-voice-root"));
             Check(VoiceRuntimeStatus.GetVoiceRuntimeRoot("Piper") == Path.Combine(Path.GetTempPath(), "skai-voice-root", "Piper"), "voice runtimes honor the isolated acceptance root");
             Check(VoiceRuntimeStatus.GetVoiceRuntimeRoot("WhisperLargeV3").EndsWith(Path.Combine("skai-voice-root", "WhisperLargeV3"), StringComparison.OrdinalIgnoreCase), "voice root supports the registered Whisper runtime");
+            Check(VoiceRuntimeStatus.GetVoiceRuntimeRoot("Qwen3TTS").EndsWith(Path.Combine("skai-voice-root", "Qwen3TTS"), StringComparison.OrdinalIgnoreCase), "voice root supports the Qwen3-TTS runtime");
             var rejectedUnknownRuntime = false;
             try { VoiceRuntimeStatus.GetVoiceRuntimeRoot("Unregistered"); }
             catch (ArgumentOutOfRangeException) { rejectedUnknownRuntime = true; }
@@ -29,7 +30,10 @@ internal static class VoiceModelTests
         Check(chatterbox.Name == "Chatterbox Nano" && !chatterbox.IsLowResource && chatterbox.License.StartsWith("MIT"), "voice catalog identifies the official MIT CPU-oriented Chatterbox Nano variant without overstating its memory fit");
         Check(chatterbox.SupportsVoiceCloning && chatterbox.SupportsEmotion && chatterbox.SourceUrl == "https://huggingface.co/ResembleAI/chatterbox-nano", "voice catalog exposes Chatterbox Nano features and official model card");
         Check(chatterbox.AdapterAvailable && chatterbox.AvailabilityNote.Contains("pinned"), "voice catalog exposes the verified Chatterbox adapter and pinned local runtime");
-        Check(VoiceModelCatalog.All.Any(model => model.Id == "qwen3-tts" && model.SupportsStreaming), "voice catalog exposes Qwen3-TTS streaming");
+        var qwen = VoiceModelCatalog.All.Single(model => model.Id == "qwen3-tts");
+        Check(qwen.AdapterAvailable && qwen.SupportsEmotion, "voice catalog exposes the connected Qwen3-TTS adapter and style controls");
+        Check(!qwen.SupportsStreaming && !qwen.SupportsVoiceCloning && !qwen.SupportsAudioEffects, "Qwen3-TTS does not claim unsupported streaming, cloning, or audio effects");
+        Check(qwen.License.StartsWith("Apache-2.0", StringComparison.Ordinal) && qwen.Size.Contains("2.5 GB", StringComparison.Ordinal), "Qwen3-TTS shows its model license and approximate download size");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "omnivoice"), "voice catalog exposes OmniVoice");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "higgs-audio-v2" && model.SupportsAudioEffects), "voice catalog exposes Higgs Audio v2 expressive effects");
         Check(VoiceModelCatalog.CloudProviders.Any(provider => provider.Id == "elevenlabs") && VoiceModelCatalog.CloudProviders.Any(provider => provider.Id == "inworld") && VoiceModelCatalog.CloudProviders.Any(provider => provider.Id == "cartesia"), "voice catalog exposes supported hosted providers");

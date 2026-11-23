@@ -24,7 +24,7 @@ export type SpeechCue = "laugh" | "cough" | "clear-throat" | "breath" | "sigh";
 const speechCuePattern = /\[(laugh|cough|clear[- ]?throat|breath|sigh)(?::[^\]]+)?\]/gi;
 
 export function removeUnsupportedSpeechCues(text: string, capabilities: VoiceCapabilities = {}) {
-  if (capabilities.supportsAudioEffects || capabilities.supportsEmotion) return text;
+  if (capabilities.supportsAudioEffects) return text;
   return text.replace(speechCuePattern, "").replace(/[ \t]{2,}/g, " ").trim();
 }
 
@@ -35,14 +35,14 @@ export const voiceProfiles: VoiceProfile[] = [
   { id: "skai-calm", name: "Skai Calm", description: "Slower pacing for focused listening.", rate: 0.88, pitch: 0.98 },
 ];
 
-export type InstalledVoiceModel = { id: string; name: string; detail: string; size: string; installed: boolean; lowResource: boolean };
+export type InstalledVoiceModel = { id: string; name: string; detail: string; size: string; installed: boolean; lowResource: boolean; supportsAudioEffects?: boolean; supportsEmotion?: boolean };
 
 export const voiceModels: InstalledVoiceModel[] = [
   { id: "os-native", name: "OS-native speech", detail: "Windows and Linux system voices", size: "No model", installed: true, lowResource: true },
   { id: "kokoro-82m-onnx", name: "Kokoro 82M ONNX", detail: "English offline local speech", size: "~136 MB INT8 model + voices", installed: false, lowResource: false },
   { id: "piper", name: "Piper English", detail: "Compact offline English speech", size: "~64 MB voice model", installed: false, lowResource: true },
   { id: "chatterbox", name: "Chatterbox Nano", detail: "English local speech; CPU-only runtime with resident model worker", size: "~1.9 GB weights + CPU runtime", installed: false, lowResource: false },
-  { id: "qwen3-tts", name: "Qwen3-TTS", detail: "Multilingual local voice design, cloning, and streaming", size: "0.6B or 1.7B model", installed: false, lowResource: false },
+  { id: "qwen3-tts", name: "Qwen3-TTS 0.6B CustomVoice", detail: "Offline multilingual speech · 9 preset speakers · style control", size: "~2.5 GB model + runtime", installed: false, lowResource: false },
   { id: "omnivoice", name: "OmniVoice", detail: "Omnilingual zero-shot local speech", size: "Model-dependent", installed: false, lowResource: false },
   { id: "higgs-audio-v2", name: "Higgs Audio v2", detail: "Expressive local multi-speaker audio generation", size: "3B model", installed: false, lowResource: false },
   { id: "pocket-tts", name: "Pocket TTS", detail: "CPU-first offline English runtime", size: "~209 MB model + shared runtime", installed: false, lowResource: false },
@@ -102,6 +102,7 @@ const voiceSourceKey = "skai.voice.source";
 const cloudProviderKey = "skai.voice.cloudProvider";
 const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
 const cloudModelIdKey = "skai.voice.cloudModelId";
+const qwenSpeakerKey = "skai.voice.qwenSpeaker";
 let activeCloudAudio: HTMLAudioElement | null = null;
 let speechGeneration = 0;
 function setVoicePlaybackActive(active: boolean) {
@@ -122,11 +123,12 @@ export function selectedVoiceSettings() {
     cloudProvider: selectedProvider.id,
     cloudModelId: localStorage.getItem(cloudModelIdKey) ?? selectedProvider.model,
     cloudVoiceId: localStorage.getItem(cloudVoiceIdKey) ?? selectedProvider.defaultVoiceId,
+    qwenSpeaker: localStorage.getItem(qwenSpeakerKey) ?? "Ryan",
   };
 }
 
-export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId", value: string | boolean) {
-  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey }[key];
+export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker", value: string | boolean) {
+  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey, qwenSpeaker: qwenSpeakerKey }[key];
   const safeValue = key === "primaryModelId" ? resolveInstalledVoiceModel(String(value)) : key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value), true) : value;
   localStorage.setItem(storageKey, String(safeValue));
 }
@@ -163,20 +165,21 @@ export async function waitForLocalSpeechToFinish(maxWaitMs = 120_000) {
 
 export async function speakNativeResponse(text: string, force = false, profileId?: string) {
   if (!text.trim()) return false;
-  const safeText = removeUnsupportedSpeechCues(text);
-  if (!safeText) return false;
   const settings = selectedVoiceSettings();
   if (!force && !settings.voiceOutputEnabled) return false;
   const profile = voiceProfiles.find((item) => item.id === (profileId || settings.profileId)) ?? voiceProfiles[0];
   const generation = speechGeneration;
   const runtimeId = settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId;
+  const runtime = installedVoiceModels.find((voice) => voice.id === runtimeId);
+  const safeText = removeUnsupportedSpeechCues(text, runtime);
+  if (!safeText) return false;
   // Skai profiles control pacing on every engine. Pitch is applied only by the
   // browser's native fallback; local model runtimes do not expose pitch control.
   const fallbackPitch = settings.source === "local" && runtimeId === "os-native" ? profile.pitch : 1;
   try {
     const speech = settings.source === "cloud"
       ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId })
-      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, modelId: runtimeId });
+      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, modelId: runtimeId, speaker: runtimeId === "qwen3-tts" ? settings.qwenSpeaker : undefined });
     if (speech?.ok) {
       if (generation !== speechGeneration) return false;
       const audioDataUrl = (speech.result as { audioDataUrl?: unknown } | undefined)?.audioDataUrl;
@@ -195,7 +198,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
         audio.addEventListener("ended", playbackEnded, { once: true });
         audio.addEventListener("pause", playbackEnded, { once: true });
         audio.addEventListener("error", playbackEnded, { once: true });
-        if (["chatterbox-nano-local", "pocket-tts-local"].includes((speech.result as { engine?: unknown }).engine as string)) {
+        if (["chatterbox-nano-local", "pocket-tts-local", "qwen3-tts-local"].includes((speech.result as { engine?: unknown }).engine as string)) {
           audio.preservesPitch = true;
           audio.playbackRate = profile.rate;
         }

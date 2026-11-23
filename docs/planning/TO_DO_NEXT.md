@@ -120,7 +120,7 @@ Mark an item done only when the linked workflow has evidence.
    advertised entry a verified local install/setup, launch/use, and removal
    path; expose license/runtime requirements and never leave an entry looking
    usable when its adapter is missing. `npm run smoke:marketplace-host` passes:
-   all 90 listings are accounted for, the 42 backed entries map to real local
+   all 90 listings are accounted for, the platform-specific 42/43 backed entries map to real local
    adapters, and the other 48 expose no install action. The curated
    `qwen3-coder:30b-a3b-q4_K_M` Ollama route now has update and removal actions
    in Installed; its install/remove contract smoke passes against a disposable
@@ -191,34 +191,19 @@ Mark an item done only when the linked workflow has evidence.
     Its browser acceptance passes duplicate-name clip storage, local preview,
     IndexedDB reload, and individual removal. These synthetic fixtures do not
     exercise voice cloning or train a voice model.
-    42 of 90 curated entries now have real adapters, and the catalog smoke
-    asserts that boundary. Chatterbox Nano has a pinned isolated CPU installer,
-    verified model downloads, a resident worker, and Marketplace/voice
-    selection wiring. The end-to-end smoke passed install, hash checks, and
-    non-silent local WAV synthesis on this Ryzen 7 5800X3D: the warm path made
-    3.04 seconds of audio in 3.36 seconds; cold startup plus synthesis took
-    23.64 seconds for 2.56 seconds of audio. This shows near-real-time warm
-    throughput on one phrase, with slow first-use model loading; spoken quality
-    and other hardware remain unreviewed. Earlier host smoke measured Piper at
-    3.53 seconds of audio in 0.83 seconds and Kokoro at 3.26 seconds in 8.91
-    seconds on the 32 GiB Windows/RX 7900 XTX machine; those one-phrase timings
-    are not a subjective speech-quality rating. Qwen3-TTS 0.6B CustomVoice now
-    has an isolated CPU feasibility result on Windows: a clean Python 3.12
-    environment installed `qwen-tts==0.1.1` with CPU-only PyTorch, loaded the
-    English Ryan voice, and generated a valid 24 kHz WAV. Cold model load took
-    56.8 seconds; load plus a short utterance took 75.5 seconds. The runtime
-    emitted a missing SoX warning but synthesis still succeeded. This does not
-    establish a real-time experience, voice cloning, interruption, streaming
-    playback, or Skai integration; the test used the upstream Python API
-    directly and the isolated dependency environment is substantially larger
-    than Skai's existing voice adapters. Keep Qwen3-TTS out of the
-    installable/ready catalog until a pinned, isolated installer and resident
-    Skai adapter pass local install, synthesis, cancellation, cleanup, and
-    resource acceptance. The upstream recommends an isolated Python 3.12
-    environment and documents multiple model variants ([upstream setup](https://github.com/QwenLM/Qwen3-TTS#quickstart),
-    [0.6B Base model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base));
-    verify each variant's license and capabilities separately before listing
-    cloning or other features.
+    43 of 90 curated entries now have real adapters on Windows x64 (42 on
+    other platforms); the catalog smoke checks the platform-specific install
+    boundary. Qwen3-TTS 0.6B CustomVoice is now a verified Windows x64 local
+    adapter: a clean Marketplace install created an isolated Python 3.12 / CPU
+    PyTorch 2.6 runtime, verified the pinned model revision and all 11 model
+    files, loaded successfully, and produced valid WAV for Ryan and Aiden. The
+    Agent Host acceptance stopped a long generation, verified the next request
+    succeeded, removed the runtime, and confirmed the model was no longer
+    installed. The model offers nine preset speakers and style instructions;
+    it does not provide reference cloning, streaming audio frames, or cough and
+    laugh effects. This acceptance does not establish voice quality or
+    real-time performance. Keep checking remaining marketplace MCP and voice
+    adapters against their licenses, runtime requirements, and real workflows.
     Keep credentialed hosted services clearly separated from local catalog
     entries.
 12. **User-controlled provider gateway.** Add explicit local/cloud/hybrid chat

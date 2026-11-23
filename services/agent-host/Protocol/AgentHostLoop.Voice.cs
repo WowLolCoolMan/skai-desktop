@@ -24,15 +24,17 @@ public static partial class AgentHostLoop
                 name = model.Name,
                 detail = model.Description,
                 size = model.Size,
-                installed = model.Id == "os-native" ? VoiceRuntimeStatus.IsOsNativeAvailable : model.Id == "kokoro-82m-onnx" ? KokoroVoiceRuntime.IsInstalled : model.Id == "piper" ? PiperVoiceRuntime.IsInstalled : model.Id == "chatterbox" ? ChatterboxVoiceRuntime.IsInstalled : model.Id is "pocket-tts" or "pocket-tts-low-resource" ? PocketTtsRuntime.IsInstalled : model.IsInstalled,
+                installed = model.Id == "os-native" ? VoiceRuntimeStatus.IsOsNativeAvailable : model.Id == "kokoro-82m-onnx" ? KokoroVoiceRuntime.IsInstalled : model.Id == "piper" ? PiperVoiceRuntime.IsInstalled : model.Id == "chatterbox" ? ChatterboxVoiceRuntime.IsInstalled : model.Id is "pocket-tts" or "pocket-tts-low-resource" ? PocketTtsRuntime.IsInstalled : model.Id == "qwen3-tts" ? Qwen3TtsVoiceRuntime.IsInstalled : model.IsInstalled,
                 lowResource = model.IsLowResource,
-                adapterAvailable = (model.AdapterAvailable || model.Id is "kokoro-82m-onnx" or "piper" or "chatterbox" or "pocket-tts" or "pocket-tts-low-resource") && (model.Id is not ("pocket-tts" or "pocket-tts-low-resource") || PocketTtsRuntime.IsSupported),
+                adapterAvailable = (model.AdapterAvailable || model.Id is "kokoro-82m-onnx" or "piper" or "chatterbox" or "pocket-tts" or "pocket-tts-low-resource" or "qwen3-tts") && (model.Id is not ("pocket-tts" or "pocket-tts-low-resource") || PocketTtsRuntime.IsSupported) && (model.Id != "qwen3-tts" || Qwen3TtsVoiceRuntime.IsSupported),
                 supportsStreaming = model.SupportsStreaming,
                 supportsVoiceCloning = model.SupportsVoiceCloning,
                 supportsEmotion = model.SupportsEmotion,
                 supportsAudioEffects = model.SupportsAudioEffects,
                 availabilityNote = (model.Id is "pocket-tts" or "pocket-tts-low-resource") && !PocketTtsRuntime.IsSupported
                     ? "Skai's verified Pocket TTS adapter currently supports Windows x64 only."
+                    : model.Id == "qwen3-tts" && !Qwen3TtsVoiceRuntime.IsSupported
+                        ? "Skai's verified Qwen3-TTS adapter currently supports Windows x64 only."
                     : model.AvailabilityNote,
             }).ToArray(),
         });
@@ -101,6 +103,13 @@ public static partial class AgentHostLoop
             var audio = PocketTtsRuntime.SynthesizeDataUrlAsync(text, selectedModelId).GetAwaiter().GetResult();
             return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "pocket-tts-local", interruptible = true, audioDataUrl = audio });
         }
+        if (selectedModelId?.Equals("qwen3-tts", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var speaker = OptionalString(request, "speaker");
+            var profileId = OptionalString(request, "profileId");
+            var audio = Qwen3TtsVoiceRuntime.SynthesizeDataUrlAsync(text, rate, speaker, profileId).GetAwaiter().GetResult();
+            return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "qwen3-tts-local", interruptible = true, audioDataUrl = audio });
+        }
         var engine = voice.Speak(text, rate);
         return new(ProtocolVersion, request.Id, true, new { spoken = true, engine, interruptible = true });
     }
@@ -132,6 +141,7 @@ public static partial class AgentHostLoop
         voice.Stop();
         PiperVoiceRuntime.StopGeneration();
         PocketTtsRuntime.StopGeneration();
+        Qwen3TtsVoiceRuntime.StopGeneration();
         return new(ProtocolVersion, request.Id, true, new { stopped = true });
     }
 

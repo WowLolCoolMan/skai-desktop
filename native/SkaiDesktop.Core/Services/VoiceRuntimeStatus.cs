@@ -13,6 +13,7 @@ public static class VoiceRuntimeStatus
     private static bool pocketTtsIntegrityValid;
 
     public static bool IsPocketTtsSupported => OperatingSystem.IsWindows() && RuntimeInformation.ProcessArchitecture == Architecture.X64;
+    public static bool IsQwen3TtsSupported => OperatingSystem.IsWindows() && RuntimeInformation.ProcessArchitecture == Architecture.X64;
 
     /// <summary>Reports whether the OS speech adapter can start on this host.</summary>
     public static bool IsOsNativeAvailable
@@ -93,6 +94,19 @@ public static class VoiceRuntimeStatus
         }
     }
 
+    public static bool IsQwen3TtsInstalled
+    {
+        get
+        {
+            var root = GetVoiceRuntimeRoot("Qwen3TTS");
+            var python = Path.Combine(root, "venv", OperatingSystem.IsWindows() ? "Scripts/python.exe" : "bin/python");
+            return File.Exists(Path.Combine(root, "installed.json"))
+                && File.Exists(python)
+                && File.Exists(Path.Combine(root, "model", "model.safetensors"))
+                && File.Exists(Path.Combine(root, "model", "speech_tokenizer", "model.safetensors"));
+        }
+    }
+
     /// <summary>Returns the per-user Pocket TTS directory, with a process-local override for isolated acceptance runs.</summary>
     public static string GetPocketTtsRoot()
     {
@@ -103,7 +117,7 @@ public static class VoiceRuntimeStatus
     /// <summary>Returns an engine's per-user runtime directory or its child under an isolated test root.</summary>
     public static string GetVoiceRuntimeRoot(string engineDirectory)
     {
-        if (engineDirectory is not ("Kokoro" or "Piper" or "ChatterboxNano" or "PocketTTS" or "WhisperLargeV3"))
+        if (engineDirectory is not ("Kokoro" or "Piper" or "ChatterboxNano" or "PocketTTS" or "Qwen3TTS" or "WhisperLargeV3"))
             throw new ArgumentOutOfRangeException(nameof(engineDirectory), "Unknown local voice runtime directory.");
         var isolatedRoot = Environment.GetEnvironmentVariable("SKAI_VOICE_ROOT");
         return !string.IsNullOrWhiteSpace(isolatedRoot)
