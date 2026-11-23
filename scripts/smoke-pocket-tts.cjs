@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-/* Full local acceptance for the pinned Pocket TTS Marketplace adapter.
- * Installs the verified runtime into the current user's Skai voice directory,
- * lets the adapter warm both local models, then synthesizes and validates WAV. */
+/* Full isolated clean-install acceptance for the pinned Pocket TTS adapter.
+ * Installs into a disposable profile, warms both models, checks cancellation,
+ * synthesizes and validates WAV, then removes only that isolated profile. */
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, execFileSync } = require("node:child_process");
 const readline = require("node:readline");
 const { ensureSmokeAgentHostBuild } = require("./smoke-agent-host-build.cjs");
 
@@ -18,6 +18,7 @@ const root = path.resolve(__dirname, "..");
 const smokeTempRoot = path.join(root, ".tmp");
 fs.mkdirSync(smokeTempRoot, { recursive: true });
 const profileRoot = fs.mkdtempSync(path.join(smokeTempRoot, "pocket-tts-smoke-"));
+const voiceRoot = path.join(profileRoot, "voice", "PocketTTS");
 const env = {
   ...process.env,
   SRAI_SETTINGS_PATH: path.join(profileRoot, "settings.json"),
@@ -27,6 +28,7 @@ const env = {
   SRAI_SCHEDULED_TASKS_PATH: path.join(profileRoot, "scheduled-tasks.json"),
   SRAI_PROJECTS_PATH: path.join(profileRoot, "projects.json"),
   SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
+  SKAI_POCKET_TTS_ROOT: voiceRoot,
   SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
 };
 const hostAssembly = ensureSmokeAgentHostBuild(root);
@@ -109,6 +111,22 @@ run().catch(error => {
   console.error(error instanceof Error ? error.message : error);
   if (stderr.trim()) console.error(stderr.trim());
   process.exitCode = 1;
-}).finally(() => {
-  child.kill();
+}).finally(async () => {
+  if (child.exitCode === null && child.signalCode === null) {
+    if (process.platform === "win32" && child.pid) {
+      try { execFileSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }); }
+      catch { child.kill(); }
+    } else child.kill();
+    if (child.exitCode === null && child.signalCode === null) {
+      await Promise.race([new Promise(resolve => child.once("exit", resolve)), new Promise(resolve => setTimeout(resolve, 5_000))]);
+    }
+  }
+  const tempRoot = path.resolve(smokeTempRoot) + path.sep;
+  const isolatedProfile = path.resolve(profileRoot);
+  const isolatedVoiceRoot = path.resolve(voiceRoot);
+  if (!isolatedProfile.startsWith(tempRoot) || path.dirname(path.dirname(isolatedVoiceRoot)) !== isolatedProfile) {
+    throw new Error("Refusing to clean an unexpected Pocket TTS smoke path.");
+  }
+  if (process.exitCode === undefined || process.exitCode === 0) fs.rmSync(isolatedProfile, { recursive: true, force: true });
+  else console.error(`Preserved isolated Pocket TTS profile for diagnosis: ${isolatedProfile}`);
 });

@@ -72,7 +72,7 @@ public static class VoiceRuntimeStatus
         get
         {
             if (!IsPocketTtsSupported) return false;
-            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "PocketTTS");
+            var root = GetPocketTtsRoot();
             var binaryPath = Path.Combine(root, "pocket-tts.exe");
             if (!File.Exists(Path.Combine(root, "installed.json")) || !File.Exists(binaryPath)) return false;
             var info = new FileInfo(binaryPath);
@@ -91,5 +91,13 @@ public static class VoiceRuntimeStatus
                 return pocketTtsIntegrityValid;
             }
         }
+    }
+
+    /// <summary>Returns the per-user Pocket TTS directory, with a process-local override for isolated acceptance runs.</summary>
+    public static string GetPocketTtsRoot()
+    {
+        var overridePath = Environment.GetEnvironmentVariable("SKAI_POCKET_TTS_ROOT");
+        if (!string.IsNullOrWhiteSpace(overridePath)) return Path.GetFullPath(overridePath);
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "PocketTTS");
     }
 }

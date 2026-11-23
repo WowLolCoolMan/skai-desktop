@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using SkaiDesktop.Core.Services;
 
@@ -16,6 +17,8 @@ internal static class PocketTtsRuntime
     private const string ReleaseArchiveUrl = "https://github.com/kyutai-labs/pocket-tts/releases/download/v4.0.1/pocket-tts-3.3.0-x86_64-pc-windows-msvc.zip";
     private const string ReleaseArchiveSha256 = "98753041f2e65744b989776f87bccb93f1f574a08afe1890c5427ec94cd6309c";
     private const string LicenseSha256 = "36516aefdc84c5d5a1e7485425913a22dbda69eb1930c5e84d6ae4972b5194b9";
+    private const string LowResourceTokenizerUrl = "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/08ffc58775e62aad9409511b9591c9af626270f3/languages/english_7m_refl_2026-10/tokenizer.model";
+    private const string LowResourceTokenizerSha256 = "d461765ae179566678c93091c5fa6f2984c31bbe990bf1aa62d92c64d91bc3f6";
     private const string VoiceName = "alba";
     private static readonly object StateGate = new();
     private static readonly SemaphoreSlim WorkerGate = new(1, 1);
@@ -31,7 +34,7 @@ internal static class PocketTtsRuntime
 
     static PocketTtsRuntime() => AppDomain.CurrentDomain.ProcessExit += (_, _) => StopWorker();
 
-    private static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Voice", "PocketTTS");
+    private static string Root => VoiceRuntimeStatus.GetPocketTtsRoot();
     private static string BinaryPath => Path.Combine(Root, "pocket-tts.exe");
     private static string CacheRoot => Path.Combine(Root, "cache");
     private static string MarkerPath => Path.Combine(Root, "installed.json");
@@ -110,6 +113,10 @@ internal static class PocketTtsRuntime
                 var sample = await SynthesizeUnlockedAsync("Skai local speech is ready.").ConfigureAwait(false);
                 ValidateWav(Convert.FromBase64String(sample["data:audio/wav;base64,".Length..]));
                 StopWorker();
+                SetStep("Preparing the pinned low-resource tokenizer");
+                var tokenizerPath = Path.Combine(CacheRoot, "huggingface", "hub", "models--kyutai--pocket-tts-without-voice-cloning", "snapshots", "08ffc58775e62aad9409511b9591c9af626270f3", "languages", "english_7m_refl_2026-10", "tokenizer.model");
+                Directory.CreateDirectory(Path.GetDirectoryName(tokenizerPath)!);
+                await DownloadVerifiedAsync(LowResourceTokenizerUrl, tokenizerPath, LowResourceTokenizerSha256, 128 * 1024).ConfigureAwait(false);
                 SetStep("Downloading and warming the low-resource English model");
                 await EnsureWorkerAsync("english_7m_refl_2026-10").ConfigureAwait(false);
                 var lowResourceSample = await SynthesizeUnlockedAsync("Skai local speech is ready.").ConfigureAwait(false);
@@ -183,10 +190,14 @@ internal static class PocketTtsRuntime
         start.ArgumentList.Add(language);
         start.ArgumentList.Add("--default-voice");
         start.ArgumentList.Add(VoiceName);
-        start.Environment["HF_HOME"] = Path.Combine(CacheRoot, "huggingface");
+        // The pinned Windows runtime does not resolve tokenizer files correctly
+        // when Hugging Face cache paths contain spaces. Keep storage in Skai's
+        // normal per-user directory, but pass its equivalent 8.3 path to it.
+        var runtimeCacheRoot = GetRuntimePath(CacheRoot);
+        start.Environment["HF_HOME"] = Path.Combine(runtimeCacheRoot, "huggingface");
         start.Environment["HF_HUB_DISABLE_TELEMETRY"] = "1";
-        start.Environment["USERPROFILE"] = CacheRoot;
-        start.Environment["HOME"] = CacheRoot;
+        start.Environment["USERPROFILE"] = runtimeCacheRoot;
+        start.Environment["HOME"] = runtimeCacheRoot;
         var candidate = new Process { StartInfo = start, EnableRaisingEvents = true };
         workerDiagnostics = "";
         candidate.OutputDataReceived += (_, eventArgs) => AppendWorkerDiagnostic(eventArgs.Data);
@@ -301,6 +312,20 @@ internal static class PocketTtsRuntime
         listener.Start();
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
+
+    private static string GetRuntimePath(string path)
+    {
+        if (!OperatingSystem.IsWindows()) return path;
+        var buffer = new StringBuilder(32_768);
+        var length = GetShortPathName(path, buffer, (uint)buffer.Capacity);
+        var runtimePath = length is > 0 and < 32_768 ? buffer.ToString() : path;
+        if (path.Contains(' ') && runtimePath.Contains(' '))
+            throw new IOException("Pocket TTS needs a Windows short-path alias to load model files from this cache folder, but Windows did not provide one. Enable 8.3 short names for this volume or use a cache location without spaces.");
+        return runtimePath;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetShortPathName(string longPath, StringBuilder shortPath, uint bufferLength);
 
     private static bool HasHash(string path, string expected) => File.Exists(path)
         && Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).Equals(expected, StringComparison.OrdinalIgnoreCase);

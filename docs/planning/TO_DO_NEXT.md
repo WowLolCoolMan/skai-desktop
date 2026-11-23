@@ -145,12 +145,16 @@ Mark an item done only when the linked workflow has evidence.
     `npm run smoke:voice:acceptance` passes local Kokoro and Piper WAV
     container/non-silent signal checks. These are runtime and signal checks,
     not subjective speech-quality or live microphone acceptance.
-    On this Windows x64 profile with Pocket TTS already installed,
-    `npm run smoke:voice:pocket-tts` passed the Agent Host install/status route,
-    verified both speech-model choices, stopped an in-flight generation, and
-    produced a fresh 113,324-byte local WAV afterward. This confirms the warm
-    installed route and cancellation recovery; it does not re-run a clean
-    Pocket TTS installation.
+    On 2026-11-23, `node scripts/smoke-pocket-tts.cjs` passed a clean isolated
+    Marketplace install on Windows x64: it downloaded and hash-checked the
+    runtime, warmed both standard and low-resource models, stopped an
+    in-flight generation, and produced a fresh 113,324-byte local WAV. The
+    first clean run exposed a Windows runtime failure when Hugging Face cache
+    paths contained spaces; Skai now gives the runtime the cache's 8.3 path
+    while retaining the normal storage location. The smoke terminates the
+    Agent Host process tree and removes its isolated profile after success.
+    Cross-device speech quality and clean installs on other operating systems
+    remain unverified.
     The isolated Voice Workbench UI smoke now builds its renderer before
     launching Electron, avoiding false failures against a stale `dist` tree.
     Its browser acceptance passes duplicate-name clip storage, local preview,
