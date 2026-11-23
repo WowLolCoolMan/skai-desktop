@@ -33,6 +33,6 @@ After the fixes and acceptance gates are complete, the `v0.1.4` tag triggers the
 ## Remaining acceptance
 
 - A trusted signed 0.1.4 installer and signed install/upgrade/uninstall evidence.
-- Fixing 8 serious color-contrast violations found by the packaged axe-core run across 14 routes; automated skip-link focus and main landmark checks pass.
+- Visual review of 14 Axe contrast checks across eight gradient patterns. Axe cannot resolve the gradient backgrounds, and the current packaged audit reports zero WCAG violations; this remains open for manual review. Skip-link and main-landmark checks pass.
 - Manual keyboard and Narrator/assistive-technology acceptance.
 - Live Windows version coverage and Linux compositor/distro acceptance described in [Production readiness gaps](PRODUCTION_READINESS_GAPS.md).

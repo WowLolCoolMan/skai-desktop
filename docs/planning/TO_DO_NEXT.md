@@ -23,8 +23,11 @@ Mark an item done only when the linked workflow has evidence.
 1. **UI and accessibility acceptance — In progress · Codex.** The packaged
    audit covers 14 routes with zero WCAG violations. Fourteen Axe checks remain
    inconclusive across eight contrast patterns because text sits over gradients;
-   review those gradients visually. Popup relationships and named regions now
-   pass. Responsive overflow passes 11 routes at five widths. Review the
+   review those gradients visually. A 1440×900 dark-theme spot check of Chat
+   and Marketplace found no obviously unreadable text; Marketplace was in its
+   host-unavailable recovery state. This does not cover all gradient patterns.
+   Popup relationships and named regions now pass. Responsive overflow passes
+   11 routes at five widths. Review the
    17-route matrix, keyboard/focus behavior, assistive technology, narrow
    layouts, and pet animations. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).

@@ -133,6 +133,11 @@ Additional evidence commands:
   patterns; it cannot compute contrast against the app's gradient backgrounds.
   These need visual/manual review. Zero violations is not full accessibility
   acceptance; assistive-technology and route-by-route visual reviews remain open.
+- A live 1440×900 dark-theme spot check covered Chat and Marketplace. Text and
+  controls looked readable in the inspected areas. Marketplace was showing its
+  Agent Host unavailable recovery state, so this is limited visual evidence;
+  it does not clear the eight gradient contrast patterns or the remaining route
+  and theme review.
 
 ## Known boundaries
 
