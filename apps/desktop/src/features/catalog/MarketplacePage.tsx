@@ -98,7 +98,10 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   const [size, setSize] = useState(() => marketplacePreference("models.size", "Any size"));
   const [taskFilter, setTaskFilter] = useState(() => marketplacePreference("models.task", "All tasks"));
   const [libraryFilter, setLibraryFilter] = useState(() => marketplacePreference("models.library", "All libraries"));
-  const [appFilter, setAppFilter] = useState(() => marketplacePreference("models.app", "All install paths"));
+  const [appFilter, setAppFilter] = useState(() => {
+    const saved = marketplacePreference<string>("models.app", "All install paths");
+    return ["All install paths", "Ollama", "LM Studio", "AirLLM"].includes(saved) ? saved : "All install paths";
+  });
   const [contextFilter, setContextFilter] = useState(() => marketplacePreference("models.context", "Any context"));
   const [installing, setInstalling] = useState<string | null>(null);
   const [installStatus, setInstallStatus] = useState<string | null>(null);
@@ -159,12 +162,18 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
 
   useEffect(() => {
     if (section !== "Models") return;
+    let active = true;
     setActiveRuntimeAvailable(null);
     const endpoint = localStorage.getItem("skai.endpoint") ?? "http://localhost:11434/v1";
     const runtime = localStorage.getItem("skai.provider") ?? "Ollama";
     void request("models.runtime.status", { endpoint, provider: runtime }).then((response) => {
-      setActiveRuntimeAvailable(Boolean(response.ok && (response.result as { available?: boolean })?.available));
-    }).catch(() => setActiveRuntimeAvailable(false));
+      if (active) setActiveRuntimeAvailable(Boolean(response.ok && (response.result as { available?: boolean })?.available));
+    }).catch(() => { if (active) setActiveRuntimeAvailable(false); });
+    return () => { active = false; };
+  }, [section]);
+
+  useEffect(() => {
+    if (section !== "Models") return;
     if (!capacityLoadStartedRef.current) {
       capacityLoadStartedRef.current = true;
       void request("system.capacity").then((response) => {

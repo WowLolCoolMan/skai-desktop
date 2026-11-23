@@ -1,5 +1,6 @@
 using SkaiDesktop.Core.Services;
 using SkaiDesktop.Core.Models;
+using SkaiDesktop.Core.Infrastructure;
 using System.Text.Json;
 
 namespace SkaiDesktop.AgentHost.Protocol;
@@ -18,11 +19,11 @@ public static partial class AgentHostLoop
         try
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            using var response = client.GetAsync(probeUri).GetAwaiter().GetResult();
+            using var message = new HttpRequestMessage(HttpMethod.Get, probeUri);
+            using var response = client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
                 return new(ProtocolVersion, request.Id, true, new { provider, available = false, status = "unavailable" });
-            using var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
-            using var json = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 16 });
+            using var json = BoundedHttpContent.ReadJsonAsync(response.Content, label: "Local runtime probe").GetAwaiter().GetResult();
             var collectionName = isOllama ? "models" : "data";
             var available = json.RootElement.ValueKind == JsonValueKind.Object
                 && json.RootElement.TryGetProperty(collectionName, out var entries)
