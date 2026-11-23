@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card } from "../../components/ui/Primitives";
 import { NavIcon } from "../../components/ui/NavIcon";
 import "./pluginsMcpHealth.css";
@@ -22,10 +22,23 @@ type StoredVoiceClip = {
   storedAt: string;
 };
 
+type PreviewableVoiceClip = StoredVoiceClip & { previewUrl: string };
+
 const WORKBENCH_PROFILES_KEY = "skai.voice.workbench.profiles";
 const WORKBENCH_NOTICE_KEY = "skai.voice.workbench.rightsNoticeAcknowledged";
 const VOICE_CLIPS_DB = "skai-voice-workbench";
 const VOICE_CLIPS_STORE = "clips";
+const MAX_CLIPS_PER_PROFILE = 48;
+const MAX_CLIPS_PER_ADD = 12;
+const MAX_CLIP_BYTES = 50 * 1024 * 1024;
+
+function audioMimeType(fileName: string, currentType: string): string {
+  const byExtension: Record<string, string> = {
+    wav: "audio/wav", mp3: "audio/mpeg", m4a: "audio/mp4", ogg: "audio/ogg", flac: "audio/flac",
+  };
+  const extension = fileName.split(".").at(-1)?.toLowerCase() ?? "";
+  return currentType.startsWith("audio/") ? currentType : byExtension[extension] ?? "application/octet-stream";
+}
 
 function openVoiceClipStore(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
@@ -39,21 +52,52 @@ function openVoiceClipStore(): Promise<IDBDatabase | null> {
   });
 }
 
-async function storeVoiceClip(profileId: string, file: File): Promise<boolean> {
+async function storeVoiceClip(profileId: string, file: File): Promise<StoredVoiceClip | null> {
+  const database = await openVoiceClipStore();
+  if (!database) return null;
+  return new Promise((resolve) => {
+    const transaction = database.transaction(VOICE_CLIPS_STORE, "readwrite");
+    const clip: StoredVoiceClip = {
+      key: `${profileId}:${crypto.randomUUID()}`,
+      profileId,
+      name: file.name,
+      blob: new Blob([file], { type: audioMimeType(file.name, file.type) }),
+      storedAt: new Date().toISOString(),
+    };
+    transaction.objectStore(VOICE_CLIPS_STORE).put(clip);
+    transaction.oncomplete = () => { database.close(); resolve(clip); };
+    transaction.onerror = () => { database.close(); resolve(null); };
+    transaction.onabort = () => { database.close(); resolve(null); };
+  });
+}
+
+async function listVoiceClips(profileId: string): Promise<StoredVoiceClip[] | null> {
+  const database = await openVoiceClipStore();
+  if (!database) return null;
+  return new Promise((resolve) => {
+    const transaction = database.transaction(VOICE_CLIPS_STORE, "readonly");
+    const query = transaction.objectStore(VOICE_CLIPS_STORE).getAll();
+    query.onsuccess = () => {
+      const clips = (query.result as StoredVoiceClip[])
+        .filter((clip) => clip.profileId === profileId && clip.blob instanceof Blob)
+        .sort((left, right) => left.storedAt.localeCompare(right.storedAt));
+      database.close();
+      resolve(clips);
+    };
+    query.onerror = () => { database.close(); resolve(null); };
+    transaction.onabort = () => { database.close(); resolve(null); };
+  });
+}
+
+async function deleteVoiceClip(key: string): Promise<boolean> {
   const database = await openVoiceClipStore();
   if (!database) return false;
   return new Promise((resolve) => {
     const transaction = database.transaction(VOICE_CLIPS_STORE, "readwrite");
-    const clip: StoredVoiceClip = {
-      key: `${profileId}:${file.name}`,
-      profileId,
-      name: file.name,
-      blob: file,
-      storedAt: new Date().toISOString(),
-    };
-    transaction.objectStore(VOICE_CLIPS_STORE).put(clip);
+    transaction.objectStore(VOICE_CLIPS_STORE).delete(key);
     transaction.oncomplete = () => { database.close(); resolve(true); };
     transaction.onerror = () => { database.close(); resolve(false); };
+    transaction.onabort = () => { database.close(); resolve(false); };
   });
 }
 
@@ -77,6 +121,17 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   const [activeWorkbenchId, setActiveWorkbenchId] = useState(() => loadWorkbenchProfiles()[0]?.id ?? "");
   const [newProfileName, setNewProfileName] = useState("");
   const [clipStorageNotice, setClipStorageNotice] = useState<string | null>(null);
+  const [storedClips, setStoredClips] = useState<PreviewableVoiceClip[]>([]);
+  const [clipsLoading, setClipsLoading] = useState(false);
+  const previewUrls = useRef(new Set<string>());
+  const makePreviewable = (clip: StoredVoiceClip): PreviewableVoiceClip => {
+    const blob = clip.blob.type.startsWith("audio/")
+      ? clip.blob
+      : clip.blob.slice(0, clip.blob.size, audioMimeType(clip.name, clip.blob.type));
+    const previewUrl = URL.createObjectURL(blob);
+    previewUrls.current.add(previewUrl);
+    return { ...clip, blob, previewUrl };
+  };
   const [rightsNoticeOpen, setRightsNoticeOpen] = useState(() => localStorage.getItem(WORKBENCH_NOTICE_KEY) !== "true");
   useEffect(() => {
     let active = true;
@@ -86,6 +141,35 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
     return () => { active = false; window.removeEventListener("skai:voice-models-updated", refresh); };
   }, []);
   const activeWorkbench = workbenchProfiles.find((item) => item.id === activeWorkbenchId) ?? null;
+  useEffect(() => {
+    let current = true;
+    setStoredClips([]);
+    setClipStorageNotice(null);
+    if (!activeWorkbenchId) return () => { current = false; };
+    setClipsLoading(true);
+    void listVoiceClips(activeWorkbenchId).then((clips) => {
+      if (!current) return;
+      setClipsLoading(false);
+      if (!clips) {
+        setClipStorageNotice("Local clip storage could not be opened. Check this app's storage space and try again.");
+        return;
+      }
+      const previewable = clips.map(makePreviewable);
+      setStoredClips(previewable);
+      setWorkbenchProfiles((profiles) => {
+        const next = profiles.map((item) => item.id === activeWorkbenchId
+          ? { ...item, clipNames: clips.map((clip) => clip.name) }
+          : item);
+        saveWorkbenchProfiles(next);
+        return next;
+      });
+    });
+    return () => { current = false; };
+  }, [activeWorkbenchId]);
+  useEffect(() => () => {
+    previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls.current.clear();
+  }, [activeWorkbenchId]);
   const activeRuntimeId = settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId;
   const activeRuntime = installedVoiceModels.find((voice) => voice.id === activeRuntimeId);
   const hasOptionalLowResourceRuntime = installedVoiceModels.some((voice) => voice.lowResource && voice.id !== settings.primaryModelId);
@@ -100,12 +184,6 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   const profile =
     voiceProfiles.find((item) => item.id === settings.profileId) ??
     voiceProfiles[0];
-  const updateWorkbench = (change: Partial<WorkbenchVoiceProfile>) => {
-    if (!activeWorkbench) return;
-    const next = workbenchProfiles.map((item) => item.id === activeWorkbench.id ? { ...item, ...change, updatedAt: new Date().toISOString() } : item);
-    setWorkbenchProfiles(next);
-    saveWorkbenchProfiles(next);
-  };
   const createWorkbenchProfile = () => {
     const name = newProfileName.trim();
     if (!name) return;
@@ -115,16 +193,49 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   };
   const addClips = async (files: FileList | null) => {
     if (!activeWorkbench || !files?.length) return;
-    const selected = [...files].slice(0, 12).filter((file) => /\.(wav|mp3|m4a|ogg|flac)$/i.test(file.name));
-    if (!selected.length) return;
-    const names = selected.map((file) => file.name);
-    const stored = await Promise.all(selected.map((file) => storeVoiceClip(activeWorkbench.id, file)));
-    if (stored.some((value) => !value)) {
-      setClipStorageNotice("Clip storage is unavailable; the file names were kept, but the audio bytes were not saved.");
-    } else {
-      setClipStorageNotice("Audio clips are stored locally on this device. No audio was uploaded.");
+    const accepted = [...files].filter((file) => /\.(wav|mp3|m4a|ogg|flac)$/i.test(file.name));
+    const oversized = accepted.filter((file) => file.size > MAX_CLIP_BYTES);
+    const remaining = Math.max(0, MAX_CLIPS_PER_PROFILE - storedClips.length);
+    const selected = accepted.filter((file) => file.size <= MAX_CLIP_BYTES).slice(0, Math.min(MAX_CLIPS_PER_ADD, remaining));
+    if (!selected.length) {
+      setClipStorageNotice(oversized.length
+        ? `Each audio clip must be 50 MB or smaller. ${oversized.map((file) => file.name).join(", ")}`
+        : remaining === 0 ? "This profile already has the maximum of 48 clips." : "Choose WAV, MP3, M4A, OGG, or FLAC audio files.");
+      return;
     }
-    updateWorkbench({ clipNames: [...new Set([...activeWorkbench.clipNames, ...names])].slice(0, 48), status: "Changes pending" });
+    const saved = (await Promise.all(selected.map((file) => storeVoiceClip(activeWorkbench.id, file))))
+      .filter((clip): clip is StoredVoiceClip => clip !== null);
+    const next = [...storedClips, ...saved.map(makePreviewable)];
+    setStoredClips(next);
+    const names = next.map((clip) => clip.name);
+    setWorkbenchProfiles((profiles) => {
+      const updated = profiles.map((item) => item.id === activeWorkbench.id
+        ? { ...item, clipNames: names, status: "Changes pending" as const, updatedAt: new Date().toISOString() }
+        : item);
+      saveWorkbenchProfiles(updated);
+      return updated;
+    });
+    setClipStorageNotice(saved.length === selected.length
+      ? `Saved ${saved.length} clip${saved.length === 1 ? "" : "s"} locally. No audio was uploaded.`
+      : `Saved ${saved.length} of ${selected.length} clips. The remaining files could not be written to local storage.`);
+  };
+  const removeClip = async (clip: PreviewableVoiceClip) => {
+    if (!activeWorkbench || !(await deleteVoiceClip(clip.key))) {
+      setClipStorageNotice("Could not remove this clip from local storage. Try again.");
+      return;
+    }
+    URL.revokeObjectURL(clip.previewUrl);
+    previewUrls.current.delete(clip.previewUrl);
+    const next = storedClips.filter((item) => item.key !== clip.key);
+    setStoredClips(next);
+    setWorkbenchProfiles((profiles) => {
+      const updated = profiles.map((item) => item.id === activeWorkbench.id
+        ? { ...item, clipNames: next.map((item) => item.name), status: "Changes pending" as const, updatedAt: new Date().toISOString() }
+        : item);
+      saveWorkbenchProfiles(updated);
+      return updated;
+    });
+    setClipStorageNotice(`Removed ${clip.name} from this voice profile.`);
   };
   const acknowledgeRightsNotice = () => { localStorage.setItem(WORKBENCH_NOTICE_KEY, "true"); setRightsNoticeOpen(false); };
   return (
@@ -235,7 +346,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
         <Card>
           <p className="section-kicker">CLIPS</p>
           <h3>{activeWorkbench?.name ?? "Choose a profile"}</h3>
-          {activeWorkbench ? <><p className="marketplace-muted">Add recordings incrementally. Leaving the page or first use can queue a rebuild once an adapter is connected.</p><input type="file" accept=".wav,.mp3,.m4a,.ogg,.flac,audio/*" multiple onChange={(event) => void addClips(event.target.files)} aria-label="Add voice clips" /><div className="voice-workbench-clip-list">{activeWorkbench.clipNames.length === 0 ? <p className="settings-help">No clips attached.</p> : activeWorkbench.clipNames.map((name) => <span key={name}>{name}</span>)}</div>{clipStorageNotice && <p className="settings-help" role="status">{clipStorageNotice}</p>}<div className="voice-workbench-status" role="status"><strong>{activeWorkbench.status}</strong><small>{activeWorkbench.status === "Changes pending" ? "A compatible voice adapter is required before a clone can be built." : "Profile metadata and selected audio clips are stored locally."}</small></div></> : <p className="settings-help">Create or choose a profile to add clips.</p>}
+          {activeWorkbench ? <><p className="marketplace-muted">Add recordings over time. Clips stay on this device and can be previewed or removed here. Voice cloning is unavailable until a compatible engine is installed.</p><label className="voice-workbench-add-clips">Add audio clips<input type="file" accept=".wav,.mp3,.m4a,.ogg,.flac,audio/wav,audio/mpeg,audio/mp4,audio/ogg,audio/flac" multiple onChange={(event) => { void addClips(event.target.files); event.currentTarget.value = ""; }} aria-label="Add voice clips" /></label><p className="settings-help">{storedClips.length} of {MAX_CLIPS_PER_PROFILE} clips · Up to 12 at once · 50 MB per clip</p><div className="voice-workbench-clip-list" aria-live="polite">{clipsLoading ? <p className="settings-help">Loading saved clips…</p> : storedClips.length === 0 ? <p className="settings-help">No clips attached.</p> : storedClips.map((clip) => <div className="voice-workbench-clip" key={clip.key}><div className="voice-workbench-clip-heading"><strong>{clip.name}</strong><span>{(clip.blob.size / (1024 * 1024)).toFixed(1)} MB</span><Button variant="ghost" type="button" onClick={() => void removeClip(clip)} aria-label={`Remove ${clip.name}`}>Remove</Button></div><audio controls preload="none" src={clip.previewUrl} aria-label={`Preview ${clip.name}`} /></div>)}</div>{clipStorageNotice && <p className="settings-help" role="status">{clipStorageNotice}</p>}<div className="voice-workbench-status" role="status"><strong>{storedClips.length > 0 ? "Changes pending" : activeWorkbench.status}</strong><small>{storedClips.length > 0 ? "Clips are saved locally. Clone building will be enabled when a compatible adapter is available." : "Profile metadata is stored locally on this device."}</small></div></> : <p className="settings-help">Create or choose a profile to add clips.</p>}
         </Card>
       </div>
     </div>

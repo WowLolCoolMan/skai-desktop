@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace SkaiDesktop.AgentHost.Protocol;
 
-/// <summary>Explicit user-key cloud speech adapters. Keys are accepted per request and never persisted.</summary>
+/// <summary>Explicit cloud speech adapters. The caller reads keys from the OS-protected voice credential store and passes them only for a user-selected synthesis request.</summary>
 internal static class CloudVoiceService
 {
     private const int MaxAudioBytes = 12 * 1024 * 1024;

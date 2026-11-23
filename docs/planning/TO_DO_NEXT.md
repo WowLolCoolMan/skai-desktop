@@ -87,7 +87,7 @@ Mark an item done only when the linked workflow has evidence.
    advertised entry a verified local install/setup, launch/use, and removal
    path; expose license/runtime requirements and never leave an entry looking
    usable when its adapter is missing. `npm run smoke:marketplace-host` passes:
-   all 89 listings are accounted for, the 41 backed entries map to real local
+   all 90 listings are accounted for, the 42 backed entries map to real local
    adapters, and the other 48 expose no install action. The curated
    `qwen3-coder:30b-a3b-q4_K_M` Ollama route now has update and removal actions
    in Installed; its install/remove contract smoke passes against a disposable
@@ -193,6 +193,12 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** Voice Workbench now enumerates clips from local IndexedDB,
+  assigns unique IDs so duplicate filenames do not overwrite one another,
+  previews audio in place, and removes individual clips. Limits are 48 clips
+  per profile, 12 per add, and 50 MB per clip. Typecheck and production renderer
+  build pass. This does not implement reference-voice cloning or rebuilding.
 
 - **2026-11-23:** Local audio cancellation now carries an operation ID from the
   composer through the Electron bridge to the Agent Host. Whisper kills the

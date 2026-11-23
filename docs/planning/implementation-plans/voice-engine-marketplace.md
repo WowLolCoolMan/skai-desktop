@@ -12,9 +12,10 @@
 - Marketplace advertises an optional ElevenLabs connector as a user-key
   cloud voice option. Voice & Audio now lets the user choose local/system or
   ElevenLabs cloud speech, enter a voice ID, and test it from the same
-  settings surface. The key is session-only and is sent only to the explicit
-  ElevenLabs speech request; it is not written to workspace settings or sent
-  to the local language model.
+  settings surface. Provider credentials are stored through the OS-protected
+  secret store, never in workspace settings. The Agent Host reads a key only
+  for an explicit cloud speech request; spoken reply text is sent to the
+  selected provider and is disclosed in Voice settings.
 - Persona cards can persist an assigned local voice profile. Chat and Coding
   continue to use the shared Settings default when no persona override is
   present.
@@ -28,6 +29,12 @@
   Marketplace-driven acceptance installs both model variants and confirms a
   valid WAV response through `voice.speak`. This adapter does not expose custom
   voice cloning, streamed playback, or effect cues.
+- Voice Workbench now keeps audio bytes in local IndexedDB and profile metadata
+  in localStorage. Users can add clips incrementally, preview saved recordings,
+  and remove individual clips. Duplicate filenames remain distinct; each
+  profile allows up to 48 clips, 12 per add, and 50 MB per clip. These are
+  source-library controls only; no clone build is claimed while no compatible
+  adapter is installed.
 - Structured effect tags such as `[cough]` and `[laugh]` are removed at the
   native fallback boundary when the current engine cannot render them. The
   fallback never says the tag aloud.
@@ -42,11 +49,9 @@ upstream project is already bundled. The remaining work includes:
 2. A common local adapter protocol for streaming playback, cancellation,
    cloning, and typed prosody/effect cues. Pocket TTS currently returns a
    complete WAV and can cancel generation by stopping its local worker.
-3. Voice Workbench clip storage, one-time rights notice, incremental rebuild
-   state, and profile assignment UI.
-4. Secure persistent keyring storage for cloud voice keys; the current slice
-   intentionally keeps keys in memory until Skai closes.
-5. Full-duplex Voice Mode with streaming audio, interruption, barge-in, and
+3. A compatible reference-voice adapter and build lifecycle for Voice
+   Workbench; current clip storage and management are local-only.
+4. Full-duplex Voice Mode with streaming audio, interruption, barge-in, and
    device acceptance tests.
 
 Until those slices land, unconnected engines remain visibly catalog-only and

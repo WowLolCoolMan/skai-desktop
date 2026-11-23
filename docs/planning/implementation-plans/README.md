@@ -47,4 +47,5 @@ archive a plan when scope or implementation changes.
 - [Voice mode](voice-mode.md)
 - [Voice mode session](voice-mode-session.md)
 - [Voice engine marketplace](voice-engine-marketplace.md)
+- [Voice Workbench clip library](voice-workbench-clip-library.md)
 - [Smart Personas](smart-personas.md)
