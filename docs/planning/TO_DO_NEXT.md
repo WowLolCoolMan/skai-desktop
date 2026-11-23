@@ -36,9 +36,11 @@ Mark an item done only when the linked workflow has evidence.
   timeout, and cancellation checks. Keep failing closed where sandbox setup is
   unavailable; no macOS command path without a sandbox. See
   [architecture](../engineering/ARCHITECTURE.md).
-4. **Persona era acceptance — In progress · Unclaimed.** Resolve the Ollama
-   stream disconnect during follow-up turns, then test date cutoffs across
-   living and deceased personas and multiple model runs. See the
+4. **Persona era acceptance — In progress · Unclaimed.** Run multi-turn
+   date-cutoff checks across living and deceased personas and multiple models.
+   A Qwen3 14B David Lynch follow-up completed; 2010-era persona quality was
+   weak, so the evidence and cutoff behavior still need broader acceptance.
+   See the
    [Smart Personas plan](implementation-plans/smart-personas.md).
 5. **Image runtime coverage — In progress · Unclaimed.** Exercise a live
    ComfyUI server and GPU/additional hardware; verify truthful progress,
@@ -191,6 +193,14 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   passed identity, research, drafting, and its first response. Three subsequent
   cutoff turns were inconclusive because Ollama closed the stream; living-era
   cutoff behavior remains open.
+
+- **2026-11-23:** Isolated Qwen3 14B David Lynch runs completed research,
+  nine-field drafting, initial chat, and a posthumous follow-up without an
+  Ollama stream disconnect. The 2025 cutoff reply explicitly said it did not
+  claim knowledge beyond the future boundary; the smoke checker now recognizes
+  that wording, including curly-apostrophe contractions. A 2010-era run had a
+  generic opening persona reply and still failed the quality bar, so broader
+  era/persona acceptance remains open.
 
 - **2026-11-22:** Name-only Persona research now accepts a confirmed first-name
   speaker label when a page also contains the full public-person name and clear
