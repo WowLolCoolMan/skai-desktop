@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
-import { ModalDialog } from "../../components/ui/ModalDialog";
+import { Button, StatusBadge } from "../../components/ui/Primitives";
 import type { AgentResponse, ChatAttachment } from "../../../shared/contracts";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 
@@ -8,17 +7,17 @@ type ImageResult = { url: string; fileName: string; mediaType?: "image" | "video
 type Workflow = { name: string; workflow: string };
 type WorkflowMode = "generate" | "edit";
 type VisualTool = "image" | "edit" | "cutout" | "enhance" | "erase" | "video" | "animate" | "character" | "lipsync" | "music" | "extend" | "motion";
-const visualTools: Array<{ id: VisualTool; label: string; icon: NavIconName; prompt: string; note: string }> = [
+const visualTools: Array<{ id: VisualTool; label: string; icon: NavIconName; prompt: string; note: string; comingSoon?: boolean }> = [
   { id: "image", label: "Image", icon: "image", prompt: "Describe the image you want to create…", note: "Create a still image with the local Diffusers engine or a ComfyUI workflow." },
   { id: "edit", label: "Edit", icon: "sparkle", prompt: "Describe how to change this image…", note: "Edit a chosen image with local Diffusers or a ComfyUI image workflow." },
   { id: "cutout", label: "Cutout", icon: "close", prompt: "Describe the subject to isolate…", note: "Use a ComfyUI segmentation workflow with an optional source image." },
   { id: "enhance", label: "Enhance", icon: "activity", prompt: "Describe the details to improve…", note: "Use an image restoration or upscaling workflow from your local ComfyUI install." },
   { id: "erase", label: "Erase", icon: "close", prompt: "Describe what to remove…", note: "Use a local inpainting workflow; choose the source image it should edit." },
-  { id: "video", label: "Video", icon: "activity", prompt: "Describe a scene to animate…", note: "Video generation needs a local ComfyUI video workflow and its required models or custom nodes." },
+  { id: "video", label: "Video", icon: "activity", prompt: "Describe a scene to animate…", note: "Video creation is planned for a future Visuals Workshop update.", comingSoon: true },
   { id: "animate", label: "Animate", icon: "activity", prompt: "Describe the motion…", note: "Use a local ComfyUI animation workflow; image-conditioned workflows can use a source image." },
   { id: "character", label: "Character", icon: "model", prompt: "Describe the character and scene…", note: "Use a character generation workflow installed in local ComfyUI." },
   { id: "lipsync", label: "Lipsync", icon: "audio", prompt: "Describe the performance…", note: "Use a local lipsync workflow; its required audio or video inputs must be available to ComfyUI." },
-  { id: "music", label: "Music", icon: "audio", prompt: "Describe the music you want to hear…", note: "Music generation needs a local ComfyUI audio workflow and its required models or custom nodes." },
+  { id: "music", label: "Music", icon: "audio", prompt: "Describe the music you want to hear…", note: "Music creation is planned for a future Visuals Workshop update.", comingSoon: true },
   { id: "extend", label: "Extend", icon: "arrow-right", prompt: "Describe how the scene should continue…", note: "Use a local ComfyUI video continuation workflow." },
   { id: "motion", label: "Motion", icon: "activity", prompt: "Describe the motion path…", note: "Use a local ComfyUI motion-control workflow." },
 ];
@@ -85,7 +84,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const selectedProvider: ImageProvider = provider === "diffusers" ? "diffusers" : "comfyui";
   const [activeTool, setActiveTool] = useState<VisualTool>(() => {
     const stored = localStorage.getItem("skai.visuals.tool");
-    return visualTools.some((item) => item.id === stored) ? stored as VisualTool : "image";
+    return visualTools.some((item) => item.id === stored && !item.comingSoon) ? stored as VisualTool : "image";
   });
   const [workflowSettingsOpen, setWorkflowSettingsOpen] = useState(false);
   const [toolWorkflows, setToolWorkflows] = useState<Record<string, string>>(() => {
@@ -177,9 +176,9 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const canGenerate = Boolean(prompt.trim() && !busy && (generationProvider === "diffusers"
     ? imageRuntime?.dependenciesAvailable
     : endpoint.trim() && workflow.includes("{{prompt}}") && (!workflow.includes("{{image}}") || sourceImage) && (!sourceImage || workflow.includes("{{image}}"))));
-  useEffect(() => { if (!selectedImage && images.length) setSelectedImage(images[0]); }, [images, selectedImage]);
+  useEffect(() => { setSelectedImage(images[0] ?? null); }, [images]);
   return <div className="feature-page image-studio-page visuals-workshop-page">
-    <nav className="visuals-toolstrip" aria-label="Visuals Workshop tools">{visualTools.map((tool) => <button key={tool.id} type="button" className={`visuals-tool-tab${activeTool === tool.id ? " is-active" : ""}`} aria-pressed={activeTool === tool.id} onClick={() => chooseTool(tool.id)}><NavIcon name={tool.icon} /><span>{tool.label}</span></button>)}</nav>
+    <nav className="visuals-toolstrip" aria-label="Visuals Workshop tools">{visualTools.map((tool) => <button key={tool.id} type="button" className={`visuals-tool-tab${activeTool === tool.id ? " is-active" : ""}${tool.comingSoon ? " is-coming-soon" : ""}`} disabled={tool.comingSoon} aria-pressed={activeTool === tool.id} title={tool.comingSoon ? `${tool.label} generation is coming soon` : undefined} onClick={() => chooseTool(tool.id)}><NavIcon name={tool.icon} /><span>{tool.label}</span>{tool.comingSoon && <small>Soon</small>}</button>)}</nav>
     <div className="visuals-main">
       <main className="visuals-stage" aria-label={`${activeToolDetails.label} workspace`}>
         <header className="visuals-stage-header"><div><p className="section-kicker">{activeToolDetails.label.toUpperCase()} WORKSPACE</p><strong>{selectedImage?.fileName ?? "Ready to create"}</strong></div><StatusBadge tone={readiness.tone}>{readiness.label}</StatusBadge></header>
