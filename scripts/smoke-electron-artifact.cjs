@@ -149,6 +149,7 @@ const microphoneFixtureArgs = microphoneFixtureReady
 console.log(`Packaged microphone fixture: ${microphoneFixtureReady ? "repeating Windows System.Speech phrase with silence gaps through Chromium's microphone device" : "no deterministic speech fixture; using the active microphone device"}`);
 const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, ...microphoneFixtureArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let bargeInCompletionCount = 0;
+let bargeInResponseCompletedCount = 0;
 const bargeInRequests = [];
 const bargeInServer = http.createServer((request, response) => {
   const pathname = (request.url ?? "").split("?", 1)[0];
@@ -167,7 +168,18 @@ const bargeInServer = http.createServer((request, response) => {
       : "The interrupted microphone turn reached the local test model.";
     console.log(`Packaged voice test endpoint request ${bargeInCompletionCount}: ${requestBody.length} bytes`);
     response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
-    response.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
+    if (bargeInCompletionCount === 1) {
+      const splitAt = content.indexOf(" Speak over");
+      response.write(`data: ${JSON.stringify({ choices: [{ delta: { content: `${content.slice(0, splitAt)} ` } }] })}\n\n`);
+      setTimeout(() => {
+        response.write(`data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(splitAt + 1) } }] })}\n\n`);
+        response.end("data: [DONE]\n\n");
+        bargeInResponseCompletedCount += 1;
+      }, 3_500);
+    } else {
+      response.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
+      bargeInResponseCompletedCount += 1;
+    }
   });
   request.resume();
 });
@@ -438,7 +450,7 @@ async function main() {
     }
     console.log(`Packaged Voice Mode in-flight Whisper cancellation: ${JSON.stringify(handsFreeCancelState)}`);
   }
-  let handsFreeBargeInState = { available: whisperInstalled && microphoneFixtureReady && process.platform === "win32", configured: false, audioFixtureInjected: false, started: false, playbackObserved: false, interruptionObserved: false, followupTranscribed: false, ended: false, completionCount: 0, peakInputLevel: 0 };
+  let handsFreeBargeInState = { available: whisperInstalled && microphoneFixtureReady && process.platform === "win32", configured: false, audioFixtureInjected: false, started: false, playbackObserved: false, streamedPlaybackObserved: false, interruptionObserved: false, followupTranscribed: false, ended: false, completionCount: 0, peakInputLevel: 0 };
   let handsFreeState = { available: whisperInstalled && microphoneFixtureReady, started: false, listening: false, transcribing: false, submitted: false, ended: false, peakInputLevel: 0 };
   if (handsFreeState.available) {
     await new Promise((resolve, reject) => {
@@ -534,6 +546,7 @@ async function main() {
       handsFreeState.transcribing ||= current.state.includes("Transcribing");
       handsFreeState.submitted = current.turns.includes("voice fixture");
       handsFreeBargeInState.playbackObserved ||= current.state.includes("Listening for an interruption");
+      handsFreeBargeInState.streamedPlaybackObserved ||= current.state.includes("Listening for an interruption") && bargeInResponseCompletedCount === 0;
       handsFreeBargeInState.interruptionObserved ||= handsFreeBargeInState.playbackObserved && current.state.includes("Transcribing");
       handsFreeBargeInState.completionCount = bargeInCompletionCount;
       handsFreeBargeInState.followupTranscribed = bargeInCompletionCount >= 2 && current.turns.split("voice fixture").length > 2;
@@ -554,7 +567,7 @@ async function main() {
     console.log(`Packaged local Whisper hands-free Voice Mode skipped: ${JSON.stringify(handsFreeState)}`);
   }
   console.log(`Packaged Voice Mode barge-in: ${JSON.stringify(handsFreeBargeInState)}`);
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || (handsFreeState.available && (!handsFreeState.configured || !handsFreeState.started || !handsFreeState.listening || !handsFreeState.transcribing || !handsFreeState.submitted || !handsFreeState.ended)) || (handsFreeCancelState.available && (!handsFreeCancelState.started || !handsFreeCancelState.transcribing || !handsFreeCancelState.endedDuringTranscription || !handsFreeCancelState.noLateTurn || !handsFreeCancelState.ended)) || (handsFreeBargeInState.available && (!handsFreeBargeInState.configured || !handsFreeBargeInState.started || !handsFreeBargeInState.playbackObserved || !handsFreeBargeInState.interruptionObserved || !handsFreeBargeInState.followupTranscribed || !handsFreeBargeInState.ended || handsFreeBargeInState.peakInputLevel <= 0)) || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || !mixedPdfState.ocrPages || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || (handsFreeState.available && (!handsFreeState.configured || !handsFreeState.started || !handsFreeState.listening || !handsFreeState.transcribing || !handsFreeState.submitted || !handsFreeState.ended)) || (handsFreeCancelState.available && (!handsFreeCancelState.started || !handsFreeCancelState.transcribing || !handsFreeCancelState.endedDuringTranscription || !handsFreeCancelState.noLateTurn || !handsFreeCancelState.ended)) || (handsFreeBargeInState.available && (!handsFreeBargeInState.configured || !handsFreeBargeInState.started || !handsFreeBargeInState.playbackObserved || !handsFreeBargeInState.streamedPlaybackObserved || !handsFreeBargeInState.interruptionObserved || !handsFreeBargeInState.followupTranscribed || !handsFreeBargeInState.ended || handsFreeBargeInState.peakInputLevel <= 0)) || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
     throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, handsFreeState, handsFreeCancelState, handsFreeBargeInState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);

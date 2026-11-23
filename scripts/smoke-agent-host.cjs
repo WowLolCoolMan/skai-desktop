@@ -84,6 +84,7 @@ function request(method, params, onProgress) {
 
 async function run() {
   let capturedModelRequest = null;
+  let modelStreamEnded = false;
   const chatDeltas = [];
   const modelServer = http.createServer((request, response) => {
     let body = "";
@@ -92,18 +93,28 @@ async function run() {
     request.on("end", () => {
       capturedModelRequest = JSON.parse(body);
       response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end('data: {"choices":[{"delta":{"content":"mode "}}]}\n\ndata: {"choices":[{"delta":{"content":"<think>hidden reasoning</think>"}}]}\n\ndata: {"choices":[{"delta":{"content":"smoke reply"}}]}\n\ndata: [DONE]\n\n');
+      response.write('data: {"choices":[{"delta":{"content":"mode "}}]}\n\n');
+      setTimeout(() => {
+        response.write('data: {"choices":[{"delta":{"content":"<think>hidden reasoning</think>"}}]}\n\n');
+        setTimeout(() => {
+          response.write('data: {"choices":[{"delta":{"content":"smoke reply"}}]}\n\n');
+          modelStreamEnded = true;
+          response.end("data: [DONE]\n\n");
+        }, 200);
+      }, 200);
     });
   });
   pendingSmokeServers.add(modelServer);
   await new Promise(resolve => modelServer.listen(0, "127.0.0.1", resolve));
   const modelPort = modelServer.address().port;
-  const modeReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${modelPort}/v1`, model: "mode-smoke-model", responseMode: "security", streamResponse: true, messages: [{ role: "user", content: "Review a local security test." }] }, delta => chatDeltas.push(delta));
+  let visibleDeltaBeforeModelEnd = false;
+  const modeReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${modelPort}/v1`, model: "mode-smoke-model", responseMode: "security", streamResponse: true, messages: [{ role: "user", content: "Review a local security test." }] }, delta => { chatDeltas.push(delta); if (!modelStreamEnded) visibleDeltaBeforeModelEnd = true; });
   await new Promise(resolve => modelServer.close(resolve));
   pendingSmokeServers.delete(modelServer);
   if (!modeReply.ok || modeReply.result?.content !== "mode smoke reply" || !capturedModelRequest?.messages?.some(message => message.role === "system" && message.content.includes("Security / Risky")))
     throw new Error("chat.complete did not forward the user-selected response mode to the selected local model.");
   if (chatDeltas.join("") !== "mode smoke reply") throw new Error(`chat.complete did not stream model deltas in order: ${JSON.stringify(chatDeltas)}`);
+  if (!visibleDeltaBeforeModelEnd) throw new Error("chat.complete withheld visible text until after model generation ended.");
   const health = await request("runtime.health");
   if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call") || !health.result?.capabilities?.includes("persona.discover"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");

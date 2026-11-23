@@ -25,8 +25,14 @@ public static partial class AgentHostLoop
                 var markerIndex = pending.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
                 if (markerIndex < 0)
                 {
-                    var safeLength = pending.Length - (marker.Length - 1);
-                    if (safeLength <= 0) break;
+                    var safeLength = pending.Length;
+                    for (var suffixLength = Math.Min(marker.Length - 1, pending.Length); suffixLength > 0; suffixLength--)
+                    {
+                        if (!pending.EndsWith(marker[..suffixLength], StringComparison.OrdinalIgnoreCase)) continue;
+                        safeLength -= suffixLength;
+                        break;
+                    }
+                    if (safeLength == 0) break;
                     if (!insideReasoning) visible.Append(pending.AsSpan(0, safeLength));
                     pending = pending[safeLength..];
                     break;
