@@ -150,6 +150,36 @@ not stall the popup assertions.
   it does not clear the eight gradient contrast patterns or the remaining route
   and theme review.
 
+### Packaged UI and accessibility rerun — 2026-11-23
+
+- The packaged route matrix passed: 17 routes × 5 window sizes × 4 theme/sidebar
+  variants, with no reported layout failures or renderer runtime errors.
+- The full Axe scan passed on 14 routes with zero WCAG A/AA violations, zero
+  serious/critical findings, zero inconclusive checks, a working skip link and
+  main landmark, and valid expanded Model Picker (`dialog`) and overflow-menu
+  (`menu`) relationships. The scan found 846 focusable controls across its
+  audited route state.
+- The interaction probe originally waited on nested animation frames and could
+  time out when the Electron renderer was not presenting frames. It now waits
+  on short timers after opening and closing the popups; the full interaction
+  check completed successfully.
+- To make contrast measurable, the task composer and selected Plugins navigation
+  surfaces now use solid theme-token backgrounds; the Marketplace/Plugins header
+  and page canvas no longer allow text to sit over unmeasurable transparent
+  gradients. The next full scan reported no inconclusive contrast checks.
+- The 1440×900 dark-theme Marketplace screenshot was from an isolated temporary
+  review profile and showed the Agent Host unavailable recovery state. The
+  actual running Skai app was separately observed as Agent-ready. The screenshot
+  remains limited visual evidence. Screen-reader behavior and pet animation
+  motion/reduced-motion behavior still need hands-on review before the full UI
+  item can close.
+- The current packaged Electron artifact smoke passed the Percy companion
+  renderer checks, including advancing animation frames and a static sprite under
+  `prefers-reduced-motion`. It also completed the one-shot dictation interaction
+  through start, stop, and transcript creation; the host's local browser speech
+  pack still reports unavailable, so this does not validate intelligible speech
+  or hands-free turn quality.
+
 ## Known boundaries
 
 Hosted model routing is not implemented in the current release. The approved

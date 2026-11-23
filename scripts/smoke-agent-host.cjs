@@ -309,25 +309,30 @@ async function run() {
     terminalTask = snapshot.result.find(item => item.id === planned.result.id) ?? null;
     if (terminalTask && ["completed", "failed", "cancelled", "blocked"].includes(terminalTask.status)) break;
   }
-  if (!terminalTask || terminalTask.status !== "failed" || !terminalTask.resultSummary) throw new Error("tasks.execute did not persist a terminal local-model failure.");
+  if (!terminalTask || terminalTask.status !== "failed" || !terminalTask.resultSummary) throw new Error(`tasks.execute did not persist a terminal local-model failure: ${JSON.stringify(terminalTask)}`);
   let queueRequests = 0;
   let activeQueueRequests = 0;
   let maxActiveQueueRequests = 0;
+  let fencedActionServed = false;
   const queueRequestBodies = [];
   const queueModelServer = http.createServer((request, response) => {
     let body = "";
+    let requestNumber = 0;
     request.setEncoding("utf8");
     request.on("data", chunk => { body += chunk; });
     request.on("end", () => {
       if (request.method === "POST" && body.length > 0) {
-        queueRequests += 1;
+        requestNumber = ++queueRequests;
         activeQueueRequests += 1;
         maxActiveQueueRequests = Math.max(maxActiveQueueRequests, activeQueueRequests);
       }
       queueRequestBodies.push(body.slice(0, 1200));
       setTimeout(() => {
         response.writeHead(200, { "content-type": "text/event-stream" });
-        response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ action: "done", summary: "Queued smoke task completed." }) } }] })}\n\ndata: [DONE]\n\n`);
+        const action = JSON.stringify({ action: "done", summary: "Queued smoke task completed." });
+        if (requestNumber === 1) fencedActionServed = true;
+        const content = requestNumber === 1 ? `\`\`\`json\n${action}\n\`\`\`` : action;
+        response.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
         if (request.method === "POST" && body.length > 0) activeQueueRequests -= 1;
       }, 750);
     });
@@ -358,8 +363,8 @@ async function run() {
     secondTerminal = snapshot.result.find(item => item.id === secondQueued.result.id) ?? null;
     if ([firstTerminal, secondTerminal].every(task => task && ["completed", "failed", "cancelled", "blocked"].includes(task.status))) break;
   }
-  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || maxActiveQueueRequests < 1 || maxActiveQueueRequests > reportedSlotLimit)
-    throw new Error(`Queued task dispatch exceeded the reported local capacity: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, maxActiveQueueRequests, reportedSlotLimit, queueRequestBodies })}`);
+  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || !fencedActionServed || maxActiveQueueRequests < 1 || maxActiveQueueRequests > reportedSlotLimit)
+    throw new Error(`Queued task dispatch or fenced-action recovery failed: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, fencedActionServed, maxActiveQueueRequests, reportedSlotLimit, queueRequestBodies })}`);
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const capacitySnapshot = await request("system.capacity");
     if (capacitySnapshot.ok && capacitySnapshot.result?.scheduler?.activeTaskCount === 0 && capacitySnapshot.result?.scheduler?.queuedTaskCount === 0) break;

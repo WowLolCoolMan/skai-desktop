@@ -224,7 +224,7 @@ public static partial class AgentHostLoop
                 : WorkspaceFileContext.EnumerateTextFileBrowser(project.FolderPaths).Files;
             var system = project is null
                 ? "You are Skai's local coding agent. Work only from the user's prompt; do not claim file edits or commands. Return exactly one JSON object: {\"action\":\"done\",\"summary\":\"...\"}."
-                : "You are Skai's local coding agent. Return exactly one JSON object and no markdown. Actions: {\"action\":\"read_file\",\"path\":\"relative/path\"}; {\"action\":\"write_file\",\"path\":\"relative/path\",\"content\":\"complete file text\",\"expectedHash\":\"current hash or null for a new file\"}; {\"action\":\"run_command\",\"command\":\"...\",\"cwd\":\".\"}; {\"action\":\"done\",\"summary\":\"...\"}. Use the provided workspace paths. Read files before editing. Never claim an action before its result is returned. Keep edits focused. You may make at most 12 file or command actions, and at most 3 commands. Commands run in the selected project folder with a two-minute timeout. If an operation fails, adapt or report it honestly.";
+                : "You are Skai's local coding agent. Return exactly one JSON object and no markdown. Actions: {\"action\":\"read_file\",\"path\":\"relative/path\"}; {\"action\":\"write_file\",\"path\":\"relative/path\",\"content\":\"complete file text\",\"expectedHash\":\"current hash or null for a new file\"}; {\"action\":\"run_command\",\"command\":\"...\",\"cwd\":\".\"}; {\"action\":\"done\",\"summary\":\"...\"}. Escape backslashes and quotes inside JSON strings, and encode line breaks as \\n. Use the provided workspace paths. Read files before editing. Never claim an action before its result is returned. Keep edits focused. You may make at most 12 file or command actions, and at most 3 commands. Commands run in the selected project folder with a two-minute timeout. If an operation fails, adapt or report it honestly.";
             var messages = new List<ChatMessage>
             {
                 new("system", system),
@@ -234,22 +234,42 @@ public static partial class AgentHostLoop
             for (var step = 0; step < 13; step++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var parameters = JsonSerializer.SerializeToElement(new
+                JsonDocument? parsedAction = null;
+                for (var formatAttempt = 0; formatAttempt < 3 && parsedAction is null; formatAttempt++)
                 {
-                    endpoint = settings.Endpoint,
-                    provider = settings.ModelProvider,
-                    model = settings.Model,
-                    timeoutSeconds = 285,
-                    responseMode = task.ResponseMode,
-                    messages,
-                }, JsonOptions);
-                var response = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"task-{task.Id}-{step}", "chat.complete", parameters), cancellationToken);
-                if (!response.Ok) throw new InvalidOperationException(response.Error?.Message ?? "The local model could not complete the task.");
-                var responseJson = JsonSerializer.SerializeToElement(response.Result, JsonOptions);
-                var content = responseJson.TryGetProperty("content", out var contentValue) ? contentValue.GetString() : null;
-                if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException("The local model returned an empty coding-agent action.");
-                messages.Add(new ChatMessage("assistant", content));
-                using var actionDocument = JsonDocument.Parse(content);
+                    var parameters = JsonSerializer.SerializeToElement(new
+                    {
+                        endpoint = settings.Endpoint,
+                        provider = settings.ModelProvider,
+                        model = settings.Model,
+                        timeoutSeconds = 285,
+                        responseMode = task.ResponseMode,
+                        messages,
+                    }, JsonOptions);
+                    var response = await CompleteChatAsync(new AgentRequest(ProtocolVersion, $"task-{task.Id}-{step}-{formatAttempt}", "chat.complete", parameters), cancellationToken);
+                    if (!response.Ok) throw new InvalidOperationException(response.Error?.Message ?? "The local model could not complete the task.");
+                    var responseJson = JsonSerializer.SerializeToElement(response.Result, JsonOptions);
+                    var content = responseJson.TryGetProperty("content", out var contentValue) ? contentValue.GetString() : null;
+                    if (string.IsNullOrWhiteSpace(content)) throw new InvalidOperationException("The local model returned an empty coding-agent action.");
+                    try
+                    {
+                        var normalizedContent = NormalizeCodingAction(content);
+                        var candidate = JsonDocument.Parse(normalizedContent);
+                        if (candidate.RootElement.ValueKind != JsonValueKind.Object)
+                        {
+                            candidate.Dispose();
+                            throw new JsonException("The coding agent action must be a JSON object.");
+                        }
+                        messages.Add(new ChatMessage("assistant", normalizedContent));
+                        parsedAction = candidate;
+                    }
+                    catch (JsonException error) when (formatAttempt < 2)
+                    {
+                        messages.Add(new ChatMessage("assistant", content.Trim()));
+                        messages.Add(new ChatMessage("user", $"Your previous response was not a valid coding action JSON object ({error.Message}). Repeat the action as one valid JSON object, with every backslash and quote escaped inside string values. Do not use markdown fences."));
+                    }
+                }
+                using var actionDocument = parsedAction ?? throw new JsonException("The local model returned invalid coding action JSON three times.");
                 var action = actionDocument.RootElement;
                 var actionName = action.TryGetProperty("action", out var actionValue) ? actionValue.GetString() : null;
                 if (actionName == "done")
@@ -359,6 +379,25 @@ public static partial class AgentHostLoop
             _ => "task.updated",
         }, new Dictionary<string, string> { ["status"] = task.Status, ["requiresApproval"] = task.RequiresApproval ? "true" : "false" });
         return new(ProtocolVersion, request.Id, true, new { id = task.Id, status = task.Status, updatedAt = task.UpdatedAtUtc, resultSummary = task.ResultSummary });
+    }
+
+    private static string NormalizeCodingAction(string content)
+    {
+        var json = content.Trim();
+        if (!json.StartsWith("```", StringComparison.Ordinal)) return json;
+
+        var openingLineEnd = json.IndexOf('\n');
+        var closingFence = json.LastIndexOf("```", StringComparison.Ordinal);
+        if (openingLineEnd < 0 || closingFence <= openingLineEnd)
+            throw new JsonException("The coding agent returned an incomplete JSON code fence.");
+
+        var language = json[3..openingLineEnd].Trim();
+        if (language.Length > 0 && !language.Equals("json", StringComparison.OrdinalIgnoreCase))
+            throw new JsonException("The coding agent fenced its action with an unsupported language label.");
+        if (!string.IsNullOrWhiteSpace(json[(closingFence + 3)..]))
+            throw new JsonException("The coding agent returned text after its JSON code fence.");
+
+        return json[(openingLineEnd + 1)..closingFence].Trim();
     }
 
     private sealed record RuntimeLoadedModel(string Runtime, string Model, long? RamBytes, long? GpuBytes);

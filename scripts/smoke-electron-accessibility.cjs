@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { randomInt } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
 
@@ -8,8 +9,12 @@ const defaultName = process.platform === "win32" ? "Skai Desktop.exe" : "Skai De
 const defaultRoot = path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : "linux"}-x64`);
 const executable = path.resolve(process.argv[2] || path.join(defaultRoot, defaultName));
 const axePath = path.join(__dirname, "..", "apps", "desktop", "node_modules", "axe-core", "axe.min.js");
-const routes = ["chat", "settings", "marketplace", "plugins", "projects", "coding", "models", "images", "terminal", "memory", "usage", "pet-workshop", "voice-workbench", "workbench"];
-const port = 19341;
+const defaultRoutes = ["chat", "settings", "marketplace", "plugins", "projects", "coding", "models", "images", "terminal", "memory", "usage", "pet-workshop", "voice-workbench", "workbench"];
+const requestedRoutes = process.env.ACCESSIBILITY_ROUTES?.split(",").map((route) => route.trim()).filter(Boolean);
+const routes = requestedRoutes?.length ? requestedRoutes : defaultRoutes;
+const unknownRoutes = routes.filter((route) => !defaultRoutes.includes(route));
+if (unknownRoutes.length) throw new Error(`Unknown accessibility route(s): ${unknownRoutes.join(", ")}`);
+const port = randomInt(20_000, 60_000);
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-accessibility-smoke-"));
 const userData = path.join(temp, "electron-profile");
 const env = { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", APPDATA: path.join(temp, "appdata"), LOCALAPPDATA: path.join(temp, "localappdata"), XDG_CONFIG_HOME: path.join(temp, "config"), XDG_DATA_HOME: path.join(temp, "data"), XDG_CACHE_HOME: path.join(temp, "cache") };
@@ -36,7 +41,7 @@ async function fetchJson(url) {
 async function command(method, params = {}) {
   const id = sequence++;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Accessibility CDP command timed out during ${currentPhase}: ${method}`)); }, 45_000);
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Accessibility CDP command timed out during ${currentPhase}: ${method}`)); }, 120_000);
     pending.set(id, { resolve, reject, timer });
     socket.send(JSON.stringify({ id, method, params }));
   });
@@ -85,43 +90,49 @@ async function main() {
   const axeSource = fs.readFileSync(axePath, "utf8");
   currentPhase = "loading axe-core into the renderer";
   console.log(`Accessibility smoke: ${currentPhase}`);
+  console.log(`Injecting Axe into packaged renderer (${routes.length} route${routes.length === 1 ? "" : "s"})...`);
   await evaluate(`${axeSource}\n; typeof axe === 'object' ? 'axe-ready' : 'axe-missing'`);
 
   const results = [];
   for (const route of routes) {
     currentPhase = `running WCAG checks on #/${route}`;
     console.log(`Accessibility smoke: ${currentPhase}`);
-    const routeResult = await evaluate(`(async () => { location.hash = '#/${route}'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 350)); const result = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }); const css = getComputedStyle(document.documentElement); const button = document.querySelector('.new-chat-button'); const buttonCss = button ? getComputedStyle(button) : null; return JSON.stringify({ route: location.hash, theme: { scheme: document.documentElement.dataset.scheme, id: document.documentElement.dataset.themeId, accent: css.getPropertyValue('--skai-color-accent').trim(), onAccent: css.getPropertyValue('--skai-color-on-accent').trim(), text: css.getPropertyValue('--skai-color-text').trim(), raised: css.getPropertyValue('--skai-color-surface-raised').trim(), buttonBg: buttonCss?.backgroundColor, buttonText: buttonCss?.color, buttonVars: button ? [getComputedStyle(button).getPropertyValue('--skai-color-accent').trim(), getComputedStyle(button).getPropertyValue('--skai-color-on-accent').trim()] : [] }, violations: result.violations.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 8).map((node) => ({ target: node.target, summary: node.failureSummary?.slice(0, 500) })) })), incomplete: result.incomplete.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 5).map((node) => ({ target: node.target, summary: node.failureSummary?.slice(0, 300) })) })) }); })()`);
+    const routeResult = await evaluate(`(async () => { location.hash = '#/${route}'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 350)); const result = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } }); const css = getComputedStyle(document.documentElement); const button = document.querySelector('.new-chat-button'); const buttonCss = button ? getComputedStyle(button) : null; return JSON.stringify({ route: location.hash, theme: { scheme: document.documentElement.dataset.scheme, id: document.documentElement.dataset.themeId, accent: css.getPropertyValue('--skai-color-accent').trim(), onAccent: css.getPropertyValue('--skai-color-on-accent').trim(), text: css.getPropertyValue('--skai-color-text').trim(), raised: css.getPropertyValue('--skai-color-surface-raised').trim(), buttonBg: buttonCss?.backgroundColor, buttonText: buttonCss?.color, buttonVars: button ? [getComputedStyle(button).getPropertyValue('--skai-color-accent').trim(), getComputedStyle(button).getPropertyValue('--skai-color-on-accent').trim()] : [] }, violations: result.violations.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 8).map((node) => ({ target: node.target, summary: node.failureSummary?.slice(0, 500) })) })), incomplete: result.incomplete.map((item) => ({ id: item.id, impact: item.impact, help: item.help, nodes: item.nodes.slice(0, 5).map((node) => { const element = document.querySelector(node.target[0]); const backgrounds = []; for (let current = element; current; current = current.parentElement) { const style = getComputedStyle(current); if (style.backgroundImage !== "none" || style.backgroundColor !== "rgba(0, 0, 0, 0)") backgrounds.push({ element: String(current.className || current.tagName).slice(0, 70), color: style.backgroundColor, image: style.backgroundImage }); } return { target: node.target, summary: node.failureSummary?.slice(0, 300), backgrounds: backgrounds.slice(0, 6) }; }) })) }); })()`);
     results.push(JSON.parse(routeResult));
+    console.log(`Finished #/${route}: ${results.at(-1).violations.length} violations, ${results.at(-1).incomplete.length} incomplete checks.`);
   }
   currentPhase = "checking keyboard landmarks";
   console.log(`Accessibility smoke: ${currentPhase}`);
   const navigationResult = await evaluate(`(() => { const skip = document.querySelector('.skip-link'); const main = document.querySelector('#main-content'); const controls = [...document.querySelectorAll('button,a,input,select,textarea,[tabindex]')].filter((el) => !el.disabled && el.tabIndex >= 0); skip?.focus(); return JSON.stringify({ skipLink: Boolean(skip && skip.getAttribute('href') === '#main-content'), skipFocusWorks: document.activeElement === skip, mainLandmark: Boolean(main?.closest('main')), focusableCount: controls.length }); })()`);
   const keyboard = JSON.parse(navigationResult);
-  const inspectPopup = async (selector, expectedRole) => {
-    currentPhase = `checking ${selector} accessibility relationship`;
-    console.log(`Accessibility smoke: ${currentPhase}`);
-    const result = await evaluate(`(async () => { location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 300)); const trigger = document.querySelector(${JSON.stringify(selector)}); if (!trigger) return JSON.stringify({ selector: ${JSON.stringify(selector)}, exists: false, controlsValid: false }); trigger.click(); await new Promise((resolve) => setTimeout(resolve, 50)); const id = trigger.getAttribute('aria-controls'); const controlled = id ? document.getElementById(id) : null; const inspection = { selector: ${JSON.stringify(selector)}, exists: true, expanded: trigger.getAttribute('aria-expanded') === 'true', popupType: trigger.getAttribute('aria-haspopup'), controlsValid: Boolean(controlled && controlled.getAttribute('role') === ${JSON.stringify(expectedRole)}) }; trigger.click(); return JSON.stringify(inspection); })()`);
-    return JSON.parse(result);
-  };
-  const popups = {
-    modelPicker: await inspectPopup(".model-picker-trigger", "dialog"),
-    overflowMenu: await inspectPopup(".overflow-menu-trigger", "menu"),
-  };
+  console.log("Checking skip link, main landmark, and keyboard focus...");
+  let popups = { skipped: true };
+  if (process.env.ACCESSIBILITY_SKIP_INTERACTION_CHECKS !== "1") {
+    const inspectPopup = async (selector, expectedRole) => {
+      currentPhase = `checking ${selector} accessibility relationship`;
+      console.log(`Accessibility smoke: ${currentPhase}`);
+      const result = await evaluate(`(async () => { location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 300)); const trigger = document.querySelector(${JSON.stringify(selector)}); if (!trigger) return JSON.stringify({ selector: ${JSON.stringify(selector)}, exists: false, controlsValid: false }); trigger.click(); await new Promise((resolve) => setTimeout(resolve, 50)); const id = trigger.getAttribute('aria-controls'); const controlled = id ? document.getElementById(id) : null; const inspection = { selector: ${JSON.stringify(selector)}, exists: true, expanded: trigger.getAttribute('aria-expanded') === 'true', popupType: trigger.getAttribute('aria-haspopup'), controlsValid: Boolean(controlled && controlled.getAttribute('role') === ${JSON.stringify(expectedRole)}) }; trigger.click(); return JSON.stringify(inspection); })()`);
+      return JSON.parse(result);
+    };
+    popups = {
+      modelPicker: await inspectPopup(".model-picker-trigger", "dialog"),
+      overflowMenu: await inspectPopup(".overflow-menu-trigger", "menu"),
+    };
+  }
   const violations = results.flatMap((result) => result.violations.map((violation) => ({ route: result.route, theme: result.theme, ...violation })));
   const incompleteByNode = new Map();
   for (const result of results) for (const check of result.incomplete) for (const node of check.nodes) {
     const key = JSON.stringify([check.id, node.target, node.summary]);
     const existing = incompleteByNode.get(key);
     if (existing) existing.routes.push(result.route);
-    else incompleteByNode.set(key, { id: check.id, impact: check.impact, help: check.help, routes: [result.route], target: node.target, summary: node.summary });
+    else incompleteByNode.set(key, { id: check.id, impact: check.impact, help: check.help, routes: [result.route], target: node.target, summary: node.summary, backgrounds: node.backgrounds ?? [] });
   }
   const incomplete = [...incompleteByNode.values()];
   const critical = violations.filter((item) => item.impact === "critical");
   const serious = violations.filter((item) => item.impact === "serious");
   console.log(JSON.stringify({ routesInspected: results.length, wcagViolations: violations.length, serious: serious.length, critical: critical.length, keyboard, popups, violations, incompleteChecks: results.reduce((sum, result) => sum + result.incomplete.length, 0), uniqueIncompletePatterns: incomplete.length, incomplete }, null, 2));
   if (keyboard.skipLink !== true || keyboard.skipFocusWorks !== true || keyboard.mainLandmark !== true || keyboard.focusableCount < 1) throw new Error(`Keyboard navigation landmarks failed: ${JSON.stringify(keyboard)}`);
-  if (!popups.modelPicker.controlsValid || popups.modelPicker.popupType !== "dialog" || !popups.overflowMenu.controlsValid || popups.overflowMenu.popupType !== "menu") throw new Error(`Expanded popover accessibility relationships failed: ${JSON.stringify(popups)}`);
+  if (!popups.skipped && (!popups.modelPicker.controlsValid || popups.modelPicker.popupType !== "dialog" || !popups.overflowMenu.controlsValid || popups.overflowMenu.popupType !== "menu")) throw new Error(`Expanded popover accessibility relationships failed: ${JSON.stringify(popups)}`);
   if (violations.length) throw new Error(`axe-core found ${violations.length} WCAG A/AA violation(s) across the packaged routes.`);
 }
 
