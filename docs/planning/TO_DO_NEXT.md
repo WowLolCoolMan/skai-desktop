@@ -30,9 +30,11 @@ Mark an item done only when the linked workflow has evidence.
    speech pack. Keep the path local. See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — In progress · Codex.** Verify Windows
-   PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Keep
-   failing closed where sandbox setup is unavailable; no macOS command path
-   without a sandbox. See [architecture](../engineering/ARCHITECTURE.md).
+  PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Windows
+  and Ubuntu 24.04 WSL acceptance now pass filesystem, network, process, memory,
+  timeout, and cancellation checks. Keep failing closed where sandbox setup is
+  unavailable; no macOS command path without a sandbox. See
+  [architecture](../engineering/ARCHITECTURE.md).
 4. **Persona era acceptance — In progress · Unclaimed.** Resolve the Ollama
    stream disconnect during follow-up turns, then test date cutoffs across
    living and deceased personas and multiple model runs. See the
@@ -79,10 +81,9 @@ Mark an item done only when the linked workflow has evidence.
     validate fit against real models and runtimes.
 15. **Resumable model installs — In progress · Codex.** The Skai-managed
     ModelScope GGUF installer now persists checksum-keyed partial shards,
-    resumes with HTTP Range, validates the complete size/hash/signature, and
-    removes its cache only after successful Ollama import. Remaining:
-    acceptance of cancellation and retries, plus retry behavior delegated to
-    Ollama/LM Studio.
+  resumes with HTTP Range, preserves partial bytes on cancellation, validates
+  the complete size/hash/signature, and removes its cache only after successful
+  Ollama import. Remaining: retry behavior delegated to Ollama/LM Studio.
 16. **Legacy conversation import.** Add preview, cancel-without-writing,
     duplicate protection, restart recovery, and preservation of edited chats.
 17. **Scanned documents and data files.** Add local OCR for scanned PDFs and
@@ -130,12 +131,19 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   upload; interrupted transfers preserve their partial for retry, invalid
   content is removed, and successful import cleans the resume cache. Ollama
   and LM Studio still own their respective upstream download and retry state.
+  A cancellation check confirms ModelScope preserves only the downloaded local
+  partial and does not upload the cancelled model.
 
 - **2026-11-22:** Windows Coding Agent Job Object acceptance and the full native
   core suite pass when the sandbox stress group runs before longer test groups.
   The allocation control now respects the OS-clamped available memory cap; the
   suite continues to verify a 320 MiB allocation where capacity permits,
   256 MiB memory denial, filesystem/network isolation, timeout, and cancellation.
+
+- **2026-11-22:** Ubuntu 24.04 WSL sandbox acceptance passed Bubblewrap and
+  cgroup checks for project-only filesystem writes, host-file isolation,
+  disabled network, memory and process caps, timeout, and cancellation. Native
+  Linux desktop/compositor acceptance remains open.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
