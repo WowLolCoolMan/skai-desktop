@@ -36,7 +36,7 @@ function registerComputerUseIpc({ ipcMain, desktopCapturer, screen, process, get
           id: source.id,
           name: source.name,
           displayId: source.display_id,
-          display: display ? { x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height } : null,
+          display: display ? { x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height, scaleFactor: display.scaleFactor } : null,
           previewWidth: thumbnail.getSize().width,
           previewHeight: thumbnail.getSize().height,
           content: thumbnail.toPNG().toString("base64"),
@@ -50,7 +50,7 @@ function registerComputerUseIpc({ ipcMain, desktopCapturer, screen, process, get
     if (process.platform !== "win32") throw new Error("Computer input is currently supported on Windows only.");
     const display = screen.getAllDisplays().find((item) => String(item.id) === String(request?.displayId));
     if (!display) throw new Error("The selected display is no longer available. Capture the screen again.");
-    return serialize(() => withSkaiMinimized(() => performWindowsAction(request, { x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height })));
+    return serialize(() => withSkaiMinimized(() => performWindowsAction(request, { x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height, scaleFactor: display.scaleFactor })));
   });
 }
 

@@ -51,7 +51,7 @@ internal static class WhisperVoiceRuntime
         if (!IsInstalled) throw new InvalidOperationException("Install Whisper large-v3 from Marketplace before transcribing audio.");
         if (audioBase64.Length is < 4 or > 28_000_000) throw new InvalidOperationException("Choose an audio file smaller than 20 MB.");
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        if (extension is not (".mp3" or ".m4a" or ".ogg" or ".wav")) throw new InvalidOperationException("Whisper accepts MP3, M4A, OGG, and WAV audio files.");
+        if (extension is not (".mp3" or ".m4a" or ".ogg" or ".wav" or ".webm")) throw new InvalidOperationException("Whisper accepts MP3, M4A, OGG, WAV, and WebM audio files.");
         var safeLanguage = NormalizeLanguage(language);
         byte[] audio;
         try { audio = Convert.FromBase64String(audioBase64); }

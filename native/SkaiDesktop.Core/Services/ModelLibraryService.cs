@@ -12,7 +12,7 @@ using SkaiDesktop.Core.Models;
 namespace SkaiDesktop.Core.Services;
 
 /// <summary>Catalog and installation adapters for chat-ready local model runtimes.</summary>
-public sealed partial class ModelLibraryService(HttpClient? httpClient = null)
+public sealed partial class ModelLibraryService(HttpClient? httpClient = null, string? modelScopeDownloadDirectory = null)
 {
     private const int MaxModelIdentifierLength = 512;
     private const int MaxCatalogQueryLength = 256;
@@ -29,6 +29,9 @@ public sealed partial class ModelLibraryService(HttpClient? httpClient = null)
         ("Text Generation WebUI", "http://127.0.0.1:5000/v1")
     ];
     private readonly HttpClient _http = httpClient ?? SharedHttp;
+    private readonly string _modelScopeDownloadDirectory = string.IsNullOrWhiteSpace(modelScopeDownloadDirectory)
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Skai", "Marketplace", "ModelScope")
+        : Path.GetFullPath(modelScopeDownloadDirectory);
 
     public async Task<IReadOnlyList<InstalledLocalModel>> DiscoverLocalModelsAsync(
         string configuredEndpoint,
@@ -319,7 +322,7 @@ public sealed partial class ModelLibraryService(HttpClient? httpClient = null)
 
 }
 
-public sealed record HubModel(string Id, long Downloads, int Likes, bool IsUncensored = false, string[]? Tags = null, long? SizeBytes = null, int? ContextLength = null);
+public sealed record HubModel(string Id, long Downloads, int Likes, bool IsUncensored = false, string[]? Tags = null, long? SizeBytes = null, int? ContextLength = null, string? License = null);
 public sealed record ModelScopeGgufFile(string Path, long SizeBytes, string? Sha256);
 public sealed record ModelScopeGgufPackage(string Repository, string Name, IReadOnlyList<ModelScopeGgufFile> Files, long Downloads, bool IsUncensored = false)
 {

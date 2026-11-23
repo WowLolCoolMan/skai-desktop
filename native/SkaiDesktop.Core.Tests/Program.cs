@@ -1,8 +1,22 @@
 // Core test runner. Each area lives in its own *Tests.cs file; they run in this order
 // and the run stops at the first failed Check (see TestSupport.cs).
 
+if (args.Length == 1 && args[0].Equals("--model-library", StringComparison.OrdinalIgnoreCase))
+{
+    await ModelLibraryTests.RunAsync();
+    Console.WriteLine("Selected Model Library checks passed.");
+    return;
+}
+if (args.Length == 1 && args[0].Equals("--workspace-sandbox", StringComparison.OrdinalIgnoreCase))
+{
+    await LocalStorageAndWorkspaceTests.RunAsync();
+    Console.WriteLine("Selected workspace and sandbox checks passed.");
+    return;
+}
+
 await DiagnosticsTests.RunAsync();
 ProductIdentityTests.Run();
+await LocalStorageAndWorkspaceTests.RunAsync();
 VoiceModelTests.Run();
 CatalogTests.Run();
 await ProjectHealthTests.RunAsync();
@@ -27,7 +41,6 @@ await CloudVoiceCredentialTests.RunAsync();
 ChatMessageTests.Run();
 PromptVariableTests.Run();
 OpenApiToolDiscoveryTests.Run();
-await LocalStorageAndWorkspaceTests.RunAsync();
 ExternalLinkTests.Run();
 OperationJournalTests.Run();
 OperationServiceTests.Run();

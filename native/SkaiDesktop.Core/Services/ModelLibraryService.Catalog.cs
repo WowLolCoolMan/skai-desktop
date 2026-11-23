@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -47,10 +48,11 @@ public sealed partial class ModelLibraryService
                         .Sum()
                     : null;
                 var contextLength = ReadContextLength(item);
+                var license = ReadLicense(item, tags);
                 return new HubModel(id,
                     item.TryGetProperty("downloads", out var downloads) && downloads.TryGetInt64(out var count) ? count : 0,
                     item.TryGetProperty("likes", out var likes) && likes.TryGetInt32(out var likeCount) ? likeCount : 0,
-                    label, tags, sizeBytes, contextLength);
+                    label, tags, sizeBytes, contextLength, license);
             }));
         }
         var filtered = (uncensored ? allModels.Where(model => model.IsUncensored) : allModels.Where(model => !model.IsUncensored));
@@ -66,6 +68,17 @@ public sealed partial class ModelLibraryService
             foreach (var name in new[] { "max_position_embeddings", "model_max_length", "max_sequence_length", "seq_length" })
                 if (textConfig.TryGetProperty(name, out var value) && value.TryGetInt32(out var length) && length is > 0 and < 10_000_000) return length;
         return null;
+    }
+
+    private static string? ReadLicense(JsonElement item, IEnumerable<string> tags)
+    {
+        if (item.TryGetProperty("cardData", out var cardData) && cardData.ValueKind == JsonValueKind.Object
+            && cardData.TryGetProperty("license", out var license) && license.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(license.GetString()))
+            return license.GetString()!.Trim();
+
+        var licenseTag = tags.FirstOrDefault(tag => tag.StartsWith("license:", StringComparison.OrdinalIgnoreCase));
+        return licenseTag is null ? null : licenseTag["license:".Length..];
     }
 
     /// <summary>Finds text-generation repositories with full Transformers weights for the optional AirLLM route.</summary>
@@ -110,7 +123,9 @@ public sealed partial class ModelLibraryService
                     sizeBytes = repositorySize;
                 var downloads = item.TryGetProperty("downloads", out var downloadsElement) && downloadsElement.TryGetInt64(out var count) ? count : 0;
                 var likes = item.TryGetProperty("likes", out var likesElement) && likesElement.TryGetInt32(out var likeCount) ? likeCount : 0;
-                models.Add(new HubModel(id!, downloads, likes, isUncensored, tags, sizeBytes));
+                var contextLength = ReadContextLength(item);
+                var license = ReadLicense(item, tags);
+                models.Add(new HubModel(id!, downloads, likes, isUncensored, tags, sizeBytes, contextLength, license));
             }
         }
         return models.DistinctBy(model => model.Id, StringComparer.OrdinalIgnoreCase).OrderByDescending(model => model.Downloads).ToArray();
@@ -222,8 +237,11 @@ public sealed partial class ModelLibraryService
         var root = new UriBuilder(configured) { Path = "", Query = "", Fragment = "" }.Uri;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromHours(6));
-        var temporaryDirectory = Path.Combine(Path.GetTempPath(), "skai-modelscope-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryDirectory);
+        var repositoryKey = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(repositoryId))).ToLowerInvariant();
+        var downloadDirectory = Path.Combine(_modelScopeDownloadDirectory, repositoryKey);
+        Directory.CreateDirectory(downloadDirectory);
+        var resumableFiles = new List<string>();
+        var importCompleted = false;
         try
         {
             var blobMap = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -237,39 +255,21 @@ public sealed partial class ModelLibraryService
                 var fileName = file.Path.Split('/').Last();
                 if (blobMap.ContainsKey(fileName)) throw new InvalidOperationException("The selected ModelScope package contains duplicate GGUF shard filenames.");
                 var downloadUri = new Uri("https://modelscope.cn/api/v1/models/" + repositoryId + "/repo?Revision=master&FilePath=" + Uri.EscapeDataString(file.Path));
-                using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);
-                request.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("local model library"));
-                using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-                if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"ModelScope file download failed ({(int)response.StatusCode}) for {file.Path}.");
-                if (response.Content.Headers.ContentLength is > 0 and var contentLength && file.SizeBytes > 0 && contentLength != file.SizeBytes)
-                    throw new InvalidDataException($"ModelScope reported an unexpected file size for {file.Path}.");
-                var localPath = Path.Combine(temporaryDirectory, fileName);
-                await using var destination = new FileStream(localPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
-                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-                await using var source = await response.Content.ReadAsStreamAsync(timeout.Token);
-                var buffer = new byte[1024 * 1024];
-                long fileBytes = 0;
-                while (true)
-                {
-                    var read = await source.ReadAsync(buffer, timeout.Token);
-                    if (read == 0) break;
-                    await destination.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
-                    hash.AppendData(buffer, 0, read);
-                    fileBytes += read;
-                    onProgress?.Invoke(totalBytes > 0
-                        ? $"Downloading {Path.GetFileName(file.Path)} · {(completedBytes + fileBytes) / 1073741824d:0.00} / {totalBytes / 1073741824d:0.00} GB"
-                        : $"Downloading {Path.GetFileName(file.Path)} · {(completedBytes + fileBytes) / 1048576d:0.0} MB");
-                }
-                await destination.FlushAsync(timeout.Token);
-                if (file.SizeBytes > 0 && fileBytes != file.SizeBytes) throw new InvalidDataException($"The downloaded size does not match ModelScope's manifest for {file.Path}.");
-                var actualHash = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
-                if (!actualHash.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException($"SHA-256 verification failed for {file.Path}; the model was not imported.");
-                await destination.DisposeAsync();
+                var fileKey = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(file.Path + "\n" + file.Sha256.ToLowerInvariant()))).ToLowerInvariant();
+                var localPath = Path.Combine(downloadDirectory, fileKey + ".gguf.partial");
+                var actualHash = await DownloadModelScopeFileAsync(downloadUri, localPath, file, totalBytes, completedBytes, onProgress, timeout.Token).ConfigureAwait(false);
+                resumableFiles.Add(localPath);
+                var fileBytes = new FileInfo(localPath).Length;
+                bool hasGgufSignature;
                 await using (var signatureFile = File.OpenRead(localPath))
                 {
                     var signature = new byte[4];
-                    if (await signatureFile.ReadAsync(signature, timeout.Token) != 4 || !signature.SequenceEqual("GGUF"u8.ToArray()))
-                        throw new InvalidDataException($"The selected file {file.Path} does not have a GGUF signature; the model was not imported.");
+                    hasGgufSignature = await signatureFile.ReadAsync(signature, timeout.Token) == 4 && signature.SequenceEqual("GGUF"u8.ToArray());
+                }
+                if (!hasGgufSignature)
+                {
+                    File.Delete(localPath);
+                    throw new InvalidDataException($"The selected file {file.Path} does not have a GGUF signature; the model was not imported.");
                 }
 
                 var digest = "sha256:" + actualHash;
@@ -310,14 +310,118 @@ public sealed partial class ModelLibraryService
                 if (string.Equals(message, "success", StringComparison.OrdinalIgnoreCase)) succeeded = true;
             }
             if (!succeeded) throw new InvalidOperationException("Ollama closed the model import stream before confirming completion.");
+            importCompleted = true;
             return modelName;
         }
         finally
         {
-            try { Directory.Delete(temporaryDirectory, recursive: true); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            if (importCompleted)
+            {
+                foreach (var path in resumableFiles)
+                {
+                    try { File.Delete(path); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+                try { if (Directory.Exists(downloadDirectory) && !Directory.EnumerateFileSystemEntries(downloadDirectory).Any()) Directory.Delete(downloadDirectory); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            else
+            {
+                try { if (Directory.Exists(downloadDirectory) && !Directory.EnumerateFileSystemEntries(downloadDirectory).Any()) Directory.Delete(downloadDirectory); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
         }
+    }
+
+    private async Task<string> DownloadModelScopeFileAsync(Uri downloadUri, string localPath, ModelScopeGgufFile file, long totalBytes, long completedBytes, Action<string>? onProgress, CancellationToken cancellationToken)
+    {
+        if (file.SizeBytes <= 0) throw new InvalidDataException($"ModelScope did not publish a verified size for {file.Path}; this package cannot be safely resumed.");
+        var expectedHash = file.Sha256?.ToLowerInvariant() ?? throw new InvalidDataException($"ModelScope did not publish a verified digest for {file.Path}; this package cannot be safely resumed.");
+        if (File.Exists(localPath))
+        {
+            var existingLength = new FileInfo(localPath).Length;
+            if (existingLength == file.SizeBytes)
+            {
+                var existingHash = await HashFileSha256Async(localPath, cancellationToken).ConfigureAwait(false);
+                if (existingHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase)) return existingHash;
+                File.Delete(localPath);
+            }
+            else if (existingLength > file.SizeBytes) File.Delete(localPath);
+        }
+
+        var offset = File.Exists(localPath) ? new FileInfo(localPath).Length : 0;
+        if (offset > 0) onProgress?.Invoke($"Resuming {Path.GetFileName(file.Path)} · {offset / 1048576d:0.0} MB already downloaded");
+        using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);
+        request.Headers.UserAgent.ParseAdd(ProductIdentity.UserAgent("local model library"));
+        if (offset > 0) request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, null);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        if (offset > 0 && response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
+            throw new InvalidDataException("ModelScope rejected the saved download offset; the partial file was preserved for retry.");
+        if (offset > 0 && response.StatusCode == HttpStatusCode.PartialContent)
+        {
+            var range = response.Content.Headers.ContentRange;
+            if (range is null || range.From != offset || range.To is null || range.Length != file.SizeBytes)
+                throw new InvalidDataException("ModelScope returned an invalid partial-content range; the saved download was preserved.");
+        }
+        else if (offset == 0 && response.StatusCode == HttpStatusCode.PartialContent)
+            throw new InvalidDataException("ModelScope returned a partial response without a requested resume offset.");
+        else if (response.StatusCode == HttpStatusCode.OK)
+        {
+            // The source ignored the Range request. Restart safely from byte zero.
+            offset = 0;
+        }
+        else if (offset > 0)
+            throw new InvalidOperationException($"ModelScope could not resume the download ({(int)response.StatusCode}) for {file.Path}.");
+        else if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"ModelScope file download failed ({(int)response.StatusCode}) for {file.Path}.");
+
+        var expectedResponseLength = file.SizeBytes - offset;
+        if (response.Content.Headers.ContentLength is > 0 and var contentLength && contentLength != expectedResponseLength)
+            throw new InvalidDataException($"ModelScope reported an unexpected response size for {file.Path}.");
+        var mode = offset > 0 ? FileMode.Append : FileMode.Create;
+        await using (var destination = new FileStream(localPath, mode, FileAccess.Write, FileShare.None, 1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+        await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var buffer = new byte[1024 * 1024];
+            long responseBytes = 0;
+            try
+            {
+                while (true)
+                {
+                    var read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+                    if (read == 0) break;
+                    responseBytes += read;
+                    if (responseBytes > expectedResponseLength) throw new InvalidDataException($"ModelScope sent more data than its manifest for {file.Path}.");
+                    await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    var fileBytes = offset + responseBytes;
+                    onProgress?.Invoke(totalBytes > 0
+                        ? $"Downloading {Path.GetFileName(file.Path)} · {(completedBytes + fileBytes) / 1073741824d:0.00} / {totalBytes / 1073741824d:0.00} GB"
+                        : $"Downloading {Path.GetFileName(file.Path)} · {(completedBytes + fileBytes) / 1048576d:0.0} MB");
+                }
+            }
+            catch (IOException error) when (!cancellationToken.IsCancellationRequested)
+            { throw new IOException($"ModelScope transfer for {file.Path} was interrupted. The partial download was kept so the next install attempt can resume it.", error); }
+            await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (new FileInfo(localPath).Length != file.SizeBytes)
+            throw new IOException($"ModelScope download for {file.Path} ended early. The partial file was kept so the next install attempt can resume it.");
+        var actualHash = await HashFileSha256Async(localPath, cancellationToken).ConfigureAwait(false);
+        if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+        {
+            File.Delete(localPath);
+            throw new InvalidDataException($"SHA-256 verification failed for {file.Path}; the corrupt partial download was removed.");
+        }
+        return actualHash;
+    }
+
+    private static async Task<string> HashFileSha256Async(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var digest = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+        return Convert.ToHexString(digest).ToLowerInvariant();
     }
 
     private static bool IsSafeModelScopeFilePath(string path)

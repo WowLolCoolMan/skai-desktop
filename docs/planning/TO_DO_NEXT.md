@@ -15,22 +15,127 @@ the relevant plan before implementation.
 - Move finished work to [the archive](../archive/README.md) or the changelog;
 keep this queue focused on unfinished work.
 
-## Active work
+## Finish the current work
 
-| Work | Status / owner | Next step | Agreed approach and acceptance | Detail |
-| --- | --- | --- | --- | --- |
-| Professional UI pass | In progress · Codex | Manually review the running app and close the visual, keyboard, and pet-animation gaps. | Improve one page at a time; preserve working actions and truthful states. Accept only after live review across supported widths and themes. | [UI progress](SKAI_PREMIUM_UI_PROGRESS.md), [references](UI_REFERENCE_GUIDE.md) |
-| Local voice acceptance | Blocked · Unclaimed | Install or enable a local `en-US` recognition pack, then verify spoken dictation and a hands-free turn with a real microphone. | Keep processing local; cover speech accuracy, cancellation, and unavailable-language recovery. SAPI synthesis voices are installed, but packaged Electron currently reports local `en-US` recognition as unavailable and Skai correctly disables dictation without remote fallback. | [Voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md), [capability matrix](CAPABILITY_MATRIX.md) |
-| Coding Agent isolation | In progress · Codex | Verify cgroup controls on supported Linux desktop profiles and Windows PSEC on additional Windows profiles. | Linux approved commands require Bubblewrap and a user systemd cgroup scope with memory, swap, process-count, and CPU limits; setup fails closed. Ubuntu 24.04/WSL2 acceptance proves those limits, project-only writes, denied sibling access/network, timeout, and cancellation. Windows PSEC and Job Object acceptance passes on this Windows 11 host. Commands now refuse to run on macOS or any platform without a supported OS sandbox; no unattended or parallel commands before broader acceptance. | [Architecture](../engineering/ARCHITECTURE.md), [readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md) |
-| Image runtime coverage | In progress · Unclaimed | Exercise a live ComfyUI server and validate GPU or additional hardware. | Show only runtime-reported progress; cancellation must stop the job and leave the page usable. | [Image guide](../guides/LOCAL_IMAGE_GENERATION.md), [capability matrix](CAPABILITY_MATRIX.md) |
-| Release validation | In progress · Unclaimed | Exercise an installed app updating through the published feed and complete native Linux desktop updater acceptance. | Headless Ubuntu 24.04/WSL2 acceptance covers AppImage update and in-app rollback from synthetic 0.1.3 to 0.1.4 and back, preserving user data. Published 0.1.4 Windows/Linux feed metadata and referenced asset sizes now verify over HTTPS; an installed app has not updated through GitHub. Signed metadata/signing are deferred by the owner, and native Linux desktop acceptance remains open. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
-| Persona research and chat | In progress · Unclaimed | Resolve the local-model stream disconnect in the second turn of living-person era acceptance, then broaden multi-turn cutoff checks across persona types. | Dated source filtering applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. The live smoke now supports `--era-date`, filters research before drafting, and persists the date. The Joe Rogan 2010 run passed identity, research, card drafting, and its first reply, but Ollama closed all three cutoff follow-up streams without a response; do not count this as cutoff acceptance. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
-| Local, cloud, and hybrid gateway | In progress · Codex | Verify a native Linux desktop unlock/restart cycle and implement the macOS credential adapter before starting a cloud chat provider. | Require explicit routing, OS-protected secrets, clear data-destination disclosure, and a working offline-only mode. No silent fallback. Windows DPAPI and Linux GNOME Keyring round-trip/isolation are verified; absent-bus fail-closed and sanitized error guidance are covered. Actual locked/corrupted keyring recovery and macOS storage remain open. | [Provider gateway plan](implementation-plans/provider-gateway.md) |
+Ordered around open acceptance blockers and the user's explicit priorities.
+Mark an item done only when the linked workflow has evidence.
+
+1. **UI and accessibility acceptance — In progress · Codex.** Manually review
+   the 17-route matrix, keyboard/focus behavior, assistive technology, narrow
+   layouts, and pet animations. Record screenshots and gaps in
+   [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
+2. **Real microphone voice — In progress · Codex.** Exercise the new local
+   Whisper microphone path with a real device; verify draft insertion,
+   cancellation, permissions, and recovery, then test hands-free on a local
+   speech pack. Keep the path local. See the
+   [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
+3. **Cross-profile Coding Agent sandbox — In progress · Codex.** Verify Windows
+   PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Keep
+   failing closed where sandbox setup is unavailable; no macOS command path
+   without a sandbox. See [architecture](../engineering/ARCHITECTURE.md).
+4. **Persona era acceptance — In progress · Unclaimed.** Resolve the Ollama
+   stream disconnect during follow-up turns, then test date cutoffs across
+   living and deceased personas and multiple model runs. See the
+   [Smart Personas plan](implementation-plans/smart-personas.md).
+5. **Image runtime coverage — In progress · Unclaimed.** Exercise a live
+   ComfyUI server and GPU/additional hardware; verify truthful progress,
+   cancellation, and recovery. See the
+   [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
+6. **Windows update acceptance — In progress · Unclaimed.** Update an installed
+   app through the published feed; validate rollback on a release built with
+   current updater support. Preserve user data.
+7. **Native Linux release acceptance — In progress · Unclaimed.** Exercise the
+   AppImage, updater, rollback, and window behavior on a supported desktop, not
+   only WSL/Xvfb. See [release readiness](../operations/RELEASE_READINESS.md).
+8. **Credential-store recovery — In progress · Codex.** Test Linux desktop
+   unlock/restart and locked/corrupted keyring recovery; implement and verify a
+   macOS credential adapter before hosted chat routes.
+9. **Marketplace end-to-end support — In progress · Codex.** Give every
+   advertised entry a verified local install/setup, launch/use, and removal
+   path; expose license/runtime requirements and never leave an entry looking
+   usable when its adapter is missing. Saved ComfyUI workflows can now be
+   reviewed and activated inside Marketplace; exact model packages and the
+   remaining MCP/voice adapters still need end-to-end support.
+10. **GitHub workflow acceptance — Next · Unclaimed.** Exercise empty/denied
+    permissions, network failure, clone conflicts, cancellation, and retry in
+    isolated profiles with real credentials.
+
+## Next up
+
+11. **Requested voice engines.** Complete install/use/stop/error acceptance for
+    requested local engines such as Chatterbox, Qwen3-TTS, OmniVoice, and Higgs
+    Audio; keep credentialed hosted services clearly separated from local
+    catalog entries.
+12. **User-controlled provider gateway.** Add explicit local/cloud/hybrid chat
+    routing only after OS-protected credentials, data disclosure, and an
+    offline-only mode are verified. No silent provider fallback.
+13. **MCP lifecycle.** Finish server setup, permission review/revocation,
+    health reporting, and recovery for supported stdio/HTTP servers.
+14. **Model fit and license guidance — In progress · Codex.** The model
+    inspector now compares package size against current free RAM, reports GPU
+    memory when telemetry exists, and labels the result as advisory. Hugging
+    Face results now surface license metadata from the model card or license
+    tag, and clearly prompt source review when neither is published. Remaining:
+    validate fit against real models and runtimes.
+15. **Resumable model installs — In progress · Codex.** The Skai-managed
+    ModelScope GGUF installer now persists checksum-keyed partial shards,
+    resumes with HTTP Range, validates the complete size/hash/signature, and
+    removes its cache only after successful Ollama import. Remaining:
+    acceptance of cancellation and retries, plus retry behavior delegated to
+    Ollama/LM Studio.
+16. **Legacy conversation import.** Add preview, cancel-without-writing,
+    duplicate protection, restart recovery, and preservation of edited chats.
+17. **Scanned documents and data files.** Add local OCR for scanned PDFs and
+    capability-aware handling for spreadsheets and other unsupported content.
+18. **Packaged media coverage.** Verify real WebM and audio fixtures in the
+    packaged app; make format and model capability errors clear.
+19. **Context and run capacity.** Verify actual 1M-token execution with a
+    compatible model; improve runtime-aware estimates and safe concurrency.
+20. **Production update trust.** Add signed update metadata and prepare trusted
+    installer signing/clean-machine validation. Code-signing certificates were
+    previously deferred; do not publish unsigned testing builds as production.
 
 ## Recently completed
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-22:** Marketplace now lists saved local ComfyUI workflows, identifies
+  the active workflow, and lets users activate one without leaving Marketplace.
+  The workflow remains in the existing app profile storage and is ready to use
+  in Image Studio. No remote workflow downloads were added.
+
+- **2026-11-22:** One-shot mic dictation now prefers the installed local Whisper
+  runtime, captures WebM in the renderer, limits recordings to five minutes and
+  20 MB, and inserts the local transcript into the draft for review. WebM is
+  accepted by the existing offline Whisper path. A live microphone acceptance
+  run is still required; hands-free mode continues to require local browser
+  speech recognition.
+
+- **2026-11-22:** Marketplace model details now include a device-fit advisory
+  based on the live local RAM/GPU capacity probe and catalog package size. It
+  clearly reports when memory telemetry is missing, warns when package size is
+  larger than current free RAM, and explains runtime/context overhead. It does
+  not claim package size guarantees that a model will fit.
+
+- **2026-11-22:** Marketplace search carries Hugging Face license metadata from
+  the model card, falling back to the repository's license tag. When neither is
+  present, the model inspector says that license metadata is unavailable and
+  directs users to review the source repository before use. Full-weight results
+  also retain published context length, including 1M-token values.
+
+- **2026-11-22:** ModelScope GGUF downloads now resume from a checksum-keyed
+  local partial file when the server supports byte ranges. The adapter checks
+  the returned range, expected size, full SHA-256, and GGUF signature before
+  upload; interrupted transfers preserve their partial for retry, invalid
+  content is removed, and successful import cleans the resume cache. Ollama
+  and LM Studio still own their respective upstream download and retry state.
+
+- **2026-11-22:** Windows Coding Agent Job Object acceptance and the full native
+  core suite pass when the sandbox stress group runs before longer test groups.
+  The allocation control now respects the OS-clamped available memory cap; the
+  suite continues to verify a 320 MiB allocation where capacity permits,
+  256 MiB memory denial, filesystem/network isolation, timeout, and cancellation.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed

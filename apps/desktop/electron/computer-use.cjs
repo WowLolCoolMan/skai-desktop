@@ -16,8 +16,8 @@ public static class SkaiComputerInput {
 }
 '@
 $display = $request.display
-$x = [int]($display.x + [Math]::Round($request.x * $display.width))
-$y = [int]($display.y + [Math]::Round($request.y * $display.height))
+$x = [int][Math]::Round(($display.x + ($request.x * $display.width)) * $display.scaleFactor)
+$y = [int][Math]::Round(($display.y + ($request.y * $display.height)) * $display.scaleFactor)
 if ($request.action -eq 'click') {
   if (-not [SkaiComputerInput]::SetCursorPos($x,$y)) { throw 'Could not move the pointer to that display point.' }
   $flag = if ($request.button -eq 'right') { 0x0008 } else { 0x0002 }

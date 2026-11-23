@@ -30,11 +30,11 @@ internal static class ModelLibraryTests
             Check(requestUri?.Host == "huggingface.co" && requestUri.Query.Contains("filter=gguf", StringComparison.Ordinal), "model library searches Hugging Face GGUF repositories");
             var data = requestUri?.Query.Contains("abliterated", StringComparison.OrdinalIgnoreCase) == true
                 ? "[{\"id\":\"org/model-abliterated-gguf\",\"downloads\":1234,\"likes\":12,\"tags\":[\"gguf\",\"abliterated\"]}]"
-                : "[{\"id\":\"org/model-gguf\",\"downloads\":1234,\"likes\":12,\"tags\":[\"gguf\"]},{\"id\":\"org/model-uncensored-gguf\",\"downloads\":9,\"tags\":[\"uncensored\"]}]";
+                : "[{\"id\":\"org/model-gguf\",\"downloads\":1234,\"likes\":12,\"tags\":[\"gguf\",\"license:apache-2.0\"],\"cardData\":{\"license\":\"apache-2.0\"}},{\"id\":\"org/model-uncensored-gguf\",\"downloads\":9,\"tags\":[\"uncensored\"]}]";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(data) });
         })));
         var hubModels = await hfSearch.SearchHuggingFaceAsync("small instruct", uncensored: false);
-        Check(hubModels.Count == 1 && hubModels[0].Id == "org/model-gguf" && hubModels[0].Downloads == 1234, "model library parses Hub IDs and popularity metadata");
+        Check(hubModels.Count == 1 && hubModels[0].Id == "org/model-gguf" && hubModels[0].Downloads == 1234 && hubModels[0].License == "apache-2.0", "model library parses Hub IDs, popularity, and published license metadata");
         var uncensoredHubModels = await hfSearch.SearchHuggingFaceAsync("small instruct", uncensored: true);
         Check(uncensoredHubModels.Count >= 1 && uncensoredHubModels.All(model => model.IsUncensored), "uncensored catalog includes only explicitly labeled repositories");
         var boundedCatalog = new ModelLibraryService(new HttpClient(new StubHandler((_, _) =>
@@ -50,6 +50,14 @@ internal static class ModelLibraryTests
         }
         var ignoredCatalogModels = await boundedCatalog.SearchHuggingFaceAsync("small", uncensored: false);
         Check(ignoredCatalogModels.Count == 0, "model catalog ignores oversized remote model IDs");
+        var airLlmCatalog = new ModelLibraryService(new HttpClient(new StubHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("[{\"id\":\"org/full-weights\",\"downloads\":42,\"tags\":[\"text-generation\",\"license:mit\"],\"cardData\":{\"license\":\"apache-2.0\"},\"config\":{\"max_position_embeddings\":1048576},\"siblings\":[{\"rfilename\":\"model.safetensors\",\"size\":4096}]}]")
+            }))));
+        var airLlmModels = await airLlmCatalog.SearchHuggingFaceAirLlmAsync("full weights", uncensored: false);
+        Check(airLlmModels.Count == 1 && airLlmModels[0].License == "apache-2.0" && airLlmModels[0].ContextLength == 1048576,
+            "full-weight model catalog results include published license and context metadata");
         var localInventory = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
         {
             var models = (request.RequestUri?.Port, request.RequestUri?.AbsolutePath) switch
@@ -159,6 +167,46 @@ internal static class ModelLibraryTests
             new ModelScopeGgufPackage("org/model", "model-Q4_K_M.gguf", [new ModelScopeGgufFile("model-Q4_K_M.gguf", ggufBytes.Length, ggufHash)], 1));
         using (var createJson = JsonDocument.Parse(importedCreateBody))
             Check(importedFileDigest == "sha256:" + ggufHash && createJson.RootElement.GetProperty("files").GetProperty("model-Q4_K_M.gguf").GetString() == importedFileDigest && importedModelName.StartsWith("ms-model-", StringComparison.Ordinal), "ModelScope GGUF downloads are SHA-256 checked and imported through Ollama's blob/create APIs");
+
+        var resumeDirectory = Path.Combine(Path.GetTempPath(), "skai-modelscope-resume-test-" + Guid.NewGuid().ToString("N"));
+        var rangedResumeSeen = false;
+        var resumeRequestCount = 0;
+        var resumableImport = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
+        {
+            if (request.Method == HttpMethod.Get)
+            {
+                resumeRequestCount++;
+                if (resumeRequestCount == 1)
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new PrefixThenThrowStream(ggufBytes, 4)) });
+                rangedResumeSeen = request.Headers.Range?.Ranges.SingleOrDefault()?.From == 4;
+                if (!rangedResumeSeen) throw new Exception("The interrupted ModelScope download was not resumed at its verified saved offset.");
+                var resumed = new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = new ByteArrayContent(ggufBytes[4..]) };
+                resumed.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(4, ggufBytes.Length - 1, ggufBytes.Length);
+                return Task.FromResult(resumed);
+            }
+            if (request.RequestUri!.AbsolutePath.StartsWith("/api/blobs/", StringComparison.Ordinal)) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created));
+            if (request.RequestUri!.AbsolutePath == "/api/create") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"status\":\"success\"}\n") });
+            throw new Exception("Unexpected resumable ModelScope request: " + request.RequestUri);
+        })), resumeDirectory);
+        var resumablePackage = new ModelScopeGgufPackage("org/model", "model-Q4_K_M.gguf", [new ModelScopeGgufFile("model-Q4_K_M.gguf", ggufBytes.Length, ggufHash)], 1);
+        try
+        {
+            try
+            {
+                await resumableImport.DownloadAndImportModelScopeGgufAsync("http://localhost:11434/v1", resumablePackage);
+                throw new Exception("Expected the first ModelScope transfer to interrupt.");
+            }
+            catch (IOException error) when (error.Message.Contains("partial download was kept", StringComparison.Ordinal))
+            {
+                var savedPartial = Directory.GetFiles(resumeDirectory, "*.partial", SearchOption.AllDirectories).SingleOrDefault();
+                Check(savedPartial is not null && new FileInfo(savedPartial).Length == 4, "Interrupted ModelScope downloads retain a bounded partial file for a safe retry");
+            }
+            await resumableImport.DownloadAndImportModelScopeGgufAsync("http://localhost:11434/v1", resumablePackage);
+            Check(rangedResumeSeen && resumeRequestCount == 2, "ModelScope retry resumes with HTTP Range, verifies the whole SHA-256, and imports the model");
+            Check(!Directory.Exists(resumeDirectory) || !Directory.EnumerateFileSystemEntries(resumeDirectory, "*", SearchOption.AllDirectories).Any(), "Successfully imported ModelScope downloads remove only their temporary resume cache");
+        }
+        finally { if (Directory.Exists(resumeDirectory)) Directory.Delete(resumeDirectory, recursive: true); }
+
         var rejectedImportHandler = new StubHandler((request, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(ggufBytes) }));
         var rejectedImport = new ModelLibraryService(new HttpClient(rejectedImportHandler));
         try
@@ -202,4 +250,35 @@ internal static class ModelLibraryTests
         Check(secondSample.Samples == 2 && Math.Abs(secondSample.EstimatedTokensPerSecond - 75) < 0.001 && secondSample.TimeToFirstTokenMilliseconds == 200,
             "later local speed samples update the running averages");
     }
+}
+
+internal sealed class PrefixThenThrowStream(byte[] bytes, int prefixLength) : Stream
+{
+    private int _position;
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override void Flush() { }
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        if (_position >= prefixLength) throw new IOException("Simulated interrupted transfer.");
+        var read = Math.Min(count, prefixLength - _position);
+        Array.Copy(bytes, _position, buffer, offset, read);
+        _position += read;
+        return read;
+    }
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_position >= prefixLength) throw new IOException("Simulated interrupted transfer.");
+        var read = Math.Min(buffer.Length, prefixLength - _position);
+        bytes.AsMemory(_position, read).CopyTo(buffer);
+        _position += read;
+        return ValueTask.FromResult(read);
+    }
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }
