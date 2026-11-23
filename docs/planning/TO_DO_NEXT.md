@@ -24,13 +24,20 @@ keep this queue focused on unfinished work.
 | Coding Agent isolation | In progress · Codex | Verify cgroup controls on supported Linux desktop profiles and Windows PSEC on additional Windows profiles. | Linux approved commands now require Bubblewrap plus a user systemd cgroup scope with process-tree memory cap, swap disabled, maximum 128 processes, and CPU quota capped at four cores; setup fails closed. Ubuntu 24.04/WSL2 acceptance proves actual memory and process limits, workspace-only writes, denied sibling access/network, timeout, and cancellation. Windows PSEC and Job Object acceptance remains verified on this Windows 11 host; no unattended or parallel commands without broader acceptance. | [Architecture](../engineering/ARCHITECTURE.md), [readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md) |
 | Image runtime coverage | In progress · Unclaimed | Exercise a live ComfyUI server and validate GPU or additional hardware. | Show only runtime-reported progress; cancellation must stop the job and leave the page usable. | [Image guide](../guides/LOCAL_IMAGE_GENERATION.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Release validation | In progress · Unclaimed | Complete published-feed and native desktop updater acceptance. | Headless Ubuntu 24.04/WSL2 acceptance now covers AppImage update and in-app rollback from synthetic 0.1.3 to 0.1.4 and back, preserving user data. Published feed, signed metadata, and native Linux desktop acceptance remain open. Production signing is deferred by the owner. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
-| Persona research and chat | In progress · Unclaimed | Improve name-only transcript discovery and extend multi-turn cutoff checks across era/persona types. | Dated source filtering now applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. A live local-model check now carries the discovered death date into the saved card and tests a later turn; continue conservative attribution and evidence removal. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
+| Persona research and chat | In progress · Unclaimed | Resolve the local-model stream disconnect in the second turn of living-person era acceptance, then broaden multi-turn cutoff checks across persona types. | Dated source filtering applies the earlier knowledge/era cutoff to chat, quotes, voice evidence, and research synthesis. The live smoke now supports `--era-date`, filters research before drafting, and persists the date. The Joe Rogan 2010 run passed identity, research, card drafting, and its first reply, but Ollama closed all three cutoff follow-up streams without a response; do not count this as cutoff acceptance. | [Smart Personas plan](implementation-plans/smart-personas.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Local, cloud, and hybrid gateway | In progress · Codex | Continue the provider and secret-store contracts; add a supported provider only after consent and credential handling are ready. | Require explicit routing, OS-protected secrets, clear data-destination disclosure, and a working offline-only mode. No silent fallback. | [Provider gateway plan](implementation-plans/provider-gateway.md) |
 
 ## Recently completed
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-22:** Extended the Persona live smoke with strict `--era-date`
+  validation, era-filtered research before drafting, persisted era metadata,
+  and a follow-up question beyond the selected date. Joe Rogan's 2010 run
+  passed identity, research, drafting, and its first response. Three subsequent
+  cutoff turns were inconclusive because Ollama closed the stream; living-era
+  cutoff behavior remains open.
 
 - **2026-11-22:** Name-only Persona research now accepts a confirmed first-name
   speaker label when a page also contains the full public-person name and clear

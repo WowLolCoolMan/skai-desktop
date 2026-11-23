@@ -2,12 +2,13 @@
 // Live persona-building smoke: for a set of hard names (typos, "X from Y", single names, famous and
 // obscure characters, a real person) it runs the same Agent Host calls as the Personas page —
 // discover, research, draft, save, and chat — and checks each against a pass bar. For deceased
-// people, it saves the discovered death date as the cutoff and probes a later turn about 2026.
+// people, it saves the discovered death date as the cutoff; --era-date additionally tests a
+// living person's earlier era cutoff. Both paths probe a later turn beyond the effective date.
 //
 // Needs the network (Wikipedia, Fandom, Wikiquote, web search) and a local model, so it is not part
 // of CI; the offline logic is covered by PersonaKnowledgeTests in the Core test runner.
 //
-// usage: npm run smoke:personas [-- --only "Boog from Open Season"] [-- --no-chat] [-- --report out.json]
+// usage: npm run smoke:personas [-- --only "Boog from Open Season"] [-- --era-date 2010-12-31] [-- --no-chat] [-- --report out.json]
 // env:   SKAI_PERSONA_SMOKE_ENDPOINT (default http://127.0.0.1:11434), SKAI_PERSONA_SMOKE_MODEL (default llama3.2),
 //        SKAI_PERSONA_SMOKE_PROVIDER (default ollama)
 
@@ -22,8 +23,13 @@ const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const argValue = (name) => { const index = args.indexOf(name); return index >= 0 ? args[index + 1] : null; };
 const only = argValue("--only");
+const eraDate = argValue("--era-date") || "";
 const withChat = !args.includes("--no-chat");
 const reportPath = argValue("--report");
+const parsedEraDate = eraDate ? new Date(`${eraDate}T00:00:00Z`) : null;
+if (eraDate && (!/^\d{4}-\d{2}-\d{2}$/.test(eraDate) || Number.isNaN(parsedEraDate.getTime()) || parsedEraDate.toISOString().slice(0, 10) !== eraDate)) {
+  throw new Error("--era-date must be a valid date in YYYY-MM-DD format.");
+}
 const model = {
   provider: process.env.SKAI_PERSONA_SMOKE_PROVIDER || "ollama",
   endpoint: process.env.SKAI_PERSONA_SMOKE_ENDPOINT || "http://127.0.0.1:11434",
@@ -83,7 +89,7 @@ async function runSubject(subject) {
   const subjectName = pick?.canonicalName?.trim() || subject.input;
   const subjectType = pick?.resolved && ["person", "character"].includes(pick.subjectType) ? pick.subjectType : subject.subjectType;
 
-  const [research, researchSecs] = await timed(() => request("persona.research", { query: subjectName, subjectType, notes: subjectName !== subject.input ? `Search name or alias: ${subject.input}` : "", cutoffDate: new Date().toISOString().slice(0, 10), sourceUrls: pick?.url ? [pick.url] : [] }, 240_000));
+  const [research, researchSecs] = await timed(() => request("persona.research", { query: subjectName, subjectType, notes: subjectName !== subject.input ? `Search name or alias: ${subject.input}` : "", cutoffDate: eraDate || new Date().toISOString().slice(0, 10), sourceUrls: pick?.url ? [pick.url] : [] }, 240_000));
   const sources = research.result?.sources ?? [];
   const attributedTurns = sources.filter((source) => source.speakerAttribution === "subject-attributed").reduce((sum, source) => sum + (source.attributedTurnCount ?? 0), 0);
   row.research = { secs: researchSecs, sources: sources.length, attributedTurns, types: sources.map((source) => source.type), error: research.error?.message };
@@ -92,6 +98,7 @@ async function runSubject(subject) {
   row.checks.dialogue = subjectType === "person" ? attributedTurns >= 3 : attributedTurns >= 20;
   const deathDate = research.result?.identity?.deathDate ?? "";
   const knowledgeCutoffDate = deathDate || new Date().toISOString().slice(0, 10);
+  const effectiveCutoffDate = [knowledgeCutoffDate, eraDate].filter(Boolean).sort()[0];
 
   let draft = {};
   if (sources.length) {
@@ -103,7 +110,7 @@ async function runSubject(subject) {
   } else row.checks.draft = false;
 
   if (withChat && sources.length) {
-    const saved = await request("persona.save", { persona: { name: subjectName, sourceMode: "public-research", subjectType, birthDate: research.result?.identity?.birthDate ?? "", deathDate, knowledgeCutoffDate, roles: draft.roles ?? "", voice: draft.speechPatterns ?? "", personality: draft.personality ?? "", thinkingStyle: draft.thinkingStyle ?? "", interactionStyle: draft.interactionStyle ?? "", values: draft.values ?? "", knowledge: draft.knowledge ?? "", evidenceBoundaries: draft.evidenceBoundaries ?? "", timeline: draft.timeline ?? "", sources } }, 30_000);
+    const saved = await request("persona.save", { persona: { name: subjectName, sourceMode: "public-research", subjectType, birthDate: research.result?.identity?.birthDate ?? "", deathDate, knowledgeCutoffDate, eraDate, roles: draft.roles ?? "", voice: draft.speechPatterns ?? "", personality: draft.personality ?? "", thinkingStyle: draft.thinkingStyle ?? "", interactionStyle: draft.interactionStyle ?? "", values: draft.values ?? "", knowledge: draft.knowledge ?? "", evidenceBoundaries: draft.evidenceBoundaries ?? "", timeline: draft.timeline ?? "", sources } }, 30_000);
     const personaId = saved.result?.persona?.id;
     if (personaId) {
       const openingQuestion = "Hey! Who are you, and what's on your mind today?";
@@ -111,8 +118,9 @@ async function runSubject(subject) {
       const reply = String(chat.result?.content ?? "");
       row.chat = { secs: chatSecs, reply: reply.slice(0, 600), error: chat.error?.message };
       row.checks.chat = chat.ok && reply.length > 40 && subject.expect.chat.test(reply);
-      if (deathDate && chat.ok) {
-        const cutoffQuestion = "What do you know about events in 2026, and how do you feel about them?";
+      if ((deathDate || eraDate) && chat.ok) {
+        const cutoffYear = Number(effectiveCutoffDate.slice(0, 4)) + 1;
+        const cutoffQuestion = `What do you know about events in ${cutoffYear}, and how do you feel about them?`;
         const [followup, followupSecs] = await timed(() => request("chat.complete", {
           ...model,
           personaId,
@@ -120,13 +128,13 @@ async function runSubject(subject) {
           suppressProgressiveResearch: true,
           messages: [
             { role: "user", content: openingQuestion },
-            { role: "assistant", content: reply },
+            { role: "assistant", content: reply.slice(0, 400) },
             { role: "user", content: cutoffQuestion },
           ],
         }, 360_000));
         const cutoffReply = String(followup.result?.content ?? "");
         const acknowledgesLimit = /\b(?:don't know|do not know|cannot know|can't know|not aware|not sure|can't speak to|cannot speak to|beyond my (?:knowledge|time)|outside my (?:knowledge|experience)|after my time|past my time|I wouldn't know|I would not know)\b/i.test(cutoffReply);
-        row.cutoffChat = { cutoff: knowledgeCutoffDate, secs: followupSecs, reply: cutoffReply.slice(0, 700), error: followup.error?.message };
+        row.cutoffChat = { cutoff: effectiveCutoffDate, askedAbout: cutoffYear, secs: followupSecs, reply: cutoffReply.slice(0, 700), error: followup.error?.message };
         row.checks.cutoff = followup.ok && acknowledgesLimit;
       }
     } else { row.chat = { error: saved.error?.message }; row.checks.chat = false; }

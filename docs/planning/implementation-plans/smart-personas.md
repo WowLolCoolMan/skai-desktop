@@ -24,6 +24,12 @@ date as the persona's knowledge cutoff and asks a second question about 2026 in
 the same conversation. The 2026-11-22 run with local `qwen3:14b` passed with
 three sources, 60 attributed transcript turns, nine drafted fields, and a
 cutoff-aware follow-up. A separate Joe Rogan run passed with three sources, 59
-attributed turns, nine fields, and a conversational response. These are
-single-model, single-profile samples; living-person era dates and broader
-multi-turn evaluation still need coverage.
+attributed turns, nine fields, and a conversational response. The smoke now
+accepts `--era-date YYYY-MM-DD`, applies that date to research before drafting,
+persists it on the test card, and probes the following year. Joe Rogan's 2010
+era run passed discovery, research, drafting, and its first in-character turn,
+but three follow-up attempts ended with the local Ollama server closing the
+stream without a reply. Era-cutoff dialogue therefore remains unverified; this
+is recorded as a model-runtime failure, not a pass or a product-policy failure.
+These are single-model, single-profile samples; broader multi-turn evaluation
+still needs coverage.
