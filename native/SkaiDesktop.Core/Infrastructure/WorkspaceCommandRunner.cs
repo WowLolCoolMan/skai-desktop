@@ -62,7 +62,12 @@ public sealed class WorkspaceCommandRunner
         }
         if (OperatingSystem.IsLinux())
         {
-            startInfo = LinuxCommandSandbox.CreateStartInfo(Path.GetFullPath(selectedRoot), workingDirectory, command, startInfo.Environment.ToArray());
+            foreach (var name in new[] { "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS" })
+            {
+                var value = Environment.GetEnvironmentVariable(name);
+                if (!string.IsNullOrWhiteSpace(value)) startInfo.Environment[name] = value;
+            }
+            startInfo = LinuxCommandSandbox.CreateStartInfo(Path.GetFullPath(selectedRoot), workingDirectory, command, startInfo.Environment.ToArray(), jobMemoryLimitBytesOverride);
         }
         else if (!isWindows)
         {
@@ -106,14 +111,14 @@ public sealed class WorkspaceCommandRunner
         var capturedOutput = TerminalControlSequence.Replace(output.ToString(), string.Empty);
         capturedOutput = new string(capturedOutput.Where(character => !char.IsControl(character) || character is '\r' or '\n' or '\t').ToArray());
         var isolationStatus = windowsSandbox?.Status ?? (OperatingSystem.IsLinux()
-            ? LinuxCommandSandbox.Status
+            ? LinuxCommandSandbox.Status(LinuxCommandSandbox.GetMemoryLimitBytes(jobMemoryLimitBytesOverride))
             : OsProcessIsolation.DescribeCurrentPlatform(isolation.IsAttached, isolation.JobMemoryLimitBytes));
         if (OperatingSystem.IsLinux())
         {
             if (!capturedOutput.StartsWith(LinuxCommandSandbox.ExecutionStartedMarker, StringComparison.Ordinal))
             {
-                isolationStatus = "Linux Bubblewrap could not establish the required sandbox; the project command was not executed. " +
-                    "Check Bubblewrap and user, PID, and network namespace availability.";
+                isolationStatus = "Linux Bubblewrap and systemd cgroup limits could not establish the required sandbox; the project command was not executed. " +
+                    "Check Bubblewrap, user/PID/network namespaces, and the active user systemd manager.";
             }
             else
             {

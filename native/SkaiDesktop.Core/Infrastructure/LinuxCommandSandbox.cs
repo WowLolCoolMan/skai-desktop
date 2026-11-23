@@ -6,15 +6,19 @@ namespace SkaiDesktop.Core.Infrastructure;
 internal static class LinuxCommandSandbox
 {
     public const string ExecutionStartedMarker = "__SKAI_LINUX_SANDBOX_READY_6C0F5147__";
+    public const uint MaxActiveProcesses = 128;
+    public const int MaxCpuCores = 4;
     private static readonly string[] ReadOnlySystemMounts = ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc"];
 
     public static ProcessStartInfo CreateStartInfo(
         string selectedRoot,
         string workingDirectory,
         string command,
-        IEnumerable<KeyValuePair<string, string?>> inheritedEnvironment)
+        IEnumerable<KeyValuePair<string, string?>> inheritedEnvironment,
+        ulong? memoryLimitBytesOverride)
     {
         var bubblewrap = FindBubblewrap();
+        var systemdRun = FindSystemdRun();
         EnsureSafeWorkspacePath(selectedRoot);
 
         var startInfo = new ProcessStartInfo
@@ -103,7 +107,7 @@ internal static class LinuxCommandSandbox
         startInfo.ArgumentList.Add("skai-linux-sandbox");
         startInfo.ArgumentList.Add(ExecutionStartedMarker);
         startInfo.ArgumentList.Add(command);
-        return startInfo;
+        return ApplyCgroupLimits(startInfo, systemdRun, inheritedEnvironment, memoryLimitBytesOverride);
     }
 
     public static string FindBubblewrap()
@@ -113,7 +117,64 @@ internal static class LinuxCommandSandbox
         throw new InvalidOperationException("Coding Agent commands require Bubblewrap (bwrap) on Linux. Install Bubblewrap and ensure user, PID, and network namespaces are available; Skai will not run this command without its Linux sandbox.");
     }
 
-    public static string Status => "Linux Bubblewrap sandbox active (selected project writable; system paths read-only; temporary files isolated; network disabled).";
+    public static string Status(ulong memoryLimitBytes) =>
+        $"Linux Bubblewrap and systemd cgroup sandbox active (selected project writable; system paths read-only; temporary files isolated; network disabled; process-tree memory cap {FormatGigabytes(memoryLimitBytes)} GiB; maximum {MaxActiveProcesses} processes; CPU quota {GetCpuQuotaPercent()}%).";
+
+    private static ProcessStartInfo ApplyCgroupLimits(
+        ProcessStartInfo bubblewrap,
+        string systemdRun,
+        IEnumerable<KeyValuePair<string, string?>> inheritedEnvironment,
+        ulong? memoryLimitBytesOverride)
+    {
+        var memoryLimit = GetMemoryLimitBytes(memoryLimitBytesOverride);
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = systemdRun,
+            WorkingDirectory = bubblewrap.WorkingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            StandardErrorEncoding = System.Text.Encoding.UTF8
+        };
+        startInfo.Environment.Clear();
+        foreach (var (name, value) in inheritedEnvironment)
+            if (value is not null) startInfo.Environment[name] = value;
+
+        startInfo.ArgumentList.Add("--user");
+        startInfo.ArgumentList.Add("--scope");
+        startInfo.ArgumentList.Add("--quiet");
+        startInfo.ArgumentList.Add($"--unit=skai-coding-command-{Guid.NewGuid():N}.scope");
+        startInfo.ArgumentList.Add($"--property=MemoryMax={memoryLimit}");
+        startInfo.ArgumentList.Add("--property=MemorySwapMax=0");
+        startInfo.ArgumentList.Add($"--property=TasksMax={MaxActiveProcesses}");
+        startInfo.ArgumentList.Add($"--property=CPUQuota={GetCpuQuotaPercent()}%");
+        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(bubblewrap.FileName);
+        foreach (var argument in bubblewrap.ArgumentList) startInfo.ArgumentList.Add(argument);
+        return startInfo;
+    }
+
+    private static string FindSystemdRun()
+    {
+        foreach (var candidate in new[] { "/usr/bin/systemd-run", "/bin/systemd-run" })
+            if (File.Exists(candidate)) return candidate;
+        throw new InvalidOperationException("Coding Agent commands require systemd-run and an active user systemd manager on Linux to enforce process-tree memory, process-count, and CPU limits. Skai will not run this command without those limits.");
+    }
+
+    private static int GetCpuQuotaPercent() => Math.Clamp(Environment.ProcessorCount, 1, MaxCpuCores) * 100;
+
+    public static ulong GetMemoryLimitBytes(ulong? memoryLimitBytesOverride)
+    {
+        var availableMemory = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        var estimatedLimit = CommandResourceLimits.EstimateJobMemoryLimitBytes(availableMemory > 0 ? (ulong)availableMemory : 0);
+        return memoryLimitBytesOverride is { } requestedLimit ? Math.Min(estimatedLimit, requestedLimit) : estimatedLimit;
+    }
+
+    private static string FormatGigabytes(ulong bytes) =>
+        (bytes / (1024d * 1024 * 1024)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
     private static bool IsWithinReadOnlySystemTree(string path)
     {

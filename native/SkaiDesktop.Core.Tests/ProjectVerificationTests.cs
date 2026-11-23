@@ -27,7 +27,7 @@ internal static class ProjectVerificationTests
             Check(store.TryClaimReady()?.Status == AgentTaskStatuses.Running, "verification fixture claims a task before evidence is attached");
             store.Complete(task.Id, "Task changes are ready for review.");
             var started = DateTimeOffset.UtcNow.AddSeconds(-1);
-            store.AttachVerificationEvidence(task.Id, new ProjectCheckEvidence("package:test", "Test", "npm run test", ".", "package.json", 0, "passed\nwith a second line", false, false, started, DateTimeOffset.UtcNow, "Linux Bubblewrap sandbox active; network disabled."));
+            store.AttachVerificationEvidence(task.Id, new ProjectCheckEvidence("package:test", "Test", "npm run test", ".", "package.json", 0, "passed\nwith a second line", false, false, started, DateTimeOffset.UtcNow, "Linux Bubblewrap + systemd cgroup limits active; network disabled."));
             var reloaded = new AgentTaskArtifactStore(Path.Combine(root, "tasks.json")).Get(task.Id);
             Check(reloaded.VerificationEvidence?.ExitCode == 0 && reloaded.VerificationEvidence.Output == "passed\nwith a second line" && reloaded.VerificationEvidence.IsolationStatus.Contains("network disabled", StringComparison.Ordinal), "multiline verification evidence and isolation status persist beside the task artifact");
         }

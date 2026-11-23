@@ -408,7 +408,7 @@ internal static class LocalStorageAndWorkspaceTests
                     TimeSpan.FromSeconds(30));
                 Check(commandResult.ExitCode == 0 && commandResult.Output.Contains("skai-command-ok", StringComparison.Ordinal), "approved project command runs in the selected project subfolder and captures output");
                 Check(commandResult.WorkingDirectory == Path.Combine(workspacePath, "src"), "project command reports its resolved working directory");
-                Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows Process Security Environment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
+                Check(commandResult.IsolationStatus.Contains(OperatingSystem.IsWindows() ? "Windows Process Security Environment active" : OperatingSystem.IsLinux() ? "Linux Bubblewrap and systemd cgroup sandbox active" : "OS process containment is unavailable", StringComparison.Ordinal), "project command reports the actual OS isolation boundary");
                 if (OperatingSystem.IsWindows())
                 {
                     Check(commandResult.IsolationStatus.Contains("job memory cap", StringComparison.Ordinal) && commandResult.IsolationStatus.Contains("network denied", StringComparison.Ordinal), "Windows Coding Agent evidence reports PSEC filesystem/network and Job Object boundaries");
@@ -447,6 +447,10 @@ internal static class LocalStorageAndWorkspaceTests
                 if (OperatingSystem.IsLinux())
                 {
                     Check(commandResult.IsolationStatus.Contains("network disabled", StringComparison.Ordinal), "Linux command evidence confirms network namespace isolation");
+                    Check(commandResult.IsolationStatus.Contains("process-tree memory cap", StringComparison.Ordinal) &&
+                          commandResult.IsolationStatus.Contains("maximum 128 processes", StringComparison.Ordinal) &&
+                          commandResult.IsolationStatus.Contains("CPU quota", StringComparison.Ordinal),
+                        "Linux command evidence reports enforced cgroup memory, process-count, and CPU limits");
                     var insideProjectPath = Path.Combine(workspacePath, "sandbox-write-probe.txt");
                     var insideWrite = await commandRunner.RunAsync(workspacePath, ".", "printf sandbox-write > sandbox-write-probe.txt", TimeSpan.FromSeconds(10));
                     Check(insideWrite.ExitCode == 0 && File.ReadAllText(insideProjectPath) == "sandbox-write", "Linux sandbox permits writes inside the selected project");
@@ -465,6 +469,41 @@ internal static class LocalStorageAndWorkspaceTests
                         TimeSpan.FromSeconds(10));
                     Check(!networkProbe.Output.Contains("not found", StringComparison.OrdinalIgnoreCase), "Linux sandbox network probe has its Python runtime available");
                     Check(networkProbe.ExitCode != 0 && !networkProbe.Output.Contains("network-connected", StringComparison.Ordinal), "Linux sandbox cannot reach an external network address");
+
+                    if (GC.GetGCMemoryInfo().TotalAvailableMemoryBytes >= 2L * 1024 * 1024 * 1024 && File.Exists("/usr/bin/python3"))
+                    {
+                        const string memoryProbe = "python3 -c \"data = bytearray(320 * 1024 * 1024); [data.__setitem__(i, 1) for i in range(0, len(data), 4096)]; print('allocation-ok')\"";
+                        var memoryControl = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(30), default, 1024UL * 1024 * 1024);
+                        Check(memoryControl.ExitCode == 0 && memoryControl.Output.Contains("allocation-ok", StringComparison.Ordinal) && memoryControl.IsolationStatus.Contains("memory cap 1.0 GiB", StringComparison.Ordinal),
+                            "Linux cgroup memory control allows a 320 MiB allocation under a 1 GiB process-tree cap");
+                        var memoryLimited = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(30), default, CommandResourceLimits.MinimumJobMemoryBytes);
+                        Check(memoryLimited.ExitCode != 0 && !memoryLimited.Output.Contains("allocation-ok", StringComparison.Ordinal) && memoryLimited.IsolationStatus.Contains("memory cap 0.3 GiB", StringComparison.Ordinal),
+                            "Linux cgroup memory.max prevents a 320 MiB allocation under the 256 MiB process-tree cap");
+
+                        const string processLimitProbe = """
+                        python3 -c '
+                        import subprocess
+                        processes = []
+                        try:
+                            for index in range(160):
+                                processes.append(subprocess.Popen(["/bin/sleep", "5"]))
+                        except OSError:
+                            print("process-cap-hit", len(processes))
+                        else:
+                            print("process-cap-missed", len(processes))
+                        finally:
+                            for child in processes:
+                                child.terminate()
+                            for child in processes:
+                                child.wait()
+                        '
+                        """;
+                        var processLimit = await commandRunner.RunAsync(workspacePath, ".", processLimitProbe, TimeSpan.FromSeconds(30), default, 1024UL * 1024 * 1024);
+                        Check(processLimit.ExitCode == 0 && processLimit.Output.Contains("process-cap-hit", StringComparison.Ordinal) && !processLimit.Output.Contains("process-cap-missed", StringComparison.Ordinal),
+                            "Linux cgroup pids.max prevents a Coding Agent command from creating more than 128 processes");
+                    }
+                    else
+                        Console.WriteLine("SKIP Linux cgroup memory stress probe: requires 2 GiB available to the test runtime and /usr/bin/python3.");
                 }
                 else if (!OperatingSystem.IsWindows())
                     Check(commandResult.IsolationStatus.Contains("filesystem and network access are not sandboxed", StringComparison.Ordinal), "unsupported process boundaries clearly report that filesystem and network are not sandboxed");

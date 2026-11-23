@@ -44,6 +44,25 @@ The packaged artifact includes the self-contained Agent Host under
 `resources/agent-host`, so a packaged install does not require a source
 checkout or a separate .NET installation.
 
+## Coding Agent command boundary
+
+Approved project commands run inside OS-managed process boundaries. Linux
+requires Bubblewrap and an active user systemd manager: the command runs in a
+transient cgroup scope with `MemoryMax` (half of available memory, bounded to
+256 MiB–8 GiB and any lower explicit budget), `MemorySwapMax=0`,
+`TasksMax=128`, and a CPU quota capped at four cores. Bubblewrap grants write
+access only to the selected project, mounts system paths read-only, isolates
+temporary files, and separates PID, network, IPC, and UTS namespaces. Session
+bus variables needed by the host-side systemd launcher are cleared before the
+approved command starts. Missing namespace or cgroup support prevents
+execution. Timeouts and cancellation terminate the scope.
+
+Windows uses a capability-free AppContainer for project filesystem and network
+isolation and a Job Object for process-tree memory and process-count limits.
+Failure to establish either required boundary prevents execution. These
+controls apply only when the user explicitly runs a detected project check or
+command; preflight only detects available checks.
+
 Built-in and custom pet profiles are managed in the renderer's Pet Workshop.
 See [Pets and companions](../guides/PETS_AND_COMPANIONS.md) for the strip format, behavior
 defaults, and local generation flow.
