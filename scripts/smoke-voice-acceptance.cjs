@@ -3,11 +3,13 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-// This is the host-side acceptance gate for local voice. Packaged Electron smoke
-// still verifies the browser recognition bridge; this command verifies the real
-// audio fixture, native speech runtime, and the explicit cancellation/fallback
-// contracts without pretending a CI machine has a microphone or speech pack.
-const requirePack = process.argv.includes("--require-installed-pack");
+// This host-side probe validates the WAV container and native speech synthesis.
+// Local speech recognition availability is measured separately in the packaged
+// Electron smoke because it belongs to Chromium's on-device recognition API.
+const requireNativeTts = process.argv.includes("--require-native-tts");
+if (process.argv.includes("--require-installed-pack")) {
+  throw new Error("--require-installed-pack was ambiguous and is no longer supported. Use --require-native-tts for Windows SAPI output; the packaged Electron smoke reports local recognition-pack availability.");
+}
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-voice-acceptance-"));
 const fixture = path.join(fixtureRoot, "voice-fixture.wav");
 const sampleRate = 16_000;
@@ -25,7 +27,7 @@ header.write("data", 36); header.writeUInt32LE(data.length, 40); fs.writeFileSyn
 
 const wav = fs.readFileSync(fixture);
 if (wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE" || wav.length <= 44) throw new Error("The generated real-audio fixture is invalid.");
-console.log(`Voice audio fixture: ${fixture} (${seconds}s, ${sampleRate}Hz mono PCM)`);
+console.log(`Synthetic WAV container fixture: ${fixture} (${seconds}s, ${sampleRate}Hz mono PCM tone; not speech)`);
 
 let nativeRuntime = false;
 let runtimeDetail = "No native speech runtime probe for this platform.";
@@ -38,9 +40,8 @@ if (process.platform === "win32") {
   nativeRuntime = probe.status === 0;
   runtimeDetail = nativeRuntime ? "A supported Linux native speech command is installed." : "No supported Linux native speech command was detected.";
 }
-console.log(`Native speech runtime: ${nativeRuntime ? "available" : "unavailable"} · ${runtimeDetail}`);
-console.log("Cancellation path: accepted by the UI/bridge contract and must leave the voice operation idle without fallback text.");
-console.log("Unavailable-language path: packaged Electron smoke must report the on-device pack error and never use remote recognition.");
-console.log("Microphone path: run packaged Electron smoke with a real microphone or approved fake-device fixture on a host that grants capture permission.");
-if (requirePack && !nativeRuntime) throw new Error("An installed native speech pack/runtime is required, but this machine does not provide one.");
+console.log(`Native speech synthesis: ${nativeRuntime ? "available" : "unavailable"} · ${runtimeDetail}`);
+console.log("This host-side probe does not test local speech-recognition packs, microphone capture, speech accuracy, or cancellation.");
+console.log("Use the packaged Electron smoke to check local recognition capability and fail-closed unavailable-language behavior; a real-microphone turn and cancellation still need device acceptance.");
+if (requireNativeTts && !nativeRuntime) throw new Error("A native speech-synthesis runtime is required, but this machine does not provide one.");
 fs.rmSync(fixtureRoot, { recursive: true, force: true });

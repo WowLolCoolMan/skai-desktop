@@ -20,7 +20,7 @@ keep this queue focused on unfinished work.
 | Work | Status / owner | Next step | Agreed approach and acceptance | Detail |
 | --- | --- | --- | --- | --- |
 | Professional UI pass | In progress · Codex | Manually review the running app and close the visual, keyboard, and pet-animation gaps. | Improve one page at a time; preserve working actions and truthful states. Accept only after live review across supported widths and themes. | [UI progress](SKAI_PREMIUM_UI_PROGRESS.md), [references](UI_REFERENCE_GUIDE.md) |
-| Local voice acceptance | Blocked · Unclaimed | On a Windows profile with the on-device speech pack installed, verify microphone dictation and a hands-free turn. | Keep processing local; cover cancellation and unavailable-device recovery. Never imply unavailable recognition is active. | [Voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md), [capability matrix](CAPABILITY_MATRIX.md) |
+| Local voice acceptance | Blocked · Unclaimed | Install or enable a local `en-US` recognition pack, then verify spoken dictation and a hands-free turn with a real microphone. | Keep processing local; cover speech accuracy, cancellation, and unavailable-language recovery. SAPI synthesis voices are installed, but packaged Electron currently reports local `en-US` recognition as unavailable and Skai correctly disables dictation without remote fallback. | [Voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Coding Agent isolation | In progress · Codex | Verify cgroup controls on supported Linux desktop profiles and Windows PSEC on additional Windows profiles. | Linux approved commands now require Bubblewrap plus a user systemd cgroup scope with process-tree memory cap, swap disabled, maximum 128 processes, and CPU quota capped at four cores; setup fails closed. Ubuntu 24.04/WSL2 acceptance proves actual memory and process limits, workspace-only writes, denied sibling access/network, timeout, and cancellation. Windows PSEC and Job Object acceptance remains verified on this Windows 11 host; no unattended or parallel commands without broader acceptance. | [Architecture](../engineering/ARCHITECTURE.md), [readiness gaps](../operations/PRODUCTION_READINESS_GAPS.md) |
 | Image runtime coverage | In progress · Unclaimed | Exercise a live ComfyUI server and validate GPU or additional hardware. | Show only runtime-reported progress; cancellation must stop the job and leave the page usable. | [Image guide](../guides/LOCAL_IMAGE_GENERATION.md), [capability matrix](CAPABILITY_MATRIX.md) |
 | Release validation | In progress · Unclaimed | Complete published-feed and native desktop updater acceptance. | Headless Ubuntu 24.04/WSL2 acceptance now covers AppImage update and in-app rollback from synthetic 0.1.3 to 0.1.4 and back, preserving user data. Published feed, signed metadata, and native Linux desktop acceptance remain open. Production signing is deferred by the owner. | [Release readiness](../operations/RELEASE_READINESS.md), [release guide](../operations/RELEASING.md) |
@@ -56,6 +56,12 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   passed dark/light/system, alternate backdrops, 960×640 layout, Settings/Chat
   contrast, and custom-theme reload/recovery. One Settings screenshot was
   visually inspected; the broader live UI review remains open.
+- **2026-11-22:** Corrected voice acceptance wording and its gate: the host probe
+  measures native synthesis and a synthetic WAV container only; it no longer
+  calls SAPI voices an installed recognition pack or claims to exercise
+  microphone/cancellation behavior. Packaged Electron on this Windows host
+  reports local `en-US` recognition unavailable, and Skai fails closed with a
+  clear error instead of remote dictation.
 - **2026-11-22:** Windows Coding Agent commands now use Windows Process Security
   Environment (PSEC) filesystem grants and a capability-free AppContainer. On
   the current Windows 11 host, native acceptance confirms nested project writes,
