@@ -91,8 +91,12 @@ Mark an item done only when the linked workflow has evidence.
 12. **User-controlled provider gateway.** Add explicit local/cloud/hybrid chat
     routing only after OS-protected credentials, data disclosure, and an
     offline-only mode are verified. No silent provider fallback.
-13. **MCP lifecycle.** Finish server setup, permission review/revocation,
-    health reporting, and recovery for supported stdio/HTTP servers.
+13. **MCP lifecycle — In progress · Codex.** Local-only smoke verifies hosted
+    endpoint rejection, read-only Filesystem MCP, Playwright stdio, local
+    PostgreSQL, approved tool calls, health, and revocation. Revoked IDs are
+    immutable. Remaining: verified adapters and setup for the other curated
+    MCP servers, plus reconnect and recovery acceptance across supported
+    transports.
 14. **Model fit and license guidance — In progress · Codex.** The model
     inspector now compares package size against current free RAM, reports GPU
     memory when telemetry exists, and labels the result as advisory. Hugging
@@ -139,6 +143,11 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   host-backed screens. Intentional shutdown and initial startup failure still
   remain stopped/offline. The Agent Host client test verifies a request succeeds
   after an unexpected exit.
+
+- **2026-11-23:** MCP connection IDs are now immutable. A revoked ID cannot be
+  overwritten through `mcp.connection.connect` to restore access; reconnecting
+  requires creating a new reviewed connection. The Core registry test now
+  checks this revocation bypass is refused.
 
 - **2026-11-23:** `smoke:voice:acceptance` now invokes installed Kokoro and
   Piper runtimes with network access disabled, validates the produced WAV and

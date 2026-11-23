@@ -23,6 +23,12 @@ public sealed class McpConnectionRegistry
         if (manifestDigest.Length > 128 || manifestDigest.Any(char.IsControl)) throw new ArgumentException("The MCP manifest digest is invalid.", nameof(manifestDigest));
         lock (_sync)
         {
+            if (_connections.TryGetValue(connectionId, out var existing))
+            {
+                if (existing.State == McpConnectionStates.Revoked)
+                    throw new InvalidOperationException("A revoked MCP connection cannot be reconfigured; create a new connection instead.");
+                throw new InvalidOperationException("That MCP connection identity is already in use; create a new connection instead.");
+            }
             var connection = new McpConnection { ConnectionId = connectionId, ServerId = serverId, Transport = transport, ManifestDigest = manifestDigest, UpdatedAtUtc = DateTimeOffset.UtcNow };
             _connections[connectionId] = connection;
             _store?.Save(_connections.Values);

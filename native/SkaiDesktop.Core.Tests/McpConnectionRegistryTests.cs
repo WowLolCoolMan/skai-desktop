@@ -25,6 +25,11 @@ internal static class McpConnectionRegistryTests
         try { registry.MarkHealthy("connection-1"); }
         catch (InvalidOperationException) { refused = true; }
         Check(refused, "revoked MCP connection cannot be silently reactivated");
+        refused = false;
+        try { registry.Configure("connection-1", "replacement-server", "streamable-http"); }
+        catch (InvalidOperationException) { refused = true; }
+        Check(refused && registry.Get("connection-1").State == McpConnectionStates.Revoked
+            && registry.Get("connection-1").ServerId == "test-server", "revoked MCP connection identity cannot be overwritten to bypass revocation");
         var reloaded = new McpConnectionRegistry(new McpConnectionStore(path));
         Check(reloaded.Get("connection-1").State == McpConnectionStates.Revoked, "MCP connection revocation survives store reload");
         }
