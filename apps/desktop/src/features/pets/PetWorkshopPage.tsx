@@ -410,7 +410,7 @@ function PetFrameEditor({ strip, animation, onSave, busy, readOnly = false, refe
           <button type="button" onClick={() => void generateCel()} disabled={generatingStrip || busy || (loop && frameIndex === activeFrameCount - 1)}>{generatingStrip ? "Generating locally…" : `Generate ${animation === "blink" ? "blink pose" : "cel"}`}</button>
         </div>}
       </div>
-      <div className="pet-workshop-frame-rail" aria-label="Animation frames">
+      <div className="pet-workshop-frame-rail" role="region" aria-label="Animation frames">
         <p>{animation === "blink" ? "4-frame blink sequence · adjustable duration" : `${activeFrameCount}-frame ${loop ? "loop · final cel mirrors rest" : "one-shot"}`}</p>
         <div>{frameThumbs.map((frame, index) => <button key={index} type="button" className={index === frameIndex ? "is-active" : ""} aria-label={`Edit frame ${index}`} aria-pressed={index === frameIndex} onClick={() => selectFrame(index)}><span>{frame ? <img src={frame} alt="" /> : <i />}</span><small>{index}</small></button>)}</div>
       </div>

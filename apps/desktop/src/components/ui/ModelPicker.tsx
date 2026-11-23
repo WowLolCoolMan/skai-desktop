@@ -97,7 +97,7 @@ export function ModelPicker({ model, provider, endpoint, models, onChange, onOpe
   };
 
   return <div className="model-picker" ref={rootRef}>
-    <button ref={triggerRef} className="model-picker-trigger" type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((value) => !value)}>
+    <button ref={triggerRef} className="model-picker-trigger" type="button" aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen((value) => !value)}>
       <span className="model-picker-trigger-copy"><span className="model-picker-label">{provider === "AirLLM" ? "MODEL · AIRLLM" : `MODEL · ${provider.toUpperCase()}`}</span><strong>{model || "Choose a local model"}</strong></span>
       <NavIcon name="chevron-right" />
     </button>

@@ -29,9 +29,9 @@ export function WorkspaceTabs({ tabs, tasks, activeId, onSelect, onClose, onNew,
   return <div className="workspace-tab-strip" role="group" aria-label="Open chats and projects">
     <div className="workspace-tab-list">{tabs.map((tab) => { const status = tabRunStatus(tab, tasks); return <div className={`workspace-tab${tab.id === activeId ? " is-active" : ""}`} key={tab.id}>
       <button className="workspace-tab-select" type="button" aria-current={tab.id === activeId ? "page" : undefined} title={`${tab.title}${status ? ` · ${status.label}` : ""}`} onClick={() => onSelect(tab)}><NavIcon name={tab.projectId ? "project" : "chat"} /><span>{tab.title}</span>{status && <small className={`workspace-tab-status is-${status.kind}`}>{status.label}</small>}</button>
-      <button className="workspace-tab-close" type="button" aria-label={`Close ${tab.title}`} title="Close tab" onClick={() => onClose(tab.id)}>×</button>
+      <button className="workspace-tab-close" type="button" aria-label={`Close ${tab.title}`} title="Close tab" onClick={() => onClose(tab.id)}><NavIcon name="close" /></button>
     </div>; })}</div>
-    {onRestore && <button className="workspace-tab-new" type="button" aria-label="Restore closed tab" title="Restore closed tab (Ctrl+Shift+T)" disabled={!canRestore} onClick={onRestore}>↶</button>}
+    {onRestore && <button className="workspace-tab-new" type="button" aria-label="Restore closed tab" title="Restore closed tab (Ctrl+Shift+T)" disabled={!canRestore} onClick={onRestore}><NavIcon name="refresh" /></button>}
     <button className="workspace-tab-new" type="button" aria-label="New tab" title="New tab (Ctrl+T)" onClick={onNew}><NavIcon name="plus" /></button>
   </div>;
 }

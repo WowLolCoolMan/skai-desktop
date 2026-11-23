@@ -51,7 +51,7 @@ export function OverflowMenu({ items, label = "More", icon, className = "" }: { 
   };
 
   return <div className={`overflow-menu ${className}`.trim()} ref={rootRef}>
-    <button ref={triggerRef} className={`ui-button ui-button-ghost overflow-menu-trigger ${icon ? "overflow-menu-trigger-icon" : ""}`} type="button" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={menuId} onMouseDown={(event) => { if (!open) event.preventDefault(); }} onClick={() => open ? close(false) : setOpen(true)}>{icon ?? label}</button>
+    <button ref={triggerRef} className={`ui-button ui-button-ghost overflow-menu-trigger ${icon ? "overflow-menu-trigger-icon" : ""}`} type="button" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onMouseDown={(event) => { if (!open) event.preventDefault(); }} onClick={() => open ? close(false) : setOpen(true)}>{icon ?? label}</button>
     {open && <div ref={menuRef} id={menuId} className="overflow-menu-panel" role="menu" aria-label={label} onKeyDown={onMenuKeyDown}>{items.map((item) => <button className="overflow-menu-item" key={item.label} type="button" role="menuitem" disabled={item.disabled} onClick={() => { if (item.disabled) return; item.onSelect(); close(false); }}>{item.icon}{item.label}</button>)}</div>}
   </div>;
 }

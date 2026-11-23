@@ -120,6 +120,20 @@ Additional evidence commands:
 - `npm run audit:release-workflow` — Electron-only gated release workflow.
 - `npm run audit:local-only` — local transport boundary.
 
+### Accessibility semantic follow-up — 2026-11-23
+
+- The packaged Axe audit covers 14 routes. It reports zero WCAG violations,
+  zero serious/critical violations, a working skip link and main landmark, and
+  correct expanded popup relationships for the Model Picker (`dialog`) and
+  overflow menu (`menu`).
+- Fixed the Model Picker's popup role, omitted `aria-controls` while popups are
+  closed, and gave labeled thread/model/recipe/frame groups semantic region
+  roles. Tab control icons are decorative SVGs rather than visible text glyphs.
+- Axe now has 14 inconclusive color-contrast checks across eight unique
+  patterns; it cannot compute contrast against the app's gradient backgrounds.
+  These need visual/manual review. Zero violations is not full accessibility
+  acceptance; assistive-technology and route-by-route visual reviews remain open.
+
 ## Known boundaries
 
 Hosted model routing is not implemented in the current release. The approved
