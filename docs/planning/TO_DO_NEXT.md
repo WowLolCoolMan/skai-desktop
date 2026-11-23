@@ -252,11 +252,12 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   mixed PDFs. Other OCR languages remain unsupported.
 
 - **2026-11-23:** Packaged Windows media smoke now stores a generated VP8 WebM
-  through Skai's scoped local media bridge, decodes its metadata, and samples
-  four timestamped frames; the H.264 MP4 fixture also yields four frames. WAV
-  file transcription reaches local Whisper. The synthetic silent WAV verifies
-  the processing path only; intelligible speech quality remains open under
-  voice acceptance.
+  through Skai's scoped local media bridge, decodes its metadata, and verifies
+  four extracted frame attachments. Some generated clips report a near-zero
+  duration, so H.264 MP4 currently provides the reliable timestamp-label check.
+  WAV file transcription reaches local Whisper. The synthetic silent WAV
+  verifies the processing path only; intelligible speech quality remains open
+  under voice acceptance.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
