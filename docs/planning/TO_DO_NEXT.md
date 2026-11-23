@@ -81,8 +81,12 @@ Mark an item done only when the linked workflow has evidence.
 11. **Requested voice engines.** Marketplace currently has verified install/use
     paths for Kokoro and Piper; Whisper large-v3 covers local transcription.
     Only 40 of the 89 curated entries currently have real adapters, and the
-    catalog smoke asserts that boundary. Implement and accept the next local
-    engine after checking hardware fit and license. Host smoke now synthesizes
+    catalog smoke asserts that boundary. Chatterbox is now identified by its
+    upstream's CPU-oriented 110M Nano model and MIT model/runtime terms rather
+    than the unrelated Turbo listing; its installer and synthesis adapter are
+    still missing. Upstream reports 3x realtime on an 8-core CPU, which is not
+    a Skai acceptance result. Implement and accept the next local engine after
+    checking hardware fit and license. Host smoke now synthesizes
     offline WAVs: on this 32 GiB Windows/RX 7900 XTX machine, Piper generated
     3.53 seconds of audio end-to-end in 0.83 seconds; Kokoro generated 3.26
     seconds in 8.91 seconds. These are one-phrase timings, not a subjective
