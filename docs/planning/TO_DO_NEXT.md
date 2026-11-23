@@ -70,9 +70,11 @@ Mark an item done only when the linked workflow has evidence.
    usable when its adapter is missing. Saved ComfyUI workflows can now be
    reviewed and activated inside Marketplace; exact model packages and the
    remaining MCP/voice adapters still need end-to-end support.
-10. **GitHub workflow acceptance — Next · Unclaimed.** Exercise empty/denied
-    permissions, network failure, clone conflicts, cancellation, and retry in
-    isolated profiles with real credentials.
+10. **GitHub workflow acceptance — In progress · Codex.** Core tests now cover
+    permission denial, network failure, request cancellation, pending/slow-down
+    retry, stale branch/conflict detection, and protected-token persistence.
+    Remaining: isolated live acceptance for consent denial, repository access,
+    clone conflicts, cancellation, and retry with a real test credential.
 
 ## Next up
 

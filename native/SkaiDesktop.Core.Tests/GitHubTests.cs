@@ -137,6 +137,51 @@ internal static class GitHubTests
         Check(resolvedRepository.FullName == "owner/project" && resolvedRepository.IsPrivate && resolvedRepository.DefaultBranch == "main", "GitHub API resolves repository identity and clone metadata");
         var listedRepositories = await githubApi.ListRepositoriesAsync("test-access-token");
         Check(listedRepositories.Count == 1 && listedRepositories[0].Id == 42 && listedRepositories[0].CloneUrl.AbsoluteUri == "https://github.com/owner/project.git", "GitHub API lists authorized repositories with safe HTTPS clone URLs");
+        var deniedApi = new GitHubApiClient(new HttpClient(new StubHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)
+            {
+                Content = new StringContent("{\"message\":\"Resource not accessible by integration\"}", Encoding.UTF8, "application/json")
+            }))));
+        try
+        {
+            await deniedApi.ListRepositoriesAsync("test-access-token");
+            throw new Exception("Expected a denied GitHub permission to be reported.");
+        }
+        catch (InvalidOperationException exception)
+        {
+            Check(exception.Message.Contains("HTTP 403", StringComparison.Ordinal)
+                && exception.Message.Contains("Resource not accessible", StringComparison.Ordinal), "GitHub API reports denied repository permissions with the server's actionable error");
+        }
+        var offlineApi = new GitHubApiClient(new HttpClient(new StubHandler((_, _) => throw new HttpRequestException("simulated network outage"))));
+        try
+        {
+            await offlineApi.ListRepositoriesAsync("test-access-token");
+            throw new Exception("Expected a GitHub network failure to propagate.");
+        }
+        catch (HttpRequestException exception)
+        {
+            Check(exception.Message.Contains("simulated network outage", StringComparison.Ordinal), "GitHub API network failures remain visible for retry");
+        }
+        var cancelledRequests = 0;
+        var cancellableApi = new GitHubApiClient(new HttpClient(new StubHandler((_, cancellationToken) =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            cancelledRequests++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("[]", Encoding.UTF8, "application/json") });
+        })));
+        using (var cancellation = new CancellationTokenSource())
+        {
+            cancellation.Cancel();
+            try
+            {
+                await cancellableApi.ListRepositoriesAsync("test-access-token", cancellation.Token);
+                throw new Exception("Expected GitHub request cancellation to stop before network access.");
+            }
+            catch (OperationCanceledException)
+            {
+                Check(cancelledRequests == 0, "cancelled GitHub repository requests do not start network work");
+            }
+        }
         var accountApi = new GitHubApiClient(new HttpClient(new StubHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
