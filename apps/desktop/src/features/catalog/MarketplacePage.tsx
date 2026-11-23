@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Model, Route } from "../../app/types";
-import type { AgentResponse, DesktopPersona, UpdateCheckResult } from "../../../shared/contracts";
+import type { AgentResponse, DesktopPersona } from "../../../shared/contracts";
 import { Button, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 import { installedVoiceModels, refreshInstalledVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
@@ -65,7 +65,7 @@ const sectionIcons: Record<Section, NavIconName> = {
   Skills: "sparkle",
   Tools: "terminal",
   Installed: "memory",
-  Updates: "arrow-up-right",
+  Updates: "memory",
 };
 
 type SavedImageWorkflow = { name: string; workflow: string };
@@ -125,8 +125,6 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   const [imageAssetStatus, setImageAssetStatus] = useState<string | null>(null);
   const [airLlmReady, setAirLlmReady] = useState<boolean | null>(null);
   const [activeRuntimeAvailable, setActiveRuntimeAvailable] = useState<boolean | null>(null);
-  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
-  const [updateChecking, setUpdateChecking] = useState(false);
   const [localCapacity, setLocalCapacity] = useState<LocalCapacity | null>(null);
   const [savedImageWorkflows, setSavedImageWorkflows] = useState<SavedImageWorkflow[]>(readSavedImageWorkflows);
   const [activeImageWorkflow, setActiveImageWorkflow] = useState(() => localStorage.getItem("skai.imageWorkflow") ?? "");
@@ -143,23 +141,6 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     localStorage.setItem("skai.marketplace.models.app", JSON.stringify(appFilter));
     localStorage.setItem("skai.marketplace.models.context", JSON.stringify(contextFilter));
   }, [appFilter, contextFilter, libraryFilter, provider, size, taskFilter]);
-  useEffect(() => {
-    const updates = window.skaiAgent?.updates;
-    if (!updates) return;
-    let active = true;
-    void updates.state().then((result) => { if (active && result) setUpdateResult(result); }).catch(() => undefined);
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    if (section !== "Updates") return;
-    const updates = window.skaiAgent?.updates;
-    if (!updates) return;
-    let active = true;
-    void updates.check().then((result) => { if (active) setUpdateResult(result); }).catch(() => { if (active) setUpdateResult({ available: false, currentVersion: "Unknown", status: "error", message: "Update check failed." }); });
-    return () => { active = false; };
-  }, [section]);
-
   useEffect(() => {
     if (section !== "Models") return;
     let active = true;
@@ -196,7 +177,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   }, [section, provider]);
 
   useEffect(() => {
-    const needsCatalog = section !== "Models" && section !== "Updates" && section !== "Image models" && section !== "Image workflows";
+    const needsCatalog = section !== "Models" && section !== "Image models" && section !== "Image workflows";
     if (!needsCatalog || catalogLoadStartedRef.current) return;
     catalogLoadStartedRef.current = true;
     void request("marketplace.catalog").then((response) => {
@@ -274,7 +255,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   };
 
   useEffect(() => {
-    if (section !== "Installed") return;
+    if (section !== "Installed" && section !== "Updates") return;
     void loadInstalledModels();
     void Promise.all([request("marketplace.image-assets.list"), request("mcp.connections.list"), request("persona.list")]).then(([assets, connections, personas]) => {
       const errors = [assets, connections, personas].filter((response) => !response.ok).map((response) => response.error?.message).filter(Boolean);
@@ -535,13 +516,6 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   }
 
   const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled", value: string | boolean) => { saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
-  const checkForUpdates = async () => {
-    if (!window.skaiAgent?.updates || updateChecking) return;
-    setUpdateChecking(true);
-    try { setUpdateResult(await window.skaiAgent.updates.check()); }
-    catch { setUpdateResult({ available: false, currentVersion: "Unknown", status: "error", message: "Update check failed." }); }
-    finally { setUpdateChecking(false); }
-  };
   const sectionDescription: Record<Section, string> = {
     Discover: "Choose the next capability you actually need, then review its local requirements before changing this computer.",
     Models: "Quick picks load first. Choose a provider to search its catalog; review the runtime, size, and device fit before installing.",
@@ -550,11 +524,11 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     "Image workflows": "Review local ComfyUI workflows and configure them in Image Studio.",
     Skills: "Browse local agent instructions and review their permission scope.",
     Tools: "See built-in capabilities and integrations that can be connected.",
-    Installed: "Review models, skills, local assets, and MCP servers available to Skai on this device.",
-    Updates: "Updates appear here only when a verified local source reports them.",
+    Installed: "Review marketplace downloads, update compatible items, or remove local installs. Skai Desktop updates are in Settings → Updates.",
+    Updates: "Review marketplace downloads, update compatible items, or remove local installs. Skai Desktop updates are in Settings → Updates.",
   };
 
-  const sectionHeading: Record<Section, string> = { Discover: "Explore the marketplace", Models: "Local models", "Image models": "Image models & LoRAs", Voices: "Voice profiles", "Image workflows": "Image workflows", Skills: "Agent skills", Tools: "Tools & integrations", Installed: "Installed tools", Updates: "Updates" };
+  const sectionHeading: Record<Section, string> = { Discover: "Explore the marketplace", Models: "Local models", "Image models": "Image models & LoRAs", Voices: "Voice profiles", "Image workflows": "Image workflows", Skills: "Agent skills", Tools: "Tools & integrations", Installed: "Installed & updates", Updates: "Installed & updates" };
   const categoryCards: Array<{ title: string; description: string; section: Section; icon: NavIconName; status: string; availability: "ready" | "setup" | "limited" }> = [
     { title: "Local models", description: "Browse model packages by task and size, then install only through a responding local runtime.", section: "Models", icon: "model", status: activeRuntimeAvailable ? `${activeLocalRuntime} responding` : activeRuntimeAvailable === false ? "No local runtime responding" : "Runtime not checked yet", availability: activeRuntimeAvailable ? "ready" : activeRuntimeAvailable === false ? "setup" : "limited" },
     { title: "Image models & LoRAs", description: "Find image adapters and manage the LoRA files stored on this device.", section: "Image models", icon: "image", status: `${installedImageAssets.length} installed · Diffusers required`, availability: "setup" },
@@ -562,12 +536,11 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     { title: "Tools & integrations", description: "Browse built-in tools, MCP servers, and compatible integrations.", section: "Tools", icon: "terminal", status: "Connections and permissions", availability: "ready" },
     { title: "Voice runtimes", description: "Choose an installed voice engine and preview its available profiles.", section: "Voices", icon: "activity", status: catalog ? `${catalog.voices.filter((voice) => voice.installed).length} installed locally` : "Checking local voices", availability: "ready" },
     { title: "Agent skills", description: "Review local skills and the permission scope each one uses.", section: "Skills", icon: "sparkle", status: catalog ? `${catalog.skills.filter((skill) => skill.installed).length} installed locally` : "Checking local catalog", availability: "ready" },
-    { title: "Installed library", description: "Update or remove models and other items managed by Skai.", section: "Installed", icon: "marketplace", status: "Manage local installs", availability: "ready" },
-    { title: "Skai updates", description: "Check the signed release channel for a verified desktop update.", section: "Updates", icon: "arrow-up-right", status: updateResult?.available ? `Version ${updateResult.version} available` : "Check for updates", availability: "ready" },
+    { title: "Installed & updates", description: "Review marketplace downloads, update compatible items, or remove local installs. Skai Desktop updates are in Settings.", section: "Installed", icon: "marketplace", status: "Manage local installs", availability: "ready" },
   ];
   const modelResults = <section className="marketplace-remote-results" aria-label="Remote model sources">
     <div className="panel-heading"><div><p className="section-kicker">LOCAL MODEL CATALOG</p><h3>Models for local runtimes</h3><p className="panel-subtitle">Browse model packages by task and size. Skai only enables installs when the required local runtime is responding.</p></div><StatusBadge tone={activeRuntimeAvailable ? "success" : activeRuntimeAvailable === false ? "warning" : "neutral"}>{activeRuntimeAvailable ? `${activeLocalRuntime} available` : activeRuntimeAvailable === false ? "No local runtime detected" : "Checking runtime"}</StatusBadge></div>
-    <div className="marketplace-model-tabs" role="tablist" aria-label="Model library views"><button type="button" role="tab" aria-selected="true" className="is-active">Get new</button><button type="button" role="tab" aria-selected="false" onClick={() => { setSection("Installed"); setQuery(""); onSectionChange?.("Installed"); }}>Installed <span>{installedModels.length}</span></button></div>
+    <div className="marketplace-model-tabs" role="tablist" aria-label="Model library views"><button type="button" role="tab" aria-selected="true" className="is-active">Get new</button><button type="button" role="tab" aria-selected="false" onClick={() => { setSection("Installed"); setQuery(""); onSectionChange?.("Installed"); }}>Installed &amp; updates <span>{installedModels.length}</span></button></div>
     <div className="marketplace-model-filter-bar"><div className="marketplace-model-safety-filters" role="group" aria-label="Model catalog safety"><button type="button" className={!uncensored ? "is-active" : ""} aria-pressed={!uncensored} onClick={() => { setUncensored(false); void searchModels(query, false); }}>Mainstream</button><button type="button" className={uncensored ? "is-active" : ""} aria-pressed={uncensored} onClick={() => { setUncensored(true); void searchModels(query, true); }}>Unfiltered</button></div><span className="marketplace-model-capacity">{localCapacity?.gpu?.totalBytes ? `${formatSize(localCapacity.gpu.totalBytes)} GPU` : "GPU not reported"} · {localCapacity?.ramTotalBytes ? `${formatSize(localCapacity.ramTotalBytes)} RAM` : "RAM not reported"}</span></div>
     <div className="marketplace-model-size-filters" role="group" aria-label="Filter models by download size"><button type="button" className={size === "Any size" ? "is-active" : ""} aria-pressed={size === "Any size"} onClick={() => setSize("Any size")}>All sizes</button><button type="button" className={size === "Fits my PC" ? "is-active" : ""} disabled={!localCapacity?.ramAvailableBytes} title={!localCapacity?.ramAvailableBytes ? "RAM availability is not currently measured" : "Package-size estimate only; loaded models need additional memory"} aria-pressed={size === "Fits my PC"} onClick={() => setSize("Fits my PC")}>Fits my PC <small>estimate</small></button><button type="button" className={size === "Tiny" ? "is-active" : ""} aria-pressed={size === "Tiny"} onClick={() => setSize("Tiny")}>Tiny <small>≤4 GB</small></button><button type="button" className={size === "Small" ? "is-active" : ""} aria-pressed={size === "Small"} onClick={() => setSize("Small")}>Small <small>4–10 GB</small></button><button type="button" className={size === "Medium" ? "is-active" : ""} aria-pressed={size === "Medium"} onClick={() => setSize("Medium")}>Medium <small>10–20 GB</small></button><button type="button" className={size === "Big" ? "is-active" : ""} aria-pressed={size === "Big"} onClick={() => setSize("Big")}>Big <small>&gt;20 GB</small></button></div>
     <details className="marketplace-model-filter-disclosure"><summary><span>More filters</span><small>{activeModelFilterCount ? `${activeModelFilterCount} active` : "Optional"}</small></summary><div className="marketplace-model-controls marketplace-model-filters"><label>Task<select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}>{taskOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providerOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Library<select value={libraryFilter} onChange={(event) => setLibraryFilter(event.target.value)}>{libraryOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Install path<select value={appFilter} onChange={(event) => setAppFilter(event.target.value)}>{appOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Context<select value={contextFilter} onChange={(event) => setContextFilter(event.target.value)}><option>Any context</option><option>1M-class window</option></select></label><div className="marketplace-filter-footer"><span>{filteredModels.length} matching models</span>{activeModelFilterCount > 0 && <Button variant="ghost" type="button" onClick={() => { setTaskFilter("All tasks"); setProvider("All providers"); setLibraryFilter("All libraries"); setAppFilter("All install paths"); setContextFilter("Any context"); setSize("Any size"); setUncensored(false); void searchModels(query, false, "All providers"); }}>Clear filters</Button>}</div></div></details>
@@ -606,16 +579,15 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     <div className="feature-page marketplace-page">
       <header className="marketplace-header">
         <div className="marketplace-heading-lockup"><span className="marketplace-heading-mark"><NavIcon name="marketplace" /></span><div><p className="eyebrow">LOCAL-FIRST MARKETPLACE</p><h2>{sectionHeading[section]}</h2><p className="page-description">{sectionDescription[section]}</p></div></div>
-         <div className="marketplace-header-actions"><StatusBadge tone={modelError ? "warning" : section === "Models" ? activeRuntimeAvailable ? "success" : activeRuntimeAvailable === false ? "warning" : "neutral" : catalog ? "success" : "neutral"}>{modelError ? "Catalog needs attention" : section === "Models" ? activeRuntimeAvailable ? `${activeLocalRuntime} available` : activeRuntimeAvailable === false ? "Runtime unavailable" : "Checking runtime" : catalog ? "Local catalog loaded" : "Loading catalog"}</StatusBadge>{!onBack && section !== "Installed" && <Button variant="secondary" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}><NavIcon name="memory" />Installed</Button>}</div>
+         <div className="marketplace-header-actions"><StatusBadge tone={modelError ? "warning" : section === "Models" ? activeRuntimeAvailable ? "success" : activeRuntimeAvailable === false ? "warning" : "neutral" : catalog ? "success" : "neutral"}>{modelError ? "Catalog needs attention" : section === "Models" ? activeRuntimeAvailable ? `${activeLocalRuntime} available` : activeRuntimeAvailable === false ? "Runtime unavailable" : "Checking runtime" : catalog ? "Local catalog loaded" : "Loading catalog"}</StatusBadge>{!onBack && section !== "Installed" && section !== "Updates" && <Button variant="secondary" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}><NavIcon name="memory" />Installed &amp; updates</Button>}</div>
       </header>
       <div className={`marketplace-frame${onBack ? " is-embedded" : ""}`}>
         <aside className="marketplace-nav-panel">
           <div className="marketplace-nav-heading"><span>Browse</span><small>{onBack ? "Embedded" : "Skai catalog"}</small></div>
           <nav className="marketplace-sections" aria-label="Marketplace sections">
-          {(onBack ? EMBEDDED_SECTIONS : ["Discover", "Models", "Image models", "Voices", "Image workflows", "Skills", "Tools", "Updates"] as Section[]).map((item) => (
-            <button key={item} className={(section === item || (item === "Tools" && section === "Installed")) ? "is-active" : ""} type="button" aria-current={(section === item || (item === "Tools" && section === "Installed")) ? "page" : undefined} onClick={() => { setSection(item); setQuery(""); onSectionChange?.(item); }}><NavIcon name={sectionIcons[item]} /><span>{item}</span>{item === "Installed" && <small>{installedModels.length + installedConnections.length}</small>}</button>
+          {(onBack ? EMBEDDED_SECTIONS : ["Discover", "Models", "Image models", "Voices", "Image workflows", "Skills", "Tools", "Installed"] as Section[]).map((item) => (
+            <button key={item} className={(section === item || (item === "Installed" && section === "Updates")) ? "is-active" : ""} type="button" aria-current={(section === item || (item === "Installed" && section === "Updates")) ? "page" : undefined} onClick={() => { setSection(item); setQuery(""); onSectionChange?.(item); }}><NavIcon name={sectionIcons[item]} /><span>{item === "Installed" ? "Installed & updates" : item}</span>{item === "Installed" && <small>{installedModels.length + installedConnections.length}</small>}</button>
           ))}
-          {!onBack && (section === "Tools" || section === "Installed") && <div className="marketplace-tools-subnav" role="tablist" aria-label="Tools views"><button type="button" role="tab" aria-selected={section === "Tools"} className={section === "Tools" ? "is-active" : ""} onClick={() => { setSection("Tools"); setQuery(""); }}>Catalog</button><button type="button" role="tab" aria-selected={section === "Installed"} className={section === "Installed" ? "is-active" : ""} onClick={() => { setSection("Installed"); setQuery(""); }}>Installed</button></div>}
           </nav>
           <div className="marketplace-nav-note"><span className="marketplace-nav-note-dot" /><div><strong>Everything stays local</strong><small>Review source, runtime, and permissions before installing.</small></div></div>
         </aside>
@@ -627,7 +599,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
             <section className="marketplace-next-step" aria-labelledby="marketplace-next-step-title">
               <div><p className="section-kicker">START HERE</p><h3 id="marketplace-next-step-title">Build a useful local workspace</h3><p>Choose a model, confirm the runtime it needs, and keep the install reviewable. Skai will not claim an item is ready until the local path is actually available.</p></div>
               <div className="marketplace-next-step-status"><span><strong>Active runtime</strong>{activeRuntimeAvailable ? activeLocalRuntime : activeRuntimeAvailable === false ? "No runtime responding" : "Not checked yet"}</span><span><strong>Installed locally</strong>{installedModels.length + installedConnections.length} core items</span><span><strong>Model catalog</strong>{modelError ? "Needs attention" : modelLoading ? "Checking providers" : "Ready to search"}</span></div>
-              <div className="marketplace-next-step-actions"><Button variant="primary" type="button" onClick={() => { setSection("Models"); setQuery(""); }}>Find a model</Button><Button variant="secondary" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}>Review installed</Button>{onNavigate && <Button variant="ghost" type="button" onClick={() => onNavigate("settings")}>Runtime settings</Button>}</div>
+              <div className="marketplace-next-step-actions"><Button variant="primary" type="button" onClick={() => { setSection("Models"); setQuery(""); }}>Find a model</Button><Button variant="secondary" type="button" onClick={() => { setSection("Installed"); setQuery(""); }}>Installed &amp; updates</Button>{onNavigate && <Button variant="ghost" type="button" onClick={() => onNavigate("settings")}>Runtime settings</Button>}</div>
             </section>
             {filteredCategories.length === 0 ? <EmptyState title="No matching categories" description="Try a different search term." action={<Button variant="ghost" onClick={() => setQuery("")}>Clear search</Button>} /> : (
               <div className="marketplace-category-grid" aria-label="Marketplace categories">
@@ -641,8 +613,6 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
             )}
             <p className="marketplace-discover-note">Downloads stay local. Each install shows its source, runtime, size, and next action before anything changes on this device.</p>
           </div>
-        ) : section === "Updates" ? (
-          <section className="marketplace-installed-pane marketplace-updates-pane"><div className="panel-heading"><div><p className="section-kicker">LOCAL UPDATE CHANNEL</p><h3>Keep Skai current</h3><p className="panel-subtitle">Check the configured release source and review the version before downloading anything. Update checks use the app's own signed release channel.</p></div><Button variant="primary" disabled={updateChecking || !window.skaiAgent?.updates} onClick={() => void checkForUpdates()}>{updateChecking ? "Checking." : "Check for updates"}</Button></div>{updateResult ? <div className="marketplace-update-result" role="status"><StatusBadge tone={updateResult.status === "error" ? "danger" : updateResult.available ? "success" : "neutral"}>{updateResult.status === "error" ? "Check failed" : updateResult.available ? `Update ${updateResult.version ?? "available"}` : "Up to date"}</StatusBadge><div><strong>{updateResult.available ? `Version ${updateResult.version ?? "available"} is ready to review.` : `Skai ${updateResult.currentVersion} is the current known version.`}</strong><span>{updateResult.status === "error" ? updateResult.message : updateResult.available ? "A download or install has not started. Review the release details in Settings before applying it." : "No verified release newer than this installation was reported."}</span></div>{updateResult.available && onNavigate && <Button variant="secondary" type="button" onClick={() => onNavigate("settings")}>Review in Settings</Button>}</div> : <EmptyState title="No update check run yet" description="Run a check when you want to verify the release channel. Nothing is downloaded automatically from this page." />}</section>
         ) : section === "Image workflows" ? (
           <section className="marketplace-installed-pane marketplace-image-workflows-pane">
             <div className="panel-heading"><div><p className="section-kicker">LOCAL WORKFLOW LIBRARY</p><h3>ComfyUI workflows</h3><p className="panel-subtitle">Manage workflows already saved on this device. Marketplace never downloads workflow code or contacts a remote workflow service.</p></div><div className="marketplace-model-actions">{onImportWorkflow && <Button variant="primary" type="button" disabled={imageWorkflowImporting} onClick={() => void importImageWorkflow()}>{imageWorkflowImporting ? "Importing…" : "Import local workflow"}</Button>}<Button variant="secondary" type="button" onClick={() => { setSavedImageWorkflows(readSavedImageWorkflows()); setImageWorkflowStatus(null); }}>Refresh library</Button></div></div>
@@ -667,10 +637,10 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
             {imageAssets.map((asset) => <article className="marketplace-model-row" key={asset.repository}><div><strong>{asset.repository}</strong><small>{asset.downloads.toLocaleString()} downloads · {asset.files.length} safetensors files</small>{asset.files.map((file) => <p key={file.path}>{file.path} · {formatSize(file.sizeBytes)}</p>)}</div><div>{asset.files.map((file) => <Button key={file.path} variant="secondary" disabled={Boolean(installing)} onClick={() => void installImageAsset(asset.repository, file.path)}>{file.path.split("/").at(-1)}</Button>)}</div></article>)}
             {!imageAssets.length && !imageAssetsLoading && <EmptyState title="Search image LoRAs" description="Results are filtered to repositories that publish safetensors files. Review the source repository before installing." />}
           </section>
-        ) : section === "Installed" ? (
+        ) : section === "Installed" || section === "Updates" ? (
           <div className="marketplace-installed-layout">
           <div className="marketplace-installed-pane">
-            <div className="panel-heading"><div><p className="section-kicker">LOCAL INVENTORY</p><h3>Installed and connected</h3><p className="panel-subtitle">Models, skills, voices, image assets, built-ins, and MCP servers available to Skai on this device.</p></div><div className="marketplace-model-actions"><StatusBadge tone={installedError || installedInventoryError ? "warning" : installedLoading ? "neutral" : "success"}>{installedLoading ? "Refreshing" : `${installedModels.length + (catalog?.skills.filter((item) => item.installed).length ?? 0) + (catalog?.voices.filter((item) => item.installed).length ?? 0) + (catalog?.tools.filter((item) => item.builtIn).length ?? 0) + installedImageAssets.length + installedConnections.length + installedPersonas.length} items`}</StatusBadge><Button variant="secondary" disabled={installedLoading} onClick={() => void loadInstalledModels()}>{installedLoading ? "Refreshing…" : "Refresh inventory"}</Button></div></div>
+            <div className="panel-heading"><div><p className="section-kicker">LOCAL INVENTORY</p><h3>Installed marketplace items</h3><p className="panel-subtitle">Review marketplace downloads, update compatible items, or remove local installs. To update Skai Desktop, open Settings → Updates.</p></div><div className="marketplace-model-actions"><StatusBadge tone={installedError || installedInventoryError ? "warning" : installedLoading ? "neutral" : "success"}>{installedLoading ? "Refreshing" : `${installedModels.length + (catalog?.skills.filter((item) => item.installed).length ?? 0) + (catalog?.voices.filter((item) => item.installed).length ?? 0) + (catalog?.tools.filter((item) => item.builtIn).length ?? 0) + installedImageAssets.length + installedConnections.length + installedPersonas.length} items`}</StatusBadge><Button variant="secondary" disabled={installedLoading} onClick={() => void loadInstalledModels()}>{installedLoading ? "Refreshing…" : "Refresh inventory"}</Button>{onNavigate && <Button variant="ghost" onClick={() => onNavigate("settings")}>Skai app updates · Settings</Button>}</div></div>
             <label className="marketplace-installed-search"><span className="sr-only">Search installed items</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search installed tools and local items…" aria-label="Search installed items" /></label>
             {(installedError || installedInventoryError) && <div className="marketplace-honesty" role="status">{[installedError, installedInventoryError].filter(Boolean).join(" ")}</div>}
             {(() => {

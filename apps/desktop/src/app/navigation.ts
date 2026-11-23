@@ -70,7 +70,7 @@ export function navigatePersonaWorkshop(page: PersonaWorkshopPage, personaId?: s
 }
 
 export function isRoute(value: string): value is Route {
-  return ["chat", "projects", "coding", "settings", "models", "compare", "images", "marketplace", "terminal", "memory", "usage", "pet-workshop", "voice-workbench", "persona-workshop", "personas", "persona-groups"].includes(value);
+  return ["chat", "projects", "coding", "settings", "models", "compare", "images", "marketplace", "terminal", "memory", "usage", "scheduled", "pet-workshop", "voice-workbench", "persona-workshop", "personas", "persona-groups"].includes(value);
 }
 
 function readHistoryState(): NavigationState | null {

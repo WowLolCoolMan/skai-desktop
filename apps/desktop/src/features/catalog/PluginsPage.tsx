@@ -36,7 +36,7 @@ export function PluginsPage({
   onImageChange?: (key: "endpoint" | "prompt" | "workflow" | "provider", value: string) => void;
   onImportWorkflow?: () => Promise<{ name: string; workflow: string } | null>;
 } = {}) {
-  const [view, setView] = useState<"catalog" | "models" | "voices" | "installed" | "updates">("catalog");
+  const [view, setView] = useState<"catalog" | "models" | "voices" | "updates">("catalog");
   const [catalogSection, setCatalogSection] = useState<MarketplaceCatalogSection>("Discover");
   const [query, setQuery] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -163,7 +163,7 @@ export function PluginsPage({
 
   const changeCatalogSection = (next: MarketplaceCatalogSection, nextQuery?: string) => {
     setCatalogSection(next);
-    setView(next === "Models" ? "models" : next === "Installed" ? "installed" : next === "Updates" ? "updates" : "catalog");
+    setView(next === "Models" ? "models" : next === "Installed" || next === "Updates" ? "updates" : next === "Voices" ? "voices" : "catalog");
     if (!["Installed", "Staff Picks"].includes(next)) {
       setQuery(nextQuery ?? localStorage.getItem(`skai.marketplace.query.${next.toLowerCase()}`) ?? "");
       setSelectedId(null);
@@ -274,13 +274,15 @@ export function PluginsPage({
           ["Voices", "activity"],
           ["Skills", "sparkle"],
           ["Tools", "terminal"],
-          ["Installed", "memory"],
-          ["Updates", "arrow-up-right"],
+          ["Installed & updates", "memory"],
         ] as const).map(([item, icon]) => {
-          const active = item === "Tools"
+          const active = item === "Installed & updates"
+            ? catalogSection === "Installed" || catalogSection === "Updates"
+            : item === "Tools"
             ? ["MCP Servers", "Skai built-ins", "Compatible plugins"].includes(catalogSection)
             : catalogSection === item;
-          return <button key={item} type="button" className={active ? "is-active" : ""} aria-current={active ? "page" : undefined} onClick={() => changeCatalogSection(item === "Tools" ? "MCP Servers" : item)}><NavIcon name={icon} /><span>{item}</span>{item === "Models" && <small>Live</small>}{item === "Tools" && <small>{tools.length + skills.length}</small>}</button>;
+          const destination: MarketplaceCatalogSection = item === "Installed & updates" ? "Updates" : item === "Tools" ? "MCP Servers" : item;
+          return <button key={item} type="button" className={active ? "is-active" : ""} aria-current={active ? "page" : undefined} onClick={() => changeCatalogSection(destination)}><NavIcon name={icon} /><span>{item}</span>{item === "Models" && <small>Live</small>}{item === "Tools" && <small>{tools.length + skills.length}</small>}</button>;
         })}
         {["MCP Servers", "Skai built-ins", "Compatible plugins"].includes(catalogSection) && <div className="plugins-tool-subnav" role="tablist" aria-label="Tools categories">
           {(["MCP Servers", "Skai built-ins", "Compatible plugins"] as const).map((item) => <button key={item} type="button" role="tab" aria-selected={catalogSection === item} className={catalogSection === item ? "is-active" : ""} onClick={() => changeCatalogSection(item)}>{item === "MCP Servers" ? "MCP servers" : item}</button>)}
@@ -291,10 +293,10 @@ export function PluginsPage({
         </div>
       </aside>
       <div className="plugins-main">
-        {view === "models" || view === "voices" || view === "installed" || view === "updates" ? (
+        {view === "models" || view === "voices" || view === "updates" ? (
           <MarketplacePage
             key={view}
-            initialSection={view === "models" ? "Models" : view === "voices" ? "Voices" : view === "updates" ? "Updates" : "Installed"}
+            initialSection={view === "models" ? "Models" : view === "voices" ? "Voices" : "Installed"}
             initialQuery={view === "models" ? query : undefined}
             onBack={() => changeCatalogSection("Discover")}
             onSectionChange={(section) => changeCatalogSection(section as MarketplaceCatalogSection)}
@@ -352,7 +354,7 @@ export function PluginsPage({
             {catalogSection === "Discover" && !query.trim() && (
               <section className="plugins-start-panel" aria-label="Marketplace actions">
                 <div><p className="section-kicker">LOCAL WORKSPACE</p><h3>Marketplace</h3><p>Model search finds packages for local runtimes. Inference stays on your configured runtime.</p><div className="marketplace-runtime-state"><strong>Local runtime</strong><StatusBadge tone={runtimeStatus === "ready" ? "success" : runtimeStatus === "unavailable" ? "danger" : "warning"}>{runtimeStatus}</StatusBadge><span>{runtimeStatus === "ready" ? `${localStorage.getItem("skai.provider") ?? "Local runtime"} · ${runtimeModelCount} models` : "No responding local runtime detected"}</span></div></div>
-                <div className="plugins-start-actions"><Button variant="primary" type="button" onClick={() => changeCatalogSection("Models")}>Search models</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("MCP Servers")}>Connect MCP</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("Installed")}>Open installed</Button><Button variant="ghost" type="button" onClick={() => changeCatalogSection("Updates")}>Check updates</Button></div>
+                <div className="plugins-start-actions"><Button variant="primary" type="button" onClick={() => changeCatalogSection("Models")}>Search models</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("MCP Servers")}>Connect MCP</Button><Button variant="secondary" type="button" onClick={() => changeCatalogSection("Updates")}>Installed &amp; updates</Button></div>
               </section>
             )}
             {error ? (
