@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const http = require("node:http");
 const { spawn, spawnSync } = require("node:child_process");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
 // Pick the Linux display backend up front; otherwise the app relaunches itself and the spawned PID is not the app.
@@ -84,19 +85,92 @@ const smokeAppDataDir = path.join(smokeUserDataDir, "appdata");
 fs.mkdirSync(smokeAppDataDir, { recursive: true });
 const microphoneFixturePath = path.join(smokeUserDataDir, "microphone-voice-fixture.wav");
 let microphoneFixtureReady = false;
+let microphoneSpeechFixtureBase64 = "";
+function extendPcmSpeechFixture(filePath, cycles = 240, silenceSeconds = 2) {
+  const source = fs.readFileSync(filePath);
+  let offset = 12;
+  let dataHeader = -1;
+  let dataStart = -1;
+  let dataLength = 0;
+  let sampleRate = 0;
+  let channels = 0;
+  let bitsPerSample = 0;
+  let encoding = 0;
+  while (offset + 8 <= source.length) {
+    const size = source.readUInt32LE(offset + 4);
+    const start = offset + 8;
+    if (source.toString("ascii", offset, offset + 4) === "fmt " && size >= 16) {
+      encoding = source.readUInt16LE(start);
+      channels = source.readUInt16LE(start + 2);
+      sampleRate = source.readUInt32LE(start + 4);
+      bitsPerSample = source.readUInt16LE(start + 14);
+    }
+    if (source.toString("ascii", offset, offset + 4) === "data") {
+      dataHeader = offset;
+      dataStart = start;
+      dataLength = size;
+      break;
+    }
+    offset = start + size + (size & 1);
+  }
+  if (encoding !== 1 || bitsPerSample !== 16 || dataHeader < 0 || dataStart < 0 || dataLength < 1 || sampleRate < 8_000 || channels < 1) return false;
+  const speech = source.subarray(dataStart, dataStart + dataLength);
+  const silence = Buffer.alloc(sampleRate * channels * (bitsPerSample / 8) * silenceSeconds);
+  const cycle = Buffer.concat([speech, silence]);
+  const singleHeader = Buffer.from(source.subarray(0, dataStart));
+  singleHeader.writeUInt32LE(cycle.length, dataHeader + 4);
+  const single = Buffer.concat([singleHeader, cycle]);
+  single.writeUInt32LE(single.length - 8, 4);
+  const repeated = Buffer.alloc(cycle.length * cycles);
+  for (let index = 0; index < cycles; index += 1) cycle.copy(repeated, index * cycle.length);
+  const header = Buffer.from(source.subarray(0, dataStart));
+  header.writeUInt32LE(repeated.length, dataHeader + 4);
+  const fixture = Buffer.concat([header, repeated]);
+  fixture.writeUInt32LE(fixture.length - 8, 4);
+  fs.writeFileSync(filePath, fixture);
+  return single;
+}
 if (process.platform === "win32") {
   const powershellScript = `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; if ($synth.GetInstalledVoices().Count -gt 0) { $synth.SetOutputToWaveFile('${microphoneFixturePath.replace(/'/g, "''")}'); $synth.Speak('Skai voice fixture one two three.'); $synth.SetOutputToNull(); $synth.Dispose(); 'fixture-ready' }`;
   const encodedScript = Buffer.from(powershellScript, "utf16le").toString("base64");
   const synthesis = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodedScript], { encoding: "utf8", timeout: 30_000, windowsHide: true });
   microphoneFixtureReady = synthesis.status === 0 && fs.existsSync(microphoneFixturePath)
     && fs.readFileSync(microphoneFixturePath).subarray(0, 4).toString("ascii") === "RIFF";
+  if (microphoneFixtureReady) {
+    const oneUtterance = extendPcmSpeechFixture(microphoneFixturePath);
+    microphoneFixtureReady = Buffer.isBuffer(oneUtterance);
+    if (microphoneFixtureReady) microphoneSpeechFixtureBase64 = oneUtterance.toString("base64");
+  }
   if (!microphoneFixtureReady && synthesis.error) console.warn(`Speech fixture unavailable; microphone smoke will use the active device: ${synthesis.error.message}`);
 }
 const microphoneFixtureArgs = microphoneFixtureReady
   ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-audio-capture=${microphoneFixturePath}`]
   : [];
-console.log(`Packaged microphone fixture: ${microphoneFixtureReady ? "Windows System.Speech WAV via Chromium microphone device" : "no deterministic speech fixture; using the active microphone device"}`);
+console.log(`Packaged microphone fixture: ${microphoneFixtureReady ? "repeating Windows System.Speech phrase with silence gaps through Chromium's microphone device" : "no deterministic speech fixture; using the active microphone device"}`);
 const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, ...microphoneFixtureArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+let bargeInCompletionCount = 0;
+const bargeInRequests = [];
+const bargeInServer = http.createServer((request, response) => {
+  const pathname = (request.url ?? "").split("?", 1)[0];
+  bargeInRequests.push(`${request.method} ${request.url}`);
+  if (request.method !== "POST" || !pathname.endsWith("/chat/completions")) {
+    response.writeHead(404).end();
+    return;
+  }
+  const chunks = [];
+  request.on("data", (chunk) => chunks.push(chunk));
+  request.once("end", () => {
+    bargeInCompletionCount += 1;
+    const requestBody = Buffer.concat(chunks).toString("utf8");
+    const content = bargeInCompletionCount === 1
+      ? Array.from({ length: 24 }, (_, index) => `This is a deliberately long local voice playback test, sentence ${index + 1}. Speak over the reply whenever you are ready.`).join(" ")
+      : "The interrupted microphone turn reached the local test model.";
+    console.log(`Packaged voice test endpoint request ${bargeInCompletionCount}: ${requestBody.length} bytes`);
+    response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    response.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
+  });
+  request.resume();
+});
 let output = "";
 let childExit = null;
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
@@ -364,37 +438,130 @@ async function main() {
     }
     console.log(`Packaged Voice Mode in-flight Whisper cancellation: ${JSON.stringify(handsFreeCancelState)}`);
   }
+  let handsFreeBargeInState = { available: whisperInstalled && microphoneFixtureReady && process.platform === "win32", configured: false, audioFixtureInjected: false, started: false, playbackObserved: false, interruptionObserved: false, followupTranscribed: false, ended: false, completionCount: 0, peakInputLevel: 0 };
   let handsFreeState = { available: whisperInstalled && microphoneFixtureReady, started: false, listening: false, transcribing: false, submitted: false, ended: false, peakInputLevel: 0 };
   if (handsFreeState.available) {
+    await new Promise((resolve, reject) => {
+      bargeInServer.once("error", reject);
+      bargeInServer.listen(0, "127.0.0.1", resolve);
+    });
+    const address = bargeInServer.address();
+    const endpoint = `http://127.0.0.1:${address.port}/v1`;
+    const endpointConfigured = await evaluate(mainTarget, `(async () => {
+      location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate'));
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      for (let i = 0; i < 100 && !document.querySelector('.settings-nav'); i++) await wait(100);
+      const models = [...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === 'Models & Providers');
+      if (!models) return false;
+      models.click(); await wait(100);
+      const endpointInput = [...document.querySelectorAll('label')].find((label) => label.textContent?.includes('Model endpoint'))?.querySelector('input');
+      const providerSelect = [...document.querySelectorAll('label')].find((label) => label.textContent?.includes('Provider'))?.querySelector('select');
+      if (!endpointInput || !providerSelect) return false;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(endpointInput, ${JSON.stringify(endpoint)});
+      endpointInput.dispatchEvent(new Event('input', { bubbles: true }));
+      endpointInput.dispatchEvent(new Event('change', { bubbles: true }));
+      providerSelect.value = 'Local API';
+      providerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      const save = [...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Save settings');
+      if (!save) return false;
+      save.click();
+      await wait(150);
+      for (let i = 0; i < 100; i++) {
+        const status = document.querySelector('.settings-save-status');
+        if (status?.classList.contains('settings-save-saved') && status.textContent?.includes('Saved locally')) {
+          const preferences = JSON.parse(localStorage.getItem('skai.preferredModels.v1') ?? '{}');
+          preferences.chat = { model: localStorage.getItem('skai.model') || 'llama3.2', provider: 'Local API', endpoint: ${JSON.stringify(endpoint)} };
+          localStorage.setItem('skai.preferredModels.v1', JSON.stringify(preferences));
+          return true;
+        }
+        await wait(100);
+      }
+      return false;
+    })()`);
+    handsFreeState.configured = endpointConfigured === true;
+    if (!handsFreeState.configured) throw new Error("Could not configure local voice smoke endpoint before the first hands-free turn.");
+    await evaluate(mainTarget, "'reload requested'", [{ method: "Page.reload", params: { ignoreCache: true } }]);
+    await sleep(1000);
+    await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
+    await sleep(500);
+    const freshChatUsesStub = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'New chat'); if (button) button.click(); return true; })()");
+    if (freshChatUsesStub) await sleep(500);
+    handsFreeState.provider = await evaluate(mainTarget, "document.querySelector('.model-picker-label')?.textContent ?? ''");
     await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+    const fixtureInjected = await evaluate(mainTarget, `(async () => {
+      const encoded = ${JSON.stringify(microphoneSpeechFixtureBase64)};
+      if (!encoded || !navigator.mediaDevices?.getUserMedia || typeof AudioContext === 'undefined') return false;
+      const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+      const context = new AudioContext();
+      const buffer = await context.decodeAudioData(bytes.buffer);
+      const samples = buffer.getChannelData(0);
+      let squareSum = 0;
+      for (let index = 0; index < samples.length; index += 1) squareSum += samples[index] * samples[index];
+      const source = context.createBufferSource(); source.buffer = buffer; source.loop = true;
+      const output = context.createMediaStreamDestination(); source.connect(output); source.start();
+      const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      const diagnostics = { initialContextState: context.state, fixtureRms: Math.sqrt(squareSum / samples.length), captureCalls: 0, injectedCalls: 0, trackReadyState: '', trackMuted: true, resumedContextState: '' };
+      const captureFixture = async (constraints) => {
+        if (!constraints?.audio) return original(constraints);
+        diagnostics.captureCalls += 1;
+        if (diagnostics.captureCalls === 1) return original(constraints);
+        diagnostics.injectedCalls += 1;
+        if (context.state !== 'running') await context.resume();
+        diagnostics.resumedContextState = context.state;
+        const cloned = output.stream.clone();
+        diagnostics.trackReadyState = cloned.getAudioTracks()[0]?.readyState ?? '';
+        diagnostics.trackMuted = cloned.getAudioTracks()[0]?.muted ?? true;
+        return cloned;
+      };
+      navigator.mediaDevices.getUserMedia = captureFixture;
+      window.__skaiBargeFixture = { context, source, output, original, captureFixture, diagnostics };
+      return JSON.stringify({ installed: navigator.mediaDevices.getUserMedia === captureFixture, ...diagnostics });
+    })()`);
+    const fixtureInfo = JSON.parse(fixtureInjected);
+    handsFreeBargeInState.audioFixtureInjected = fixtureInfo.installed === true;
+    handsFreeBargeInState.audioFixtureInfo = fixtureInfo;
+    handsFreeBargeInState.configured = handsFreeState.configured === true;
     const beforeTurns = await evaluate(mainTarget, "document.querySelectorAll('.chat-message.user').length");
-    const startHandsFree = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice mode'); if (!button) return false; button.click(); return true; })()");
+    const startHandsFree = handsFreeBargeInState.audioFixtureInjected && await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice mode'); if (!button || button.disabled) return false; button.click(); return true; })()");
     handsFreeState.started = startHandsFree === true;
-    const handsFreeDeadline = Date.now() + 60_000;
-    while (Date.now() < handsFreeDeadline && handsFreeState.started && !handsFreeState.submitted) {
+    handsFreeBargeInState.started = handsFreeState.started;
+    const handsFreeDeadline = Date.now() + 120_000;
+    while (Date.now() < handsFreeDeadline && handsFreeState.started && !handsFreeBargeInState.followupTranscribed) {
       const current = JSON.parse(await evaluate(mainTarget, `(() => JSON.stringify({ modal: Boolean(document.querySelector('.voice-mode-dialog')), state: document.querySelector('.voice-mode-state')?.textContent ?? '', detail: document.querySelector('.voice-mode-detail')?.textContent ?? '', level: Number(document.querySelector('.voice-mode-session')?.dataset.inputLevel ?? 0), turns: [...document.querySelectorAll('.chat-message.user')].slice(${beforeTurns}).map((item) => item.innerText.toLowerCase()).join(' ') }))()`));
       handsFreeState.peakInputLevel = Math.max(handsFreeState.peakInputLevel, current.level);
       handsFreeState.listening ||= current.state.includes("Listening");
       handsFreeState.transcribing ||= current.state.includes("Transcribing");
       handsFreeState.submitted = current.turns.includes("voice fixture");
+      handsFreeBargeInState.playbackObserved ||= current.state.includes("Listening for an interruption");
+      handsFreeBargeInState.interruptionObserved ||= handsFreeBargeInState.playbackObserved && current.state.includes("Transcribing");
+      handsFreeBargeInState.completionCount = bargeInCompletionCount;
+      handsFreeBargeInState.followupTranscribed = bargeInCompletionCount >= 2 && current.turns.split("voice fixture").length > 2;
+      handsFreeBargeInState.peakInputLevel = Math.max(handsFreeBargeInState.peakInputLevel, current.level);
       if (!current.modal && (current.detail.includes("Whisper") || current.turns)) break;
       await sleep(100);
     }
     if (handsFreeState.started) {
       const ended = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'End voice mode'); if (!button) return false; button.click(); return true; })()");
       handsFreeState.ended = ended === true && await evaluate(mainTarget, "!document.querySelector('.voice-mode-dialog')") === true;
+      handsFreeBargeInState.ended = handsFreeState.ended;
     }
+    handsFreeBargeInState.audioFixtureInfo = await evaluate(mainTarget, "(() => JSON.stringify(window.__skaiBargeFixture?.diagnostics ?? null))()");
+    handsFreeBargeInState.requestPaths = [...bargeInRequests];
+    await evaluate(mainTarget, "(async () => { const fixture = window.__skaiBargeFixture; if (!fixture) return; navigator.mediaDevices.getUserMedia = fixture.original; try { fixture.source.stop(); } catch {} fixture.output.stream.getTracks().forEach((track) => track.stop()); await fixture.context.close().catch(() => {}); delete window.__skaiBargeFixture; return true; })()");
     console.log(`Packaged local Whisper hands-free Voice Mode: ${JSON.stringify(handsFreeState)}`);
   } else {
     console.log(`Packaged local Whisper hands-free Voice Mode skipped: ${JSON.stringify(handsFreeState)}`);
   }
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || (handsFreeState.available && (!handsFreeState.started || !handsFreeState.listening || !handsFreeState.transcribing || !handsFreeState.submitted || !handsFreeState.ended)) || (handsFreeCancelState.available && (!handsFreeCancelState.started || !handsFreeCancelState.transcribing || !handsFreeCancelState.endedDuringTranscription || !handsFreeCancelState.noLateTurn || !handsFreeCancelState.ended)) || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, handsFreeState, handsFreeCancelState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
+  console.log(`Packaged Voice Mode barge-in: ${JSON.stringify(handsFreeBargeInState)}`);
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || (handsFreeState.available && (!handsFreeState.configured || !handsFreeState.started || !handsFreeState.listening || !handsFreeState.transcribing || !handsFreeState.submitted || !handsFreeState.ended)) || (handsFreeCancelState.available && (!handsFreeCancelState.started || !handsFreeCancelState.transcribing || !handsFreeCancelState.endedDuringTranscription || !handsFreeCancelState.noLateTurn || !handsFreeCancelState.ended)) || (handsFreeBargeInState.available && (!handsFreeBargeInState.configured || !handsFreeBargeInState.started || !handsFreeBargeInState.playbackObserved || !handsFreeBargeInState.interruptionObserved || !handsFreeBargeInState.followupTranscribed || !handsFreeBargeInState.ended || handsFreeBargeInState.peakInputLevel <= 0)) || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, handsFreeState, handsFreeCancelState, handsFreeBargeInState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }
 
 async function cleanup() {
+  if (bargeInServer.listening) await new Promise((resolve) => bargeInServer.close(resolve));
   if (child.exitCode === null && child.signalCode === null) {
     if (process.platform === "win32") {
       await new Promise((resolve) => {

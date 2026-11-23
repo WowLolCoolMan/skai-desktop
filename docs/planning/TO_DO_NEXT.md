@@ -53,10 +53,12 @@ Mark an item done only when the linked workflow has evidence.
    transcription is terminated by the cancel request and returns no transcript.
    During spoken replies, Voice Mode now monitors the local mic, cuts off
    playback after sustained user speech, retains a short pre-roll to capture
-   the utterance onset, then records/transcribes that turn. Focused voice-
-   activity, typecheck, and build checks pass. Packaged Windows acceptance
-   still proves turn-based hands-free behavior, but does not yet prove barge-in;
-   streamed voice also remains open. Keep the path local.
+   the utterance onset, then records/transcribes that turn. Packaged Windows
+   acceptance now uses a loopback model stub and separate speech fixtures to
+   verify a long spoken reply, microphone monitoring during playback, sustained
+   speech interruption, Whisper transcription of the interruption, and delivery
+   of the follow-up to the model. Focused voice-activity, typecheck, and build
+   checks pass. Streamed voice remains open. Keep the path local.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
