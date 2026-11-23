@@ -9,7 +9,7 @@ import { AttachmentList } from "./AttachmentList";
 import { composerCommands, type ComposerCommand } from "./composerCommands";
 import { stopNativeSpeech, waitForLocalSpeechToFinish } from "../../services/nativeTts";
 import { isLocalAudioFile, transcribeLocalAudioFile } from "./localAudioTranscription";
-import { audioRms } from "./voiceActivity";
+import { audioRms, isSustainedVoiceActivity } from "./voiceActivity";
 import { isLocalEndpoint } from "../../services/localOnly";
 
 type ChatComposerProps = {
@@ -64,6 +64,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [voicePackInstalling, setVoicePackInstalling] = useState(false);
   const [audioTranscribing, setAudioTranscribing] = useState(false);
   const [voiceTurnTranscribing, setVoiceTurnTranscribing] = useState(false);
+  const [voicePlaybackActive, setVoicePlaybackActive] = useState(false);
   const [audioTranscriptReady, setAudioTranscriptReady] = useState(false);
   const [omniOpen, setOmniOpen] = useState(false);
   const [computerOpen, setComputerOpen] = useState(false);
@@ -81,11 +82,14 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const audioAbortRef = useRef<AbortController | null>(null);
   const whisperRecorderRef = useRef<{ recorder: MediaRecorder; stream: MediaStream; chunks: Blob[] } | null>(null);
   const whisperRecorderTimerRef = useRef<number | null>(null);
-  const handsFreeCaptureRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number } | null>(null);
+  const handsFreeCaptureRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number; monitorDuringPlayback: boolean; bargeInTriggered: boolean } | null>(null);
   const handsFreeAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const handsFreeRef = useRef(false);
   const awaitingResponseRef = useRef(false);
+  const pendingBargeInTranscriptRef = useRef<string | null>(null);
+  const voicePlaybackActiveRef = useRef(false);
+  const startHandsFreeListeningRef = useRef<(monitorDuringPlayback?: boolean) => Promise<void>>(async () => {});
   const sawBusyRef = useRef(false);
   const busyRef = useRef(busy);
   const draftRef = useRef(draft);
@@ -106,6 +110,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     handsFreeRef.current = false;
     audioAbortRef.current?.abort();
     handsFreeAbortRef.current?.abort();
+    pendingBargeInTranscriptRef.current = null;
     stopHandsFreeCapture(false);
     if (whisperRecorderTimerRef.current !== null) window.clearTimeout(whisperRecorderTimerRef.current);
     const recorder = whisperRecorderRef.current;
@@ -263,6 +268,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       handsFreeRef.current = false;
       awaitingResponseRef.current = false;
       sawBusyRef.current = false;
+      pendingBargeInTranscriptRef.current = null;
       setHandsFreeActive(false);
       stopNativeSpeech();
       if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
@@ -283,6 +289,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     handsFreeRef.current = false;
     awaitingResponseRef.current = false;
     sawBusyRef.current = false;
+    pendingBargeInTranscriptRef.current = null;
     setHandsFreeActive(false);
     stopNativeSpeech();
     if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
@@ -305,8 +312,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     }
   };
 
-  const startHandsFreeListening = async () => {
-    if (!handsFreeRef.current || busyRef.current || awaitingResponseRef.current || handsFreeCaptureRef.current || handsFreeAbortRef.current) return;
+  const startHandsFreeListening = async (monitorDuringPlayback = false) => {
+    if (!handsFreeRef.current || (!monitorDuringPlayback && (busyRef.current || awaitingResponseRef.current)) || (monitorDuringPlayback && !voicePlaybackActiveRef.current) || handsFreeCaptureRef.current || handsFreeAbortRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined" || typeof AudioContext === "undefined") {
       setVoiceError("This desktop runtime cannot capture local Voice Mode audio.");
       endVoiceMode();
@@ -322,10 +329,17 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         endVoiceMode();
         return;
       }
-      const stream = pendingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (!handsFreeRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
+      const stream = pendingStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (!handsFreeRef.current || (monitorDuringPlayback && !voicePlaybackActiveRef.current)) { stream.getTracks().forEach((track) => track.stop()); return; }
       const context = pendingContext = new AudioContext();
       await context.resume();
+      if (!handsFreeRef.current || (monitorDuringPlayback && !voicePlaybackActiveRef.current)) {
+        stream.getTracks().forEach((track) => track.stop());
+        await context.close().catch(() => {});
+        pendingStream = null;
+        pendingContext = null;
+        return;
+      }
       const source = context.createMediaStreamSource(stream);
       const analyser = context.createAnalyser();
       const silentMonitor = context.createGain();
@@ -337,7 +351,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       const samples = new Float32Array(analyser.fftSize);
       const mimeType = ["audio/webm;codecs=opus", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type));
       if (!mimeType) throw new Error("This desktop runtime cannot record a supported local audio format.");
-      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001 };
+      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false };
       handsFreeCaptureRef.current = capture;
       capture.recorder = new MediaRecorder(stream, { mimeType });
       capture.recorder.ondataavailable = (event) => { if (event.data.size) capture.chunks.push(event.data); };
@@ -368,6 +382,10 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
           handsFreeAbortRef.current = controller;
           void transcribeLocalAudioFile(new File([blob], `voice-turn-${Date.now()}.webm`, { type: "audio/webm" }), controller.signal).then((transcript) => {
             if (!handsFreeRef.current || controller.signal.aborted) return;
+            if (busyRef.current) {
+              pendingBargeInTranscriptRef.current = transcript;
+              return;
+            }
             if (!onVoiceTranscript(transcript)) {
               awaitingResponseRef.current = false;
               setVoiceError("Add a document before speaking a Documents-only request.");
@@ -392,14 +410,35 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         const level = audioRms(samples);
         document.querySelector(".voice-mode-session")?.setAttribute("data-input-level", level.toFixed(6));
         const now = performance.now();
-        const threshold = Math.max(0.0006, capture.noiseFloor * 1.6);
+        const threshold = capture.monitorDuringPlayback ? Math.max(0.005, capture.noiseFloor * 2.8) : Math.max(0.0006, capture.noiseFloor * 1.6);
         if (!capture.speechDetected && now - capture.calibrationStartedAt < 350) capture.noiseFloor = Math.min(0.02, capture.noiseFloor * 0.9 + level * 0.1);
         if (level > threshold) {
-          capture.speechDetected = true;
           capture.lastSpeechAt = now;
           if (!capture.speechStartedAt) capture.speechStartedAt = now;
+          if (!capture.monitorDuringPlayback) capture.speechDetected = true;
+          else if (!capture.bargeInTriggered && isSustainedVoiceActivity(level, threshold, capture.speechStartedAt, now)) {
+            capture.bargeInTriggered = true;
+            capture.speechDetected = true;
+            capture.monitorDuringPlayback = false;
+            capture.startedAt = now;
+            capture.chunks.length = 0;
+            const previousRecorder = capture.recorder;
+            if (previousRecorder && previousRecorder.state !== "inactive") {
+              previousRecorder.ondataavailable = null;
+              previousRecorder.onstop = null;
+              try { previousRecorder.stop(); } catch { /* It may already have stopped. */ }
+            }
+            const resumedRecorder = new MediaRecorder(stream, { mimeType });
+            resumedRecorder.ondataavailable = (event) => { if (event.data.size) capture.chunks.push(event.data); };
+            resumedRecorder.start(250);
+            capture.recorder = resumedRecorder;
+            setVoiceError(null);
+            stopNativeSpeech();
+          }
+        } else if (capture.monitorDuringPlayback && !capture.bargeInTriggered) {
+          capture.speechStartedAt = 0;
         }
-        if (now - capture.startedAt > 30_000 || (capture.speechDetected && now - capture.lastSpeechAt > 900 && now - capture.speechStartedAt > 300)) { finalize(); return; }
+        if ((!capture.monitorDuringPlayback && now - capture.startedAt > 30_000) || (capture.speechDetected && now - capture.lastSpeechAt > 900 && now - capture.speechStartedAt > 300)) { finalize(); return; }
         if (capture.context.state !== "running") void capture.context.resume();
       };
       capture.frame = window.setInterval(inspect, 40);
@@ -411,6 +450,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       endVoiceMode();
     }
   };
+  startHandsFreeListeningRef.current = startHandsFreeListening;
 
   const openFilePickerFromOmni = () => {
     setOmniOpen(false);
@@ -463,11 +503,39 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   };
 
   useEffect(() => {
+    const onPlayback = (event: Event) => {
+      const active = (event as CustomEvent<boolean>).detail === true;
+      voicePlaybackActiveRef.current = active;
+      setVoicePlaybackActive(active);
+      const capture = handsFreeCaptureRef.current;
+      if (active && handsFreeRef.current && awaitingResponseRef.current) {
+        void startHandsFreeListeningRef.current(true);
+      } else if (!active && capture?.monitorDuringPlayback && !capture.bargeInTriggered) {
+        setVoiceListening(false);
+        stopHandsFreeCapture(false);
+      }
+    };
+    window.addEventListener("skai:voice-playback", onPlayback);
+    return () => window.removeEventListener("skai:voice-playback", onPlayback);
+  }, []);
+
+  useEffect(() => {
+    if (!busy && pendingBargeInTranscriptRef.current && handsFreeRef.current) {
+      const transcript = pendingBargeInTranscriptRef.current;
+      pendingBargeInTranscriptRef.current = null;
+      awaitingResponseRef.current = false;
+      sawBusyRef.current = false;
+      if (!onVoiceTranscript(transcript)) {
+        setVoiceError("The interrupted voice turn could not be submitted. Try again.");
+        void startHandsFreeListening();
+      }
+      return;
+    }
     if (busy && handsFreeRef.current && !awaitingResponseRef.current) {
       awaitingResponseRef.current = true;
       sawBusyRef.current = true;
       recognitionRef.current?.stop();
-      stopHandsFreeCapture(false);
+      if (!handsFreeCaptureRef.current?.monitorDuringPlayback) stopHandsFreeCapture(false);
     } else if (busy) {
       sawBusyRef.current = true;
     }
@@ -641,6 +709,6 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     <div className="composer-actions"><Button variant={documentsOnly ? "secondary" : "ghost"} type="button" onClick={onToggleDocumentsOnly} disabled={busy || rewriteBusy} aria-pressed={documentsOnly} aria-label={documentsOnly ? "Documents only is on" : "Use documents only"} title={documentsOnly ? "Documents only: on" : "Use only attached documents as evidence"}><NavIcon name="document" /></Button><Button variant="ghost" type="button" onClick={() => setOmniOpen(true)} disabled={rewriteBusy || (attachments.length >= 5 && !audioTranscribing)} aria-haspopup="dialog" aria-expanded={omniOpen} aria-label="Add files or audio" aria-describedby="attachment-help" title="Add files, folders, or audio"><NavIcon name="plus" /></Button><Button variant={audioTranscribing ? "secondary" : "ghost"} type="button" onClick={() => audioAbortRef.current ? audioAbortRef.current.abort() : audioPickerRef.current?.click()} disabled={busy || rewriteBusy || voiceListening || handsFreeActive} aria-label={audioTranscribing ? "Stop audio transcription" : "Transcribe an audio file"} title={audioTranscribing ? "Stop audio transcription" : "Transcribe MP3, M4A, OGG, WAV, or WebM locally"}><NavIcon name={audioTranscribing ? "stop" : "audio"} /></Button>{!hasMessageContent && <Button variant={voiceListening ? "secondary" : "ghost"} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"} title={voiceListening ? "Stop voice input and transcribe locally" : "Record a local Whisper dictation"}><NavIcon name={voiceListening && !handsFreeActive ? "stop" : "microphone"} /></Button>}{!hasMessageContent && <Button variant={handsFreeActive ? "secondary" : "ghost"} type="button" onClick={toggleHandsFree} disabled={rewriteBusy || (voiceListening && !handsFreeActive) || audioTranscribing} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title="Start a local turn-based voice conversation"><NavIcon name={handsFreeActive ? "stop" : "headset"} /></Button>}<div><span id="attachment-help" className="composer-hint">{documentsOnly ? "Answers use only the documents attached to this message · " : ""}{attachments.length}/5 attached · Enter to {busy ? "queue" : "send"} · Shift+Enter for a new line · / for commands · $skill-id for a local skill · drop files here</span>{hasMessageContent && <Button variant={busy ? "secondary" : "primary"} disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit}>{rewriteBusy ? "Rewriting…" : busy ? "Queue ↗" : "Send ↗"}</Button>}</div></div>
     <ModalDialog open={omniOpen} onClose={() => setOmniOpen(false)} titleId="omni-input-title" className="ui-dialog omni-input-dialog"><div className="dialog-heading"><div><p className="section-kicker">ADD TO THIS MESSAGE</p><h3 id="omni-input-title">Choose an input</h3><p>Attach local media or start a private voice turn. You can review attachments before sending.</p></div><button type="button" onClick={() => setOmniOpen(false)} aria-label="Close input menu">×</button></div><div className="omni-input-options"><button type="button" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><strong>Files and folders</strong><span>Images, documents, PDFs, and videos</span><small>{attachments.length}/5 attachments</small></button><button type="button" onClick={openAudioPickerFromOmni} disabled={busy || voiceListening || handsFreeActive}><strong>Audio file</strong><span>Transcribe MP3, M4A, OGG, or WAV on this device</span><small>No raw audio is sent</small></button><button type="button" onClick={startVoiceFromOmni} disabled={rewriteBusy || handsFreeActive || audioTranscribing}><strong>Voice input</strong><span>Dictate one message into the composer</span><small>On-device speech recognition</small></button><button type="button" onClick={startHandsFreeFromOmni} disabled={rewriteBusy || voiceListening || audioTranscribing}><strong>Voice Mode</strong><span>Have a turn-based hands-free conversation</span><small>End anytime</small></button><button type="button" onClick={() => { setOmniOpen(false); setComputerOpen(true); void captureComputerScreens(); }}><strong>Computer use</strong><span>View a screen, attach it for model context, or send direct mouse and keyboard input</span><small>Local display capture · Windows input</small></button></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setOmniOpen(false)}>Cancel</Button></div></ModalDialog>
     <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL COMPUTER CONTROL</p><h3 id="computer-use-title">Computer use</h3><p>Ask the local vision model to act on this display, or use the direct controls. Each action is shown below; stop ends the session after the current model response.</p></div><button type="button" onClick={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} aria-label="Close computer use">×</button></div>{computerScreens.length > 1 && <label className="computer-screen-picker">Display<select value={computerScreenId} onChange={(event) => { setComputerScreenId(event.target.value); setComputerPoint(null); }} aria-label="Select display">{computerScreens.map((screen) => <option value={screen.id} key={screen.id}>{screen.name}</option>)}</select></label>}{selectedComputerScreen && <button type="button" className="computer-screen-preview" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); const imageRatio = selectedComputerScreen.previewWidth / selectedComputerScreen.previewHeight; const boxRatio = rect.width / rect.height; const imageWidth = boxRatio > imageRatio ? rect.height * imageRatio : rect.width; const imageHeight = boxRatio > imageRatio ? rect.height : rect.width / imageRatio; const offsetX = (rect.width - imageWidth) / 2; const offsetY = (rect.height - imageHeight) / 2; setComputerPoint({ x: Math.max(0, Math.min(1, (event.clientX - rect.left - offsetX) / imageWidth)), y: Math.max(0, Math.min(1, (event.clientY - rect.top - offsetY) / imageHeight)) }); }} aria-label="Choose a point on the captured display"><img src={`data:image/png;base64,${selectedComputerScreen.content}`} alt={`Captured display: ${selectedComputerScreen.name}`} />{computerPoint && <span className="computer-point-marker" style={{ left: `${computerPoint.x * 100}%`, top: `${computerPoint.y * 100}%` }} />}</button>}{!selectedComputerScreen && <p className="settings-help">Capture a display to begin.</p>}<div className="computer-use-controls computer-use-agent"><input value={computerTask} onChange={(event) => setComputerTask(event.target.value)} maxLength={2000} placeholder="Describe what you want the local model to do…" aria-label="Computer-use task" /><Button variant={computerBusy ? "secondary" : "primary"} type="button" disabled={!selectedComputerScreen || !computerTask.trim()} onClick={() => computerBusy ? stopComputerTask() : void startComputerTask()}>{computerBusy ? "Stop session" : "Start session"}</Button><Button variant="secondary" type="button" disabled={computerBusy} onClick={() => void captureComputerScreens()}>Refresh screen</Button><Button variant="secondary" type="button" disabled={!selectedComputerScreen || attachments.length >= 5 || computerBusy} onClick={attachComputerScreenshot}>Attach screenshot</Button></div><div className="computer-use-controls"><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "left" })}>Click point</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "right" })}>Right click</Button><input value={computerText} onChange={(event) => setComputerText(event.target.value)} maxLength={2000} placeholder="Text to type into the selected app" aria-label="Text to type" /><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerText || computerBusy} onClick={() => void runComputerAction({ action: "type", text: computerText })}>Type text</Button><select value={computerKey} onChange={(event) => setComputerKey(event.target.value)} aria-label="Key to press">{["Enter", "Tab", "Escape", "Backspace", "Delete", "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown", "Space"].map((key) => <option key={key}>{key}</option>)}</select><Button variant="secondary" type="button" disabled={!selectedComputerScreen || computerBusy} onClick={() => void runComputerAction({ action: "key", key: computerKey })}>Press key</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: 480 })}>Scroll up</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: -480 })}>Scroll down</Button></div>{computerSteps.length > 0 && <ol className="computer-use-steps" aria-label="Computer-use actions">{computerSteps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>}{computerStatus && <p className="computer-use-status" role="status">{computerBusy ? "Working… " : ""}{computerStatus}</p>}<div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setComputerOpen(false)}>Close</Button></div></ModalDialog>
-    <ModalDialog open={handsFreeActive} onClose={endVoiceMode} titleId="voice-mode-title" className="ui-dialog voice-mode-dialog"><div className="voice-mode-session"><div className={`voice-mode-orb ${voiceListening ? "is-listening" : busy ? "is-speaking" : "is-preparing"}`} aria-hidden="true"><span /><span /><span /></div><p className="section-kicker">LOCAL VOICE MODE</p><h3 id="voice-mode-title">Voice conversation</h3><p className="voice-mode-state">{voiceTurnTranscribing ? "Transcribing on this device" : voiceListening ? "Listening on this device" : busy ? "Skai is responding" : "Preparing the next turn"}</p><p className="voice-mode-detail">{voiceTurnTranscribing ? "Your microphone is paused while local Whisper transcribes this turn." : voiceListening ? "Speak naturally, then pause. Local Whisper transcribes your words before they are sent." : busy ? "The microphone is paused while the local model responds." : "The next listening turn will start after local speech finishes."}</p>{voiceError && <p className="composer-voice-error" role="status">{voiceError}</p>}<div className="voice-mode-session-actions">{busy && <Button variant="ghost" type="button" onClick={stopNativeSpeech}>Stop speaking</Button>}<Button variant="secondary" type="button" onClick={endVoiceMode}>End voice mode</Button></div></div></ModalDialog>
+    <ModalDialog open={handsFreeActive} onClose={endVoiceMode} titleId="voice-mode-title" className="ui-dialog voice-mode-dialog"><div className="voice-mode-session"><div className={`voice-mode-orb ${voiceListening ? "is-listening" : busy || voicePlaybackActive ? "is-speaking" : "is-preparing"}`} aria-hidden="true"><span /><span /><span /></div><p className="section-kicker">LOCAL VOICE MODE</p><h3 id="voice-mode-title">Voice conversation</h3><p className="voice-mode-state">{voiceTurnTranscribing ? "Transcribing on this device" : voiceListening && voicePlaybackActive ? "Listening for an interruption" : voiceListening ? "Listening on this device" : voicePlaybackActive ? "Skai is speaking" : busy ? "Skai is responding" : "Preparing the next turn"}</p><p className="voice-mode-detail">{voiceTurnTranscribing ? "Your microphone is paused while local Whisper transcribes this turn." : voiceListening && voicePlaybackActive ? "Start speaking to interrupt Skai. Your speech stays on this device." : voiceListening ? "Speak naturally, then pause. Local Whisper transcribes your words before they are sent." : voicePlaybackActive ? "Speak at any time to interrupt the spoken reply." : busy ? "The microphone will listen once the spoken reply starts." : "The next listening turn will start after local speech finishes."}</p>{voiceError && <p className="composer-voice-error" role="status">{voiceError}</p>}<div className="voice-mode-session-actions">{(busy || voicePlaybackActive) && <Button variant="ghost" type="button" onClick={stopNativeSpeech}>Stop speaking</Button>}<Button variant="secondary" type="button" onClick={endVoiceMode}>End voice mode</Button></div></div></ModalDialog>
   </section>;
 }

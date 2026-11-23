@@ -5,3 +5,8 @@ export function audioRms(samples: ArrayLike<number>) {
   for (let index = 0; index < samples.length; index++) sum += samples[index] * samples[index];
   return Math.sqrt(sum / samples.length);
 }
+
+/** Require sustained microphone energy before treating echo or a click as an interruption. */
+export function isSustainedVoiceActivity(level: number, threshold: number, startedAt: number, now: number, durationMs = 180) {
+  return level > threshold && startedAt > 0 && now - startedAt >= durationMs;
+}

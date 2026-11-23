@@ -31,12 +31,13 @@ available: microphone audio is captured as WebM, limited to five minutes and
 20 MB, and transcribed through the offline host. The recording is inserted
 into the draft for review before sending. If Whisper is not installed, the
 composer may use the browser's local recognition mode (`processLocally = true`);
-it never falls back to remote recognition. Hands-free mode currently uses the
-browser's local recognition mode, submits final transcripts, requests speech
-for replies, waits for local speech to finish, then resumes listening. Turning
-hands-free off stops recognition and any reply currently being spoken. Real
-microphone recording/transcription, cancellation, and device-error acceptance
-remain open. Barge-in and streamed speech are not implemented.
+it never falls back to remote recognition. Hands-free mode uses local Whisper
+with pause-segmented microphone turns and requests speech for replies. During
+reply playback it monitors the microphone with echo cancellation and requires
+sustained input before interrupting speech; the new turn is recorded and
+transcribed locally. Ending hands-free mode stops capture, transcription, and
+playback. Packaged barge-in acceptance remains open, and voice responses are
+still turn-based rather than streamed.
 
 The renderer owns the selected voice profile, primary model, and low-resource
 model. OS-native speech ships as the installed default. Pocket TTS is

@@ -51,7 +51,11 @@ Mark an item done only when the linked workflow has evidence.
    Packaged acceptance now also verifies the denied-permission message and a
    successful retry. The local Whisper adapter smoke confirms an active Python
    transcription is terminated by the cancel request and returns no transcript.
-   Keep the path local. Streamed voice and barge-in acceptance remain open.
+   During spoken replies, Voice Mode now monitors the local mic and cuts off
+   playback after sustained user speech, then records/transcribes that turn.
+   Focused voice-activity, typecheck, and build checks cover this implementation;
+   packaged interruption acceptance and streamed voice remain open. Keep the
+   path local.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
@@ -272,6 +276,14 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   and confirms a successful retry. The subsequent System.Speech fixture reached
   local Whisper and produced one matching transcript attachment. Audio
   transcription cancellation and hands-free remain unverified.
+
+- **2026-11-23:** Hands-free Voice Mode now supports acoustic barge-in during
+  reply playback. It requires 180 ms of sustained microphone activity, discards
+  the assistant-playback recording segment, stops speech, and starts a fresh
+  local Whisper turn. Pending interruption transcripts wait for an in-flight
+  response to settle before submission. Focused unit, typecheck, and renderer
+  build checks pass; packaged barge-in and streamed-response acceptance remain
+  open.
 
 - **2026-11-23:** Marketplace → Installed now exposes update and removal for
   Ollama models, with host requests pinned to the discovered local endpoint.

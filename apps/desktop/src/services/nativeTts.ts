@@ -103,6 +103,9 @@ const cloudProviderKey = "skai.voice.cloudProvider";
 const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
 const cloudModelIdKey = "skai.voice.cloudModelId";
 let activeCloudAudio: HTMLAudioElement | null = null;
+function setVoicePlaybackActive(active: boolean) {
+  window.dispatchEvent(new CustomEvent("skai:voice-playback", { detail: active }));
+}
 
 export function selectedVoiceSettings() {
   const selectedProvider = cloudVoiceProviders.find((provider) => provider.id === localStorage.getItem(cloudProviderKey)) ?? cloudVoiceProviders[0];
@@ -132,6 +135,7 @@ export function stopNativeSpeech() {
   activeCloudAudio?.pause();
   activeCloudAudio = null;
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  setVoicePlaybackActive(false);
 }
 
 export async function waitForLocalSpeechToFinish(maxWaitMs = 120_000) {
@@ -172,12 +176,23 @@ export async function speakNativeResponse(text: string, force = false, profileId
       if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/")) {
         activeCloudAudio?.pause();
         activeCloudAudio = new Audio(audioDataUrl);
+        const audio = activeCloudAudio;
+        const playbackEnded = () => {
+          if (activeCloudAudio === audio) activeCloudAudio = null;
+          setVoicePlaybackActive(false);
+        };
+        audio.addEventListener("playing", () => setVoicePlaybackActive(true), { once: true });
+        audio.addEventListener("ended", playbackEnded, { once: true });
+        audio.addEventListener("pause", playbackEnded, { once: true });
+        audio.addEventListener("error", playbackEnded, { once: true });
         if (["chatterbox-nano-local", "pocket-tts-local"].includes((speech.result as { engine?: unknown }).engine as string)) {
-          activeCloudAudio.preservesPitch = true;
-          activeCloudAudio.playbackRate = profile.rate;
+          audio.preservesPitch = true;
+          audio.playbackRate = profile.rate;
         }
-        activeCloudAudio.addEventListener("ended", () => { activeCloudAudio = null; }, { once: true });
-        await activeCloudAudio.play();
+        await audio.play();
+      } else {
+        setVoicePlaybackActive(true);
+        void waitForLocalSpeechToFinish().finally(() => setVoicePlaybackActive(false));
       }
       return true;
     }
@@ -196,6 +211,9 @@ export async function speakNativeResponse(text: string, force = false, profileId
   utterance.voice = localVoice;
   utterance.rate = profile.rate;
   utterance.pitch = fallbackPitch;
+  utterance.onstart = () => setVoicePlaybackActive(true);
+  utterance.onend = () => setVoicePlaybackActive(false);
+  utterance.onerror = () => setVoicePlaybackActive(false);
   window.speechSynthesis.speak(utterance);
   return true;
 }
