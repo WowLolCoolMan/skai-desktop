@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const net = require("node:net");
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 
 const desktopRoot = path.join(__dirname, "..", "apps", "desktop");
 const electronBinary = require(path.join(desktopRoot, "node_modules", "electron"));
@@ -83,6 +83,18 @@ async function setInputFiles(selector, files) {
 }
 
 async function main() {
+  // The smoke launches Electron against dist/index.html, so build the renderer
+  // from the current source instead of accidentally testing a stale dist tree.
+  const npmCli = process.env.npm_execpath;
+  if (!npmCli) throw new Error("Run the Voice Workbench smoke through its npm script so it can build the desktop renderer.");
+  const build = spawnSync(process.execPath, [npmCli, "--prefix", desktopRoot, "run", "build"], {
+    cwd: path.join(desktopRoot, "..", ".."),
+    stdio: "inherit",
+    windowsHide: true,
+  });
+  if (build.error) throw build.error;
+  if (build.status !== 0) throw new Error("The Voice Workbench smoke could not build the current desktop renderer.");
+
   const port = await getFreePort();
   child = spawn(electronBinary, [".", `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`], {
     cwd: desktopRoot, env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],

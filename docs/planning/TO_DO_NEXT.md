@@ -139,6 +139,17 @@ Mark an item done only when the linked workflow has evidence.
     `npm run smoke:voice:acceptance` passes local Kokoro and Piper WAV
     container/non-silent signal checks. These are runtime and signal checks,
     not subjective speech-quality or live microphone acceptance.
+    On this Windows x64 profile with Pocket TTS already installed,
+    `npm run smoke:voice:pocket-tts` passed the Agent Host install/status route,
+    verified both speech-model choices, stopped an in-flight generation, and
+    produced a fresh 113,324-byte local WAV afterward. This confirms the warm
+    installed route and cancellation recovery; it does not re-run a clean
+    Pocket TTS installation.
+    The isolated Voice Workbench UI smoke now builds its renderer before
+    launching Electron, avoiding false failures against a stale `dist` tree.
+    Its browser acceptance passes duplicate-name clip storage, local preview,
+    IndexedDB reload, and individual removal. These synthetic fixtures do not
+    exercise voice cloning or train a voice model.
     42 of 90 curated entries now have real adapters, and the catalog smoke
     asserts that boundary. Chatterbox Nano has a pinned isolated CPU installer,
     verified model downloads, a resident worker, and Marketplace/voice
