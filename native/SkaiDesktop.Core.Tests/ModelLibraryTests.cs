@@ -218,6 +218,54 @@ internal static class ModelLibraryTests
         }
         finally { if (Directory.Exists(resumeDirectory)) Directory.Delete(resumeDirectory, recursive: true); }
 
+        var importRetryDirectory = Path.Combine(Path.GetTempPath(), "skai-modelscope-import-retry-test-" + Guid.NewGuid().ToString("N"));
+        var retryDownloadCount = 0;
+        var retryBlobCount = 0;
+        var retryCreateCount = 0;
+        var importRetryHandler = new StubHandler((request, _) =>
+        {
+            if (request.Method == HttpMethod.Get)
+            {
+                retryDownloadCount++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(ggufBytes) });
+            }
+            if (request.RequestUri!.AbsolutePath.StartsWith("/api/blobs/", StringComparison.Ordinal))
+            {
+                retryBlobCount++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created));
+            }
+            if (request.RequestUri!.AbsolutePath == "/api/create")
+            {
+                retryCreateCount++;
+                return Task.FromResult(retryCreateCount == 1
+                    ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = new StringContent("temporary import failure") }
+                    : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"status\":\"success\"}\n") });
+            }
+            throw new Exception("Unexpected ModelScope import-retry request: " + request.RequestUri);
+        });
+        try
+        {
+            var firstImport = new ModelLibraryService(new HttpClient(importRetryHandler), importRetryDirectory);
+            try
+            {
+                await firstImport.DownloadAndImportModelScopeGgufAsync("http://localhost:11434/v1", resumablePackage);
+                throw new Exception("Expected Ollama create to fail on the first import attempt.");
+            }
+            catch (InvalidOperationException error) when (error.Message.Contains("temporary import failure", StringComparison.Ordinal))
+            {
+                var cachedFile = Directory.GetFiles(importRetryDirectory, "*.partial", SearchOption.AllDirectories).SingleOrDefault();
+                Check(cachedFile is not null && new FileInfo(cachedFile).Length == ggufBytes.Length,
+                    "A verified ModelScope download remains cached when Ollama model creation fails");
+            }
+            var retryImport = new ModelLibraryService(new HttpClient(importRetryHandler), importRetryDirectory);
+            var retriedName = await retryImport.DownloadAndImportModelScopeGgufAsync("http://localhost:11434/v1", resumablePackage);
+            Check(retryDownloadCount == 1 && retryBlobCount == 2 && retryCreateCount == 2 && retriedName.StartsWith("ms-model-", StringComparison.Ordinal),
+                "Retrying a failed Ollama create in a fresh service reuses the verified GGUF cache without downloading it again");
+            Check(!Directory.Exists(importRetryDirectory) || !Directory.EnumerateFileSystemEntries(importRetryDirectory, "*", SearchOption.AllDirectories).Any(),
+                "A successful retry removes its verified temporary import cache");
+        }
+        finally { if (Directory.Exists(importRetryDirectory)) Directory.Delete(importRetryDirectory, recursive: true); }
+
         var cancelDirectory = Path.Combine(Path.GetTempPath(), "skai-modelscope-cancel-test-" + Guid.NewGuid().ToString("N"));
         var cancelStream = new CancellablePrefixStream(ggufBytes, 4);
         var cancellableImport = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>

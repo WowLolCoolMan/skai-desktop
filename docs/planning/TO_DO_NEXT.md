@@ -237,7 +237,11 @@ Mark an item done only when the linked workflow has evidence.
     ModelScope GGUF installer now persists checksum-keyed partial shards,
   resumes with HTTP Range, preserves partial bytes on cancellation, validates
   the complete size/hash/signature, and removes its cache only after successful
-  Ollama import. Remaining: retry behavior delegated to Ollama/LM Studio.
+  Ollama import. Focused acceptance also verifies that a failed Ollama create
+  preserves the verified download across service instances, retries without a
+  second source download, and clears the cache after a successful import.
+  Remaining: runtime-owned download/retry behavior for Ollama and LM Studio
+  still requires acceptance against those installed runtimes.
 16. **Legacy conversation import — Done · Codex.** JSON archive import now
     previews the merge, requires confirmation, keeps repeat imports idempotent,
     reassigns colliding IDs, strips legacy project context, and leaves existing
@@ -447,6 +451,11 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   and LM Studio still own their respective upstream download and retry state.
   A cancellation check confirms ModelScope preserves only the downloaded local
   partial and does not upload the cancelled model.
+
+- **2026-11-23:** Focused Model Library acceptance verifies retry after Ollama
+  rejects model creation: the verified ModelScope download survives service
+  recreation, is reused without another source GET, and is removed after the
+  retry succeeds.
 
 - **2026-11-22:** Windows Coding Agent Job Object acceptance and the full native
   core suite pass when the sandbox stress group runs before longer test groups.
