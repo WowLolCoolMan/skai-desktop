@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
 // Pick the Linux display backend up front; otherwise the app relaunches itself and the spawned PID is not the app.
 const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
@@ -82,7 +82,21 @@ if (artifactManifest.executable !== path.basename(executable) || artifactManifes
 const smokeUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-electron-smoke-"));
 const smokeAppDataDir = path.join(smokeUserDataDir, "appdata");
 fs.mkdirSync(smokeAppDataDir, { recursive: true });
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const microphoneFixturePath = path.join(smokeUserDataDir, "microphone-voice-fixture.wav");
+let microphoneFixtureReady = false;
+if (process.platform === "win32") {
+  const powershellScript = `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; if ($synth.GetInstalledVoices().Count -gt 0) { $synth.SetOutputToWaveFile('${microphoneFixturePath.replace(/'/g, "''")}'); $synth.Speak('Skai voice fixture one two three.'); $synth.SetOutputToNull(); $synth.Dispose(); 'fixture-ready' }`;
+  const encodedScript = Buffer.from(powershellScript, "utf16le").toString("base64");
+  const synthesis = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodedScript], { encoding: "utf8", timeout: 30_000, windowsHide: true });
+  microphoneFixtureReady = synthesis.status === 0 && fs.existsSync(microphoneFixturePath)
+    && fs.readFileSync(microphoneFixturePath).subarray(0, 4).toString("ascii") === "RIFF";
+  if (!microphoneFixtureReady && synthesis.error) console.warn(`Speech fixture unavailable; microphone smoke will use the active device: ${synthesis.error.message}`);
+}
+const microphoneFixtureArgs = microphoneFixtureReady
+  ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-audio-capture=${microphoneFixturePath}`]
+  : [];
+console.log(`Packaged microphone fixture: ${microphoneFixtureReady ? "Windows System.Speech WAV via Chromium microphone device" : "no deterministic speech fixture; using the active microphone device"}`);
+const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, ...microphoneFixtureArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 let childExit = null;
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
@@ -198,9 +212,20 @@ async function main() {
   };
   console.log(`Packaged mixed-PDF text and OCR: ${JSON.stringify(mixedPdfState)}`);
   await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
+  // Remount ChatComposer so the earlier audio-file transcript status cannot be
+  // mistaken for a result from the microphone recording below.
+  await evaluate(mainTarget, "location.hash = '#/usage'; window.dispatchEvent(new PopStateEvent('popstate')); 'usage'");
+  await sleep(250);
+  await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
+  const remountedChat = await evaluate(mainTarget, "(async () => { for (let waited = 0; waited < 10000; waited += 100) { if (document.querySelector('.composer-card') && document.querySelector('button[aria-label=\"Start voice input\"]')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
+  if (remountedChat !== true) throw new Error("Chat composer did not remount before microphone acceptance.");
   await sleep(150);
+  const whisperStatusRaw = await evaluate(mainTarget, "(async () => JSON.stringify(await window.skaiAgent.request('voice.whisper.install.status')))()");
+  const whisperStatus = JSON.parse(whisperStatusRaw);
+  const whisperInstalled = whisperStatus.ok === true && whisperStatus.result?.installed === true;
   const dictationStarted = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
-  let dictationResult = JSON.stringify({ button: dictationStarted === "clicked", started: false, stopped: false, settled: false, error: "", listening: false, transcript: false, localRecognition: localVoiceState.availability });
+  console.log(`Packaged microphone recording: ${dictationStarted === "clicked" ? "start requested" : dictationStarted}`);
+  let dictationResult = JSON.stringify({ button: dictationStarted === "clicked", started: false, stopped: false, settled: false, error: "", listening: false, transcribingObserved: false, transcript: false, whisperInstalled, localRecognition: localVoiceState.availability });
   let recorderStarted = false;
   let recorderStopped = false;
   const dictationStartDeadline = Date.now() + 10_000;
@@ -211,16 +236,23 @@ async function main() {
     await sleep(100);
   }
   if (recorderStarted) {
-    await sleep(300);
+    await sleep(microphoneFixtureReady ? 3_000 : 300);
     const stopResult = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Stop voice input'); if (!button) return 'missing'; button.click(); return 'clicked'; })()");
     recorderStopped = stopResult === "clicked";
+    console.log(`Packaged microphone recording: started=${recorderStarted}, stop=${stopResult}, fixture=${microphoneFixtureReady}`);
   }
-  const dictationDeadline = Date.now() + 60_000;
+  const dictationDeadline = Date.now() + (microphoneFixtureReady ? 180_000 : 60_000);
+  let microphoneTranscriptionObserved = false;
+  let lastProgressLog = Date.now();
   while (Date.now() < dictationDeadline) {
-    const state = JSON.parse(await evaluate(mainTarget, "(() => JSON.stringify({ button: Boolean([...document.querySelectorAll('button')].find((item) => ['Start voice input', 'Stop voice input'].includes(item.getAttribute('aria-label')))), error: document.querySelector('.composer-voice-error')?.textContent ?? '', listening: [...document.querySelectorAll('button')].some((item) => item.getAttribute('aria-label') === 'Stop voice input' && item.getAttribute('aria-pressed') === 'true'), transcribing: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Transcribing audio with local Whisper')), transcript: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Local transcript added')) }))()"));
-    dictationResult = JSON.stringify({ button: dictationStarted === "clicked", started: recorderStarted, stopped: recorderStopped, settled: !state.listening && !state.transcribing && Boolean(state.transcript || state.error), error: state.error, listening: state.listening, transcript: state.transcript, localRecognition: localVoiceState.availability });
-    if (!state.listening && !state.transcribing && (state.transcript || state.error)) break;
-    await sleep(100);
+    const state = JSON.parse(await evaluate(mainTarget, `(() => { const transcriptAttachments = [...document.querySelectorAll('.attachment-list-composer .attachment-card')].filter((card) => card.querySelector('strong')?.textContent?.toLowerCase().endsWith('.audio-transcript.txt')); const snippets = [...document.querySelectorAll('.attachment-list-composer .attachment-snippet')].map((item) => item.textContent ?? '').join(' ').toLowerCase(); return JSON.stringify({ button: Boolean([...document.querySelectorAll('button')].find((item) => ['Start voice input', 'Stop voice input'].includes(item.getAttribute('aria-label')))), error: document.querySelector('.composer-voice-error')?.textContent ?? '', listening: [...document.querySelectorAll('button')].some((item) => item.getAttribute('aria-label') === 'Stop voice input' && item.getAttribute('aria-pressed') === 'true'), transcribing: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Transcribing audio with local Whisper')), transcript: [...document.querySelectorAll('[role=\"status\"]')].some((item) => item.textContent?.includes('Local transcript added')), transcriptAttachments: transcriptAttachments.length, fixtureMatched: ${microphoneFixtureReady ? "snippets.includes('voice fixture')" : "false"} }); })()`));
+    microphoneTranscriptionObserved ||= state.transcribing;
+    const freshTranscript = state.transcript && microphoneTranscriptionObserved && state.transcriptAttachments > 0;
+    const settled = !state.listening && !state.transcribing && Boolean(freshTranscript || state.error || microphoneTranscriptionObserved);
+    dictationResult = JSON.stringify({ button: dictationStarted === "clicked", started: recorderStarted, stopped: recorderStopped, settled, error: state.error, listening: state.listening, transcribingObserved: microphoneTranscriptionObserved, transcript: freshTranscript, transcriptAttachments: state.transcriptAttachments, fixtureMatched: state.fixtureMatched, microphoneFixtureReady, whisperInstalled, localRecognition: localVoiceState.availability });
+    if (settled) break;
+    if (Date.now() - lastProgressLog >= 30_000) { console.log(`Packaged microphone transcription still running: ${JSON.stringify({ transcribing: state.transcribing, observed: microphoneTranscriptionObserved, whisperInstalled })}`); lastProgressLog = Date.now(); }
+    await sleep(50);
   }
   console.log(`Packaged dictation outcome: ${dictationResult}`);
   const settingsResult = await evaluate(mainTarget, "(async () => { location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 250)); const settingsNav = document.querySelector('.settings-nav'); const tabs = [...(settingsNav?.querySelectorAll('button') ?? [])]; const tab = tabs.find((button) => button.textContent?.trim() === 'Models & Providers'); if (!tab) return JSON.stringify({ route: location.hash, tab: false, airLlmCheck: false, petControls: false }); tab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); const airLlmCheck = [...document.querySelectorAll('.settings-content button')].some((button) => button.textContent?.trim() === 'Check readiness'); const petTab = [...(settingsNav?.querySelectorAll('button') ?? [])].find((button) => button.textContent?.trim() === 'Pet'); if (!petTab) return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: false }); petTab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: document.body.innerText.includes('Show all pets') && document.body.innerText.includes('Let the active pet walk around') }); })()");
@@ -250,7 +282,9 @@ async function main() {
   const petReducedState = JSON.parse(petReducedResult);
   const error = dictationState.error.toLowerCase();
   const dictationFailClosed = dictationState.button && dictationState.started && dictationState.stopped && dictationState.settled
-    && (dictationState.transcript || !error.includes("remote"));
+    && (microphoneFixtureReady
+      ? dictationState.transcript && dictationState.fixtureMatched
+      : dictationState.transcript || !error.includes("remote"));
   const webmHasUsableDuration = Number(videoFixture.probeDetails?.duration) > 0.1;
   const webmSamplingWorked = !videoFixture.supported || (videoFixture.recorded && videoFixture.dropped && videoState.frames.length === 4
     && videoState.frames.every((frame) => webmHasUsableDuration ? frame.kind.startsWith("Video frame") : frame.name.includes(".frame-")));
@@ -288,4 +322,4 @@ async function cleanup() {
   console.warn(`Unable to remove temporary Electron smoke data: ${smokeUserDataDir}`);
 }
 
-main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(cleanup);
+main().catch((error) => { console.error(error?.stack || String(error)); process.exitCode = 1; }).finally(cleanup);

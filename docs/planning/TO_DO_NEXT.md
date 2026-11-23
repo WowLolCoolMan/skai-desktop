@@ -33,14 +33,15 @@ Mark an item done only when the linked workflow has evidence.
    User. Next action: run Narrator or NVDA, review the remaining themes/routes,
    and report failures. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
-2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke now
-   starts/stops dictation and reaches transcript creation through the local
-   Whisper path. Kokoro, Piper, and Windows SAPI synthesis probes pass; these
-   confirm audio output but not subjective quality. External acceptance blocker:
-   this host reports the en-US browser speech pack unavailable. Owner: User.
-   Next action: install/enable a local en-US recognition pack, dictate a known
-   sentence, test permission denial then recovery, cancel a recording, and run a
-   hands-free reply/listen cycle. Keep all audio local. See the
+2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke
+   feeds a deterministic spoken fixture through Chromium microphone capture,
+   records/stops it, and verifies installed local Whisper creates a transcript
+   attachment matching the expected phrase without logging transcript text.
+   Kokoro, Piper, and Windows SAPI synthesis probes pass; they confirm audio
+   output, not subjective quality. Chromium's native offline `en-US`
+   recognition remains unavailable, so hands-free acceptance is still open.
+   Also verify permission denial/recovery and cancellation. Keep the path local.
+   See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
    Ubuntu 24.04 WSL acceptance pass filesystem, network, process, memory,
