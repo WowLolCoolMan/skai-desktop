@@ -30,9 +30,11 @@ Mark an item done only when the linked workflow has evidence.
    speech pack. Keep the path local. See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — In progress · Codex.** Verify Windows
-   PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Keep
-   failing closed where sandbox setup is unavailable; no macOS command path
-   without a sandbox. See [architecture](../engineering/ARCHITECTURE.md).
+  PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Windows
+  and Ubuntu 24.04 WSL acceptance now pass filesystem, network, process, memory,
+  timeout, and cancellation checks. Keep failing closed where sandbox setup is
+  unavailable; no macOS command path without a sandbox. See
+  [architecture](../engineering/ARCHITECTURE.md).
 4. **Persona era acceptance — In progress · Unclaimed.** Resolve the Ollama
    stream disconnect during follow-up turns, then test date cutoffs across
    living and deceased personas and multiple model runs. See the
@@ -136,6 +138,11 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   The allocation control now respects the OS-clamped available memory cap; the
   suite continues to verify a 320 MiB allocation where capacity permits,
   256 MiB memory denial, filesystem/network isolation, timeout, and cancellation.
+
+- **2026-11-22:** Ubuntu 24.04 WSL sandbox acceptance passed Bubblewrap and
+  cgroup checks for project-only filesystem writes, host-file isolation,
+  disabled network, memory and process caps, timeout, and cancellation. Native
+  Linux desktop/compositor acceptance remains open.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
