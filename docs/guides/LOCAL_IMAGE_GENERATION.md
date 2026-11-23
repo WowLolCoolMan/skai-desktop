@@ -45,12 +45,17 @@ local jobs. Live generation acceptance against a running ComfyUI instance
 passed on 2026-11-23. Skai discovered the locally installed
 `Juggernaut-XL_v9.safetensors` checkpoint, submitted a text-to-image workflow,
 reported queue/progress updates, retrieved the generated 512×512 PNG from the
-local ComfyUI endpoint, and validated the payload (438,972 bytes). The server
-reported an AMD Radeon RX 7900 XTX with 23.8 GiB free VRAM at the start of the
-check; ComfyUI's own execution logs were not inspected, so this does not yet
-confirm which device performed inference. The live check did not exercise
-cancellation or image-to-image editing through ComfyUI. ComfyUI remains a
-separate local service and is not required for the built-in Diffusers path.
+local ComfyUI endpoint, and validated the payload (438,972 bytes). A repeatable
+Agent Host acceptance smoke also cancelled a live ComfyUI job and verified the
+queue cleared, then uploaded a generated source image, completed image-to-image,
+and retrieved a valid edited PNG (351,304 bytes). Run it with
+`npm run smoke:image:comfy-live`; it requires an already-running loopback
+ComfyUI service and an installed checkpoint, and leaves successful outputs in
+the ComfyUI output directory. The server reported an AMD Radeon RX 7900 XTX
+with 23.8 GiB free VRAM at the start of the check; ComfyUI's own execution logs
+were not inspected, so this does not yet confirm which device performed
+inference. ComfyUI remains a separate local service and is not required for the
+built-in Diffusers path.
 
 ## Current boundaries and next work
 

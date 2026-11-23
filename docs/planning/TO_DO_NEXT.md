@@ -68,12 +68,13 @@ Mark an item done only when the linked workflow has evidence.
    models; Codex will add model gating or continue low-tier tuning accordingly.
    See the [Smart Personas plan](implementation-plans/smart-personas.md).
 5. **Image runtime coverage — In progress · Codex.** Packaged Diffusers CPU
-   acceptance passes. On 2026-11-23, live ComfyUI acceptance on this PC also
-   passed checkpoint discovery, workflow submission, progress polling, PNG
+   acceptance passes. On 2026-11-23, live ComfyUI acceptance on this PC passed
+   checkpoint discovery, workflow submission, progress polling, cancellation
+   with an empty queue afterward, image-to-image source upload, edited PNG
    retrieval, and payload validation using `Juggernaut-XL_v9.safetensors` on
-   the RX 7900 XTX. Remaining: exercise cancellation and image-to-image through
-   the ComfyUI path and confirm GPU execution from ComfyUI's own device logs.
-   See the [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
+   the RX 7900 XTX. Remaining: confirm GPU execution from ComfyUI's own device
+   logs. Repeat with `npm run smoke:image:comfy-live`. See the
+   [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
 6. **Windows update acceptance — Blocked on release · Owner: User / release
    owner.** The current-source loopback install passed. Read-only checks now
    confirm both public v0.1.4 feeds, SHA-512 metadata, and asset sizes, but that
