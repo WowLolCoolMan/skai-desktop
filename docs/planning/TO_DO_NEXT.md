@@ -53,9 +53,11 @@ Mark an item done only when the linked workflow has evidence.
    ComfyUI server and GPU/additional hardware; verify truthful progress,
    cancellation, and recovery. See the
    [image guide](../guides/LOCAL_IMAGE_GENERATION.md).
-6. **Windows update acceptance — In progress · Unclaimed.** Update an installed
-   app through the published feed; validate rollback on a release built with
-   current updater support. Preserve user data.
+6. **Windows update acceptance — In progress · Codex.** The isolated current-
+   source updater smoke now installs a disposable 0.1.3 baseline, verifies and
+   applies the 0.1.4 installer from loopback, preserves a profile marker, and
+   removes the temporary app files. Remaining: published-feed install and
+   rollback acceptance on a release built with current updater support.
 7. **Native Linux release acceptance — In progress · Unclaimed.** Exercise the
    AppImage, updater, rollback, and window behavior on a supported desktop, not
    only WSL/Xvfb. See [release readiness](../operations/RELEASE_READINESS.md).
@@ -148,6 +150,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   overwritten through `mcp.connection.connect` to restore access; reconnecting
   requires creating a new reviewed connection. The Core registry test now
   checks this revocation bypass is refused.
+
+- **2026-11-23:** Windows in-app update smoke now passes on the current updater
+  code: a disposable 0.1.3 baseline verified and installed the 0.1.4 loopback
+  update, retained its user-data marker, and removed its temporary app files.
+  It builds the baseline fixture with hard links when possible and safely falls
+  back to copies across Windows volumes. The test installer is unsigned; this is
+  local acceptance only.
 
 - **2026-11-23:** `smoke:voice:acceptance` now invokes installed Kokoro and
   Piper runtimes with network access disabled, validates the produced WAV and

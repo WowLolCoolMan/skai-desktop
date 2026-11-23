@@ -115,7 +115,13 @@ async function main() {
         const metadata = JSON.parse(sourceText);
         metadata.version = "0.1.3";
         fs.writeFileSync(to, JSON.stringify(metadata, null, 2) + "\n");
-      } else if (entry.isFile()) fs.linkSync(from, to);
+      } else if (entry.isFile()) {
+        try { fs.linkSync(from, to); }
+        catch (error) {
+          if (error.code !== "EXDEV") throw error;
+          fs.copyFileSync(from, to);
+        }
+      }
       else throw new Error(`Unsupported entry in the packaged updater fixture: ${from}`);
     }
   }
