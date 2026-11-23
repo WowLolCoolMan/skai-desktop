@@ -7,9 +7,16 @@ if (args.Length == 1 && args[0].Equals("--model-library", StringComparison.Ordin
     Console.WriteLine("Selected Model Library checks passed.");
     return;
 }
+if (args.Length == 1 && args[0].Equals("--workspace-sandbox", StringComparison.OrdinalIgnoreCase))
+{
+    await LocalStorageAndWorkspaceTests.RunAsync();
+    Console.WriteLine("Selected workspace and sandbox checks passed.");
+    return;
+}
 
 await DiagnosticsTests.RunAsync();
 ProductIdentityTests.Run();
+await LocalStorageAndWorkspaceTests.RunAsync();
 VoiceModelTests.Run();
 CatalogTests.Run();
 await ProjectHealthTests.RunAsync();
@@ -34,7 +41,6 @@ await CloudVoiceCredentialTests.RunAsync();
 ChatMessageTests.Run();
 PromptVariableTests.Run();
 OpenApiToolDiscoveryTests.Run();
-await LocalStorageAndWorkspaceTests.RunAsync();
 ExternalLinkTests.Run();
 OperationJournalTests.Run();
 OperationServiceTests.Run();

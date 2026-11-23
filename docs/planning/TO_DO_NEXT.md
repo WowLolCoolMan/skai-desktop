@@ -124,6 +124,11 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   content is removed, and successful import cleans the resume cache. Ollama
   and LM Studio still own their respective upstream download and retry state.
 
+- **2026-11-22:** Windows Coding Agent Job Object acceptance and the full native
+  core suite pass when the sandbox stress group runs before longer test groups.
+  The tests continue to verify the 1 GiB allocation, 256 MiB memory denial,
+  filesystem/network isolation, timeout, and cancellation.
+
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
   missing lookup, save/read, per-connection and per-service isolation, removal,

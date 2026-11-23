@@ -535,7 +535,7 @@ internal static class LocalStorageAndWorkspaceTests
                     const string memoryProbe = "try { $probe = New-Object 'byte[]' 335544320; $probe[0] = 1; $probe[$probe.Length - 1] = 1; exit 99 } catch { [Console]::Error.WriteLine($_.Exception.GetType().FullName); exit 73 }";
                     var memoryControl = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, 1024UL * 1024 * 1024);
                     Check(memoryControl.ExitCode == 99 && memoryControl.IsolationStatus.Contains("job memory cap 1.0 GiB", StringComparison.Ordinal),
-                        "Windows memory-limit acceptance control can allocate 320 MiB under a 1 GiB Job Object cap");
+                        $"Windows memory-limit acceptance control can allocate 320 MiB under a 1 GiB Job Object cap (exit={memoryControl.ExitCode}, timedOut={memoryControl.TimedOut}, isolation={memoryControl.IsolationStatus}, output={memoryControl.Output})");
                     var memoryLimited = await commandRunner.RunAsync(workspacePath, ".", memoryProbe, TimeSpan.FromSeconds(20), default, CommandResourceLimits.MinimumJobMemoryBytes);
                     Check(memoryLimited.ExitCode != 99 && memoryLimited.IsolationStatus.Contains("job memory cap 0.3 GiB", StringComparison.Ordinal),
                         "Windows Job Object prevents a 320 MiB allocation from succeeding under its 256 MiB cap");
