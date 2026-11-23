@@ -27,6 +27,15 @@ const { createPetStateStore } = require("./pet-state-store.cjs");
 const { createTrayController } = require("./tray-controller.cjs");
 const { createPetWindowController } = require("./pet-window.cjs");
 
+// Acquire the lock before any platform-specific relaunch so simultaneous
+// launches cannot each schedule their own replacement process.
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => showMainWindow());
+}
+
 // Chromium fixes its display backend before any of this file runs, and
 // app.commandLine.appendSwitch("ozone-platform") at this point is too late: the
 // browser stays on Wayland while the GPU process starts on X11 and segfaults.
@@ -137,12 +146,6 @@ const updateManager = createUpdateManager({
 // Linux: name the launcher entry packaging/linux/install.sh creates, so desktop portals and
 // docks can match the running app to it (Chromium exposes this as CHROME_DESKTOP).
 if (process.platform === "linux") app.setDesktopName("skai-desktop.desktop");
-const hasSingleInstanceLock = !relaunchingForDisplayBackend && app.requestSingleInstanceLock();
-if (!hasSingleInstanceLock) {
-  app.quit();
-} else {
-  app.on("second-instance", () => showMainWindow());
-}
 const isBlockedAttachmentName = (name) => blockedAttachmentNames.has(name.toLowerCase()) || name.toLowerCase().includes(".env.");
 const isPng = (bytes) => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 const isJpeg = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
