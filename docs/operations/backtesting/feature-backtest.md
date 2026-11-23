@@ -23,6 +23,7 @@ worktree.
 | PDF attachment policy | `smoke-pdf-attachment` |
 | Scanned PDF OCR | Packaged Windows smoke confirms a generated image-only PDF is locally rendered and the fixture text is recognized with the bundled English OCR runtime. Mixed PDFs and non-English OCR remain unsupported. |
 | Packaged video and audio formats | `smoke:electron:artifact` records and decodes a VP8 WebM through the scoped local media file bridge, samples it into four timestamped JPEGs, and samples the H.264 MP4 fixture into four frames. A synthetic silent WAV reaches local Whisper; this checks the processing path, not speech intelligibility. |
+| Local model fit against real runtimes | On Windows with 32 GiB RAM, Ollama generated responses from `lfm3-omni:2b-q4_K_M` (2.05 GB) and `qwen3:14b` (14.8B Q4_K_M, 9.28 GB). Qwen loaded allocation was 9.66 GB; free RAM moved from 21.8 GiB before load to 13.2 GiB while loaded. Both models were unloaded afterward. GPU fit and other hardware remain unverified. |
 | Local voice engines | Kokoro and Piper generated valid WAV audio through Skai's Agent Host; Whisper large-v3 transcribed a Piper-generated local audio fixture. |
 | Installed AirLLM sidecar preflight | `npm run smoke:airllm` |
 | Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, one-shot microphone capture/stop/Whisper completion, and unavailable-language browser speech pack behavior | `smoke:electron:artifact` |

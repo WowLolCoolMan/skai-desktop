@@ -84,7 +84,8 @@ Mark an item done only when the linked workflow has evidence.
     memory when telemetry exists, and labels the result as advisory. Hugging
     Face results now surface license metadata from the model card or license
     tag, and clearly prompt source review when neither is published. Remaining:
-    validate fit against real models and runtimes.
+    validate across more hardware and compare GPU/offload behavior; this Windows
+    host has no supported NVIDIA memory telemetry.
 15. **Resumable model installs — In progress · Codex.** The Skai-managed
     ModelScope GGUF installer now persists checksum-keyed partial shards,
   resumes with HTTP Range, preserves partial bytes on cancellation, validates
@@ -149,6 +150,14 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   clearly reports when memory telemetry is missing, warns when package size is
   larger than current free RAM, and explains runtime/context overhead. It does
   not claim package size guarantees that a model will fit.
+
+- **2026-11-23:** Local Ollama fit acceptance passed for two installed GGUF
+  models on a 32 GiB Windows host. `lfm3-omni:2b-q4_K_M` (2.05 GB on disk)
+  generated a five-token response; `qwen3:14b` (14.8B Q4_K_M, 9.28 GB on disk)
+  generated a six-token response with thinking disabled. Qwen's measured loaded
+  allocation was 9.66 GB; free RAM was 21.8 GiB before load and 13.2 GiB while
+  loaded. Both models were unloaded after the check. This validates those RAM
+  cases through Ollama, not GPU telemetry or the advisory across other hardware.
 
 - **2026-11-22:** Marketplace search carries Hugging Face license metadata from
   the model card, falling back to the repository's license tag. When neither is
