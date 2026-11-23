@@ -84,8 +84,11 @@ Mark an item done only when the linked workflow has evidence.
   resumes with HTTP Range, preserves partial bytes on cancellation, validates
   the complete size/hash/signature, and removes its cache only after successful
   Ollama import. Remaining: retry behavior delegated to Ollama/LM Studio.
-16. **Legacy conversation import.** Add preview, cancel-without-writing,
-    duplicate protection, restart recovery, and preservation of edited chats.
+16. **Legacy conversation import — Done · Codex.** JSON archive import now
+    previews the merge, requires confirmation, keeps repeat imports idempotent,
+    reassigns colliding IDs, strips legacy project context, and leaves existing
+    conversations intact. Verified by the disposable Agent Host smoke; see
+    [conversation import](../guides/CONVERSATION_IMPORT.md).
 17. **Scanned documents and data files.** Add local OCR for scanned PDFs and
     capability-aware handling for spreadsheets and other unsupported content.
 18. **Packaged media coverage.** Verify real WebM and audio fixtures in the
@@ -144,6 +147,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   cgroup checks for project-only filesystem writes, host-file isolation,
   disabled network, memory and process caps, timeout, and cancellation. Native
   Linux desktop/compositor acceptance remains open.
+
+- **2026-11-22:** Conversation import is available from Chat → More. A native
+  picker reads bounded UTF-8 JSON archives; users review the merge plan before
+  applying it. Existing chats are never overwritten, conflicting IDs are
+  reassigned, legacy project context is stripped, and repeated imports skip
+  prior chats. A disposable Agent Host smoke verifies preview-without-writing,
+  collision handling, project-context stripping, and idempotence.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed

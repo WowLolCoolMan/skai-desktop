@@ -20,6 +20,20 @@ function registerWorkspaceIpc({
       const result = await dialog.showOpenDialog(window, { properties: ["openDirectory"] });
       return { v: 1, ok: true, result: { path: result.canceled ? null : result.filePaths[0] ?? null } };
     }
+    if (method === "workspace.pickConversationArchive") {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      const result = await dialog.showOpenDialog(window, { properties: ["openFile"], filters: [{ name: "Conversation archive", extensions: ["json"] }] });
+      if (result.canceled || !result.filePaths[0]) return { v: 1, ok: true, result: { fileName: null, content: null } };
+      const filePath = result.filePaths[0];
+      if (path.extname(filePath).toLowerCase() !== ".json") throw new Error("Choose a JSON conversation archive.");
+      const bytes = await fs.readFile(filePath);
+      const maxBytes = 25 * 1024 * 1024;
+      if (bytes.length === 0 || bytes.length > maxBytes) throw new Error("The conversation archive must be between 1 byte and 25 MB.");
+      let content;
+      try { content = new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, ""); }
+      catch { throw new Error("The conversation archive must be valid UTF-8 JSON."); }
+      return { v: 1, ok: true, result: { fileName: path.basename(filePath), content } };
+    }
     if (method === "workspace.pickFiles") {
       const window = BrowserWindow.fromWebContents(event.sender);
       const result = await dialog.showOpenDialog(window, { properties: ["openFile", "multiSelections"], filters: [{ name: "Chat files", extensions: ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "toml", "html", "css", "js", "ts", "jsx", "tsx", "cs", "py", "java", "go", "rs", "c", "h", "cpp", "hpp", "sh", "sql", "log", "pdf", "png", "jpg", "jpeg", "mp4", "webm"] }] });
