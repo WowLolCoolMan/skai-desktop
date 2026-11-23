@@ -33,6 +33,41 @@ internal static class CloudVoiceCredentialTests
                     throw new Exception("Expected unsafe Linux secret-store identifiers to be rejected.");
                 }
                 catch (ArgumentException) { Check(true, "Linux secret store rejects path-shaped identifiers"); }
+
+                var originalBus = Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
+                var originalRuntimeDirectory = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+                try
+                {
+                    Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", null);
+                    Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", null);
+                    Check(!store.IsAvailable, "Linux Secret Service is unavailable without a session bus");
+                    try
+                    {
+                        _ = await store.GetAsync("connection-01");
+                        throw new Exception("Expected a missing Linux session bus to fail closed.");
+                    }
+                    catch (PlatformNotSupportedException) { Check(true, "Linux secret access fails closed when the session bus is unavailable"); }
+                }
+                finally
+                {
+                    Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", originalBus);
+                    Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", originalRuntimeDirectory);
+                }
+
+                Directory.CreateDirectory(directory);
+                var failingToolPath = Path.Combine(directory, "secret-tool-failure");
+                await File.WriteAllTextAsync(failingToolPath, "#!/bin/sh\nprintf 'private keyring diagnostic' >&2\nexit 7\n");
+                File.SetUnixFileMode(failingToolPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                var lockedStore = new PlatformSecretStore(service, "provider acceptance", directory, failingToolPath);
+                try
+                {
+                    _ = await lockedStore.GetAsync("connection-01");
+                    throw new Exception("Expected a locked Linux keyring to report credential access failure.");
+                }
+                catch (InvalidOperationException error)
+                {
+                    Check(error.Message.Contains("Unlock it and try again", StringComparison.Ordinal) && !error.Message.Contains("private keyring diagnostic", StringComparison.Ordinal), "Linux keyring failures provide safe recovery guidance without exposing diagnostics");
+                }
             }
             finally
             {

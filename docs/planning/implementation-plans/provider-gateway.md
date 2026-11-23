@@ -26,9 +26,11 @@ complete, enforceable operating mode.
 - Linux Core acceptance now exercises the real GNOME Keyring Secret Service in
   an isolated D-Bus session on Ubuntu 24.04/WSL2. It verifies missing-key
   lookup, credential round-trip, per-connection and per-service isolation,
-  removal, and unsafe-ID rejection. The checks skip when `secret-tool` or a
-  session bus is absent; this does not establish native desktop startup/unlock
-  guidance, unavailable/corrupted keyring recovery, or macOS storage.
+  removal, unsafe-ID rejection, and fail-closed behavior without a session bus.
+  A failing `secret-tool` fixture also verifies sanitized unlock guidance. The
+  checks skip when `secret-tool` or a session bus is absent; they do not
+  establish a native desktop startup/unlock cycle, actual locked/corrupted
+  keyring recovery, or macOS storage.
 
 ## Architecture
 
