@@ -118,6 +118,17 @@ Additional evidence commands:
 - `npm run audit:electron-runtime` — single-architecture and secure-boundary
   guard, including rejection of XAML/Uno/WinUI/native desktop artifacts.
 - `npm run audit:release-workflow` — Electron-only gated release workflow.
+
+### 2026-11-23 packaged accessibility smoke
+
+The freshly staged Windows Electron package passed the automated accessibility
+smoke across all 14 routes: zero WCAG A/AA violations, a working skip link and
+main landmark, and valid expanded-popup relationships for the model picker and
+overflow menu. Axe reported 14 inconclusive color-contrast checks, grouped into
+8 unique gradient-backed patterns; those still need visual review. The smoke
+now logs its current route/check and waits for popup rendering with a short
+timer rather than `requestAnimationFrame`, so headless or throttled windows do
+not stall the popup assertions.
 - `npm run audit:local-only` — local transport boundary.
 
 ### Accessibility semantic follow-up — 2026-11-23
