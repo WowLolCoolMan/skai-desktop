@@ -44,8 +44,10 @@ Mark an item done only when the linked workflow has evidence.
    stops capture while the model speaks, and cancels transcription when ended.
    Packaged acceptance now confirms a spoken fixture is transcribed and
    submitted through Voice Mode with a measurable input signal, and that End
-   closes the session cleanly. Cancellation during an in-flight Voice Mode
-   transcription still needs a direct packaged assertion.
+   closes the session cleanly. A second packaged turn confirms End closes the
+   session during Whisper transcription and no late chat turn appears during
+   the following 10-second observation window. This checks renderer behavior;
+   the Whisper adapter smoke separately verifies process cancellation.
    Packaged acceptance now also verifies the denied-permission message and a
    successful retry. The local Whisper adapter smoke confirms an active Python
    transcription is terminated by the cancel request and returns no transcript.

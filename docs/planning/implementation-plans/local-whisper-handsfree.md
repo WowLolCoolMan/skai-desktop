@@ -33,7 +33,10 @@ change one-shot dictation behavior.
 - Microphone capture is stopped during transcription/model response/speech
   playback to reduce echo and unnecessary recording.
 - End Voice Mode stops the microphone and aborts current Whisper work; no late
-  transcript is submitted after stop.
+  transcript is submitted after stop. The packaged smoke ends a real fixture
+  turn while Whisper is transcribing and confirms no chat turn appears during
+  a 10-second observation window; the adapter smoke verifies worker-process
+  cancellation directly.
 - Missing Whisper or unavailable microphone is explained without remote
   fallback.
 - Existing one-shot dictation and audio-file transcription remain intact.

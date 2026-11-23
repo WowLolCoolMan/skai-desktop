@@ -338,6 +338,32 @@ async function main() {
     && (localAudioState.transcript || localAudioState.error.toLowerCase().includes("on-device speech pack") || localAudioState.error.toLowerCase().includes("no speech was recognized"));
   await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
   await sleep(250);
+  let handsFreeCancelState = { available: whisperInstalled && microphoneFixtureReady, started: false, transcribing: false, endedDuringTranscription: false, noLateTurn: false, ended: false };
+  if (handsFreeCancelState.available) {
+    const beforeCancelTurns = await evaluate(mainTarget, "document.querySelectorAll('.chat-message.user').length");
+    const started = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'Start voice mode'); if (!button || button.disabled) return false; button.click(); return true; })()");
+    handsFreeCancelState.started = started === true && await evaluate(mainTarget, "Boolean(document.querySelector('button[aria-label=\"End voice mode\"]'))") === true;
+    const cancelDeadline = Date.now() + 30_000;
+    while (Date.now() < cancelDeadline && handsFreeCancelState.started && !handsFreeCancelState.transcribing) {
+      const state = JSON.parse(await evaluate(mainTarget, "(() => JSON.stringify({ state: document.querySelector('.voice-mode-state')?.textContent ?? '', error: document.querySelector('.composer-voice-error')?.textContent ?? '' }))()"));
+      handsFreeCancelState.transcribing = state.state.includes("Transcribing");
+      if (state.error) break;
+      await sleep(100);
+    }
+    let endClicked = false;
+    if (handsFreeCancelState.transcribing) {
+      endClicked = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'End voice mode'); if (!button) return false; button.click(); return true; })()");
+      await sleep(10_000);
+      const afterCancel = JSON.parse(await evaluate(mainTarget, "(() => JSON.stringify({ turns: document.querySelectorAll('.chat-message.user').length, modal: Boolean(document.querySelector('.voice-mode-dialog')) }))()"));
+      handsFreeCancelState.endedDuringTranscription = endClicked === true;
+      handsFreeCancelState.noLateTurn = afterCancel.turns === beforeCancelTurns;
+      handsFreeCancelState.ended = endClicked === true && !afterCancel.modal;
+    } else if (handsFreeCancelState.started) {
+      endClicked = await evaluate(mainTarget, "(() => { const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === 'End voice mode'); if (!button) return false; button.click(); return true; })()");
+      handsFreeCancelState.ended = endClicked === true && await evaluate(mainTarget, "!document.querySelector('.voice-mode-dialog')") === true;
+    }
+    console.log(`Packaged Voice Mode in-flight Whisper cancellation: ${JSON.stringify(handsFreeCancelState)}`);
+  }
   let handsFreeState = { available: whisperInstalled && microphoneFixtureReady, started: false, listening: false, transcribing: false, submitted: false, ended: false, peakInputLevel: 0 };
   if (handsFreeState.available) {
     await evaluate(mainTarget, "(() => { [...document.querySelectorAll('.attachment-remove')].reverse().forEach((button) => button.click()); return 'cleared'; })()");
@@ -362,8 +388,8 @@ async function main() {
   } else {
     console.log(`Packaged local Whisper hands-free Voice Mode skipped: ${JSON.stringify(handsFreeState)}`);
   }
-  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || (handsFreeState.available && (!handsFreeState.started || !handsFreeState.listening || !handsFreeState.transcribing || !handsFreeState.submitted || !handsFreeState.ended)) || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
-    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, handsFreeState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
+  if (mainTarget.id === petTarget.id || !petTarget.url?.includes("pet=1") || !mainState.title.includes("Skai Desktop") || !mainState.settings || !mainState.navigation || !videoSamplingWorked || !localAudioHandled || !pdfOcrState.ok || !pdfOcrState.ocr || !pdfOcrState.recognizedFixtureText || !mixedPdfState.ok || mixedPdfState.ocrPages.join(",") !== "2" || !mixedPdfState.selectableText || !mixedPdfState.scannedText || !microphoneDenialState.button || !microphoneDenialState.denied || !microphoneRecoveryState.recovered || !permissionRecoveryRemount || !dictationFailClosed || (handsFreeState.available && (!handsFreeState.started || !handsFreeState.listening || !handsFreeState.transcribing || !handsFreeState.submitted || !handsFreeState.ended)) || (handsFreeCancelState.available && (!handsFreeCancelState.started || !handsFreeCancelState.transcribing || !handsFreeCancelState.endedDuringTranscription || !handsFreeCancelState.noLateTurn || !handsFreeCancelState.ended)) || settingsState.route !== "#/settings" || !settingsState.tab || !settingsState.airLlmCheck || !settingsState.petControls || marketplaceState.route !== "#/marketplace" || !marketplaceState.catalog || marketplaceState.heading !== "Discover" || !marketplaceState.search || !marketplaceState.modelsLink || marketplaceState.modelsRoute !== "#/marketplace" || !marketplaceState.modelHub || !marketplaceState.searchProviders || !marketplaceState.backToCatalog || !toolsInstalledState.inTools || !toolsInstalledState.installedTab || !toolsInstalledState.inventoryVisible || installedState.route !== "#/models" || !installedState.inventoryPane || !installedState.inventoryHeading || modelsState.route !== "#/models" || !modelsState.input || !modelsState.reviewButton || !modelsState.reviewDialog || !modelsState.confirmButton || !petState.title.includes("Skai companion") || !petState.companion || !petState.sprite || (!petState.transparent && !petState.opaque) || !petState.animated || !petState.framesAdvance || !petState.stripSized || !petReducedState.sprite || petReducedState.running) {
+    throw new Error(`Packaged Electron rendered incomplete surfaces: ${JSON.stringify({ mainState, settingsState, marketplaceState, installedState, modelsState, petState, petReducedState, dictationState, handsFreeState, handsFreeCancelState, microphoneDenialState, microphoneRecoveryState, permissionRecoveryRemount, localAudioState, pdfOcrState, mixedPdfState, voiceState, mp4DropResult, videoFixture, videoState, mp4VideoState })}`);
   }
   console.log(`Packaged Electron smoke passed: ${mainState.title}; Marketplace review gate, Percy renderer title=${petState.title}, separate transparent surface with animated sprite; AirLLM worker staged.`);
 }
