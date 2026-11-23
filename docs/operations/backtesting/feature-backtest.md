@@ -1,6 +1,6 @@
 # Skai Desktop feature backtest
 
-Updated: 2026-11-22
+Updated: 2026-11-23
 
 This is the living acceptance matrix for the feature backtest goal. “Pass” means
 the current repository check or packaged smoke test produced evidence for the
@@ -21,11 +21,14 @@ worktree.
 | Chat queue, conversation search, metadata, fork/export/archive | `smoke-chat-queue`, `smoke-conversation-search`, `smoke-conversation-metadata` |
 | Memory workflows | `smoke-memory` |
 | PDF attachment policy | `smoke-pdf-attachment` |
+| Scanned PDF OCR | Packaged Windows smoke confirms a generated image-only PDF is locally rendered and the fixture text is recognized with the bundled English OCR runtime. Mixed PDFs and non-English OCR remain unsupported. |
+| Packaged video and audio formats | `smoke:electron:artifact` records and decodes a VP8 WebM through the scoped local media file bridge, samples it into four timestamped JPEGs, and samples the H.264 MP4 fixture into four frames. A synthetic silent WAV reaches local Whisper; this checks the processing path, not speech intelligibility. |
+| Local model fit against real runtimes | On Windows with 32 GiB RAM, Ollama generated responses from `lfm3-omni:2b-q4_K_M` (2.05 GB) and `qwen3:14b` (14.8B Q4_K_M, 9.28 GB). Qwen loaded allocation was 9.66 GB; free RAM moved from 21.8 GiB before load to 13.2 GiB while loaded. Both models were unloaded afterward. GPU fit and other hardware remain unverified. |
 | Local voice engines | Kokoro and Piper generated valid WAV audio through Skai's Agent Host; Whisper large-v3 transcribed a Piper-generated local audio fixture. |
 | Installed AirLLM sidecar preflight | `npm run smoke:airllm` |
-| Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, and unavailable-language dictation behavior | `smoke:electron:artifact` |
-| Accessibility | 14 routes, 0 WCAG violations in `smoke:electron:accessibility` |
-| Responsive overflow | 11 routes × 5 viewport widths |
+| Packaged Electron routes, Marketplace, Percy, video sampling, local audio transcription, one-shot microphone capture/stop/Whisper completion, and unavailable-language browser speech pack behavior | `smoke:electron:artifact` |
+| Accessibility | 14 routes, 0 WCAG violations in `smoke:electron:accessibility`; 29 checks require manual review |
+| Responsive overflow | 11 routes × 5 viewport widths; fixed the Settings footer overflowing its panel |
 | UI matrix | 17 routes × 5 sizes × 4 theme/sidebar variants |
 | Published update feeds | `npm run smoke:published-update-feed -- --version 0.1.4` validates both public metadata files, SHA-512 values, and referenced installer/AppImage HTTP status and byte sizes. `npm run smoke:linux:update-feed:published` additionally downloaded, verified, installed, and reopened the actual published 0.1.4 AppImage from an isolated synthetic 0.1.3 baseline and retained a disposable profile marker. The published 0.1.4 updater predates in-app rollback. |
 | Themes and live reload | `smoke:electron:themes` |
@@ -43,12 +46,12 @@ worktree.
 | Area | Current evidence and next validation |
 | --- | --- |
 | AirLLM inference | AirLLM and Torch import successfully from `%LOCALAPPDATA%\\Skai\\AirLLM\\venv`; the worker’s CUDA preflight and malformed-input paths return structured errors. A real model run still requires an NVIDIA GPU and CUDA-capable PyTorch, plus a compatible Hugging Face model and enough disk/RAM/VRAM. |
-| Microphone dictation and hands-free voice mode | Packaged Electron reports the `en-US` on-device speech pack unavailable and refuses remote recognition. Install the OS speech capability with elevation, then verify real microphone capture, one-shot dictation, live hands-free turns, cancellation, and device-error recovery. |
+| Microphone dictation and hands-free voice mode | Packaged Electron reports the `en-US` on-device browser speech pack unavailable and refuses remote recognition. The separate one-shot local Whisper route captured/stopped a microphone clip and completed a reviewable transcript. Intelligible spoken-word quality, permission denial/recovery, and live hands-free turns still need acceptance. |
 | Packaged Marketplace workflow | `smoke:electron:artifact` passes Models search/review and explicitly verifies Tools → Installed inventory in the packaged app. |
-| Persona model quality | The David Lynch smoke passed identity, death-date, research, attributed-turn, draft, and chat checks with Qwen3 14B (3 sources, 60 attributed turns, 8 drafted fields). Existing one-subject Sam Hyde coverage also passes. These checks do not establish semantic fidelity or cutoff truthfulness across multiple turns and subjects. |
+| Persona model quality | Qwen3 14B completed David Lynch identity, death-date, research, attributed-turn, nine-field draft, initial chat, and posthumous follow-up without a stream disconnect. The follow-up explicitly declined knowledge beyond its future boundary. A 2010-era run returned a generic opening persona reply and missed the quality bar. These checks do not establish semantic fidelity or cutoff truthfulness across multiple turns and subjects. |
 | Cloud voice playback | ElevenLabs adapter validation and failure paths are covered; an end-to-end successful request requires a user-provided API key and voice ID. |
 | Release signing and lifecycle | Release audit and metadata checks pass. Local unsigned Windows install/upgrade/uninstall and loopback-feed updater acceptance pass; Linux local-feed update/install/reopen/rollback and published-feed update/install/reopen pass under WSL2. Production signing is deferred by the owner; signed updater metadata and native Linux acceptance remain open. |
-| WebM video sampling | H.264 MP4 sampling passes. The smoke harness's data-URL WebM probe is rejected by Chromium's URL safety policy on this host, so the run reports this and leaves actual packaged WebM decoding unverified. |
+| WebM video sampling | Packaged smoke uses the app's scoped local media bridge for both metadata decoding and attachment sampling; four timestamped frames were produced. H.264 MP4 also sampled into four frames. |
 | Diffusers GPU and ComfyUI acceptance | The packaged CPU path passes live cancellation, text-to-image, image-to-image, and history restoration after reload. This host has an AMD RX 7900 XTX, but the installed worker used CPU; GPU acceleration and a live ComfyUI server remain unverified. |
 | Published `electron-updater` channel and rollback/recovery | The published Linux 0.1.4 feed successfully updated and reopened the released AppImage in an isolated WSL2 profile. The release updater predates rollback; current-source Linux rollback passes only in the loopback acceptance. Published Windows in-app update and native Linux desktop acceptance remain open. |
 

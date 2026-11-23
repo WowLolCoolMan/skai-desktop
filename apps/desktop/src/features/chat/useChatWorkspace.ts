@@ -20,6 +20,15 @@ type ChatWorkspaceOptions = {
 };
 
 export type ChatResponseMode = "think" | "coding" | "security";
+export type ConversationImportPreview = {
+  fileName: string;
+  content: string;
+  total: number;
+  importCount: number;
+  skippedDuplicates: number;
+  reassignedIds: number;
+  sampleTitles: string[];
+};
 const CHAT_RESPONSE_MODES: ChatResponseMode[] = ["think", "coding", "security"];
 function normalizeResponseMode(value: unknown): ChatResponseMode {
   return CHAT_RESPONSE_MODES.includes(value as ChatResponseMode) ? value as ChatResponseMode : "think";
@@ -302,6 +311,41 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([result.markdown], { type: "text/markdown" })); link.download = result.fileName; link.click(); URL.revokeObjectURL(link.href);
   };
 
+  const previewConversationImport = async (): Promise<ConversationImportPreview | null> => {
+    try {
+      const picked = await request("workspace.pickConversationArchive");
+      if (!picked.ok) { onError(picked.error?.message ?? "Conversation archive could not be opened."); return null; }
+      const file = picked.result as { fileName?: string | null; content?: string | null };
+      if (!file.content || !file.fileName) return null;
+      const response = await request("conversations.import.preview", { fileName: file.fileName, content: file.content });
+      if (!response.ok) { onError(response.error?.message ?? "Conversation archive could not be previewed."); return null; }
+      return { ...response.result as Omit<ConversationImportPreview, "content">, content: file.content };
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Conversation archive could not be previewed.");
+      return null;
+    }
+  };
+
+  const applyConversationImport = async (preview: ConversationImportPreview) => {
+    try {
+      const response = await request("conversations.import.apply", {
+        content: preview.content,
+        expectedImportCount: preview.importCount,
+        expectedSkippedDuplicates: preview.skippedDuplicates,
+        expectedReassignedIds: preview.reassignedIds,
+      });
+      if (!response.ok) { onError(response.error?.message ?? "Conversations could not be imported."); return null; }
+      const result = response.result as { imported: number; skippedDuplicates: number; reassignedIds: number; total: number };
+      const refreshed = await request("conversations.list", { includeArchived: false });
+      if (refreshed.ok) setConversations((refreshed.result as DesktopConversation[]) ?? []);
+      else onError(refreshed.error?.message ?? "Conversations imported, but the list could not be refreshed.");
+      return result;
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Conversations could not be imported.");
+      return null;
+    }
+  };
+
   const updateConversationMetadata = async (patch: { pinned?: boolean; archived?: boolean; title?: string }, targetId = conversationId) => {
     if (!targetId) return false;
     const response = await request("conversation.metadata.save", { id: targetId, ...patch });
@@ -350,5 +394,5 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
+  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
 }

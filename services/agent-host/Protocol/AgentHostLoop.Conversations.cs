@@ -99,6 +99,59 @@ public static partial class AgentHostLoop
         return new(ProtocolVersion, request.Id, true, new { fileName = "skai-chat-export.md", markdown, conversationCount = sessions.Count });
     }
 
+    private static AgentResponse PreviewConversationImport(AgentRequest request)
+    {
+        var archive = RequiredConversationArchive(request);
+        var incoming = ConversationArchive.Parse(archive);
+        var plan = ConversationArchive.PlanImport(CreateConversationStore().Load(), incoming);
+        return new(ProtocolVersion, request.Id, true, new
+        {
+            fileName = OptionalBoundedValue(OptionalString(request, "fileName"), 260),
+            total = incoming.Count,
+            importCount = plan.Conversations.Count,
+            skippedDuplicates = plan.SkippedDuplicates,
+            reassignedIds = plan.ReassignedIds,
+            sampleTitles = plan.Conversations.Take(5).Select(session => session.Title).ToArray(),
+        });
+    }
+
+    private static AgentResponse ApplyConversationImport(AgentRequest request)
+    {
+        var archive = RequiredConversationArchive(request);
+        var store = CreateConversationStore();
+        var existing = store.Load();
+        var incoming = ConversationArchive.Parse(archive);
+        var plan = ConversationArchive.PlanImport(existing, incoming);
+        var expectedImportCount = RequiredNonNegativeInt(request, "expectedImportCount");
+        var expectedSkippedDuplicates = RequiredNonNegativeInt(request, "expectedSkippedDuplicates");
+        var expectedReassignedIds = RequiredNonNegativeInt(request, "expectedReassignedIds");
+        if (plan.Conversations.Count != expectedImportCount || plan.SkippedDuplicates != expectedSkippedDuplicates || plan.ReassignedIds != expectedReassignedIds)
+            throw new InvalidOperationException("Local conversation history changed after the preview. Preview the archive again before importing.");
+        if (plan.Conversations.Count > 0) store.Save(existing.Concat(plan.Conversations));
+        return new(ProtocolVersion, request.Id, true, new
+        {
+            imported = plan.Conversations.Count,
+            skippedDuplicates = plan.SkippedDuplicates,
+            reassignedIds = plan.ReassignedIds,
+            total = incoming.Count,
+        });
+    }
+
+    private static string RequiredConversationArchive(AgentRequest request)
+    {
+        if (request.Params is not { } parameters || !parameters.TryGetProperty("content", out var value) || value.ValueKind != JsonValueKind.String)
+            throw new InvalidOperationException("A conversation archive is required.");
+        var content = value.GetString() ?? string.Empty;
+        if (content.Length == 0 || content.Length > ConversationArchive.MaxArchiveCharacters || content.Contains('\0'))
+            throw new InvalidDataException("The conversation archive is empty or exceeds the supported size limit.");
+        return content;
+    }
+
+    private static int RequiredNonNegativeInt(AgentRequest request, string name) =>
+        request.Params?.TryGetProperty(name, out var value) == true && value.TryGetInt32(out var result) && result >= 0
+            ? result
+            : throw new InvalidOperationException($"{name} must be a non-negative integer.");
+
     private static AgentResponse ExtractPdfAttachment(AgentRequest request)
     {
         var fileName = RequiredBoundedString(request, "fileName", 260);
@@ -111,6 +164,21 @@ public static partial class AgentHostLoop
         if (bytes.Length > ChatAttachmentPolicy.MaxPdfBytes)
             throw new InvalidDataException("The PDF attachment exceeds the size limit.");
         var content = PdfAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
+        return new(ProtocolVersion, request.Id, true, new { fileName, mediaType = (string?)null, content });
+    }
+
+    private static AgentResponse ExtractSpreadsheetAttachment(AgentRequest request)
+    {
+        var fileName = RequiredBoundedString(request, "fileName", 260);
+        if (!ChatAttachmentPolicy.IsAllowedSpreadsheetName(fileName))
+            throw new InvalidOperationException("Only approved .xlsx spreadsheet attachments can be extracted.");
+        var encoded = RequiredBoundedString(request, "content", checked((int)(((SpreadsheetAttachmentTextExtractor.MaxWorkbookBytes + 2) / 3) * 4 + 4)));
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(encoded); }
+        catch (FormatException exception) { throw new InvalidDataException("The spreadsheet attachment encoding is invalid.", exception); }
+        if (bytes.Length > SpreadsheetAttachmentTextExtractor.MaxWorkbookBytes)
+            throw new InvalidDataException("The spreadsheet attachment exceeds the local extraction limit.");
+        var content = SpreadsheetAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
         return new(ProtocolVersion, request.Id, true, new { fileName, mediaType = (string?)null, content });
     }
 

@@ -47,6 +47,12 @@ public static class ChatAttachmentPolicy
         return !IsBlockedName(name) && Path.GetExtension(name).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
     }
 
+    public static bool IsAllowedSpreadsheetName(string fileName)
+    {
+        var name = Path.GetFileName(fileName);
+        return !IsBlockedName(name) && Path.GetExtension(name).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static readonly HashSet<string> BlockedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         ".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets"
@@ -55,7 +61,7 @@ public static class ChatAttachmentPolicy
     public static bool IsAllowedName(string fileName)
     {
         var name = Path.GetFileName(fileName);
-        return !IsBlockedName(name) && (AllowedExtensions.Contains(Path.GetExtension(name)) || GetImageMediaType(name) is not null || IsAllowedPdfName(name));
+        return !IsBlockedName(name) && (AllowedExtensions.Contains(Path.GetExtension(name)) || GetImageMediaType(name) is not null || IsAllowedPdfName(name) || IsAllowedSpreadsheetName(name));
     }
 
     public static bool IsAllowedTextName(string fileName)

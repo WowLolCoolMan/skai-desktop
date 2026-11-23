@@ -1,4 +1,5 @@
 // Local workspace file selection and Agent Host request IPC.
+const { extractScannedPdfText } = require("./pdf-ocr.cjs");
 
 function registerWorkspaceIpc({
   ipcMain, BrowserWindow, dialog, fs, path, attachmentTextExtensions,
@@ -6,6 +7,20 @@ function registerWorkspaceIpc({
   themeService, nativeTheme, requestAgent,
 }) {
   ipcMain.handle("agent:request", async (event, method, params) => {
+    if (method === "workspace.attachment.extract") {
+      const response = await requestAgent(method, params);
+      if (response?.ok || !/no selectable text was found in this pdf/i.test(response?.error?.message ?? "")) return response;
+      try {
+        const content = await extractScannedPdfText({
+          fileName: params?.fileName,
+          content: params?.content,
+          dependenciesPath: path.resolve(__dirname, "..", "node_modules"),
+        });
+        return { ...response, ok: true, error: undefined, result: { fileName: params.fileName, mediaType: null, content, ocr: true } };
+      } catch (error) {
+        return { ...response, error: { code: "OCR_FAILED", message: error instanceof Error ? error.message : "Local PDF OCR failed." } };
+      }
+    }
     if (method === "appearance.getThemes" || method === "appearance.saveThemeSelection" || method === "appearance.openThemesFolder" || method === "appearance.editTheme" || method === "appearance.duplicateTheme" || method === "appearance.importBase16" || method === "appearance.exportTheme" || method === "appearance.saveFonts" || method === "appearance.listFonts" || method === "appearance.readCustomFont" || method === "appearance.openFontsFolder" || method === "appearance.saveAppearanceOptions" || method === "appearance.saveThemeGradient" || method === "appearance.resetAppearance") return themeService.handle(method, params);
     // Theme: follow the app's Light/Dark/System choice instead of the OS, so native
     // pieces (select popups, scrollbars, file dialogs, tray menu, window frame) match.
@@ -20,9 +35,23 @@ function registerWorkspaceIpc({
       const result = await dialog.showOpenDialog(window, { properties: ["openDirectory"] });
       return { v: 1, ok: true, result: { path: result.canceled ? null : result.filePaths[0] ?? null } };
     }
+    if (method === "workspace.pickConversationArchive") {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      const result = await dialog.showOpenDialog(window, { properties: ["openFile"], filters: [{ name: "Conversation archive", extensions: ["json"] }] });
+      if (result.canceled || !result.filePaths[0]) return { v: 1, ok: true, result: { fileName: null, content: null } };
+      const filePath = result.filePaths[0];
+      if (path.extname(filePath).toLowerCase() !== ".json") throw new Error("Choose a JSON conversation archive.");
+      const bytes = await fs.readFile(filePath);
+      const maxBytes = 25 * 1024 * 1024;
+      if (bytes.length === 0 || bytes.length > maxBytes) throw new Error("The conversation archive must be between 1 byte and 25 MB.");
+      let content;
+      try { content = new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, ""); }
+      catch { throw new Error("The conversation archive must be valid UTF-8 JSON."); }
+      return { v: 1, ok: true, result: { fileName: path.basename(filePath), content } };
+    }
     if (method === "workspace.pickFiles") {
       const window = BrowserWindow.fromWebContents(event.sender);
-      const result = await dialog.showOpenDialog(window, { properties: ["openFile", "multiSelections"], filters: [{ name: "Chat files", extensions: ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "toml", "html", "css", "js", "ts", "jsx", "tsx", "cs", "py", "java", "go", "rs", "c", "h", "cpp", "hpp", "sh", "sql", "log", "pdf", "png", "jpg", "jpeg", "mp4", "webm"] }] });
+      const result = await dialog.showOpenDialog(window, { properties: ["openFile", "multiSelections"], filters: [{ name: "Chat files", extensions: ["txt", "md", "markdown", "csv", "xlsx", "json", "xml", "yaml", "yml", "toml", "html", "css", "js", "ts", "jsx", "tsx", "cs", "py", "java", "go", "rs", "c", "h", "cpp", "hpp", "sh", "sql", "log", "pdf", "png", "jpg", "jpeg", "mp4", "webm"] }] });
       if (result.canceled) return { v: 1, ok: true, result: { attachments: [] } };
       const attachments = [];
       let textCharacters = 0;
@@ -34,10 +63,11 @@ function registerWorkspaceIpc({
         if (isBlockedAttachmentName(fileName)) throw new Error(`That file name cannot be attached: ${fileName}`);
         const imageType = extension === ".png" ? "image/png" : [".jpg", ".jpeg"].includes(extension) ? "image/jpeg" : null;
         const isPdf = extension === ".pdf";
+        const isSpreadsheet = extension === ".xlsx";
         const videoType = extension === ".mp4" ? "video/mp4" : extension === ".webm" ? "video/webm" : null;
-        if (!imageType && !isPdf && !videoType && !attachmentTextExtensions.has(extension)) throw new Error(`That file type cannot be attached: ${fileName}`);
+        if (!imageType && !isPdf && !isSpreadsheet && !videoType && !attachmentTextExtensions.has(extension)) throw new Error(`That file type cannot be attached: ${fileName}`);
         const bytes = await fs.readFile(filePath);
-        if (bytes.length > (isPdf || videoType ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The selected file is too large: ${fileName}`);
+        if (bytes.length > (isPdf || isSpreadsheet || videoType ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The selected file is too large: ${fileName}`);
         if (imageType) {
           if (!(imageType === "image/png" ? isPng(bytes) : isJpeg(bytes))) throw new Error(`The selected image is not valid: ${fileName}`);
           imageBytes += bytes.length;
@@ -50,6 +80,14 @@ function registerWorkspaceIpc({
           videoBytes += bytes.length;
           if (videoBytes > 40 * 1024 * 1024) throw new Error("Selected videos exceed the combined 40 MB limit.");
           attachments.push({ fileName, mediaType: videoType, content: bytes.toString("base64") });
+        } else if (isSpreadsheet) {
+          if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error(`The selected spreadsheet is not a valid Open XML file: ${fileName}`);
+          const extracted = await requestAgent("workspace.attachment.extractSpreadsheet", { fileName, content: bytes.toString("base64") });
+          if (!extracted.ok) throw new Error(extracted.error?.message ?? `Could not extract ${fileName}.`);
+          const content = extracted.result?.content ?? "";
+          textCharacters += content.length;
+          if (textCharacters > 48_000) throw new Error("Selected text files exceed the combined character limit.");
+          attachments.push({ fileName, mediaType: null, content });
         } else {
           const content = bytes.toString("utf8").slice(0, 16000);
           textCharacters += content.length;

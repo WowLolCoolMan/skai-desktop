@@ -31,6 +31,8 @@ is a short introduction; this repository is the detailed source of truth.
 
 ## User guides
 
+- [Conversation import](guides/CONVERSATION_IMPORT.md) — preview and safely
+  merge portable or legacy JSON chat archives.
 - [Model library](guides/MODEL_LIBRARY.md) — local model discovery, install,
   selection, and compatibility.
 - [Local image generation](guides/LOCAL_IMAGE_GENERATION.md) — Diffusers and

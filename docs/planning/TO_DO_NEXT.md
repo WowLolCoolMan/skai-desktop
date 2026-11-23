@@ -20,14 +20,18 @@ keep this queue focused on unfinished work.
 Ordered around open acceptance blockers and the user's explicit priorities.
 Mark an item done only when the linked workflow has evidence.
 
-1. **UI and accessibility acceptance — In progress · Codex.** Manually review
-   the 17-route matrix, keyboard/focus behavior, assistive technology, narrow
-   layouts, and pet animations. Record screenshots and gaps in
+1. **UI and accessibility acceptance — In progress · Codex.** The packaged
+   audit covers 14 routes with zero automated WCAG violations; 29 checks remain
+   incomplete and require manual review. Responsive overflow now passes 11
+   routes at five widths after fixing the Settings footer. Review the 17-route matrix,
+   keyboard/focus behavior, assistive technology, narrow layouts, and pet
+   animations. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
-2. **Real microphone voice — In progress · Codex.** Exercise the new local
-   Whisper microphone path with a real device; verify draft insertion,
-   cancellation, permissions, and recovery, then test hands-free on a local
-   speech pack. Keep the path local. See the
+2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke now
+   records and stops a short microphone clip and confirms local Whisper returns
+   a reviewable transcript on this host. Still verify intelligible speech,
+   permission denial/recovery, cancellation, and hands-free on a local speech
+   pack. Keep the path local. See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — In progress · Codex.** Verify Windows
   PSEC and Linux Bubblewrap/cgroup behavior on more supported profiles. Windows
@@ -35,9 +39,11 @@ Mark an item done only when the linked workflow has evidence.
   timeout, and cancellation checks. Keep failing closed where sandbox setup is
   unavailable; no macOS command path without a sandbox. See
   [architecture](../engineering/ARCHITECTURE.md).
-4. **Persona era acceptance — In progress · Unclaimed.** Resolve the Ollama
-   stream disconnect during follow-up turns, then test date cutoffs across
-   living and deceased personas and multiple model runs. See the
+4. **Persona era acceptance — In progress · Unclaimed.** Run multi-turn
+   date-cutoff checks across living and deceased personas and multiple models.
+   A Qwen3 14B David Lynch follow-up completed; 2010-era persona quality was
+   weak, so the evidence and cutoff behavior still need broader acceptance.
+   See the
    [Smart Personas plan](implementation-plans/smart-personas.md).
 5. **Image runtime coverage — In progress · Unclaimed.** Exercise a live
    ComfyUI server and GPU/additional hardware; verify truthful progress,
@@ -78,18 +84,28 @@ Mark an item done only when the linked workflow has evidence.
     memory when telemetry exists, and labels the result as advisory. Hugging
     Face results now surface license metadata from the model card or license
     tag, and clearly prompt source review when neither is published. Remaining:
-    validate fit against real models and runtimes.
+    validate across more hardware and compare GPU/offload behavior; this Windows
+    host has no supported NVIDIA memory telemetry.
 15. **Resumable model installs — In progress · Codex.** The Skai-managed
     ModelScope GGUF installer now persists checksum-keyed partial shards,
   resumes with HTTP Range, preserves partial bytes on cancellation, validates
   the complete size/hash/signature, and removes its cache only after successful
   Ollama import. Remaining: retry behavior delegated to Ollama/LM Studio.
-16. **Legacy conversation import.** Add preview, cancel-without-writing,
-    duplicate protection, restart recovery, and preservation of edited chats.
-17. **Scanned documents and data files.** Add local OCR for scanned PDFs and
-    capability-aware handling for spreadsheets and other unsupported content.
-18. **Packaged media coverage.** Verify real WebM and audio fixtures in the
-    packaged app; make format and model capability errors clear.
+16. **Legacy conversation import — Done · Codex.** JSON archive import now
+    previews the merge, requires confirmation, keeps repeat imports idempotent,
+    reassigns colliding IDs, strips legacy project context, and leaves existing
+    conversations intact. Verified by the disposable Agent Host smoke; see
+    [conversation import](../guides/CONVERSATION_IMPORT.md).
+17. **Scanned documents and data files — Done · Codex.** `.xlsx` attachments
+    extract bounded cached cell values locally without running formulas.
+    Packaged English OCR handles image-only scanned PDFs locally, up to 20 pages;
+    the attachment is labeled as OCR and its text remains untrusted. Mixed PDFs
+    with both selectable text and scanned pages are not OCRed page by page.
+18. **Packaged media coverage — Done · Codex.** The packaged Windows smoke
+    records and decodes VP8 WebM through the same local file bridge used by the
+    app, samples it into four timestamped frames, and also samples the H.264
+    MP4 fixture. WAV reaches local Whisper; spoken-word quality remains tracked
+    under item 2.
 19. **Context and run capacity.** Verify actual 1M-token execution with a
     compatible model; improve runtime-aware estimates and safe concurrency.
 20. **Production update trust.** Add signed update metadata and prepare trusted
@@ -100,6 +116,16 @@ Mark an item done only when the linked workflow has evidence.
 
 Current behavior and acceptance limits belong in the capability matrix and
 feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
+
+- **2026-11-23:** Packaged accessibility audit inspected 14 routes and found
+  zero automated WCAG violations, zero serious/critical findings, a working
+  skip link, and a working main landmark. Twenty-nine checks remain incomplete
+  for manual review; this does not close the 17-route visual and assistive
+  technology acceptance item.
+
+- **2026-11-23:** Fixed the Settings footer extending beyond the content panel
+  at wide and narrow widths. Rebuilt the Windows artifact; responsive overflow
+  passed 11 routes × 5 widths, and the full packaged artifact smoke passed.
 
 - **2026-11-22:** Marketplace now lists saved local ComfyUI workflows, identifies
   the active workflow, and lets users activate one without leaving Marketplace.
@@ -113,11 +139,25 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   run is still required; hands-free mode continues to require local browser
   speech recognition.
 
+- **2026-11-22:** Packaged Windows smoke now exercises one-shot microphone
+  dictation through start, stop, and local Whisper completion. It passed on this
+  host while Chromium's separate on-device speech pack remained unavailable.
+  This confirms the local Whisper route only; intelligible spoken-word quality,
+  microphone permission denial/recovery, and hands-free acceptance remain open.
+
 - **2026-11-22:** Marketplace model details now include a device-fit advisory
   based on the live local RAM/GPU capacity probe and catalog package size. It
   clearly reports when memory telemetry is missing, warns when package size is
   larger than current free RAM, and explains runtime/context overhead. It does
   not claim package size guarantees that a model will fit.
+
+- **2026-11-23:** Local Ollama fit acceptance passed for two installed GGUF
+  models on a 32 GiB Windows host. `lfm3-omni:2b-q4_K_M` (2.05 GB on disk)
+  generated a five-token response; `qwen3:14b` (14.8B Q4_K_M, 9.28 GB on disk)
+  generated a six-token response with thinking disabled. Qwen's measured loaded
+  allocation was 9.66 GB; free RAM was 21.8 GiB before load and 13.2 GiB while
+  loaded. Both models were unloaded after the check. This validates those RAM
+  cases through Ollama, not GPU telemetry or the advisory across other hardware.
 
 - **2026-11-22:** Marketplace search carries Hugging Face license metadata from
   the model card, falling back to the repository's license tag. When neither is
@@ -145,6 +185,32 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   disabled network, memory and process caps, timeout, and cancellation. Native
   Linux desktop/compositor acceptance remains open.
 
+- **2026-11-22:** Conversation import is available from Chat → More. A native
+  picker reads bounded UTF-8 JSON archives; users review the merge plan before
+  applying it. Existing chats are never overwritten, conflicting IDs are
+  reassigned, legacy project context is stripped, and repeated imports skip
+  prior chats. A disposable Agent Host smoke verifies preview-without-writing,
+  collision handling, project-context stripping, and idempotence.
+
+- **2026-11-22:** Chat can attach `.xlsx` files up to 20 MB. The Agent Host
+  reads bounded Open XML workbook, relationship, shared-string, and worksheet
+  parts locally; it includes sheet names and cell references, never executes
+  formulas, and returns at most the normal per-file text budget. CSV remains a
+  plain local text attachment.
+
+- **2026-11-23:** Packaged Windows smoke confirmed the bundled local PDF.js and
+  Tesseract.js runtime rendered an image-only PDF and recovered its known English
+  text without a hosted OCR route. OCR is limited to the first 20 pages and
+  16,000 characters; resulting text is labeled OCR and untrusted. Mixed
+  selectable/scanned PDFs and other OCR languages remain unsupported.
+
+- **2026-11-23:** Packaged Windows media smoke now stores a generated VP8 WebM
+  through Skai's scoped local media bridge, decodes its metadata, and samples
+  four timestamped frames; the H.264 MP4 fixture also yields four frames. WAV
+  file transcription reaches local Whisper. The synthetic silent WAV verifies
+  the processing path only; intelligible speech quality remains open under
+  voice acceptance.
+
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed
   missing lookup, save/read, per-connection and per-service isolation, removal,
@@ -165,6 +231,14 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   passed identity, research, drafting, and its first response. Three subsequent
   cutoff turns were inconclusive because Ollama closed the stream; living-era
   cutoff behavior remains open.
+
+- **2026-11-23:** Isolated Qwen3 14B David Lynch runs completed research,
+  nine-field drafting, initial chat, and a posthumous follow-up without an
+  Ollama stream disconnect. The 2025 cutoff reply explicitly said it did not
+  claim knowledge beyond the future boundary; the smoke checker now recognizes
+  that wording, including curly-apostrophe contractions. A 2010-era run had a
+  generic opening persona reply and still failed the quality bar, so broader
+  era/persona acceptance remains open.
 
 - **2026-11-22:** Name-only Persona research now accepts a confirmed first-name
   speaker label when a page also contains the full public-person name and clear
