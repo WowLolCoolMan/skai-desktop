@@ -74,10 +74,17 @@ Mark an item done only when the linked workflow has evidence.
 
 ## Next up
 
-11. **Requested voice engines.** Complete install/use/stop/error acceptance for
-    requested local engines such as Chatterbox, Qwen3-TTS, OmniVoice, and Higgs
-    Audio; keep credentialed hosted services clearly separated from local
-    catalog entries.
+11. **Requested voice engines.** Marketplace currently has verified install/use
+    paths for Kokoro and Piper; Whisper large-v3 covers local transcription.
+    Only 40 of the 89 curated entries currently have real adapters, and the
+    catalog smoke asserts that boundary. Implement and accept the next local
+    engine, prioritizing Qwen3-TTS, then Chatterbox, OmniVoice, and Higgs Audio.
+    Qwen's upstream recommends an isolated Python 3.12 environment with the
+    `qwen-tts` package; confirm individual model-card terms, resource fit,
+    offline operation, install cancellation, synthesis, and removal before
+    marking it installable ([upstream setup](https://github.com/QwenLM/Qwen3-TTS#quickstart)).
+    Keep credentialed hosted services clearly separated from local catalog
+    entries.
 12. **User-controlled provider gateway.** Add explicit local/cloud/hybrid chat
     routing only after OS-protected credentials, data disclosure, and an
     offline-only mode are verified. No silent provider fallback.
