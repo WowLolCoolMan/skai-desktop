@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("skaiAgent", {
   request: (method, params) => ipcRenderer.invoke("agent:request", method, params),
+  onProgress: (handler) => {
+    const listener = (_event, message) => handler(message);
+    ipcRenderer.on("agent:progress", listener);
+    return () => ipcRenderer.removeListener("agent:progress", listener);
+  },
   computer: {
     capture: () => ipcRenderer.invoke("computer:capture"),
     action: (action) => ipcRenderer.invoke("computer:action", action),

@@ -67,22 +67,24 @@ child.stderr.on("data", chunk => { stderr += chunk.toString(); });
 reader.on("line", line => {
   try {
     const response = JSON.parse(line);
-    const resolve = pending.get(response.id);
-    if (resolve) { pending.delete(response.id); resolve(response); }
+    const entry = pending.get(response.id);
+    if (entry && response.kind === "progress") { entry.onProgress?.(response.result?.delta); return; }
+    if (entry) { pending.delete(response.id); entry.resolve(response); }
   } catch { /* The host protocol response is validated by the request timeout. */ }
 });
 
-function request(method, params) {
+function request(method, params, onProgress) {
   const id = `smoke-${nextId++}`;
   child.stdin.write(`${JSON.stringify({ v: 1, id, method, params })}\n`);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out waiting for ${method}.`)); }, 10_000);
-    pending.set(id, response => { clearTimeout(timer); resolve(response); });
+    pending.set(id, { onProgress, resolve: response => { clearTimeout(timer); resolve(response); } });
   });
 }
 
 async function run() {
   let capturedModelRequest = null;
+  const chatDeltas = [];
   const modelServer = http.createServer((request, response) => {
     let body = "";
     request.setEncoding("utf8");
@@ -90,17 +92,18 @@ async function run() {
     request.on("end", () => {
       capturedModelRequest = JSON.parse(body);
       response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end('data: {"choices":[{"delta":{"content":"mode smoke reply"}}]}\n\ndata: [DONE]\n\n');
+      response.end('data: {"choices":[{"delta":{"content":"mode "}}]}\n\ndata: {"choices":[{"delta":{"content":"smoke reply"}}]}\n\ndata: [DONE]\n\n');
     });
   });
   pendingSmokeServers.add(modelServer);
   await new Promise(resolve => modelServer.listen(0, "127.0.0.1", resolve));
   const modelPort = modelServer.address().port;
-  const modeReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${modelPort}/v1`, model: "mode-smoke-model", responseMode: "security", messages: [{ role: "user", content: "Review a local security test." }] });
+  const modeReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${modelPort}/v1`, model: "mode-smoke-model", responseMode: "security", streamResponse: true, messages: [{ role: "user", content: "Review a local security test." }] }, delta => chatDeltas.push(delta));
   await new Promise(resolve => modelServer.close(resolve));
   pendingSmokeServers.delete(modelServer);
   if (!modeReply.ok || modeReply.result?.content !== "mode smoke reply" || !capturedModelRequest?.messages?.some(message => message.role === "system" && message.content.includes("Security / Risky")))
     throw new Error("chat.complete did not forward the user-selected response mode to the selected local model.");
+  if (chatDeltas.join("") !== "mode smoke reply") throw new Error(`chat.complete did not stream model deltas in order: ${JSON.stringify(chatDeltas)}`);
   const health = await request("runtime.health");
   if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call") || !health.result?.capabilities?.includes("persona.discover"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");

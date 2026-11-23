@@ -1106,7 +1106,7 @@ const agentHostClient = createAgentHostClient({
 });
 const startAgentHost = () => agentHostClient.start();
 const stopAgentHost = (onStopped) => agentHostClient.stop(onStopped);
-const requestAgent = (method, params) => agentHostClient.request(method, params);
+const requestAgent = (method, params, onProgress) => agentHostClient.request(method, params, onProgress);
 const trayController = createTrayController({
   app,
   Tray,

@@ -96,6 +96,10 @@ function createAgentHostClient(options) {
       }
       const entry = pending.get(message.id);
       if (!entry) return;
+      if (message.kind === "progress") {
+        entry.onProgress?.(message.result?.delta, message.result?.reset === true);
+        return;
+      }
       pending.delete(message.id);
       clearTimeout(entry.timer);
       const completion = petCompletionText(entry.method, message);
@@ -144,7 +148,7 @@ function createAgentHostClient(options) {
     });
   }
 
-  function request(method, params) {
+  function request(method, params, onProgress) {
     if (typeof method !== "string" || !allowedMethods.has(method)) {
       return Promise.resolve({ v: 1, ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "That desktop operation is not exposed by the renderer bridge." } });
     }
@@ -173,7 +177,7 @@ function createAgentHostClient(options) {
         resolve(response);
         restart();
       }, timeoutMs);
-      pending.set(id, { resolve, timer, method });
+      pending.set(id, { resolve, timer, method, onProgress });
       try {
         host.stdin.write(`${JSON.stringify({ v: 1, id, method, params: requestParams })}\n`);
       } catch {

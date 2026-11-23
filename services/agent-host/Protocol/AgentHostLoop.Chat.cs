@@ -122,6 +122,18 @@ public static partial class AgentHostLoop
             completionMaxTokens = asksForDepth ? 2_048 : Math.Clamp(completionMaxTokens ?? 450, 256, 700);
         }
         var text = new System.Text.StringBuilder();
+        var streamVisibleText = true;
+        var streamMarkerTail = string.Empty;
+        void AppendModelChunk(string chunk)
+        {
+            text.Append(chunk);
+            // Do not stream any output once a reasoning-channel marker appears;
+            // the final response is still scrubbed by the existing filter.
+            var markerProbe = streamMarkerTail + chunk;
+            if (markerProbe.Contains("<think", StringComparison.OrdinalIgnoreCase)) streamVisibleText = false;
+            streamMarkerTail = markerProbe.Length <= 6 ? markerProbe : markerProbe[^6..];
+            if (streamVisibleText) ChatProgress.Value?.Invoke(chunk, false);
+        }
         var evidenceSummary = activePersona is { SourceMode: "public-research" } ? TryBuildPersonaEvidenceSummary(activePersona, personaQuery) : null;
         if (evidenceSummary is not null) text.Append(evidenceSummary);
         var airLlm = new AirLlmProvider();
@@ -153,24 +165,25 @@ public static partial class AgentHostLoop
 
             if (explicitAirLlm)
             {
-                await airLlm.StreamChatAsync(settings, messages, chunk => text.Append(chunk), deadline.Token,
+                await airLlm.StreamChatAsync(settings, messages, AppendModelChunk, deadline.Token,
                     completionMaxTokens, OptionalString(request, "apiKey"));
             }
             else
             {
                 try
                 {
-                    await openAiProvider.StreamChatAsync(settings, messages, chunk => text.Append(chunk), deadline.Token,
+                    await openAiProvider.StreamChatAsync(settings, messages, AppendModelChunk, deadline.Token,
                         completionMaxTokens, OptionalString(request, "apiKey"));
                 }
                 catch (Exception error) when (AirLlmProvider.ShouldAutoFallback(settings, endpoint, error, airLlm.IsRuntimeAvailable(settings)))
                 {
                     usedFallback = true;
+                    ChatProgress.Value?.Invoke(string.Empty, true);
                     text.Clear();
                     settings.ModelProvider = "AirLLM";
                     try
                     {
-                        await airLlm.StreamChatAsync(settings, messages, chunk => text.Append(chunk), deadline.Token,
+                        await airLlm.StreamChatAsync(settings, messages, AppendModelChunk, deadline.Token,
                             completionMaxTokens, OptionalString(request, "apiKey"));
                     }
                     catch (OperationCanceledException) when (deadline.IsCancellationRequested)

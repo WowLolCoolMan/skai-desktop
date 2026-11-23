@@ -65,10 +65,17 @@ async function run() {
   assert.equal(launches[0].options.env.PATH, "augmented");
   assert.equal(launches[0].options.env.SKAI_PLUGIN_DOWNLOADS, path.join("C:/Downloads", "Skai Plugins"));
 
-  const responsePromise = client.request("chat.complete", { prompt: "hello" });
+  const deltas = [];
+  let didReset = false;
+  const responsePromise = client.request("chat.complete", { prompt: "hello" }, (delta, reset) => { deltas.push(delta); didReset ||= reset; });
   const request = requests.at(-1);
   assert.equal(request.method, "chat.complete");
   assert.equal(request.params.timeoutSeconds, 285);
+  host.stdout.write(`${JSON.stringify({ v: 1, id: request.id, ok: true, kind: "progress", result: { delta: "discard this", reset: true } })}\n`);
+  host.stdout.write(`${JSON.stringify({ v: 1, id: request.id, ok: true, kind: "progress", result: { delta: "hello " } })}\n`);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(deltas, ["discard this", "hello "], "progress messages are delivered without settling the request");
+  assert.equal(didReset, true, "the renderer can discard output from a provider that yielded before falling back");
   host.stdout.write(`${JSON.stringify({ v: 1, id: request.id, ok: true, result: "hi" })}\n`);
   const response = await responsePromise;
   assert.equal(response.result, "hi");

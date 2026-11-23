@@ -6,7 +6,7 @@ public sealed record AgentRequest(int V, string Id, string Method, JsonElement? 
 
 public sealed record AgentError(string Code, string Message);
 
-public sealed record AgentResponse(int V, string Id, bool Ok, object? Result = null, AgentError? Error = null);
+public sealed record AgentResponse(int V, string Id, bool Ok, object? Result = null, AgentError? Error = null, string? Kind = null);
 
 public sealed record RuntimeHealth(
     string Service,

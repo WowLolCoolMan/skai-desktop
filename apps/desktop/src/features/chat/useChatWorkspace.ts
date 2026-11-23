@@ -157,7 +157,24 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     }
     const hasImageAttachment = messageAttachments.some((attachment) => attachment.mediaType?.startsWith("image/"));
     const responseModel = hasImageAttachment ? readPreferredModel("vision", model) : model;
-    const response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), ...(documentsOnly ? { documentsOnly: true } : {}) });
+    const progressChannel = crypto.randomUUID();
+    let streamedText = "";
+    const unsubscribe = window.skaiAgent.onProgress?.(({ channel, delta, reset }) => {
+      if (channel !== progressChannel || typeof delta !== "string") return;
+      if (reset) streamedText = "";
+      streamedText += delta;
+      setMessages([...next, { role: "assistant", content: streamedText }]);
+    });
+    let response: Awaited<ReturnType<typeof request>>;
+    try {
+      response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), streamResponse: true, progressChannel, ...(documentsOnly ? { documentsOnly: true } : {}) });
+    } catch (error) {
+      setBusy(false);
+      onError(error instanceof Error ? error.message : "The model request failed.");
+      return;
+    } finally {
+      unsubscribe?.();
+    }
     if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);

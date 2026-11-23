@@ -127,7 +127,8 @@ function registerWorkspaceIpc({
       }
       return { v: 1, ok: true, result: { attachments } };
     }
-    return requestAgent(method, params);
+    const channel = typeof params?.progressChannel === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(params.progressChannel) ? params.progressChannel : null;
+    return requestAgent(method, params, channel ? (delta, reset) => event.sender.send("agent:progress", { channel, delta, reset }) : undefined);
   });
 }
 

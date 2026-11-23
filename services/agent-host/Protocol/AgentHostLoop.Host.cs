@@ -9,6 +9,7 @@ namespace SkaiDesktop.AgentHost.Protocol;
 
 public static partial class AgentHostLoop
 {
+    private static readonly AsyncLocal<Action<string, bool>?> ChatProgress = new();
     public static async Task RunAsync(Stream input, Stream output, CancellationToken cancellationToken = default)
     {
         using var hostCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -42,8 +43,13 @@ public static partial class AgentHostLoop
             }
             AgentResponse HandleSafely(AgentRequest request)
             {
+                var previous = ChatProgress.Value;
+                ChatProgress.Value = request.Method == "chat.complete" && OptionalBoolean(request, "streamResponse")
+                    ? (delta, reset) => WriteResponseAsync(new(ProtocolVersion, request.Id, true, new { delta, reset }, Kind: "progress")).GetAwaiter().GetResult()
+                    : null;
                 try { return Handle(request, voice); }
                 catch (Exception ex) { return new(ProtocolVersion, request.Id, false, Error: new("REQUEST_FAILED", ex.Message)); }
+                finally { ChatProgress.Value = previous; }
             }
             while (!hostCancellation.IsCancellationRequested)
             {

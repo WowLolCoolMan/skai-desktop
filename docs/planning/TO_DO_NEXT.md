@@ -57,8 +57,13 @@ Mark an item done only when the linked workflow has evidence.
    acceptance now uses a loopback model stub and separate speech fixtures to
    verify a long spoken reply, microphone monitoring during playback, sustained
    speech interruption, Whisper transcription of the interruption, and delivery
-   of the follow-up to the model. Focused voice-activity, typecheck, and build
-   checks pass. Streamed voice remains open. Keep the path local.
+   of the follow-up to the model. Local model text now streams through the
+   Agent Host protocol, request-scoped Electron IPC, and the active chat view;
+   provider fallback clears partial text before showing fallback output, and
+   interim deltas stop if a reasoning marker appears. The local protocol smoke
+   confirms ordered token delivery. Speech playback still waits for the full
+   response because current voice adapters return whole audio clips; incremental
+   speech/audio streaming remains open. Keep the path local.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
