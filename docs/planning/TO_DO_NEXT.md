@@ -76,8 +76,12 @@ Mark an item done only when the linked workflow has evidence.
     memory when telemetry exists, and labels the result as advisory. Remaining:
     surface trustworthy license metadata and validate fit against real models
     and runtimes.
-15. **Resumable model installs.** Resume interrupted downloads with integrity
-    checks, safe cleanup, progress, cancellation, and retry.
+15. **Resumable model installs — In progress · Codex.** The Skai-managed
+    ModelScope GGUF installer now persists checksum-keyed partial shards,
+    resumes with HTTP Range, validates the complete size/hash/signature, and
+    removes its cache only after successful Ollama import. Remaining:
+    acceptance of cancellation and retries, plus retry behavior delegated to
+    Ollama/LM Studio.
 16. **Legacy conversation import.** Add preview, cancel-without-writing,
     duplicate protection, restart recovery, and preservation of edited chats.
 17. **Scanned documents and data files.** Add local OCR for scanned PDFs and
@@ -112,6 +116,13 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   clearly reports when memory telemetry is missing, warns when package size is
   larger than current free RAM, and explains runtime/context overhead. It does
   not claim package size guarantees that a model will fit.
+
+- **2026-11-22:** ModelScope GGUF downloads now resume from a checksum-keyed
+  local partial file when the server supports byte ranges. The adapter checks
+  the returned range, expected size, full SHA-256, and GGUF signature before
+  upload; interrupted transfers preserve their partial for retry, invalid
+  content is removed, and successful import cleans the resume cache. Ollama
+  and LM Studio still own their respective upstream download and retry state.
 
 - **2026-11-22:** Linux Core credential tests now run against GNOME Keyring's
   real Secret Service in an isolated D-Bus session. Ubuntu 24.04/WSL2 passed

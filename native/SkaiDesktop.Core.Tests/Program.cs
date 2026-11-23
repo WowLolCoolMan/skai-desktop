@@ -1,6 +1,13 @@
 // Core test runner. Each area lives in its own *Tests.cs file; they run in this order
 // and the run stops at the first failed Check (see TestSupport.cs).
 
+if (args.Length == 1 && args[0].Equals("--model-library", StringComparison.OrdinalIgnoreCase))
+{
+    await ModelLibraryTests.RunAsync();
+    Console.WriteLine("Selected Model Library checks passed.");
+    return;
+}
+
 await DiagnosticsTests.RunAsync();
 ProductIdentityTests.Run();
 VoiceModelTests.Run();
