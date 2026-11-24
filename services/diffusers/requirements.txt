@@ -3,5 +3,5 @@ diffusers>=0.40,<1
 transformers>=5.23.0,<6
 accelerate>=1.16.0,<2
 safetensors>=0.8.0
-torch>=2.1
+torch>=2.15.0
 rembg[cpu]==2.0.87
