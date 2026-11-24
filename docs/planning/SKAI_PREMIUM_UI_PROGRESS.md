@@ -89,7 +89,7 @@ what they cover.
   allowed to expand into the vertical workspace scroll. Mobile Coding header
   and project actions now wrap without page-level horizontal overflow. The
   packaged matrix reported no clipped controls; typecheck, production build,
-  and Electron packaging passed. Remaining: capture and compare #10–#30,
+  and Electron packaging passed. Remaining: capture and compare #12–#30,
   and complete the direct document attachment → Documents-only → send flow.
 - Reference #9 now has packaged 1440×900 evidence in the Coding Activity
   drawer. The isolated fixture pauses a local task after four file writes;
@@ -100,7 +100,7 @@ what they cover.
   after Stop, so end-to-end cancellation remains an open Agent Host issue;
   native core cancellation tests pass. The drawer keeps this review beside the
   Coding Agent thread. Mobile comparison for task progress and references
-  #11–30 are still waiting.
+  #12–30 are still waiting.
 - Reference #10 now has packaged 1440×900 evidence with the Details rail open
   beside a saved Chat thread. The flow configures and saves a local-time weekly
   run, then confirms it appears in that conversation's schedule list. Comparing
@@ -110,6 +110,12 @@ what they cover.
   interaction remains open because this fixture cannot select the seeded
   conversation from the collapsed narrow sidebar. Typecheck, production build,
   and Electron packaging passed after the rail fix.
+- Reference #11 now has packaged 1440×900 evidence of the standalone
+  Scheduled page. Its isolated UI flow created a weekly standalone prompt,
+  selected it, and exercised Pause → Resume → Cancel; the task detail reflected
+  each state. The page keeps standalone prompts distinct from conversation
+  schedules and says local prompts do not automatically access project files.
+  Remaining screenshot review starts at #12.
 - Reference #6 now has a packaged 1440×900 active Voice Mode screenshot. The
   UI smoke starts from the Chat composer, waits for local listening, verifies
   the visible End control, and closes the session using a fake microphone;

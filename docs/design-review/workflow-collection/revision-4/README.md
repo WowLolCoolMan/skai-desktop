@@ -163,7 +163,7 @@ project's Activity drawer beside the Coding Agent thread rather than navigating
 to a separate task page.
 
 The per-reference pass remains open for reference #9 cancellation, mobile
-task-progress behavior, and references #11–30. This is desktop evidence only;
+task-progress behavior, and references #12–30. This is desktop evidence only;
 the remaining reference-specific page states still need comparison and
 interaction evidence.
 
@@ -183,6 +183,19 @@ on desktop and stacks below the conversation on narrow screens. The 390×844
 Chat layout smoke passed after that correction. Mobile schedule interaction
 still needs a direct flow check because the narrow sidebar collapses the seeded
 thread list in the current fixture.
+
+### Standalone scheduled tasks — reference #11
+
+The packaged 1440×900 state is captured in
+[Standalone Scheduled evidence](evidence-scheduled-standalone-1440.png). Skai
+shows a searchable local schedule list beside details for the selected run,
+including its next time, repeat interval, workspace mode, saved result, and
+Run now / Pause / Cancel controls. The page explains that these prompts run
+locally and do not automatically access project files. The focused packaged
+flow created a standalone weekly prompt, selected it, then paused, resumed, and
+cancelled it; all three state changes appeared in the details view. This keeps
+standalone automations separate from conversation schedules as in the
+reference. The 1440×900 matrix found no layout or runtime issues.
 
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.

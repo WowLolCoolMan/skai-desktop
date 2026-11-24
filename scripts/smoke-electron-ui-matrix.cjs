@@ -24,6 +24,7 @@ const port = 19331;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
 const exerciseTaskProgress = process.env.UI_MATRIX_EXERCISE_TASK_PROGRESS === "1";
 const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1";
+const exerciseScheduledPage = process.env.UI_MATRIX_EXERCISE_SCHEDULED_PAGE === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
 let resolveTaskProgressPaused;
@@ -322,6 +323,32 @@ async function main() {
           await cdp.evaluate(`document.querySelector('.chat-schedules-panel .chat-schedules-heading button')?.click()`);
           const savedSchedule = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ((document.querySelector('.chat-schedule-list')?.innerText ?? '').includes('Create a weekly progress summary')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!savedSchedule) throw new Error(`Saving the conversation schedule did not add its row to Scheduled runs: ${JSON.stringify(await cdp.evaluate(`(() => ({ panel: document.querySelector('.chat-schedules-panel')?.innerText, form: document.querySelector('.chat-schedule-form')?.innerText, fields: [...(document.querySelector('.chat-schedule-form')?.querySelectorAll('input,select') ?? [])].map((field) => field.value), button: [...(document.querySelector('.chat-schedule-form')?.querySelectorAll('button') ?? [])].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
+        }
+        if (route === "scheduled" && exerciseScheduledPage) {
+          const seededScheduleVisible = await cdp.evaluate(`document.querySelector('.scheduled-detail-panel')?.innerText.includes('Review the herb garden plan') ?? false`);
+          if (!seededScheduleVisible) throw new Error("The standalone schedule detail did not open from the seeded task list.");
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "scheduled-standalone-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await cdp.evaluate(`document.querySelector('.scheduled-new-button')?.click()`);
+          const newScheduleForm = await cdp.evaluate(`Boolean(document.querySelector('.scheduled-form-panel'))`);
+          if (!newScheduleForm) throw new Error("New task did not open the standalone schedule form.");
+          await cdp.evaluate(`(() => { const form = document.querySelector('.scheduled-form-panel'); const prompt = form?.querySelector('textarea'); const date = form?.querySelector('input[type="datetime-local"]'); const repeat = form?.querySelector('.scheduled-form-grid select'); const setValue = (element, value, prototype) => { if (!element) return; Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); }; setValue(prompt, 'Review weekend meal plan', HTMLTextAreaElement.prototype); const due = new Date(Date.now() + 86400000); setValue(date, new Date(due.getTime() - due.getTimezoneOffset() * 60000).toISOString().slice(0, 16), HTMLInputElement.prototype); setValue(repeat, '10080', HTMLSelectElement.prototype); return true; })()`);
+          await cdp.evaluate(`document.querySelector('.scheduled-form-actions button:last-child')?.click()`);
+          const newScheduleVisible = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.scheduled-list-item')].some((item) => item.innerText.includes('Review weekend meal plan'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!newScheduleVisible) throw new Error("Saving a standalone schedule did not add it to the task list.");
+          await cdp.evaluate(`([...document.querySelectorAll('.scheduled-list-item')].find((item) => item.innerText.includes('Review weekend meal plan'))?.click())`);
+          await cdp.evaluate(`([...document.querySelectorAll('.scheduled-detail-actions button')].find((button) => button.innerText.trim() === 'Pause')?.click())`);
+          const paused = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.scheduled-detail-panel')?.innerText.includes('paused')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!paused) throw new Error("Pausing a standalone scheduled task did not update its detail state.");
+          await cdp.evaluate(`([...document.querySelectorAll('.scheduled-detail-actions button')].find((button) => button.innerText.trim() === 'Resume')?.click())`);
+          const resumed = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.scheduled-detail-panel')?.innerText.includes('scheduled')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!resumed) throw new Error("Resuming a standalone scheduled task did not restore its active state.");
+          await cdp.evaluate(`([...document.querySelectorAll('.scheduled-detail-actions button')].find((button) => button.innerText.trim() === 'Cancel schedule')?.click())`);
+          const cancelled = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.scheduled-detail-panel')?.innerText.includes('cancelled')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!cancelled) throw new Error("Cancel schedule did not move the standalone task into its terminal state.");
         }
         if (route === "coding" && process.env.UI_MATRIX_EXERCISE_CODING === "1") {
           await clickInRenderer(cdp, ".coding-no-project button");
