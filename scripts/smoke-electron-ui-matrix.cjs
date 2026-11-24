@@ -23,6 +23,22 @@ const port = 19331;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
 const env = { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", XDG_CONFIG_HOME: path.join(temp, "config"), XDG_DATA_HOME: path.join(temp, "data"), XDG_CACHE_HOME: path.join(temp, "cache"), APPDATA: path.join(temp, "appdata"), LOCALAPPDATA: path.join(temp, "localappdata") };
 for (const dir of ["config", "data", "cache", "appdata", "localappdata"]) fs.mkdirSync(path.join(temp, dir), { recursive: true });
+const agentProfile = path.join(temp, "agent-profile");
+fs.mkdirSync(agentProfile, { recursive: true });
+Object.assign(env, {
+  SRAI_SETTINGS_PATH: path.join(agentProfile, "settings.json"),
+  SRAI_MCP_CONNECTIONS_PATH: path.join(agentProfile, "mcp-connections.json"),
+  SRAI_CONVERSATIONS_PATH: path.join(agentProfile, "conversations.json"),
+  SRAI_MEMORY_PATH: path.join(agentProfile, "memory.json"),
+  SRAI_CORPUS_PATH: path.join(agentProfile, "document-corpus.json"),
+  SRAI_CHAT_QUEUE_PATH: path.join(agentProfile, "chat-queue.json"),
+  SRAI_TASKS_PATH: path.join(agentProfile, "agent-tasks.json"),
+  SRAI_SCHEDULED_TASKS_PATH: path.join(agentProfile, "scheduled-tasks.json"),
+  SRAI_PROJECTS_PATH: path.join(agentProfile, "projects.json"),
+  SRAI_UNDO_PATH: path.join(agentProfile, "workspace-undo.json"),
+  SRAI_OPERATIONS_PATH: path.join(agentProfile, "operations.json"),
+});
+fs.writeFileSync(env.SRAI_SETTINGS_PATH, JSON.stringify({ themeMode: "dark" }));
 const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
 const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${path.join(temp, "electron")}`, `--skai-isolated-smoke-app-data=${path.join(temp, "appdata")}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let appLog = "";
@@ -48,6 +64,22 @@ function connect(url) {
     evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(`evaluate: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`); return result.result?.value; },
     close: () => socket.close(),
   };
+}
+
+async function clickInRenderer(cdp, selector) {
+  const point = await cdp.evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) return null; const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
+  if (!point) throw new Error(`UI interaction target was not found: ${selector}`);
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
+  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", clickCount: 1 });
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x, y: point.y, button: "left", clickCount: 1 });
+}
+
+async function clickButtonText(cdp, text, scope = "body") {
+  const point = await cdp.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(scope)}); const element = [...(root?.querySelectorAll('button') ?? [])].find((button) => button.innerText.trim() === ${JSON.stringify(text)}); if (!element || element.disabled) return null; const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
+  if (!point) throw new Error(`UI button was not found or is disabled: ${text}`);
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
+  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", clickCount: 1 });
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x, y: point.y, button: "left", clickCount: 1 });
 }
 
 // Collected in the page: layout problems for the current route and viewport.
@@ -119,14 +151,10 @@ const settingsCategorySource = settingsSource.match(/const categories = \[([^\]]
 const settingsCategories = [...settingsCategorySource.matchAll(/"([^\"]+)"/g)].map((match) => match[1]);
 if (settingsCategories.length < 5) throw new Error("Could not read the settings categories from SettingsPage.tsx.");
 const captureDirectory = path.join(__dirname, "..", ".tmp", "ui-matrix-review");
-// Match BrowserWindow's supported minimum size (960×640); smaller synthetic
-// viewports cannot be reached because Electron clamps the actual window.
+// The five native desktop sizes plus the requested 390 px renderer emulation.
 const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [960, 640]];
 const testedRoutes = process.env.UI_MATRIX_ROUTE ? routes.filter((route) => process.env.UI_MATRIX_ROUTE.split(",").includes(route)) : routes;
 const requestedViewport = /^(\d+)x(\d+)$/.exec(process.env.UI_MATRIX_VIEWPORT || "");
-if (requestedViewport && (Number(requestedViewport[1]) < 960 || Number(requestedViewport[2]) < 640)) {
-  throw new Error("UI_MATRIX_VIEWPORT must be at least 960x640, the Electron window's supported minimum size.");
-}
 const testedViewports = requestedViewport ? [[Number(requestedViewport[1]), Number(requestedViewport[2])]] : viewports;
 const variants = process.env.UI_MATRIX_QUICK === "1" ? [["dark", "false"]] : [["dark", "false"], ["light", "false"], ["dark", "true"], ["light", "true"]];
 
@@ -142,7 +170,12 @@ async function main() {
   const runtimeErrors = [];
   let phase = "startup";
   cdp.on((message) => {
-    if (message.method === "Runtime.exceptionThrown") runtimeErrors.push(`${phase}: ${(message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text ?? "").split("\n")[0]}`);
+    if (message.method === "Runtime.exceptionThrown") {
+      const details = message.params.exceptionDetails;
+      const summary = (details.exception?.description ?? details.text ?? "").split("\n")[0];
+      const frame = details.stackTrace?.callFrames?.[0];
+      runtimeErrors.push(`${phase}: ${summary}${frame ? ` @ ${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1}` : ""}`);
+    }
     if (message.method === "Runtime.consoleAPICalled" && (message.params.type === "error" || message.params.type === "assert")) runtimeErrors.push(`${phase}: console.error ${message.params.args.map((arg) => arg.value ?? arg.description ?? "").join(" ").slice(0, 200)}`);
   });
   await cdp.send("Runtime.enable");
@@ -150,19 +183,34 @@ async function main() {
 
   // Long, awkward content: long titles, unbroken tokens, wide code, tables, many chats, long project names.
   phase = "seed";
-  const longWord = "Supercalifragilisticexpialidocious_".repeat(5);
-  const longTitle = "Investigate why the tiled window squeezes the composer when the conversation title is extremely long and keeps going";
-  const seedProject = fs.mkdtempSync(path.join(temp, "project-with-an-exceptionally-long-folder-name-for-layout-testing-"));
-  fs.writeFileSync(path.join(seedProject, "README.md"), `# Seed\n${longWord}\n`);
+  const captureMode = process.env.UI_MATRIX_CAPTURE === "1";
+  const includeCodingFixture = process.env.UI_MATRIX_EXERCISE_CHAT !== "1";
+  const longWord = captureMode ? "" : "Supercalifragilisticexpialidocious_".repeat(5);
+  const longTitle = captureMode ? "Plan a simple herb garden" : "Investigate why the tiled window squeezes the composer when the conversation title is extremely long and keeps going";
+  const seedProject = fs.mkdtempSync(path.join(temp, captureMode ? "starter-project-" : "project-with-an-exceptionally-long-folder-name-for-layout-testing-"));
+  fs.writeFileSync(path.join(seedProject, "README.md"), "# Starter project\n\nUse the Coding Agent thread to review the project, then inspect README.md in the docked editor.\n");
+  fs.mkdirSync(path.join(seedProject, "src"), { recursive: true });
+  fs.writeFileSync(path.join(seedProject, "src", "index.ts"), "export function greet(name: string) {\n  return `Hello, ${name}`;\n}\n");
   const seeded = await cdp.evaluate(`(async () => {
     const r = (m, p) => window.skaiAgent.request(m, p);
     const results = [];
-    results.push(await r("conversation.save", { title: ${JSON.stringify(longTitle)}, messages: [{ role: "user", content: ${JSON.stringify(`Unbroken token: ${longWord}`)} }, { role: "assistant", content: ${JSON.stringify("Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40))} }] }));
-    results.push(await r("conversation.save", { title: ${JSON.stringify(longWord)}, messages: [{ role: "user", content: "short" }] }));
-    for (let i = 0; i < 25; i++) await r("conversation.save", { title: "Filler conversation number " + i, messages: [{ role: "user", content: "filler " + i }] });
-    results.push(await r("tasks.plan", { title: ${JSON.stringify(longTitle)}, instruction: ${JSON.stringify(`Instruction ${longWord}`)}, environment: "local" }));
-    results.push(await r("scheduled.create", { prompt: ${JSON.stringify(`${longTitle} ${longWord}`)}, dueAt: new Date(Date.now() + 3600000).toISOString(), repeatEveryMinutes: 60 }));
-    results.push(await r("project.save", { name: ${JSON.stringify(longTitle)}, folderPaths: [${JSON.stringify(seedProject)}] }));
+    results.push(await r("conversation.save", { title: ${JSON.stringify(longTitle)}, messages: [{ role: "user", content: ${JSON.stringify(captureMode ? "Help me plan a low-maintenance herb garden for a sunny patio." : `Unbroken token: ${longWord}`)} }, { role: "assistant", content: ${JSON.stringify(captureMode ? "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." : "Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40))} }] }));
+    if (!${captureMode}) {
+      results.push(await r("conversation.save", { title: ${JSON.stringify(longWord)}, messages: [{ role: "user", content: "short" }] }));
+      for (let i = 0; i < 25; i++) await r("conversation.save", { title: "Filler conversation number " + i, messages: [{ role: "user", content: "filler " + i }] });
+    }
+    results.push(await r("tasks.plan", { title: ${JSON.stringify(captureMode ? "Review garden layout options" : longTitle)}, instruction: ${JSON.stringify(captureMode ? "Compare container sizes and sunlight needs before suggesting a layout." : `Instruction ${longWord}`)}, environment: "local" }));
+    results.push(await r("scheduled.create", { prompt: ${JSON.stringify(captureMode ? "Review the herb garden plan" : `${longTitle} ${longWord}`)}, dueAt: new Date(Date.now() + 3600000).toISOString(), repeatEveryMinutes: 60 }));
+    const project = await r("project.save", { name: ${JSON.stringify(captureMode ? "Skai Starter Project" : "Revision 4 coding fixture")}, folderPaths: [${JSON.stringify(seedProject)}] });
+    results.push(project);
+    if (project.ok && ${includeCodingFixture}) results.push(await r("conversation.save", { title: "Review the starter project", mode: "Coding Agent", responseMode: "coding", projectId: project.result?.id, messages: [{ role: "user", content: "Review this project structure and suggest the next small improvement." }, { role: "assistant", content: "I’ll inspect the existing files, then outline a focused change and how to verify it." }] }));
+    if (${captureMode} && results[0]?.result?.id) results.push(await r("conversation.save", { id: results[0].result.id, title: ${JSON.stringify(longTitle)}, mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Help me plan a low-maintenance herb garden for a sunny patio." }, { role: "assistant", content: "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." }] }));
+    if (${captureMode}) for (const card of [
+      { name: "Default", roles: "General-purpose assistant", instructions: "Be clear, practical, and adaptable to the user's task." },
+      { name: "Release Engineer", roles: "Helps with releases, readiness, and ops", instructions: "Be concise, practical, and safety-minded. Focus on release planning, readiness checks, risk, and operations." },
+      { name: "Code Reviewer", roles: "Reviews code and suggests improvements", instructions: "Prioritize correctness, security, and maintainability. Explain findings with file and line references." },
+      { name: "Tech Writer", roles: "Drafts and edits clear technical docs", instructions: "Use plain language, organize information clearly, and preserve technical accuracy." },
+    ]) results.push(await r("persona.save", { persona: { ...card, sourceMode: "own-material", subjectType: "character", voice: "Friendly and clear", personality: "Patient, focused, and direct", thinkingStyle: "Work step by step and explain important choices", interactionStyle: "Ask for missing context only when it affects the result", values: "Clarity, accuracy, and useful next steps", knowledge: "Use the supplied material and task context", evidenceBoundaries: "State uncertainty and do not invent unsupported facts", sourceMaterial: card.instructions } }));
     return results;
   })()`);
   if (!Array.isArray(seeded) || seeded.some((result) => result?.ok !== true)) throw new Error(`Seeding the throwaway profile failed: ${JSON.stringify(seeded)}`);
@@ -174,14 +222,97 @@ async function main() {
     await sleep(500);
     await cdp.evaluate("(async () => { for (let i = 0; i < 150 && !document.querySelector('[aria-label=\"Primary navigation\"]'); i++) await new Promise((r) => setTimeout(r, 100)); return 1; })()");
     for (const [width, height] of testedViewports) {
-      await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+      await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 960 });
       for (const route of testedRoutes) {
         phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/${route}`;
         const renderedRoute = route === "personas" || route === "persona-groups" ? "persona-workshop" : route === "plugins" ? "marketplace" : route === "workbench" ? "chat" : route;
-        await cdp.evaluate(`window.history.pushState(window.history.state, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
+        await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
         const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
         if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
-        await sleep(120);
+        if (route === "coding" && process.env.UI_MATRIX_EXERCISE_CODING === "1") {
+          await clickInRenderer(cdp, ".coding-no-project button");
+          const projectsReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.title.endsWith(' · projects')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!projectsReady) throw new Error("Coding workflow could not open Projects.");
+          await clickInRenderer(cdp, ".project-directory-open-action");
+          const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-workspace-tabs')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!projectReady) throw new Error("Coding workflow could not open the seeded project.");
+          const seededCodingThreadVisible = await cdp.evaluate(`Boolean([...document.querySelectorAll('.sidebar-project-thread')].find((button) => button.innerText.trim() === 'Review the starter project'))`);
+          if (!seededCodingThreadVisible) await cdp.evaluate(`document.querySelector('button[aria-label="Expand Skai Starter Project"]')?.click(); 1`);
+          const seededCodingThreadReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.sidebar-project-thread')].some((button) => button.innerText.trim() === 'Review the starter project')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!seededCodingThreadReady) throw new Error("Coding workflow could not find the seeded project conversation.");
+          await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
+          const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
+          const readme = await cdp.evaluate(`(() => [...document.querySelectorAll('.project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)()`);
+          if (readme) await cdp.evaluate(`document.querySelector('.project-file-item[title=${JSON.stringify(readme)}]')?.click(); 1`);
+          await sleep(500);
+          const editorReady = await cdp.evaluate(`Boolean(document.querySelector('.monaco-editor-shell .monaco-editor'))`);
+          if (!editorReady) throw new Error(`Coding workflow did not load Monaco beside its chat thread: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, mode: document.querySelector('.sidebar-agent-trigger strong')?.textContent?.trim(), selectedFile: document.querySelector('.file-editor-heading span')?.textContent, files: [...document.querySelectorAll('.project-file-item')].map((item) => ({ text: item.innerText, title: item.title })), workspace: document.querySelector('.coding-session-grid')?.className, editor: document.querySelector('#coding-files-workspace')?.outerHTML.slice(0, 300), empty: document.querySelector('.project-file-preview')?.innerText }))()`))}`);
+          await cdp.evaluate(`(() => { const workspace = document.querySelector('.coding-session-grid'); if (workspace) workspace.scrollTop = workspace.scrollHeight; return 1; })()`);
+          await clickInRenderer(cdp, ".monaco-editor");
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Control", code: "ControlLeft", modifiers: 2 });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "a", code: "KeyA", modifiers: 2 });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "a", code: "KeyA", modifiers: 2 });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Control", code: "ControlLeft" });
+          await cdp.send("Input.insertText", { text: "# Revision 4 editor review\n\nTemporary smoke edit for the isolated workspace.\n" });
+          const draftReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { if (document.querySelector('#coding-file-editor button:last-child')?.disabled === false) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!draftReady) throw new Error(`Monaco did not accept the isolated edit: ${JSON.stringify(await cdp.evaluate(`(() => { const selectors = ['.app-main','.app-content','.coding-session-grid','.coding-project-browser','.project-file-layout','.file-editor-panel','.monaco-editor-shell','.monaco-editor','.monaco-editor .view-lines']; return { viewport: [innerWidth, innerHeight], widths: Object.fromEntries(selectors.map((selector) => { const element = document.querySelector(selector); const rect = element?.getBoundingClientRect(); return [selector, rect && { x: rect.x, y: rect.y, w: rect.width, h: rect.height, client: [element.clientWidth, element.clientHeight], scroll: [element.scrollWidth, element.scrollHeight] }]; })), file: document.querySelector('#coding-file-editor')?.innerText, editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 140), active: document.activeElement?.outerHTML?.slice(0, 120), buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }; })()`))}`);
+          await clickButtonText(cdp, "Review diff", "#coding-file-editor");
+          const diffReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.coding-diff-preview section[aria-label="Original file"]') && document.querySelector('.coding-diff-preview section[aria-label="Working copy"]')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
+          if (!diffReady) throw new Error(`Review diff did not open the side-by-side file comparison while keeping the coding thread visible: ${JSON.stringify(await cdp.evaluate(`(() => ({ heading: document.querySelector('#coding-file-editor')?.innerText, editorText: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0,160), shell: document.querySelector('.coding-diff-preview')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
+          const threadStillVisible = await cdp.evaluate(`Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent'))`);
+          if (!threadStillVisible) throw new Error("Opening the file diff hid the Coding Agent conversation.");
+          await clickButtonText(cdp, "Editor", "#coding-file-editor");
+          const editorRestored = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.monaco-editor-shell .monaco-editor')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!editorRestored) throw new Error("Switching back from Review diff did not restore Monaco editor.");
+          await sleep(350);
+          await clickButtonText(cdp, "Save edit", "#coding-file-editor");
+          const undoReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const undo = [...document.querySelectorAll('#coding-file-editor button')].find((button) => button.textContent?.trim() === 'Undo'); if (undo && !undo.disabled) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!undoReady) throw new Error("Saving the isolated Monaco edit did not enable Undo.");
+          await cdp.evaluate(`([...document.querySelectorAll('#coding-file-editor button')].find((button) => button.textContent?.trim() === 'Undo')?.click(), 1)`);
+          const restoredEditor = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.monaco-editor')?.innerText?.replace(/\\s+/g, ' ')?.includes('Starter project')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
+          if (!restoredEditor) throw new Error(`Undo did not restore the starter file in Monaco: ${JSON.stringify(await cdp.evaluate(`(() => ({ editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 180), heading: document.querySelector('#coding-file-editor')?.innerText, undo: [...document.querySelectorAll('#coding-file-editor button')].find((button) => button.textContent?.trim() === 'Undo')?.disabled }))()`))}`);
+        }
+        if (route === "persona-workshop" && process.env.UI_MATRIX_EXERCISE_PERSONA === "1") {
+          const personaReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-library-picker > button')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!personaReady) throw new Error("Persona workflow did not load the seeded persona list.");
+          await cdp.evaluate(`([...document.querySelectorAll('.persona-library-picker > button')].find((button) => button.innerText.includes('Release Engineer'))?.click(), 1)`);
+          const selectedPersona = await cdp.evaluate(`document.querySelector('.persona-library-detail h2')?.textContent?.trim()`);
+          if (selectedPersona !== "Release Engineer") throw new Error(`Persona profile selection failed: ${selectedPersona}`);
+        }
+        await sleep(process.env.UI_MATRIX_CAPTURE === "1" ? 350 : 120);
+        if (process.env.UI_MATRIX_CAPTURE === "1" && (route === "marketplace" || route === "memory")) {
+          const settled = await cdp.evaluate(`(async () => { const pending = ${JSON.stringify(route === "memory" ? "Loading memory…" : "Loading Marketplace…")}; for (let i = 0; i < 60; i++) { if (!document.body.innerText.includes(pending)) return true; await new Promise((r) => setTimeout(r, 100)); } return !document.body.innerText.includes(pending); })()`);
+          if (!settled) console.warn(`[capture] #/${route} remained in its loading state after 6 seconds; checking the connected native feature.`);
+        }
+        if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT === "1") {
+          const activeChatClass = await cdp.evaluate(`document.querySelector('.chat-page')?.className ?? ''`);
+          if (!activeChatClass.includes("is-coding-agent")) {
+            const responseButtons = await cdp.evaluate(`([...document.querySelectorAll('.chat-response-mode-options button')].map((button) => button.textContent?.trim()))`);
+            if (!responseButtons.includes("Coding")) throw new Error("A regular Chat thread did not render its response-mode controls.");
+            await cdp.evaluate(`([...document.querySelectorAll('.chat-response-mode-options button')].find((button) => button.textContent?.trim() === 'Coding')?.click(), 1)`);
+            await sleep(80);
+            const codingModeOpened = await cdp.evaluate(`Boolean(document.querySelector('.chat-page.is-coding-agent'))`);
+            if (!codingModeOpened) throw new Error("Selecting Coding response mode did not switch the thread into Coding Agent context.");
+          }
+          await cdp.evaluate(`(() => { const input = document.querySelector('.sidebar-search'); if (!input) return false; const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, 'garden'); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+          const filteredHistory = await cdp.evaluate(`document.querySelector('.sidebar-history-list')?.innerText ?? ''`);
+          if (!filteredHistory.includes("Plan a simple herb garden") || filteredHistory.includes("Review the starter project")) throw new Error(`Conversation search did not filter the local history as expected: ${filteredHistory}`);
+          await cdp.evaluate(`(() => { const input = document.querySelector('.sidebar-search'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true })); return 1; })()`);
+          await clickInRenderer(cdp, ".overflow-menu-trigger[aria-label='Chat options']");
+          await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.includes('Show task tools'))?.click(), 1)`);
+          const toolsVisible = await cdp.evaluate(`document.querySelector('.chat-layout')?.classList.contains('has-chat-tools')`);
+          if (!toolsVisible) throw new Error("Chat options did not open its task planning tools.");
+          await clickInRenderer(cdp, ".overflow-menu-trigger[aria-label='Chat options']");
+          await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.includes('Hide task tools'))?.click(), 1)`);
+          const toolsHidden = await cdp.evaluate(`!document.querySelector('.chat-layout')?.classList.contains('has-chat-tools')`);
+          if (!toolsHidden) throw new Error("Chat task planning tools did not close from Chat options.");
+          await clickInRenderer(cdp, ".chat-header-actions button[aria-label='Chat options']");
+          const importAvailable = await cdp.evaluate(`Boolean([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.includes('Import conversations')))`).catch(() => false);
+          if (!importAvailable) throw new Error("Chat options did not expose conversation import.");
+          await clickInRenderer(cdp, ".overflow-menu-trigger[aria-label='Chat options']");
+          await cdp.evaluate(`([...document.querySelectorAll('.sidebar-history-row')].find((row) => row.innerText.includes('Plan a simple herb garden'))?.querySelector('.sidebar-history-item')?.click(), 1)`);
+        }
         const states = route === "settings" ? settingsCategories : [null];
         for (const category of states) {
           if (category) {
@@ -190,12 +321,24 @@ async function main() {
             phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
           }
           const issues = await cdp.evaluate(PROBE);
-          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          if (process.env.UI_MATRIX_LAYOUT_DEBUG === "1" && width < 640) {
+            const layout = await cdp.evaluate(`(() => { const layout = [...document.querySelectorAll('.app-shell,.global-rail,.workspace-sidebar,.thread-sidebar,.app-main,.app-content,.chat-page,.chat-layout,.chat-column,.conversation-surface,.message-list,.message-content,.coding-page-active,.coding-session-grid,.project-thread-panel,.coding-project-browser,.monaco-editor-shell')].filter((el) => getComputedStyle(el).display !== 'none').map((el) => { const r = el.getBoundingClientRect(); return { el: el.className?.toString?.() || el.tagName, box: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], client: [el.clientWidth, el.clientHeight], scroll: [el.scrollWidth, el.scrollHeight], overflow: [getComputedStyle(el).overflowX, getComputedStyle(el).overflowY] }; }); const overflows = [...document.querySelectorAll('body *')].filter((el) => { const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=='none'&&r.width>0&&el.scrollWidth>el.clientWidth+2; }).map((el)=>({el:el.className?.toString?.()||el.tagName,client:el.clientWidth,scroll:el.scrollWidth,box:[Math.round(el.getBoundingClientRect().left),Math.round(el.getBoundingClientRect().width)],overflow:getComputedStyle(el).overflowX})); return { layout, overflows: overflows.slice(0,30) }; })()`);
+            console.log(`[layout] ${phase}: ${JSON.stringify(layout)}`);
+            if (route === "chat") console.log(`[header] ${JSON.stringify(await cdp.evaluate(`(() => {const h=document.querySelector('.chat-context-bar'),hs=getComputedStyle(h); return {direction:hs.flexDirection,align:hs.alignItems,children:[...h.children].map((el) => { const r=el.getBoundingClientRect(),s=getComputedStyle(el); return {el:el.className?.toString?.()||el.tagName,box:[Math.round(r.left),Math.round(r.width)],display:s.display,minWidth:s.minWidth,flex:s.flex,margin:s.margin,position:s.position,left:s.left,right:s.right,transform:s.transform,alignSelf:s.alignSelf,gridColumn:s.gridColumn}; })}; })()`))}`);
+          }
+          const captureDesktop = width === 1440 && height === 900 && theme === "dark" && collapsed === "false";
+          const captureMobile = width === 390 && height === 844 && process.env.UI_MATRIX_CAPTURE_MOBILE === "1";
+          if (process.env.UI_MATRIX_CAPTURE === "1" && (captureDesktop || captureMobile)) {
             fs.mkdirSync(captureDirectory, { recursive: true });
-            const name = category ? `settings-${category}` : route;
+            const name = category ? `settings-${category}` : captureMobile ? `${route}-390` : route;
             const safeName = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
             const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
             fs.writeFileSync(path.join(captureDirectory, `${safeName}.png`), Buffer.from(screenshot.data, "base64"));
+          }
+          if (route === "persona-workshop" && process.env.UI_MATRIX_EXERCISE_PERSONA === "1") {
+            await clickInRenderer(cdp, ".persona-library-start button");
+            const chatReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.persona-chat-content')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!chatReady) throw new Error("Persona workflow could not start a conversation from the selected profile.");
           }
           const problems = [];
           if (issues.blank) problems.push("blank page");
@@ -203,6 +346,33 @@ async function main() {
           for (const [kind, label] of [["offscreen", "off-screen"], ["clipped", "clipped"], ["bleed", "bleeds out of its card"], ["unreachable", "unreachable"]]) for (const item of issues[kind]) problems.push(`${label}: ${item.el} "${item.text}" at ${item.box.join(",")}${item.container ? ` in ${item.container}` : ""}${kind === "unreachable" ? ` clip-chain ${JSON.stringify(item.clips)}` : ""}`);
           for (const [a, b] of issues.overlap) problems.push(`overlap: ${a.el} "${a.text}" ${JSON.stringify(a.box)} in ${JSON.stringify(a.card)} x ${b.el} "${b.text}" ${JSON.stringify(b.box)} in ${JSON.stringify(b.card)}`);
           if (problems.length) findings.push(`${phase}\n    ${problems.join("\n    ")}`);
+          if (route === "pet-workshop" && process.env.UI_MATRIX_EXERCISE_PET === "1" && !category) {
+            await clickInRenderer(cdp, ".pet-workshop-quick-picks button:nth-child(2)");
+            await sleep(120);
+            const selected = await cdp.evaluate(`({ name: document.querySelector('.pet-workshop-overview-preview h2')?.textContent?.trim(), current: localStorage.getItem('skai.pet.character') })`);
+            if (selected.name !== "Byte" || selected.current !== "byte") throw new Error(`Companion selection did not persist: ${JSON.stringify(selected)}`);
+            const initiallyVisible = await cdp.evaluate(`document.querySelector('.pet-workshop-show-toggle input')?.checked === true`);
+            await clickInRenderer(cdp, ".pet-workshop-show-toggle input");
+            await sleep(100);
+            const hiddenState = await cdp.evaluate(`({ checked: document.querySelector('.pet-workshop-show-toggle input')?.checked, saved: localStorage.getItem('skai.pet.visible') })`);
+            if (hiddenState.checked !== !initiallyVisible || hiddenState.saved !== String(!initiallyVisible)) throw new Error(`Companion visibility did not toggle off: ${JSON.stringify(hiddenState)}`);
+            await clickInRenderer(cdp, ".pet-workshop-show-toggle input");
+            await sleep(100);
+            const restoredState = await cdp.evaluate(`({ checked: document.querySelector('.pet-workshop-show-toggle input')?.checked, saved: localStorage.getItem('skai.pet.visible') })`);
+            if (restoredState.checked !== initiallyVisible || restoredState.saved !== String(initiallyVisible)) throw new Error(`Companion visibility did not restore: ${JSON.stringify(restoredState)}`);
+            await clickInRenderer(cdp, ".pet-workshop-action-card");
+            await sleep(150);
+            if (!(await cdp.evaluate(`document.querySelector('.pet-workshop-full-editor')?.open === true`))) throw new Error("Customize appearance did not open the pet editor.");
+            await cdp.evaluate(`document.querySelector('.pet-workshop-return')?.scrollIntoView({ block: 'center' }); 1`);
+            await sleep(100);
+            await clickInRenderer(cdp, ".pet-workshop-return");
+            let returned = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { if (document.title.endsWith(' · chat')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!returned) {
+              await cdp.evaluate(`document.querySelector('.pet-workshop-return')?.click(); 1`);
+              returned = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { if (document.title.endsWith(' · chat')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            }
+            if (!returned) throw new Error(`Return to work did not navigate back to Chat; state is ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, href: location.href, activeWorkspace: document.querySelector('[aria-label="Workspace navigation"] .is-active')?.textContent?.trim() ?? '' }))()`))}.`);
+          }
         }
       }
     }

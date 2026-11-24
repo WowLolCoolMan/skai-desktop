@@ -5,6 +5,57 @@ handoffs and temporary screenshot paths. The live Electron artifact and the
 automated acceptance scripts are authoritative; this document only summarizes
 what they cover.
 
+## Revision 4 implementation pass — 2026-11-23
+
+### Changes made
+
+- Kept Persona Workshop and Pet Workshop as separate pages; the Persona page
+  uses a selectable persona list with a focused profile editor and a direct
+  Start conversation action. The Pet page presents optional companion
+  selection, visibility, appearance, animation, and return-to-work actions
+  before the advanced editor.
+- Kept the Coding Agent thread beside Monaco on desktop. The Monaco editor
+  now has a project/file-specific model identity. Its Review diff action shows
+  a read-only Original / Working copy comparison because the packaged Monaco
+  DiffEditor cleanup raised a runtime error during view changes. Git's actual
+  line-level diff review remains separate and available.
+- Tightened mobile Coding context actions and kept the editor/chat workspace
+  scrollable within the work surface.
+- Kept Video labeled as a planned future destination; no generation or editing
+  capability is represented as available.
+
+### Packaged evidence
+
+- `npm run desktop:typecheck`, `npm run desktop:build`, and
+  `npm run package:electron` passed after the UI changes. Vite still prints
+  the existing large-chunk advisory.
+- The packaged route matrix passed 20 routes at 1440×900 in dark/light themes
+  with the sidebar expanded/collapsed, with no renderer runtime or layout
+  findings.
+- Packaged Chat and Coding checks passed at 390×844. The active Coding
+  project flow was checked at that size after the editor workspace was scrolled
+  internally; there was no page-level horizontal overflow or clipped control.
+- Chat's seeded history search, task-tools visibility toggle, and import-menu
+  availability passed. Coding's edit → compare → save → undo flow passed at
+  desktop and mobile sizes. Persona selection/start-conversation and Pet
+  select/visibility/customization/return-to-work smokes pass.
+
+### Waiting for acceptance
+
+- Compare each of the 30 supported Revision 4 workflow references against its
+  matching live state and record screenshot plus interaction evidence. The 20
+  route matrix renders screens but does not by itself prove all 30 workflows.
+- Add focused interaction checks for references #4–#19 and #21–#29 where the
+  matching state is not covered above, especially document grounding, Voice
+  Mode, task/schedule lifecycle, GitHub, model-download review, Marketplace
+  voice installation, MCP approval, image edit/history, multimodal input,
+  Voice Workbench, Memory/corpus, and Usage/Settings.
+- Confirm local model-backed generation against a responsive local runtime;
+  UI rendering alone does not verify inference. Keep Video future-only.
+- Finish keyboard/focus, screen-reader, theme, and user-perceived visual
+  review. The automated package checks do not establish spoken assistive
+  technology behavior.
+
 ## Current shell
 
 - Electron + React + TypeScript is the only desktop UI architecture.

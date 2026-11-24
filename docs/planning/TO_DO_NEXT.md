@@ -33,6 +33,24 @@ Mark an item done only when the linked workflow has evidence.
    User. Next action: run Narrator or NVDA, review the remaining themes/routes,
    and report failures. Record screenshots and gaps in
    [UI progress](SKAI_PREMIUM_UI_PROGRESS.md).
+   Revision 4 implementation work now includes distinct Persona and Pet
+   Workshop pages, a simpler Pet overview, Monaco beside the Coding Agent
+   thread, and responsive Chat/Coding layouts. The file editor's Review diff
+   action now opens a read-only Original / Working copy comparison: the
+   packaged Monaco diff widget threw a model-disposal runtime error when
+   switching views. The Coding flow passes edit, compare, save, and undo with
+   no runtime error. The latest packaged matrix covered 20 routes at 1440×900
+   in four dark/light and sidebar variants; Chat and Coding passed at 390×844,
+   including an active Coding project, with no page-level overflow or clipped
+   controls. Next action: finish screenshot-by-screenshot matching of the 30
+   supported Revision 4 workflow references and their distinct states, then
+   add interaction evidence for queue/message actions, document grounding,
+   voice, plans/schedules, GitHub, model review, Marketplace, MCP, image/media,
+   Memory, and Settings. Keep Video planned. The project file comparison is
+   not a line-level diff; Git diff review remains the line-level review
+   surface. Do not close this item until the remaining flows have evidence and
+   the references have been visually reviewed. See
+   [Revision 4 review status](../design-review/workflow-collection/revision-4/README.md).
 2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke
    feeds a deterministic spoken fixture through Chromium microphone capture,
    records/stops it, and verifies installed local Whisper creates a transcript

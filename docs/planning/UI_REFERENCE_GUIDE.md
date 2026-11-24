@@ -53,6 +53,18 @@ The numbered files in [`ui-references/`](../ui-references) are the original user
 | `reference-20.png` | Worktrees settings reference | If Worktree execution is enabled in a future release, show its location, cleanup policy, and managed worktrees with safe defaults and visible safeguards. The current Electron build keeps Worktree visibly unavailable because the host does not yet connect that environment. |
 | `reference-21.png` | Comparison table of Open WebUI, LobeChat, LibreChat, Jan, GPT4All, AnythingLLM, Khoj, text-generation-webui, LocalAI, NextChat, and HuggingChat | Use the categories as a landscape map: full-featured chat, offline desktop, document/knowledge workflows, developer tooling, and lightweight clients. Compare capabilities and usability patterns against the live products before choosing architecture. The star counts and short descriptions are snapshot claims from the supplied image, not current measurements or verified product facts. |
 
+## Revision 4 workflow collection
+
+The current generated collection is in
+[`design-review/workflow-collection/revision-4`](../design-review/workflow-collection/revision-4/README.md).
+It covers 30 supported workflow references plus the Video future concept.
+Keep Persona Workshop and Pet Workshop on separate routes. Keep Monaco beside
+the Coding Agent conversation on desktop; stack the two work areas at narrow
+widths. Video remains visibly planned until generation, editing, and export
+workflows are implemented. Revision 4's README records which live flows have
+passed and which reference states still need screenshot and interaction
+evidence; a route screenshot alone does not prove the workflow.
+
 ## How to use these references
 
 1. Before a UI change, identify the relevant screenshot(s), the interaction they demonstrate, and the current app behavior.

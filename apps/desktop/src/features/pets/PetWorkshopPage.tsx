@@ -110,8 +110,8 @@ function PetGenerationGuide({ onApprove }: { onApprove: (name: string, concept: 
   </section>;
 }
 
-function stripPreviewStyle(strip: PetStrip): CSSProperties {
-  const scale = Math.min(72 / strip.frameWidth, 72 / strip.frameHeight);
+function stripPreviewStyle(strip: PetStrip, maxDimension = 72): CSSProperties {
+  const scale = Math.min(maxDimension / strip.frameWidth, maxDimension / strip.frameHeight);
   const width = strip.frameWidth * scale;
   return {
     backgroundImage: `url(${strip.dataUrl})`,
@@ -419,17 +419,36 @@ function PetFrameEditor({ strip, animation, onSave, busy, readOnly = false, refe
   </section>;
 }
 
-export function PetWorkshopPage() {
+export function PetWorkshopPage({ onReturnToWork }: { onReturnToWork: () => void }) {
   const [profiles, setProfiles] = useState<PetSpriteProfile[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [newName, setNewName] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState<PetAnimationId>("idle");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [petVisible, setPetVisible] = useState(() => localStorage.getItem("skai.pet.visible") !== "false");
   const profile = profiles.find((item) => item.id === selectedId) ?? null;
   const builtinProfile = BUILTIN_PROFILES.find((item) => item.id === selectedId) ?? null;
   const activeProfile = profile ?? builtinProfile;
   const isBuiltin = Boolean(builtinProfile);
+  const chooseCompanion = (character: string) => {
+    const id = character.startsWith("custom:") ? character.slice("custom:".length) : `builtin:${character}`;
+    setSelectedId(id);
+    setSelectedAnimation("idle");
+    localStorage.setItem("skai.pet.character", character);
+    window.dispatchEvent(new StorageEvent("storage", { key: "skai.pet.character", newValue: character }));
+  };
+  const setCompanionVisible = (visible: boolean) => {
+    setPetVisible(visible);
+    localStorage.setItem("skai.pet.visible", String(visible));
+    window.skaiAgent?.pet?.setVisible(visible);
+    window.dispatchEvent(new StorageEvent("storage", { key: "skai.pet.visible", newValue: String(visible) }));
+  };
+  const revealEditor = (targetId: string) => {
+    setEditorOpen(true);
+    window.setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
   const behavior = useMemo(() => profile ? normalizePetBehavior(profile.behavior, profile.name) : builtinProfile ? readPetBehavior(builtinProfile.name.toLocaleLowerCase(), builtinProfile.name) : null, [profile, builtinProfile]);
   const [behaviorPreview, setBehaviorPreview] = useState<PetBehaviorSettings | null>(null);
   const preferenceId = profile ? `custom:${profile.id}` : builtinProfile ? builtinProfile.name.toLocaleLowerCase() : "";
@@ -564,10 +583,30 @@ export function PetWorkshopPage() {
   };
 
   return <section className="pet-workshop-page">
-    <PageHeader eyebrow="EXTRAS · PET WORKSHOP" title="Build a companion" description="Draw the frames, shape the personality, and preview how your pet behaves on the desktop." />
+    <PageHeader eyebrow="OPTIONAL DESKTOP COMPANION" title="Pets Workshop" description="Choose a companion for your desktop. Pets are optional, and you can keep working without one." />
     {loadError && <p className="form-error" role="alert">{loadError}</p>}
-    <div className="pet-workshop-layout">
-      <aside className="pet-workshop-library">
+    {activeProfile && <div className="pet-workshop-overview">
+      <section className="pet-workshop-overview-preview" aria-label="Choose a companion">
+        <div className="pet-workshop-hero-sprite" role="img" aria-label={`${activeProfile.name} companion preview`}><i style={activeProfile.strips.idle ? stripPreviewStyle(activeProfile.strips.idle, 180) : undefined} /></div>
+        <h2>{activeProfile.name}</h2>
+        <p>{isBuiltin ? "A Skai original companion." : "Your custom companion."}</p>
+        <div className="pet-workshop-quick-picks" role="listbox" aria-label="Choose a companion">
+          {BUILTIN_PROFILES.map((item, index) => <button key={item.id} type="button" role="option" aria-selected={item.id === selectedId} className={item.id === selectedId ? "is-active" : ""} onClick={() => chooseCompanion(BUILTIN_NAMES[index])}><span><i style={stripPreviewStyle(item.strips.idle!)} /></span><strong>{item.name}</strong></button>)}
+          {profiles.map((item) => <button key={item.id} type="button" role="option" aria-selected={item.id === selectedId} className={item.id === selectedId ? "is-active" : ""} onClick={() => chooseCompanion(`custom:${item.id}`)}><span>{item.strips.idle ? <i style={stripPreviewStyle(item.strips.idle)} /> : "✦"}</span><strong>{item.name}</strong></button>)}
+        </div>
+      </section>
+      <section className="pet-workshop-overview-actions" aria-label="Companion settings">
+        <div className="pet-workshop-optional-callout"><span aria-hidden="true">ⓘ</span><p><strong>Optional:</strong> Pets are a friendly companion for your desktop. You can use Skai Desktop without a pet, and the companion never covers the composer.</p></div>
+        <label className="pet-workshop-show-toggle"><span><strong>Show companion</strong><small>Keep your selected pet visible above your windows.</small></span><input type="checkbox" checked={petVisible} onChange={(event) => setCompanionVisible(event.target.checked)} /></label>
+        <button className="pet-workshop-action-card" type="button" onClick={() => revealEditor("pet-workshop-library")}><span className="pet-workshop-action-icon" aria-hidden="true">✦</span><span><strong>Customize appearance</strong><small>Change your companion’s look or import a profile.</small></span><b aria-hidden="true">›</b></button>
+        <button className="pet-workshop-action-card" type="button" onClick={() => revealEditor("pet-workshop-animation-section")}><span className="pet-workshop-action-icon" aria-hidden="true">▷</span><span><strong>Customize animation</strong><small>Choose how your companion moves and reacts.</small></span><b aria-hidden="true">›</b></button>
+        <Button variant="secondary" className="pet-workshop-return" onClick={onReturnToWork}>Return to work</Button>
+      </section>
+    </div>}
+    <details className="pet-workshop-full-editor" open={editorOpen} onToggle={(event) => setEditorOpen(event.currentTarget.open)}>
+      <summary><span><strong>Pet editor</strong><small>Sprite frames, behavior, and custom profiles</small></span><span aria-hidden="true">⌄</span></summary>
+      <div className="pet-workshop-layout">
+      <aside className="pet-workshop-library" id="pet-workshop-library">
         <div className="pet-workshop-create"><label htmlFor="pet-workshop-name">New companion</label><input id="pet-workshop-name" value={newName} onChange={(event) => setNewName(event.target.value)} maxLength={48} placeholder="Name your pet" /><Button variant="primary" onClick={() => void createProfile()}>Create pet</Button><label className="ui-button ui-button-secondary pet-workshop-import"><span>Import profile</span><input type="file" accept="application/json,.json" onChange={(event) => { void importProfile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div>
         <p className="section-kicker pet-workshop-library-label">SKAI ORIGINALS</p><div className="pet-workshop-profile-list" role="listbox" aria-label="Built-in companions">{BUILTIN_PROFILES.map((item) => <button key={item.id} type="button" className={item.id === selectedId ? "is-active" : ""} role="option" aria-selected={item.id === selectedId} onClick={() => { setSelectedId(item.id); setSelectedAnimation("idle"); }}><span className="pet-workshop-profile-avatar"><i style={stripPreviewStyle(item.strips.idle!)} /></span><span><strong>{item.name}</strong><small>Built-in · 8 states + blink</small></span><b>›</b></button>)}</div>
         <PetGenerationGuide onApprove={createGeneratedProfile} />
@@ -598,6 +637,7 @@ export function PetWorkshopPage() {
           </section>
         </> : <div className="pet-workshop-welcome"><div className="pet-workshop-welcome-mark">✦</div><p className="section-kicker">MAKE IT YOURS</p><h2>Start with a blank canvas</h2><p>Create a custom pet profile or import one to begin drawing 4–32-frame animations and designing its behavior.</p></div>}
       </main>
-    </div>
+      </div>
+    </details>
   </section>;
 }
