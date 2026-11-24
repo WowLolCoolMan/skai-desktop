@@ -3075,7 +3075,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 /* Visuals Workshop: a canvas-first workspace with a compact mode bar and prompt dock. */
 .app-content-images { padding: 8px 10px 10px; overflow: hidden; }
 .app-content-images .visuals-workshop-page { width: 100%; max-width: none; height: 100%; min-height: 0; margin: 0; padding: 0; gap: 8px; overflow: hidden; }
-.visuals-toolstrip { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 42px; padding: 2px 4px 7px; overflow-x: auto; border-bottom: 1px solid var(--skai-color-border); scrollbar-width: thin; }
+.visuals-toolstrip { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-start; gap: 3px; min-width: 0; min-height: 42px; padding: 2px 4px 7px; overflow-x: auto; border-bottom: 1px solid var(--skai-color-border); scrollbar-width: thin; }
+.visuals-page-title { flex: 0 0 auto; margin: 0 0 0 4px; color: var(--skai-color-text); font-size: clamp(24px, 2vw, 30px); font-weight: 650; line-height: 1.2; }
 .visuals-tool-tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; min-height: 32px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: transparent; font: inherit; font-size: var(--skai-text-xs); white-space: nowrap; cursor: pointer; }
 .visuals-tool-tab .nav-icon { width: 15px; height: 15px; }
 .visuals-tool-tab:hover:not(:disabled) { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
@@ -3083,7 +3084,38 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .visuals-tool-tab:focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: 2px; }
 .visuals-tool-tab:disabled { cursor: not-allowed; opacity: .5; }
 .visuals-tool-tab small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); text-transform: uppercase; }
+.visuals-more-tools { position: relative; flex: 0 0 auto; }
+.visuals-more-tools > summary { padding: 8px 11px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); cursor: pointer; list-style: none; white-space: nowrap; }
+.visuals-more-tools > summary::-webkit-details-marker { display: none; }
+.visuals-more-tools[open] > summary { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
+.visuals-more-tools-menu { position: absolute; z-index: 12; top: calc(100% + 7px); right: 0; display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 3px; width: 300px; padding: 7px; border: 1px solid var(--skai-color-border-strong); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); box-shadow: 0 12px 34px color-mix(in srgb, black 28%, transparent); }
+.visuals-more-tools-menu .visuals-tool-tab { justify-content: flex-start; border-radius: var(--skai-radius-md); }
 .visuals-main { display: grid; min-height: 0; flex: 1 1 0; grid-template-columns: minmax(0, 1fr) 76px; gap: 8px; }
+.visuals-workshop-page.is-generate-empty .visuals-main { display: none; }
+.visuals-workshop-page.is-generate-empty .visuals-controls { width: min(900px, 100%); max-height: none; margin-block: auto; padding: 18px; box-shadow: none; }
+.visuals-workshop-page.is-generate-empty .visuals-controls > textarea { min-height: 126px; }
+.visuals-workshop-page.is-generate-empty .visuals-composer-footer { align-items: stretch; flex-direction: column; }
+.visuals-workshop-page.is-generate-empty .visuals-composer-options { flex-wrap: wrap; }
+.visuals-workshop-page.is-generate-empty .visuals-composer-action { width: min(420px, 100%); align-self: center; }
+.visuals-workshop-page.is-generate-empty .visuals-composer-action .ui-button { justify-content: center; width: 100%; min-height: 50px; }
+.visuals-workshop-page.is-editing { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); grid-template-rows: auto auto minmax(0, 1fr) 116px; }
+.visuals-workshop-page.is-editing > .visuals-page-title { grid-column: 1 / -1; grid-row: 1; }
+.visuals-workshop-page.is-editing > .visuals-toolstrip { grid-column: 1 / -1; grid-row: 2; }
+.visuals-workshop-page.is-editing .visuals-main { display: contents; }
+.visuals-workshop-page.is-editing .visuals-stage { grid-column: 1; grid-row: 3; }
+.visuals-workshop-page.is-editing .visuals-stage-header { display: none; }
+.visuals-workshop-page.is-editing .visuals-gallery { grid-column: 1 / -1; grid-row: 4; align-items: stretch; flex-direction: row; }
+.visuals-workshop-page.is-editing .visuals-gallery-heading { display: flex; width: 110px; align-items: center; justify-content: center; gap: 7px; padding: 8px; border-right: 1px solid var(--skai-color-border); border-bottom: 0; }
+.visuals-workshop-page.is-editing .visuals-gallery-items { display: flex; align-items: center; gap: 8px; padding: 7px 10px; }
+.visuals-workshop-page.is-editing .visuals-gallery-item { width: 78px; flex: 0 0 78px; }
+.visuals-workshop-page.is-editing .visuals-gallery-media { width: 62px; height: 62px; }
+.visuals-workshop-page.is-editing .visuals-controls { grid-column: 2; grid-row: 3; align-self: stretch; width: auto; max-height: none; align-content: start; overflow: auto; box-shadow: none; }
+.visuals-workshop-page.is-editing .visuals-control-summary { flex-wrap: wrap; }
+.visuals-workshop-page.is-editing .visuals-control-summary > span { flex: 1 0 100%; font-size: var(--skai-text-xs); }
+.visuals-workshop-page.is-editing .visuals-controls > textarea { min-height: 140px; }
+.visuals-workshop-page.is-editing .visuals-composer-footer { align-items: stretch; flex-direction: column; }
+.visuals-workshop-page.is-editing .visuals-composer-options { flex-wrap: wrap; }
+.visuals-workshop-page.is-editing .visuals-composer-action .ui-button { justify-content: center; width: 100%; min-height: 46px; }
 .visuals-stage { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-canvas); }
 .visuals-stage-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 7px 13px; border-bottom: 1px solid var(--skai-color-border); }
 .visuals-stage-header > div { display: grid; min-width: 0; gap: 2px; }
@@ -3091,6 +3123,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .visuals-stage-header strong { overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-xs); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .visuals-canvas { display: grid; min-height: 0; flex: 1 1 0; place-items: center; overflow: auto; padding: 18px; background: var(--skai-color-canvas); }
 .visuals-empty-state { display: grid; justify-items: center; width: min(560px, 100%); gap: 10px; text-align: center; }
+.visuals-edit-source-preview { display: grid; justify-items: center; max-width: 100%; max-height: 100%; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.visuals-edit-source-preview img { display: block; max-width: min(100%, 760px); max-height: min(46vh, 460px); object-fit: contain; border-radius: var(--skai-radius-lg); box-shadow: 0 12px 36px color-mix(in srgb, black 22%, transparent); }
 .visuals-empty-mark { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid var(--skai-color-border-strong); border-radius: var(--skai-radius-2xl); color: var(--skai-color-accent); background: var(--skai-color-surface); }
 .visuals-empty-mark .nav-icon { width: 23px; height: 23px; }
 .visuals-empty-state h2, .visuals-generation-state h2 { margin: 4px 0 0; color: var(--skai-color-text); font-size: calc(var(--skai-text-xl) * var(--skai-heading-scale)); font-weight: 600; }
@@ -3130,7 +3164,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .visuals-control-summary > span { min-width: 0; }
 .visuals-control-summary label { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; }
 .visuals-control-summary select { max-width: 180px; padding: 5px 8px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
-.visuals-source-image { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.visuals-source-image { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.visuals-source-image img { width: 38px; height: 38px; flex: 0 0 38px; object-fit: cover; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); }
+.visuals-source-image span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .visuals-controls > textarea { width: 100%; min-height: 66px; resize: vertical; padding: 8px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font: inherit; font-size: var(--skai-text-sm); line-height: 1.4; }
 .visuals-controls > textarea:focus { outline: 2px solid color-mix(in srgb, var(--skai-color-accent) 65%, transparent); outline-offset: 1px; }
 .visuals-composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -3157,6 +3193,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .app-content-images { overflow: auto; }
   .app-content-images .visuals-workshop-page { height: auto; min-height: 100%; overflow: visible; }
   .visuals-toolstrip { justify-content: flex-start; }
+  .visuals-workshop-page.is-editing { display: flex; flex-direction: column; overflow: visible; }
+  .visuals-workshop-page.is-editing .visuals-main { display: grid; }
+  .visuals-workshop-page.is-editing .visuals-stage { min-height: 320px; }
+  .visuals-workshop-page.is-editing .visuals-stage-header { display: flex; }
+  .visuals-workshop-page.is-editing .visuals-controls { width: 100%; }
+  .visuals-workshop-page.is-editing .visuals-gallery { min-height: 94px; flex-direction: column; }
+  .visuals-workshop-page.is-editing .visuals-gallery-heading { width: 100%; justify-content: flex-start; border-right: 0; border-bottom: 1px solid var(--skai-color-border); }
+  .visuals-workshop-page.is-editing .visuals-gallery-items { display: flex; }
+  .visuals-workshop-page.is-editing .visuals-gallery-item { width: 62px; flex: 0 0 62px; }
+  .visuals-more-tools-menu { right: auto; left: 0; }
   .visuals-main { min-height: 460px; flex: 1 0 460px; }
   .visuals-canvas { min-height: 360px; }
   .visuals-controls { max-height: none; }
@@ -3164,13 +3210,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 640px) {
   .app-content-images { padding: 6px; }
   .visuals-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(320px, 1fr) auto; min-height: 0; flex: 1 0 auto; }
+  .visuals-more-tools-menu { width: min(300px, calc(100vw - 24px)); }
   .visuals-canvas { min-height: 320px; padding: 12px; }
   .visuals-gallery { align-items: stretch; }
   .visuals-gallery-heading { display: flex; justify-content: flex-start; gap: 7px; padding: 8px 10px; }
   .visuals-gallery-items { display: flex; align-items: start; min-height: 74px; }
   .visuals-gallery-item { width: 62px; flex: 0 0 62px; }
   .visuals-controls { width: 100%; padding: 9px; }
-  .visuals-control-summary { align-items: flex-start; }
+  .visuals-control-summary { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 7px; }
+  .visuals-control-summary > span { font-size: var(--skai-text-xs); line-height: 1.4; }
+  .visuals-control-summary label { width: 100%; justify-content: space-between; }
+  .visuals-control-summary select { max-width: none; flex: 1; }
   .visuals-composer-footer { align-items: flex-end; }
   .visuals-composer-options { flex-wrap: wrap; }
   .visuals-composer-action .ui-button { min-height: 38px; padding-inline: 10px; }

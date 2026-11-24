@@ -49,7 +49,20 @@ Mark an item done only when the linked workflow has evidence.
    Memory, and Settings. Keep Video planned. The project file comparison is
    not a line-level diff; Git diff review remains the line-level review
    surface. Do not close this item until the remaining flows have evidence and
-   the references have been visually reviewed. See
+   the references have been visually reviewed. On 2026-11-24, Image Generate
+   and Edit were refined against references #24–25: the page now foregrounds
+   Generate/Edit, groups secondary tools, exposes local runtime readiness,
+   uses an image-left/edit-controls-right/history-below Edit layout, and
+   switches into Edit when a history image is reopened. Packaged #24 Generate
+   screenshots passed at 1440×900 and 390×844; the #25 seeded history-to-edit
+   flow passed at 1440×900 with both source previews, the Edit action, and 0px
+   horizontal overflow. The runtime was ready, but real inference remains
+   blocked because the local `stabilityai/sd-turbo` cache contains only partial
+   `.incomplete` blobs. The smoke does not download 5.2 GB of weights. The
+   packaged missing-model recovery state passed and says how to retry after
+   downloading the model. Resume generation with
+   `npm run smoke:image:workflow` after the cache is complete. Evidence files
+   are in the Revision 4 collection. See
    [Revision 4 review status](../design-review/workflow-collection/revision-4/README.md).
 2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke
    feeds a deterministic spoken fixture through Chromium microphone capture,
@@ -105,8 +118,15 @@ Mark an item done only when the linked workflow has evidence.
    the matcher now accepts that clear equivalent. Broader acceptance across
    additional personas and model families remains open.
    See the [Smart Personas plan](implementation-plans/smart-personas.md).
-5. **Image runtime coverage — In progress · Codex.** Packaged Diffusers CPU
-   acceptance passes. On 2026-11-23, live ComfyUI acceptance on this PC passed
+5. **Image runtime coverage — In progress · Codex.** A prior packaged Diffusers CPU
+   acceptance passed. On 2026-11-24, the local Diffusers Python dependencies
+   reported ready, cancellation passed, and the missing-model recovery flow
+   passed; actual generation was blocked because the `stabilityai/sd-turbo`
+   cache contains only partial `.incomplete` blobs. No model download was
+   started. Complete or provide the local model cache, then rerun
+   `npm run smoke:image:workflow` for generation → edit → history persistence.
+   UI-only history → Edit acceptance passes with a seeded 512×512 local image.
+   On 2026-11-23, live ComfyUI acceptance on this PC passed
    checkpoint discovery, workflow submission, progress polling, cancellation
    with an empty queue afterward, image-to-image source upload, edited PNG
     retrieval, and payload validation using `Juggernaut-XL_v9.safetensors` on

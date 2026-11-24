@@ -15,6 +15,7 @@ const artifactRoot = path.resolve(artifactArgument || path.join(__dirname, "..",
 const executable = path.join(artifactRoot, process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop");
 const verifyMissingRuntime = process.argv.includes("--runtime-unavailable");
 const verifyMissingModel = process.argv.includes("--model-unavailable");
+const verifyEditUi = process.argv.includes("--edit-ui");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function findPort() {
@@ -34,19 +35,40 @@ async function main() {
   const python = path.join(localData, "Skai", "Diffusers", "venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
   const modelCache = process.env.HF_HUB_CACHE || process.env.HUGGINGFACE_HUB_CACHE || path.join(process.env.HF_HOME || path.join(os.homedir(), ".cache", "huggingface"), "hub");
   if (!verifyMissingRuntime && !fs.existsSync(python)) throw new Error(`Install Skai's local Diffusers runtime before running this smoke: ${python}`);
-  if (!verifyMissingRuntime && !verifyMissingModel && !fs.existsSync(path.join(modelCache, "models--stabilityai--sd-turbo")))
+  if (!verifyMissingRuntime && !verifyMissingModel && !verifyEditUi && !fs.existsSync(path.join(modelCache, "models--stabilityai--sd-turbo")))
     throw new Error(`This smoke never downloads model weights. Cache stabilityai/sd-turbo first: ${modelCache}`);
 
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "skai-image-workflow-"));
+  const appDataDir = path.join(userDataDir, "appdata");
+  fs.mkdirSync(appDataDir, { recursive: true });
+  const agentProfile = path.join(userDataDir, "agent-profile");
+  fs.mkdirSync(agentProfile, { recursive: true });
   const port = await findPort();
   const display = resolveDisplayBackend({ argv: [] });
-  const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...(display.switchValue ? [`--ozone-platform=${display.switchValue}`] : []), `--user-data-dir=${userDataDir}`], {
+  const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...(display.switchValue ? [`--ozone-platform=${display.switchValue}`] : []), `--user-data-dir=${path.join(userDataDir, "electron")}`, `--skai-isolated-smoke-app-data=${appDataDir}`], {
     cwd: artifactRoot,
     env: {
       ...process.env,
+      SKAI_ELECTRON_SMOKE: "true",
       HF_HUB_OFFLINE: "1",
       SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
-      ...(verifyMissingRuntime ? { SKAI_DIFFUSERS_PYTHON: path.join(userDataDir, "missing-python.exe") } : {}),
+      APPDATA: appDataDir,
+      LOCALAPPDATA: path.join(userDataDir, "localappdata"),
+      XDG_CONFIG_HOME: path.join(userDataDir, "config"),
+      XDG_DATA_HOME: path.join(userDataDir, "data"),
+      XDG_CACHE_HOME: path.join(userDataDir, "cache"),
+      SRAI_SETTINGS_PATH: path.join(agentProfile, "settings.json"),
+      SRAI_MCP_CONNECTIONS_PATH: path.join(agentProfile, "mcp-connections.json"),
+      SRAI_CONVERSATIONS_PATH: path.join(agentProfile, "conversations.json"),
+      SRAI_MEMORY_PATH: path.join(agentProfile, "memory.json"),
+      SRAI_CORPUS_PATH: path.join(agentProfile, "document-corpus.json"),
+      SRAI_CHAT_QUEUE_PATH: path.join(agentProfile, "chat-queue.json"),
+      SRAI_TASKS_PATH: path.join(agentProfile, "agent-tasks.json"),
+      SRAI_SCHEDULED_TASKS_PATH: path.join(agentProfile, "scheduled-tasks.json"),
+      SRAI_PROJECTS_PATH: path.join(agentProfile, "projects.json"),
+      SRAI_UNDO_PATH: path.join(agentProfile, "workspace-undo.json"),
+      SRAI_OPERATIONS_PATH: path.join(agentProfile, "operations.json"),
+      SKAI_DIFFUSERS_PYTHON: verifyMissingRuntime ? path.join(userDataDir, "missing-python.exe") : python,
       ...(verifyMissingModel ? {
         HF_HOME: path.join(userDataDir, "empty-huggingface-home"),
         HF_HUB_CACHE: path.join(userDataDir, "empty-huggingface-home", "hub"),
@@ -61,10 +83,11 @@ async function main() {
   child.stderr.on("data", (chunk) => { output += chunk.toString(); });
   const sleep = (ms) => wait(ms);
 
+  let lastTargets = [];
   async function getMainTarget() {
     const response = await fetch(`http://127.0.0.1:${port}/json/list`);
-    const targets = await response.json();
-    return targets.find((target) => target.type === "page" && target.title?.includes("Skai Desktop") && !target.url?.includes("pet=1"));
+    lastTargets = await response.json();
+    return lastTargets.find((target) => target.type === "page" && target.title?.includes("Skai") && !target.url?.includes("pet=1"));
   }
 
   async function evaluate(target, expression, timeout = 30_000) {
@@ -130,6 +153,27 @@ async function main() {
     } finally { socket.close(); }
   }
 
+  async function captureScreenshot(target, outputPath) {
+    const socket = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Image workflow screenshot timed out.")), 15_000);
+        socket.addEventListener("message", (event) => {
+          const message = JSON.parse(String(event.data));
+          if (message.id !== 1) return;
+          clearTimeout(timer);
+          if (message.error) reject(new Error(message.error.message));
+          else { fs.mkdirSync(path.dirname(outputPath), { recursive: true }); fs.writeFileSync(outputPath, Buffer.from(message.result.data, "base64")); resolve(); }
+        });
+        socket.send(JSON.stringify({ id: 1, method: "Page.captureScreenshot", params: { format: "png" } }));
+      });
+    } finally { socket.close(); }
+  }
+
   async function waitFor(target, expression, description, timeout = 240_000) {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
@@ -140,68 +184,119 @@ async function main() {
     throw new Error(`Timed out waiting for ${description}.`);
   }
 
+  async function waitForImageOutput(target, timeout = 600_000) {
+    const deadline = Date.now() + timeout;
+    let nextLog = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const state = await evaluate(target, "JSON.stringify({ count: document.querySelectorAll('.visuals-gallery-item').length, progress: document.querySelector('.visuals-generation-state')?.innerText ?? null, error: document.querySelector('[role=alert]')?.innerText ?? null, action: document.querySelector('.visuals-composer-action button')?.innerText ?? null })", 15_000);
+      const current = JSON.parse(state || "{}");
+      if (current.count > 0) return current;
+      if (!current.progress && current.action?.includes("Create image")) throw new Error(`The local image request ended without output: ${JSON.stringify(current)}`);
+      if (Date.now() >= nextLog) { console.log(`Local image inference is still running: ${JSON.stringify(current)}`); nextLog = Date.now() + 30_000; }
+      await sleep(1_000);
+    }
+    throw new Error(`Timed out waiting for generated output. ${await evaluate(target, "JSON.stringify({ progress: document.querySelector('.visuals-generation-state')?.innerText ?? null, error: document.querySelector('[role=alert]')?.innerText ?? null, action: document.querySelector('.visuals-composer-action button')?.innerText ?? null })")}`);
+  }
+
   try {
     const deadline = Date.now() + 30_000;
     let target;
     while (Date.now() < deadline && !target) { target = await getMainTarget().catch(() => undefined); if (!target) await sleep(250); }
-    if (!target) throw new Error(`Packaged Skai did not start. ${output.slice(-2_000)}`);
+    if (!target) throw new Error(`Packaged Skai did not expose its main page. Targets: ${JSON.stringify(lastTargets)}. ${output.slice(-2_000)}`);
     await waitFor(target, "Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]'))", "app navigation");
     await evaluate(target, "location.hash = '#/images'; 'navigated'");
-    await waitFor(target, "Boolean(document.querySelector('.image-studio-page textarea[aria-describedby=\\\"image-prompt-help\\\"]'))", "Images page");
-    const setPrompt = async (value) => callFunction(target, "function(value) { const field = document.querySelector('.image-studio-page textarea[aria-describedby=\\\"image-prompt-help\\\"]'); if (!field) return null; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, String(value)); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; }", [value]);
+    await waitFor(target, "Boolean(document.querySelector('#visuals-prompt'))", "Images page");
+    const setPrompt = async (value) => callFunction(target, "function(value) { const field = document.querySelector('#visuals-prompt'); if (!field) return null; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, String(value)); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; }", [value]);
 
     if (verifyMissingRuntime) {
-      await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('dependencies-missing')", "missing-runtime state");
-      const unavailable = await evaluate(target, "JSON.stringify({ message: document.querySelector('.image-runtime-callout')?.innerText, installAction: [...document.querySelectorAll('.image-runtime-callout button')].some(button => button.textContent.includes('Install optional runtime')), generateDisabled: [...document.querySelectorAll('.form-footer button')].find(button => button.textContent.trim() === 'Generate image')?.disabled })");
+      await waitFor(target, "document.querySelector('.visuals-runtime-settings')?.textContent.includes('dependencies-missing')", "missing-runtime state");
+      const unavailable = await evaluate(target, "JSON.stringify({ message: document.querySelector('.visuals-runtime-settings')?.innerText, installAction: [...document.querySelectorAll('.visuals-runtime-settings button')].some(button => button.textContent.includes('Install local image runtime')), generateDisabled: [...document.querySelectorAll('.visuals-composer-action button')].find(button => button.textContent.includes('Create image'))?.disabled })");
       const unavailableState = JSON.parse(unavailable);
-      if (!unavailableState.message?.includes("Install the optional local image runtime") || !unavailableState.installAction || unavailableState.generateDisabled !== true)
+      if (!unavailableState.installAction || unavailableState.generateDisabled !== true)
         throw new Error(`Missing-runtime state was not actionable or allowed a run: ${unavailable}`);
       console.log(`Packaged missing-runtime recovery passed: ${JSON.stringify(unavailableState)}.`);
       return;
     }
 
     if (verifyMissingModel) {
-      await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('The local image runtime is ready.')", "installed image dependencies");
+      await waitFor(target, "document.querySelector('.visuals-runtime-settings')?.textContent.includes('local image runtime')", "installed image dependencies");
       await setPrompt("A small red paper kite on a clear sky, simple illustration.");
-      await waitFor(target, "[...document.querySelectorAll('.form-footer button')].some(button => button.textContent.trim() === 'Generate image' && !button.disabled)", "model-failure test to become available");
-      await evaluate(target, "[...document.querySelectorAll('.form-footer button')].find(button => button.textContent.trim() === 'Generate image').click(); true");
+      await waitFor(target, "[...document.querySelectorAll('.visuals-composer-action button')].some(button => button.textContent.includes('Create image') && !button.disabled)", "model-failure test to become available");
+      await evaluate(target, "[...document.querySelectorAll('.visuals-composer-action button')].find(button => button.textContent.includes('Create image')).click(); true");
       const failure = await waitFor(target, "document.querySelector('[role=alert]')?.textContent.trim() || null", "offline model-cache error", 90_000);
-      const recovered = await waitFor(target, "[...document.querySelectorAll('.form-footer button')].some(button => button.textContent.trim() === 'Generate image' && !button.disabled) && document.querySelectorAll('.image-result').length === 0 ? 'ready' : null", "retryable image page after worker failure", 30_000);
+      const recovered = await waitFor(target, "[...document.querySelectorAll('.visuals-composer-action button')].some(button => button.textContent.includes('Create image') && !button.disabled) && document.querySelectorAll('.visuals-gallery-item').length === 0 ? 'ready' : null", "retryable image page after worker failure", 30_000);
       if (!failure.includes("not in the local model cache") || !failure.includes("Connect to the internet once") || recovered !== "ready")
         throw new Error(`Missing-model failure was not actionable or retryable: ${JSON.stringify({ failure, recovered })}`);
       console.log(`Packaged missing-model recovery passed: ${failure.slice(0, 240)}.`);
       return;
     }
 
-    await evaluate(target, "(() => { const field = document.querySelector('.image-provider-picker select'); const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(field, 'diffusers'); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()");
-    await waitFor(target, "document.querySelector('.image-runtime-callout')?.textContent.includes('Ready') || Boolean(document.querySelector('.image-runtime-callout .status-badge'))", "local image runtime status");
+    if (verifyEditUi) {
+      const seeded = await evaluate(target, `(async () => {
+        const database = await new Promise((resolve, reject) => {
+          const request = indexedDB.open('skai-image-history', 1);
+          request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains('outputs')) request.result.createObjectStore('outputs', { keyPath: 'id' }); };
+          request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+        });
+        const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+        const context = canvas.getContext('2d');
+        const sky = context.createLinearGradient(0, 0, 0, 512); sky.addColorStop(0, '#b1a0d4'); sky.addColorStop(1, '#f2b99f'); context.fillStyle = sky; context.fillRect(0, 0, 512, 512);
+        context.fillStyle = '#59678c'; context.beginPath(); context.moveTo(0, 360); context.lineTo(180, 90); context.lineTo(310, 360); context.fill();
+        context.fillStyle = '#303d5c'; context.beginPath(); context.moveTo(130, 390); context.lineTo(330, 130); context.lineTo(512, 390); context.fill();
+        context.fillStyle = '#ece7f0'; context.beginPath(); context.moveTo(292, 180); context.lineTo(330, 130); context.lineTo(365, 181); context.lineTo(338, 168); context.lineTo(323, 180); context.fill();
+        const entry = { id: 'revision4-edit-fixture', url: canvas.toDataURL('image/png'), fileName: 'alpine-dusk.png', createdAt: new Date().toISOString(), provider: 'diffusers', prompt: 'Alpine peaks at dusk' };
+        await new Promise((resolve, reject) => { const tx = database.transaction('outputs', 'readwrite'); tx.objectStore('outputs').put(entry); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+        database.close(); return 'seeded';
+      })()`);
+      if (seeded !== "seeded") throw new Error(`Could not seed the isolated image history fixture: ${seeded}`);
+      await evaluate(target, "location.reload(); true").catch(() => undefined);
+      target = await waitForTarget();
+      await waitFor(target, "document.querySelectorAll('.visuals-gallery-item').length === 1", "seeded image history");
+      await waitFor(target, "document.querySelector('.visuals-runtime-settings .status-badge')?.textContent.trim().toLowerCase() === 'ready'", "local image runtime readiness");
+      await evaluate(target, "document.querySelector('.visuals-gallery-item').click(); true");
+      await waitFor(target, "[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Use for edit')", "image history action");
+      await evaluate(target, "[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Use for edit').click(); true");
+      const editState = await waitFor(target, "document.querySelector('.visuals-workshop-page.is-editing') && document.querySelector('.visuals-edit-source-preview img') && document.querySelector('.visuals-source-image img') ? JSON.stringify({ page: true, source: document.querySelector('.visuals-edit-source-preview img').naturalWidth, miniature: document.querySelector('.visuals-source-image img').naturalWidth, prompt: Boolean(document.querySelector('#visuals-prompt')), action: document.querySelector('.visuals-composer-action button')?.textContent.trim(), gallery: document.querySelectorAll('.visuals-gallery-item').length }) : null", "Edit layout and source image preview");
+      const edit = JSON.parse(editState);
+      if (!edit.page || edit.source !== 512 || edit.miniature <= 0 || edit.prompt !== true || edit.action !== "Edit image" || edit.gallery !== 1) throw new Error(`Image edit flow did not preserve its source/history context: ${editState}`);
+      const layout = await evaluate(target, "JSON.stringify({ viewport: [innerWidth, innerHeight], overflow: document.documentElement.scrollWidth - innerWidth, stage: (() => { const r=document.querySelector('.visuals-stage').getBoundingClientRect(); return [Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height)]; })(), controls: (() => { const r=document.querySelector('.visuals-controls').getBoundingClientRect(); return [Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height)]; })(), history: (() => { const r=document.querySelector('.visuals-gallery').getBoundingClientRect(); return [Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height)]; })() })");
+      const layoutState = JSON.parse(layout);
+      if (layoutState.overflow > 1 || layoutState.stage[0] >= layoutState.controls[0] || layoutState.history[1] <= layoutState.stage[1]) throw new Error(`Image edit layout did not match the two-column editor and lower history flow: ${layout}`);
+      const screenshot = path.join(__dirname, "..", ".tmp", "ui-matrix-review", "images-edit.png");
+      await captureScreenshot(target, screenshot);
+      console.log(`Packaged image history → Edit flow passed: ${JSON.stringify(edit)}. Layout ${JSON.stringify(layoutState)}. Screenshot ${screenshot}.`);
+      return;
+    }
+
+    await evaluate(target, "(() => { const field = document.querySelector('.visuals-control-summary select'); if (!field) throw new Error('Image engine control is missing.'); const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(field, 'diffusers'); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()");
+    await waitFor(target, "document.querySelector('.visuals-runtime-settings .status-badge')?.textContent.trim() === 'ready'", "local image runtime status");
 
     await setPrompt("A small amber glass vase on a plain cream studio backdrop, centered product photo.");
-    await waitFor(target, "[...document.querySelectorAll('.form-footer button')].some(button => button.textContent.trim() === 'Generate image' && !button.disabled)", "generation to become available");
-    await evaluate(target, "[...document.querySelectorAll('.form-footer button')].find(button => button.textContent.trim() === 'Generate image').click(); true");
-    await waitFor(target, "[...document.querySelectorAll('.form-footer button')].some(button => button.textContent.trim() === 'Cancel generation')", "active generation cancel control");
-    await evaluate(target, "[...document.querySelectorAll('.form-footer button')].find(button => button.textContent.trim() === 'Cancel generation').click(); true");
-    await waitFor(target, "[...document.querySelectorAll('.form-footer button')].some(button => button.textContent.trim() === 'Generate image') && !document.querySelector('.image-generation-progress')", "cancelled worker to stop", 60_000);
+    await waitFor(target, "[...document.querySelectorAll('.visuals-composer-action button')].some(button => button.textContent.includes('Create image') && !button.disabled)", "generation to become available");
+    await evaluate(target, "[...document.querySelectorAll('.visuals-composer-action button')].find(button => button.textContent.includes('Create image')).click(); true");
+    await waitFor(target, "[...document.querySelectorAll('.visuals-composer-action button')].some(button => button.textContent.trim() === 'Cancel')", "active generation cancel control");
+    await evaluate(target, "[...document.querySelectorAll('.visuals-composer-action button')].find(button => button.textContent.trim() === 'Cancel').click(); true");
+    await waitFor(target, "[...document.querySelectorAll('.visuals-composer-action button')].some(button => button.textContent.includes('Create image')) && !document.querySelector('.visuals-generation-state')", "cancelled worker to stop", 60_000);
     console.log("Packaged UI cancellation: Cancel returned the Images page to idle before another run.");
 
-    await evaluate(target, "[...document.querySelectorAll('.form-footer button')].find(button => button.textContent.trim() === 'Generate image').click(); true");
-    await waitFor(target, "document.querySelectorAll('.image-result').length === 1", "generated output in local history");
-    const generated = await evaluate(target, "JSON.stringify({ image: document.querySelector('.image-result img')?.src.slice(0, 23), natural: [document.querySelector('.image-result img')?.naturalWidth, document.querySelector('.image-result img')?.naturalHeight], historyCount: document.querySelectorAll('.image-result').length })");
+    await evaluate(target, "[...document.querySelectorAll('.visuals-composer-action button')].find(button => button.textContent.includes('Create image')).click(); true");
+    await waitForImageOutput(target);
+    const generated = await evaluate(target, "JSON.stringify({ image: document.querySelector('.visuals-output img')?.src.slice(0, 23), natural: [document.querySelector('.visuals-output img')?.naturalWidth, document.querySelector('.visuals-output img')?.naturalHeight], historyCount: document.querySelectorAll('.visuals-gallery-item').length })");
     const generatedState = JSON.parse(generated);
     if (generatedState.image !== "data:image/jpeg;base64," || generatedState.natural[0] !== 512 || generatedState.natural[1] !== 512)
       throw new Error(`Generated UI output was not a valid local 512px JPEG: ${generated}`);
     console.log(`Packaged UI generation and history: ${JSON.stringify(generatedState)}.`);
 
-    await evaluate(target, "document.querySelector('.image-result').click(); true");
+    await evaluate(target, "document.querySelector('.visuals-gallery-item').click(); true");
     await waitFor(target, "[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Use for edit')", "generated output inspector");
     await evaluate(target, "[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Use for edit').click(); true");
-    await waitFor(target, "document.querySelector('.form-footer button')?.textContent.trim() === 'Edit image'", "history image reopened for editing");
+    await waitFor(target, "document.querySelector('.visuals-workshop-page')?.classList.contains('is-editing') && document.querySelector('.visuals-edit-source-preview img')", "history image reopened for editing");
     await setPrompt("The same vase with a green leaf beside it, same cream studio backdrop.");
-    await evaluate(target, "document.querySelector('.form-footer button').click(); true");
-    await waitFor(target, "document.querySelectorAll('.image-result').length === 2", "edited output retained beside source");
+    await evaluate(target, "document.querySelector('.visuals-composer-action button').click(); true");
+    await waitFor(target, "document.querySelectorAll('.visuals-gallery-item').length === 2", "edited output retained beside source");
     await evaluate(target, "location.reload(); true");
     target = await waitForTarget();
-    const persisted = await waitFor(target, "document.querySelectorAll('.image-result').length === 2 ? JSON.stringify([...document.querySelectorAll('.image-result img')].map(image => [image.naturalWidth, image.naturalHeight, image.src.slice(0, 23)])) : null", "generated and edited images after restart", 30_000);
+    const persisted = await waitFor(target, "document.querySelectorAll('.visuals-gallery-item').length === 2 ? JSON.stringify([...document.querySelectorAll('.visuals-gallery-item img')].map(image => [image.naturalWidth, image.naturalHeight, image.src.slice(0, 23)])) : null", "generated and edited images after restart", 30_000);
     const persistedState = JSON.parse(persisted);
     if (persistedState.some((image) => image[0] !== 512 || image[1] !== 512 || image[2] !== "data:image/jpeg;base64,"))
       throw new Error(`Image history did not reopen valid local image blobs: ${persisted}`);

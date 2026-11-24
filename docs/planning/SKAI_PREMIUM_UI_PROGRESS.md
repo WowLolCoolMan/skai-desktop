@@ -5,6 +5,35 @@ handoffs and temporary screenshot paths. The live Electron artifact and the
 automated acceptance scripts are authoritative; this document only summarizes
 what they cover.
 
+## Targeted Revision 4 continuity pass — 2026-11-24
+
+- Refined Images against references #24–25. Generate and Edit are the two
+  primary modes, secondary ComfyUI tools are under More tools, and the local
+  runtime state is visible beside the engine selector. Generate uses a centered
+  prompt-first form when history is empty. Edit places the source image left,
+  prompt/actions right, and history in a bottom strip. Reopening history with
+  **Use for edit** switches to Edit automatically and preserves both source
+  previews.
+- Captured and reviewed the packaged Generate state at 1440×900 and 390×844,
+  and the Edit state at 1440×900. See the three tracked screenshots in the
+  [Revision 4 collection](../design-review/workflow-collection/revision-4/README.md).
+- `npm run desktop:typecheck`, `npm run desktop:build`, and
+  `npm run package:electron` passed. The one-route packaged layout smoke passed
+  for Images at both 1440×900 and 390×844. The mobile pass showed no page-level
+  horizontal overflow after stacking the runtime and engine controls.
+- `node scripts/smoke-image-workflow.cjs --edit-ui` passed: it seeds a local
+  512×512 test history item in a throwaway profile, reopens it for editing,
+  checks both source previews, checks the Edit action, and verifies the
+  1440×900 layout has 0px horizontal overflow. The fixture does not claim to
+  verify inference.
+- `node scripts/smoke-image-workflow.cjs --model-unavailable` passed and
+  verifies the actionable retry state. The full `npm run smoke:image:workflow`
+  completed cancellation but could not generate: the packaged runtime is
+  installed, while the local `stabilityai/sd-turbo` cache contains only partial
+  `.incomplete` blobs. The smoke was kept offline and did not download the
+  several-gigabyte model. Rerun after completing the local model cache to verify
+  generation, image-to-image edit, and history persistence.
+
 ## Revision 4 implementation pass — 2026-11-23
 
 ### Changes made

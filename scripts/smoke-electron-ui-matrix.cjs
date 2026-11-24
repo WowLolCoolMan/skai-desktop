@@ -285,6 +285,9 @@ async function main() {
           const settled = await cdp.evaluate(`(async () => { const pending = ${JSON.stringify(route === "memory" ? "Loading memory…" : "Loading Marketplace…")}; for (let i = 0; i < 60; i++) { if (!document.body.innerText.includes(pending)) return true; await new Promise((r) => setTimeout(r, 100)); } return !document.body.innerText.includes(pending); })()`);
           if (!settled) console.warn(`[capture] #/${route} remained in its loading state after 6 seconds; checking the connected native feature.`);
         }
+        if (process.env.UI_MATRIX_CAPTURE === "1" && route === "images") {
+          await cdp.evaluate(`(async () => { for (let i = 0; i < 300; i++) { const status = document.querySelector('.visuals-runtime-settings .status-badge')?.textContent?.trim().toLowerCase(); if (status && status !== 'checking') return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+        }
         if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT === "1") {
           const activeChatClass = await cdp.evaluate(`document.querySelector('.chat-page')?.className ?? ''`);
           if (!activeChatClass.includes("is-coding-agent")) {

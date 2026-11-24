@@ -25,7 +25,7 @@ The designs apply those familiar navigation and review patterns to Skai's docume
 - Video is a future page concept only. Generate and Edit are marked as planned; no video editing or generation controls are shown as working features.
 - No old sample brand, unsupported A/B comparison page, fake model capabilities, past scheduled dates, or contradictory runtime states are part of the final set.
 
-## Implementation review status — 2026-11-23
+## Implementation review status — 2026-11-24
 
 The current packaged app has been checked at 1440×900 across 20 routes in dark
 and light themes with the workspace sidebar expanded and collapsed. The matrix
@@ -36,6 +36,27 @@ search/task-tools/import-menu checks and the Coding Agent edit → compare → s
 made to scroll internally. Persona Workshop and Pet Workshop remain separate
 routes and their selection/customization flows have separate smoke coverage.
 The Video page remains a planned concept.
+
+### Image workflow continuity evidence
+
+The Image page now follows the two primary steps in references #24–25: choose
+Generate or Edit, create from a prompt, or reopen a history item into Edit.
+Secondary local workflow tools are grouped under More tools. Generate keeps the
+prompt and source action prominent and shows local runtime readiness. Edit
+shows its source image beside the editing controls and keeps history below. The
+packaged screens are captured here:
+
+- [Generate · 1440×900](evidence-image-generate-1440.png)
+- [Generate · 390×844](evidence-image-generate-390.png)
+- [Edit with source and history · 1440×900](evidence-image-edit-1440.png)
+
+The seeded history-to-edit interaction passed at 1440×900 with both source
+previews and zero horizontal overflow. Image generation itself remains
+unverified on this profile: the Python runtime is installed, but the local
+`stabilityai/sd-turbo` model cache contains only partial `.incomplete` blobs.
+The offline smoke confirms the recovery message and does not download the
+multi-gigabyte model. This remains an acceptance blocker for the generated
+result/edit/history-persistence flow.
 
 This is route and representative-flow evidence, not proof that every numbered
 image has been matched. Several references describe distinct states within one
