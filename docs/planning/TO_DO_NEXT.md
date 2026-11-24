@@ -36,10 +36,10 @@ Mark an item done only when the linked workflow has evidence.
    Revision 4 implementation work now includes distinct Persona and Pet
    Workshop pages, a simpler Pet overview, Monaco beside the Coding Agent
    thread, and responsive Chat/Coding layouts. The file editor's Review diff
-   action now opens a read-only Original / Working copy comparison: the
-   packaged Monaco diff widget threw a model-disposal runtime error when
-   switching views. The Coding flow passes edit, compare, save, and undo with
-   no runtime error. The latest packaged matrix covered 20 routes at 1440×900
+   action now opens a read-only inline comparison with context, additions,
+   deletions, and line numbers. The Coding flow passes edit, compare, save,
+   and undo with no runtime error. The latest packaged matrix covered 20 routes
+   at 1440×900
    in four dark/light and sidebar variants; Chat and Coding passed at 390×844,
    including an active Coding project, with no page-level overflow or clipped
    controls. Reference #4 now has paired packaged screenshots at 1440×900 and
@@ -56,7 +56,8 @@ Mark an item done only when the linked workflow has evidence.
    attach → Documents-only → send flow still needs interaction evidence.
    Reference #7 has a packaged search-result screenshot; filtered result
    selection preserves the query, and the conversation-import preview/collision
-   smoke passes. The remaining screenshot reviews now cover #13–#30.
+   smoke passes. References #13 and #14 now have packaged Coding thread/editor
+   and inline diff evidence; the remaining screenshot reviews cover #15–#30.
    Reference #6 now has a packaged active-listening screenshot and an isolated
    start → local listening → End workflow check. Skai keeps Voice Mode in the
    current Chat thread rather than adding the reference's standalone page; the
@@ -78,7 +79,9 @@ Mark an item done only when the linked workflow has evidence.
    executor. The executor now receives it; the isolated Agent Host regression
    and packaged Stop workflow both reach Cancelled and close the in-flight
    request. Remaining: compare mobile task progress and review references
-   #13–30. Reference #10 now has a packaged 1440×900 screenshot and flow:
+   #15–30. References #13 and #14 now have packaged Coding thread/editor and
+   inline diff evidence with a save/undo interaction smoke. Reference #10 now
+   has a packaged 1440×900 screenshot and flow:
    open a saved conversation, open Details, configure a prompt/local time/weekly
    repeat, save, and confirm it appears under that thread. The screenshot shows
    the Details rail beside the active conversation. A 390×844 Chat layout smoke
@@ -95,12 +98,14 @@ Mark an item done only when the linked workflow has evidence.
    project; a Windows native-picker run created and opened a temporary project.
    Remaining: mobile project creation and direct Open folder smoke.
    Next action: finish screenshot-by-screenshot matching of the 30
-   supported Revision 4 workflow references and their distinct states, then
+   supported Revision 4 workflow references and their distinct states; #13
+   and #14 now have paired desktop evidence, so continue with #15. Then
    add interaction evidence for document grounding,
    voice, plans/schedules, GitHub, model review, Marketplace, MCP, image/media,
-   Memory, and Settings. Keep Video planned. The project file comparison is
-   not a line-level diff; Git diff review remains the line-level review
-   surface. Do not close this item until the remaining flows have evidence and
+   Memory, and Settings. Keep Video planned. Reference #14 now has a read-only
+   inline diff with additions, deletions, context, and line numbers; Git diff
+   remains the repository-level review surface. Do not close this item until
+   the remaining flows have evidence and
    the references have been visually reviewed. On 2026-11-24, Image Generate
    and Edit were refined against references #24–25: the page now foregrounds
    Generate/Edit, groups secondary tools, exposes local runtime readiness,

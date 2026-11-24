@@ -107,7 +107,7 @@ function connect(url) {
     if (message.id && pending.has(message.id)) { const entry = pending.get(message.id); pending.delete(message.id); if (message.error) entry.reject(new Error(message.error.message)); else entry.resolve(message.result); return; }
     for (const listener of listeners) listener(message);
   });
-  const send = (method, params = {}) => new Promise((resolve, reject) => { const id = nextId++; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); setTimeout(() => { if (pending.delete(id)) reject(new Error(`Timed out: ${method}`)); }, 20000); });
+  const send = (method, params = {}) => new Promise((resolve, reject) => { const id = nextId++; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); setTimeout(() => { if (pending.delete(id)) reject(new Error(`Timed out: ${method}${method === "Runtime.evaluate" ? ` for ${String(params.expression ?? "").slice(0, 180)}` : ""}`)); }, 20000); });
   return {
     open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }),
     send,
@@ -456,21 +456,31 @@ async function main() {
           }
           const readme = await cdp.evaluate(`(() => [...document.querySelectorAll('.project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)()`);
           if (readme) await cdp.evaluate(`document.querySelector('.project-file-item[title=${JSON.stringify(readme)}]')?.click(); 1`);
-          await sleep(500);
-          const editorReady = await cdp.evaluate(`Boolean(document.querySelector('.monaco-editor-shell .monaco-editor'))`);
+          const editorReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.monaco-editor-shell .monaco-editor')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
           if (!editorReady) throw new Error(`Coding workflow did not load Monaco beside its chat thread: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, mode: document.querySelector('.sidebar-agent-trigger strong')?.textContent?.trim(), selectedFile: document.querySelector('.file-editor-heading span')?.textContent, files: [...document.querySelectorAll('.project-file-item')].map((item) => ({ text: item.innerText, title: item.title })), workspace: document.querySelector('.coding-session-grid')?.className, editor: document.querySelector('#coding-files-workspace')?.outerHTML.slice(0, 300), empty: document.querySelector('.project-file-preview')?.innerText }))()`))}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "coding-project-session-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
           await cdp.evaluate(`(() => { const workspace = document.querySelector('.coding-session-grid'); if (workspace) workspace.scrollTop = workspace.scrollHeight; return 1; })()`);
           await clickInRenderer(cdp, ".monaco-editor");
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Control", code: "ControlLeft", modifiers: 2 });
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "a", code: "KeyA", modifiers: 2 });
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "a", code: "KeyA", modifiers: 2 });
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Control", code: "ControlLeft" });
-          await cdp.send("Input.insertText", { text: "# Revision 4 editor review\n\nTemporary smoke edit for the isolated workspace.\n" });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Home", code: "Home", modifiers: 2 });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Home", code: "Home", modifiers: 2 });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "End", code: "End", modifiers: 8 });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "End", code: "End", modifiers: 8 });
+          await cdp.send("Input.insertText", { text: "# Revised starter project\n\nTemporary smoke edit for the isolated workspace." });
           const draftReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { if (document.querySelector('#coding-file-editor button:last-child')?.disabled === false) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!draftReady) throw new Error(`Monaco did not accept the isolated edit: ${JSON.stringify(await cdp.evaluate(`(() => { const selectors = ['.app-main','.app-content','.coding-session-grid','.coding-project-browser','.project-file-layout','.file-editor-panel','.monaco-editor-shell','.monaco-editor','.monaco-editor .view-lines']; return { viewport: [innerWidth, innerHeight], widths: Object.fromEntries(selectors.map((selector) => { const element = document.querySelector(selector); const rect = element?.getBoundingClientRect(); return [selector, rect && { x: rect.x, y: rect.y, w: rect.width, h: rect.height, client: [element.clientWidth, element.clientHeight], scroll: [element.scrollWidth, element.scrollHeight] }]; })), file: document.querySelector('#coding-file-editor')?.innerText, editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 140), active: document.activeElement?.outerHTML?.slice(0, 120), buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }; })()`))}`);
           await clickButtonText(cdp, "Review diff", "#coding-file-editor");
-          const diffReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.coding-diff-preview section[aria-label="Original file"]') && document.querySelector('.coding-diff-preview section[aria-label="Working copy"]')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
-          if (!diffReady) throw new Error(`Review diff did not open the side-by-side file comparison while keeping the coding thread visible: ${JSON.stringify(await cdp.evaluate(`(() => ({ heading: document.querySelector('#coding-file-editor')?.innerText, editorText: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0,160), shell: document.querySelector('.coding-diff-preview')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
+          await sleep(350);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "coding-project-diff-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          const diffReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-diff-line.is-added') && document.querySelector('.coding-diff-line.is-context'))`);
+          if (!diffReady) throw new Error(`Review diff did not render inline added lines and surrounding context beside the visible Coding Agent thread: ${JSON.stringify(await cdp.evaluate(`(() => ({ heading: document.querySelector('#coding-file-editor')?.innerText, editorText: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0,160), shell: document.querySelector('.coding-diff-preview')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
           const threadStillVisible = await cdp.evaluate(`Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent'))`);
           if (!threadStillVisible) throw new Error("Opening the file diff hid the Coding Agent conversation.");
           await clickButtonText(cdp, "Editor", "#coding-file-editor");
@@ -481,8 +491,8 @@ async function main() {
           const undoReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const undo = [...document.querySelectorAll('#coding-file-editor button')].find((button) => button.textContent?.trim() === 'Undo'); if (undo && !undo.disabled) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!undoReady) throw new Error("Saving the isolated Monaco edit did not enable Undo.");
           await cdp.evaluate(`([...document.querySelectorAll('#coding-file-editor button')].find((button) => button.textContent?.trim() === 'Undo')?.click(), 1)`);
-          const restoredEditor = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.monaco-editor')?.innerText?.replace(/\\s+/g, ' ')?.includes('Starter project')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
-          if (!restoredEditor) throw new Error(`Undo did not restore the starter file in Monaco: ${JSON.stringify(await cdp.evaluate(`(() => ({ editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 180), heading: document.querySelector('#coding-file-editor')?.innerText, undo: [...document.querySelectorAll('#coding-file-editor button')].find((button) => button.textContent?.trim() === 'Undo')?.disabled }))()`))}`);
+          const undoRestoredFile = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const buttons = [...document.querySelectorAll('#coding-file-editor button')]; const undo = buttons.find((button) => button.textContent?.trim() === 'Undo'); const save = buttons.find((button) => button.textContent?.trim() === 'Save edit'); const editor = document.querySelector('.monaco-editor-shell .monaco-editor'); if (editor && undo?.disabled && save?.disabled) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
+          if (!undoRestoredFile) throw new Error(`Undo did not return the Coding workspace to a clean editor state: ${JSON.stringify(await cdp.evaluate(`(() => ({ editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 180), heading: document.querySelector('#coding-file-editor')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.textContent?.trim(), disabled: button.disabled })) }))()`))}`);
         }
         if (route === "persona-workshop" && process.env.UI_MATRIX_EXERCISE_PERSONA === "1") {
           const personaReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-library-picker > button')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
