@@ -163,9 +163,26 @@ project's Activity drawer beside the Coding Agent thread rather than navigating
 to a separate task page.
 
 The per-reference pass remains open for reference #9 cancellation, mobile
-task-progress behavior, and references #10–30. This is desktop evidence only;
+task-progress behavior, and references #11–30. This is desktop evidence only;
 the remaining reference-specific page states still need comparison and
 interaction evidence.
+
+### Schedule from a conversation — reference #10
+
+The packaged 1440×900 state is captured in
+[conversation schedule evidence](evidence-chat-schedule-1440.png). Details opens
+a right-side rail for the active conversation, where the user can set a prompt,
+a local run time, and a repeat interval, see existing runs, and save another
+schedule. The focused packaged flow selected a saved conversation, opened
+Details, edited a weekly schedule, saved it, and confirmed it appeared in that
+conversation's schedule list. The schedule stays attached to the conversation
+while its thread and composer remain visible. Revision 4 places the form in the
+main conversation surface; Skai keeps it in the Details rail to preserve thread
+space. The rail was previously hidden by a stale Chat style rule; it now opens
+on desktop and stacks below the conversation on narrow screens. The 390×844
+Chat layout smoke passed after that correction. Mobile schedule interaction
+still needs a direct flow check because the narrow sidebar collapses the seeded
+thread list in the current fixture.
 
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.

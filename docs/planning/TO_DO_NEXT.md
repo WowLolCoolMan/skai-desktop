@@ -56,7 +56,7 @@ Mark an item done only when the linked workflow has evidence.
    attach → Documents-only → send flow still needs interaction evidence.
    Reference #7 has a packaged search-result screenshot; filtered result
    selection preserves the query, and the conversation-import preview/collision
-   smoke passes. The remaining screenshot reviews now cover #10–#30.
+   smoke passes. The remaining screenshot reviews now cover #11–#30.
    Reference #6 now has a packaged active-listening screenshot and an isolated
    start → local listening → End workflow check. Skai keeps Voice Mode in the
    current Chat thread rather than adding the reference's standalone page; the
@@ -77,7 +77,13 @@ Mark an item done only when the linked workflow has evidence.
    packaged held-model fixture did not close its in-flight request after Stop,
    leaving the task Running. Waiting: investigate Agent Host cancellation,
    verify end-to-end Stop, compare mobile task progress, and review references
-   #10–30.
+   #11–30. Reference #10 now has a packaged 1440×900 screenshot and flow:
+   open a saved conversation, open Details, configure a prompt/local time/weekly
+   repeat, save, and confirm it appears under that thread. The screenshot shows
+   the Details rail beside the active conversation. A 390×844 Chat layout smoke
+   passes, but mobile schedule interaction remains open because the narrow
+   sidebar collapses the seeded conversation list in this fixture. Typecheck,
+   production build, and Electron package passed after the Chat rail fix.
    Next action: finish screenshot-by-screenshot matching of the 30
    supported Revision 4 workflow references and their distinct states, then
    add interaction evidence for document grounding,

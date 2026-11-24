@@ -23,6 +23,7 @@ if (!fs.existsSync(executable)) {
 const port = 19331;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
 const exerciseTaskProgress = process.env.UI_MATRIX_EXERCISE_TASK_PROGRESS === "1";
+const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
 let resolveTaskProgressPaused;
@@ -266,6 +267,7 @@ async function main() {
     results.push(project);
     if (project.ok && ${includeCodingFixture}) results.push(await r("conversation.save", { title: "Review the starter project", mode: "Coding Agent", responseMode: "coding", projectId: project.result?.id, messages: [{ role: "user", content: "Review this project structure and suggest the next small improvement." }, { role: "assistant", content: "I’ll inspect the existing files, then outline a focused change and how to verify it." }] }));
     if (${captureMode} && results[0]?.result?.id) results.push(await r("conversation.save", { id: results[0].result.id, title: ${JSON.stringify(longTitle)}, mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Help me plan a low-maintenance herb garden for a sunny patio." }, { role: "assistant", content: "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." }] }));
+    if (${captureMode} && ${exerciseChatSchedule} && results[0]?.result?.id) results.push(await r("scheduled.create", { prompt: "Give me a weekly summary of key updates, progress, and next steps.", conversationId: results[0].result.id, dueAt: new Date(Date.now() + 86400000).toISOString(), repeatEveryMinutes: 10080, workspaceMode: "ChatBot" }));
     if (${captureMode} && ${exerciseDocuments}) results.push(await r("conversation.save", { title: "Plan and results summary", mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Based only on the attached plan and results, what were the objectives and did we meet them?", attachments: [{ fileName: "Plan.pdf", content: "Objectives: deliver the MVP by the end of Q2; reach at least 10,000 active users; achieve a conversion rate of at least 5%." }, { fileName: "Results.xlsx", content: "MVP delivered in Q2. Active users: 12,480. Conversion rate: 5.6%." }] }, { role: "assistant", content: "According to Plan.pdf, the objectives were to deliver the MVP by Q2, reach at least 10,000 active users, and reach a conversion rate of at least 5%. Results.xlsx reports delivery in Q2, 12,480 active users, and a 5.6% conversion rate, so all three objectives were met. Sources: Plan.pdf (objectives); Results.xlsx (outcomes)." }] }));
     if (${captureMode} && ${exerciseChatSearch}) for (const item of [
       { title: "Garden planning", query: "What should I plant in my garden this spring?", answer: "Here is a simple garden plan with plant suggestions and timing." },
@@ -297,6 +299,30 @@ async function main() {
         await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
         const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
         if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
+        if (route === "chat" && exerciseChatSchedule) {
+          await clickButtonText(cdp, "Plan a simple herb garden", ".sidebar-history-list");
+          const conversationReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.chat-page .chat-thread-summary, .chat-page .chat-context-bar strong')?.textContent?.includes('Plan a simple herb garden')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!conversationReady) throw new Error("The seeded conversation did not open for the schedule workflow.");
+          await cdp.evaluate(`([...document.querySelectorAll('.chat-header-actions button')].find((button) => button.textContent?.trim() === 'Details')?.click())`);
+          const schedulePanelReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { const rail = document.querySelector('.chat-rail'); if (rail && !rail.hidden && document.querySelector('.chat-schedules-panel')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!schedulePanelReady) throw new Error("Conversation Details did not show its local Scheduled runs panel.");
+          await cdp.evaluate(`document.querySelector('.chat-schedules-panel .chat-schedules-heading button')?.click()`);
+          const scheduleDraftReady = await cdp.evaluate(`Boolean(document.querySelector('.chat-schedule-form'))`);
+          if (!scheduleDraftReady) throw new Error(`The conversation schedule form did not open: ${JSON.stringify(await cdp.evaluate(`(() => ({ panel: document.querySelector('.chat-schedules-panel')?.innerText, buttons: [...(document.querySelector('.chat-schedules-panel')?.querySelectorAll('button') ?? [])].map((button) => ({ text: button.innerText, expanded: button.getAttribute('aria-expanded') })), details: document.querySelector('.chat-rail')?.hidden }))()`))}`);
+          await cdp.evaluate(`(() => { const form = document.querySelector('.chat-schedule-form'); const prompt = form?.querySelector('input'); const date = form?.querySelector('input[type="datetime-local"]'); const repeat = form?.querySelector('select'); const setValue = (element, value, prototype) => { if (!element) return; Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); }; setValue(prompt, 'Create a weekly progress summary', HTMLInputElement.prototype); const due = new Date(Date.now() + 86400000); setValue(date, new Date(due.getTime() - due.getTimezoneOffset() * 60000).toISOString().slice(0, 16), HTMLInputElement.prototype); setValue(repeat, '10080', HTMLSelectElement.prototype); return true; })()`);
+          const scheduleDraft = await cdp.evaluate(`(() => { const form = document.querySelector('.chat-schedule-form'); return { prompt: form?.querySelector('input')?.value, repeat: form?.querySelector('select')?.value, existing: document.querySelector('.chat-schedule-list')?.innerText ?? '' }; })()`);
+          if (scheduleDraft.prompt !== "Create a weekly progress summary" || scheduleDraft.repeat !== "10080" || !scheduleDraft.existing.includes("weekly summary")) throw new Error(`The conversation schedule draft or existing run was not ready: ${JSON.stringify(scheduleDraft)}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "chat-schedule-from-conversation-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await cdp.evaluate(`document.querySelector('.chat-schedule-form button')?.click()`);
+          await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (!document.querySelector('.chat-schedule-form')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          await cdp.evaluate(`document.querySelector('.chat-schedules-panel .chat-schedules-heading button')?.click()`);
+          const savedSchedule = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ((document.querySelector('.chat-schedule-list')?.innerText ?? '').includes('Create a weekly progress summary')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!savedSchedule) throw new Error(`Saving the conversation schedule did not add its row to Scheduled runs: ${JSON.stringify(await cdp.evaluate(`(() => ({ panel: document.querySelector('.chat-schedules-panel')?.innerText, form: document.querySelector('.chat-schedule-form')?.innerText, fields: [...(document.querySelector('.chat-schedule-form')?.querySelectorAll('input,select') ?? [])].map((field) => field.value), button: [...(document.querySelector('.chat-schedule-form')?.querySelectorAll('button') ?? [])].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
+        }
         if (route === "coding" && process.env.UI_MATRIX_EXERCISE_CODING === "1") {
           await clickInRenderer(cdp, ".coding-no-project button");
           const projectsReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.title.endsWith(' · projects')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
@@ -593,7 +619,11 @@ main().catch((error) => { console.error(error.message); process.exitCode = 1; })
   }
   if (process.platform === "win32" && child.pid) {
     const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-    await new Promise((resolve) => { killer.once("close", resolve); killer.once("error", resolve); });
+    await Promise.race([
+      new Promise((resolve) => { killer.once("close", resolve); killer.once("error", resolve); }),
+      sleep(5000),
+    ]);
+    if (killer.exitCode === null && !killer.killed) killer.kill();
   } else if (!child.killed) child.kill("SIGTERM");
   await sleep(1500);
   try { fs.rmSync(temp, { recursive: true, force: true }); } catch { /* the app may release files shortly after exit */ }

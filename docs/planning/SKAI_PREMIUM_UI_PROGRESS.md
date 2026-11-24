@@ -100,7 +100,16 @@ what they cover.
   after Stop, so end-to-end cancellation remains an open Agent Host issue;
   native core cancellation tests pass. The drawer keeps this review beside the
   Coding Agent thread. Mobile comparison for task progress and references
-  #10–30 are still waiting.
+  #11–30 are still waiting.
+- Reference #10 now has packaged 1440×900 evidence with the Details rail open
+  beside a saved Chat thread. The flow configures and saves a local-time weekly
+  run, then confirms it appears in that conversation's schedule list. Comparing
+  the capture exposed a stale style rule that hid Details even when its toggle
+  was open; the rail is now visible on desktop and stacks below the thread on
+  narrow screens. The 390×844 Chat layout smoke passes. The mobile schedule
+  interaction remains open because this fixture cannot select the seeded
+  conversation from the collapsed narrow sidebar. Typecheck, production build,
+  and Electron packaging passed after the rail fix.
 - Reference #6 now has a packaged 1440×900 active Voice Mode screenshot. The
   UI smoke starts from the Chat composer, waits for local listening, verifies
   the visible End control, and closes the session using a fake microphone;
