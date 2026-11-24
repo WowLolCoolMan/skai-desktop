@@ -89,8 +89,14 @@ what they cover.
   allowed to expand into the vertical workspace scroll. Mobile Coding header
   and project actions now wrap without page-level horizontal overflow. The
   packaged matrix reported no clipped controls; typecheck, production build,
-  and Electron packaging passed. Remaining: capture and compare #6 and #9–#30,
+  and Electron packaging passed. Remaining: capture and compare #9–#30,
   and complete the direct document attachment → Documents-only → send flow.
+- Reference #6 now has a packaged 1440×900 active Voice Mode screenshot. The
+  UI smoke starts from the Chat composer, waits for local listening, verifies
+  the visible End control, and closes the session using a fake microphone;
+  the separate Windows voice acceptance covers real microphone input and local
+  Whisper. Skai intentionally keeps Voice Mode in the active Chat context in a
+  modal, following the familiar in-thread voice workflow.
 
 ## Revision 4 implementation pass — 2026-11-23
 

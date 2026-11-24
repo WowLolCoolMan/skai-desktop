@@ -91,6 +91,25 @@ result-state capture shows the source documents on the sent turn while the
 composer is ready for the next turn. The direct UI attach → Documents-only →
 send flow remains open for acceptance.
 
+### Local Voice Mode — reference #6
+
+The packaged 1440×900 active listening state is captured in
+[Voice Mode evidence](evidence-voice-mode-1440.png). The UI smoke starts Voice
+Mode from the Chat composer with a fake local microphone, waits for the
+“Listening on this device” state, verifies the visible End control, and closes
+the session. The broader Windows voice acceptance separately covers a real
+microphone turn, local Whisper transcription, interruption, and cancellation.
+
+Revision 4 depicts Voice Mode as a separate destination with a large start
+button. Skai keeps it attached to the current Chat thread and opens a focused
+session dialog from the composer. This matches the in-thread voice entry used
+by mainstream AI chat apps and keeps the conversation context available. The
+standalone page layout is a documented workflow variation; the local
+hands-free start/listen/end flow is covered. This capture also reflects a
+voice-expressiveness control from separate, uncommitted working-copy changes;
+those runtime and settings changes are not part of the pushed UI batch and
+still need their own review and tests.
+
 ### Conversation search and import — reference #7
 
 The packaged 1440×900 search result is captured in

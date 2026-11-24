@@ -56,7 +56,12 @@ Mark an item done only when the linked workflow has evidence.
    attach → Documents-only → send flow still needs interaction evidence.
    Reference #7 has a packaged search-result screenshot; filtered result
    selection preserves the query, and the conversation-import preview/collision
-   smoke passes. The remaining screenshot reviews still include #6 and #9–#30.
+   smoke passes. The remaining screenshot reviews still include #9–#30.
+   Reference #6 now has a packaged active-listening screenshot and an isolated
+   start → local listening → End workflow check. Skai keeps Voice Mode in the
+   current Chat thread rather than adding the reference's standalone page; the
+   variation and familiar in-thread workflow rationale are documented in the
+   Revision 4 README.
    Reference #8 now has a project-scoped task-plan screenshot and packaged
    open → edit brief → save for review flow at desktop and 390×844; it does not
    start a run. The desktop planner is compact, while the mobile planner opens
@@ -135,7 +140,11 @@ Mark an item done only when the linked workflow has evidence.
    acceptance passed the full microphone, local Whisper, long-reply playback,
    barge-in, and follow-up flow with this implementation. Speech engines still
    synthesize a whole audio clip per text chunk; actual incremental audio-frame
-   streaming remains open. Keep the path local.
+   streaming remains open. Keep the path local. Separate voice-expressiveness
+   work is currently present as uncommitted working-copy changes across Chat,
+   Settings, native voice models, and Agent Host adapters. Review and test that
+   work independently before including it in a push; it is not part of the
+   Revision 4 UI commits.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and

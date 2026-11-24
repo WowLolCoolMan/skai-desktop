@@ -40,7 +40,8 @@ Object.assign(env, {
 });
 fs.writeFileSync(env.SRAI_SETTINGS_PATH, JSON.stringify({ themeMode: "dark" }));
 const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
-const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${path.join(temp, "electron")}`, `--skai-isolated-smoke-app-data=${path.join(temp, "appdata")}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const voiceFixtureArgs = process.env.UI_MATRIX_EXERCISE_VOICE === "1" ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] : [];
+const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${path.join(temp, "electron")}`, `--skai-isolated-smoke-app-data=${path.join(temp, "appdata")}`, "--disable-gpu", ...voiceFixtureArgs, ...displayBackendArgs], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let appLog = "";
 child.stdout.on("data", (chunk) => { appLog = (appLog + chunk).slice(-20000); });
 child.stderr.on("data", (chunk) => { appLog = (appLog + chunk).slice(-20000); });
@@ -396,6 +397,26 @@ async function main() {
             const groundedState = await cdp.evaluate(`({ thread: document.querySelector('.chat-layout')?.innerText ?? '', attachments: [...document.querySelectorAll('.chat-message.user')].flatMap((message) => [...message.querySelectorAll('.attachment-list')].map((item) => item.innerText)).join(' ') })`);
             if (!groundedState.thread.includes("12,480") || !groundedState.thread.includes("5.6%") || !groundedState.thread.includes("Plan.pdf") || !groundedState.thread.includes("Results.xlsx") || !groundedState.attachments.includes("Plan.pdf") || !groundedState.attachments.includes("Results.xlsx")) throw new Error(`The document-grounded Chat reference state did not restore both attachments, outcomes, and source names: ${JSON.stringify(groundedState)}`);
           }
+        }
+        if (route === "chat" && process.env.UI_MATRIX_EXERCISE_VOICE === "1") {
+          await clickInRenderer(cdp, 'button[aria-label="Start voice mode"]');
+          const voiceSessionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.voice-mode-session[aria-label], .voice-mode-session') && document.querySelector('[aria-modal="true"] #voice-mode-title')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!voiceSessionReady) throw new Error(`Chat did not open its local Voice Mode session: ${JSON.stringify(await cdp.evaluate(`({ error: document.querySelector('.composer-voice-error,[role="status"]')?.textContent, active: document.querySelector('button[aria-label="End voice mode"]')?.getAttribute('aria-pressed') })`))}`);
+          const voiceListeningReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const status = document.querySelector('.voice-mode-state')?.textContent?.trim(); if (status === 'Listening on this device') return true; if (document.querySelector('.composer-voice-error,[role="status"]')?.textContent?.includes('Microphone access was denied')) return false; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!voiceListeningReady) throw new Error(`Voice Mode did not reach its local listening state: ${JSON.stringify(await cdp.evaluate(`({ status: document.querySelector('.voice-mode-state')?.textContent, error: document.querySelector('.composer-voice-error,[role="status"]')?.textContent })`))}`);
+          const voiceState = await cdp.evaluate(`(() => { const end = [...document.querySelectorAll('.voice-mode-session button')].find((button) => button.textContent.includes('End voice mode')); const rect = end?.getBoundingClientRect(); const style = end && getComputedStyle(end); return { title: document.querySelector('#voice-mode-title')?.textContent?.trim(), status: document.querySelector('.voice-mode-state')?.textContent?.trim(), end: Boolean(end), endText: end?.textContent, endBox: rect && [Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height)], endDisplay: style?.display, endOpacity: style?.opacity, viewportHeight: innerHeight, slider: Boolean(document.querySelector('.voice-mode-expressiveness input')) }; })()`);
+          if (voiceState.title !== "Voice conversation" || voiceState.status !== "Listening on this device" || !voiceState.end || !voiceState.endBox?.[2] || voiceState.endBox[1] < 0 || voiceState.endBox[1] + voiceState.endBox[3] > voiceState.viewportHeight) throw new Error(`Voice Mode did not expose its active listening state and visible End control: ${JSON.stringify(voiceState)}`);
+          console.log(`[voice] ${JSON.stringify(voiceState)}`);
+          await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-chat', '.chat-column', '.message-list']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return 1; })()`);
+          await sleep(350);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "voice-mode-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await clickButtonText(cdp, "End voice mode", ".voice-mode-session");
+          const voiceSessionClosed = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (!document.querySelector('[aria-modal="true"] #voice-mode-title')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!voiceSessionClosed) throw new Error("End voice mode did not close the local voice session.");
         }
         const states = route === "settings" ? settingsCategories : [null];
         for (const category of states) {
