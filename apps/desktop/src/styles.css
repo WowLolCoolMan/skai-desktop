@@ -4135,3 +4135,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-file-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(160px, .9fr) minmax(150px, .7fr); grid-template-areas: "editor" "explorer"; }
   .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-file-explorer { min-height: 150px; }
 }
+
+/* In Coding Agent mode, keep the chat and tab bar on the same track when the
+   navigation sidebar is collapsed. The mode selector above has higher
+   specificity than the shared collapsed-sidebar placement rule. */
+@media (min-width: 641px) {
+  .app-shell.workspace-sidebar-collapsed:has(.app-sidebar.is-coding-agent) {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+  .app-shell.workspace-sidebar-collapsed:has(.app-sidebar.is-coding-agent) > .workspace-tabs-hotkeys {
+    grid-column: 2;
+  }
+}
+@media (max-width: 900px) and (min-width: 641px) {
+  .app-shell.workspace-sidebar-collapsed:has(.app-sidebar.is-coding-agent) {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+}

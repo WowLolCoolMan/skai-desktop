@@ -28,6 +28,7 @@ const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1
 const exerciseScheduledPage = process.env.UI_MATRIX_EXERCISE_SCHEDULED_PAGE === "1";
 const exerciseProjectCreate = process.env.UI_MATRIX_EXERCISE_PROJECT_CREATE === "1";
 const exerciseCodingPanels = process.env.UI_MATRIX_EXERCISE_CODING_PANELS === "1";
+const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
 let resolveTaskProgressPaused;
@@ -336,6 +337,38 @@ async function main() {
         await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
         const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
         if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
+        if (exerciseCodingCollapsedLayout && route === "chat" && width >= 761) {
+          const layout = await cdp.evaluate(`(() => {
+            const shell = document.querySelector('.app-shell');
+            const sidebar = document.querySelector('.app-sidebar');
+            const tabs = shell?.querySelector(':scope > .workspace-tabs-hotkeys');
+            const main = shell?.querySelector(':scope > .app-main');
+            if (!shell || !sidebar || !tabs || !main) return null;
+            const wasCollapsed = shell.classList.contains('workspace-sidebar-collapsed');
+            const wasCodingAgent = sidebar.classList.contains('is-coding-agent');
+            shell.classList.add('workspace-sidebar-collapsed');
+            sidebar.classList.add('is-coding-agent');
+            const tabRect = tabs.getBoundingClientRect();
+            const mainRect = main.getBoundingClientRect();
+            const shellRect = shell.getBoundingClientRect();
+            return { shellWidth: shellRect.width, tabLeft: tabRect.left, tabRight: tabRect.right, mainLeft: mainRect.left, mainRight: mainRect.right, mainWidth: mainRect.width, gridColumns: getComputedStyle(shell).gridTemplateColumns, wasCollapsed, wasCodingAgent };
+          })()`);
+          if (!layout || Math.abs(layout.tabLeft - layout.mainLeft) > 1 || Math.abs(layout.tabRight - layout.mainRight) > 1 || layout.mainWidth < layout.shellWidth * 0.7) {
+            throw new Error(`Collapsed Coding Agent tabs and chat do not share the same full-width grid track: ${JSON.stringify(layout)}`);
+          }
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "coding-agent-collapsed-layout-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await cdp.evaluateWith(function (previous) {
+            const shell = document.querySelector('.app-shell');
+            const sidebar = document.querySelector('.app-sidebar');
+            if (!previous.wasCollapsed) shell?.classList.remove('workspace-sidebar-collapsed');
+            if (!previous.wasCodingAgent) sidebar?.classList.remove('is-coding-agent');
+            return true;
+          }, layout);
+        }
         if (route === "chat" && exerciseChatSchedule) {
           await clickButtonText(cdp, "Plan a simple herb garden", ".sidebar-history-list");
           const conversationReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.chat-page .chat-thread-summary, .chat-page .chat-context-bar strong')?.textContent?.includes('Plan a simple herb garden')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
