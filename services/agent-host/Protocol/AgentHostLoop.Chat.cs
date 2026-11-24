@@ -88,6 +88,18 @@ public static partial class AgentHostLoop
         var responseMode = OptionalString(request, "responseMode") ?? ChatResponseModes.Think;
         if (!ChatResponseModes.IsValid(responseMode)) throw new InvalidOperationException("The chat response mode is invalid.");
 
+        if (OptionalBoolean(request, "voiceMode"))
+        {
+            var expressiveness = Math.Clamp(OptionalInt(request, "voiceExpressiveness") ?? 50, 0, 100);
+            var style = expressiveness switch
+            {
+                < 25 => "Keep delivery understated and measured.",
+                < 65 => "Use a natural, warm conversational delivery with varied sentence rhythm.",
+                _ => "Use an expressive, lively conversational delivery with natural emphasis and varied rhythm, without sounding theatrical.",
+            };
+            messages.Insert(0, new ChatMessage("system", $"This reply will be spoken aloud in a live voice conversation. Write for listening: use natural spoken phrasing, contractions where appropriate, concise paragraphs, and clear transitions. Avoid markdown formatting, headings, tables, and stage directions. Preserve accuracy and answer the user's actual request. {style}"));
+        }
+
         var skillIds = ReadSkillIds(request);
         if (!documentsOnly && skillIds.Count > 0)
         {

@@ -73,10 +73,10 @@ async function run() {
   }
 
   const firstStart = Date.now();
-  const first = validateSpeech(await request("voice.speak", { text: "Skai local voice adapter capability check.", modelId: "chatterbox", rate: 1 }, 12 * 60_000));
+  const first = validateSpeech(await request("voice.speak", { text: "Skai local voice adapter capability check.", modelId: "chatterbox", rate: 1, expressiveness: 20 }, 12 * 60_000));
   const firstMs = Date.now() - firstStart;
   const warmStart = Date.now();
-  const warm = validateSpeech(await request("voice.speak", { text: "This second sample checks that the local worker stays warm.", modelId: "chatterbox", rate: 1 }, 5 * 60_000));
+  const warm = validateSpeech(await request("voice.speak", { text: "This second sample checks the expressive local worker [chuckle].", modelId: "chatterbox", rate: 1, expressiveness: 85 }, 5 * 60_000));
   const warmMs = Date.now() - warmStart;
   process.stdout.write(`Chatterbox Nano local install and speech smoke passed: first ${first.durationSeconds}s (${first.bytes.toLocaleString()} bytes, RMS ${first.rms}, ${firstMs}ms), warm ${warm.durationSeconds}s (${warm.bytes.toLocaleString()} bytes, RMS ${warm.rms}, ${warmMs}ms), ${first.sampleRate}Hz.\n`);
 }

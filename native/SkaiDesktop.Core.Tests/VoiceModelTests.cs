@@ -28,10 +28,10 @@ internal static class VoiceModelTests
         finally { Environment.SetEnvironmentVariable("SKAI_VOICE_ROOT", previousVoiceRoot); }
         var chatterbox = VoiceModelCatalog.All.Single(model => model.Id == "chatterbox");
         Check(chatterbox.Name == "Chatterbox Nano" && !chatterbox.IsLowResource && chatterbox.License.StartsWith("MIT"), "voice catalog identifies the official MIT CPU-oriented Chatterbox Nano variant without overstating its memory fit");
-        Check(chatterbox.SupportsVoiceCloning && chatterbox.SupportsEmotion && chatterbox.SourceUrl == "https://huggingface.co/ResembleAI/chatterbox-nano", "voice catalog exposes Chatterbox Nano features and official model card");
+        Check(!chatterbox.SupportsVoiceCloning && chatterbox.SupportsAudioEffects && chatterbox.SourceUrl == "https://huggingface.co/ResembleAI/chatterbox-nano", "voice catalog exposes only Chatterbox Nano features wired by the local adapter");
         Check(chatterbox.AdapterAvailable && chatterbox.AvailabilityNote.Contains("pinned"), "voice catalog exposes the verified Chatterbox adapter and pinned local runtime");
         var qwen = VoiceModelCatalog.All.Single(model => model.Id == "qwen3-tts");
-        Check(qwen.AdapterAvailable && qwen.SupportsEmotion, "voice catalog exposes the connected Qwen3-TTS adapter and style controls");
+        Check(qwen.AdapterAvailable && !qwen.SupportsEmotion && qwen.AvailabilityNote.Contains("ignores style instructions", StringComparison.Ordinal), "voice catalog accurately describes Qwen3-TTS 0.6B sampling controls and instruction limits");
         Check(!qwen.SupportsStreaming && !qwen.SupportsVoiceCloning && !qwen.SupportsAudioEffects, "Qwen3-TTS does not claim unsupported streaming, cloning, or audio effects");
         Check(qwen.License.StartsWith("Apache-2.0", StringComparison.Ordinal) && qwen.Size.Contains("2.5 GB", StringComparison.Ordinal), "Qwen3-TTS shows its model license and approximate download size");
         Check(VoiceModelCatalog.All.Any(model => model.Id == "omnivoice"), "voice catalog exposes OmniVoice");

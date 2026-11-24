@@ -61,14 +61,14 @@ internal static class ChatterboxVoiceRuntime
         lock (StateGate) return new { installed = IsInstalled, status = IsInstalled ? "installed" : installState, step = installStep, error = installError };
     }
 
-    public static async Task<string> SynthesizeDataUrlAsync(string text, double rate)
+    public static async Task<string> SynthesizeDataUrlAsync(string text, double rate, int expressiveness)
     {
         if (!IsInstalled) throw new InvalidOperationException("Install Chatterbox Nano from Marketplace before selecting it for speech.");
         await WorkerGate.WaitAsync().ConfigureAwait(false);
         try
         {
             var activeWorker = await EnsureWorkerAsync().ConfigureAwait(false);
-            var message = JsonSerializer.Serialize(new { text = text[..Math.Min(text.Length, 4_000)] });
+            var message = JsonSerializer.Serialize(new { text = text[..Math.Min(text.Length, 4_000)], expressiveness = Math.Clamp(expressiveness, 0, 100) });
             await activeWorker.StandardInput.WriteLineAsync(message).ConfigureAwait(false);
             await activeWorker.StandardInput.FlushAsync().ConfigureAwait(false);
             string? line;
@@ -318,7 +318,8 @@ for line in sys.stdin:
  try:
   request=json.loads(line)
   with contextlib.redirect_stdout(sys.stderr):
-   wav=model.generate(request['text'])
+   amount=max(0.0, min(1.0, float(request.get('expressiveness', 50))/100.0))
+   wav=model.generate(request['text'], temperature=0.72 + amount*0.28, top_p=0.88 + amount*0.10)
    audio=wav.squeeze().detach().cpu().numpy()
    buffer=io.BytesIO()
    sf.write(buffer, audio, model.sr, format='WAV', subtype='PCM_16')

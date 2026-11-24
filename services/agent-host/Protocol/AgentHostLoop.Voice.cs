@@ -65,6 +65,7 @@ public static partial class AgentHostLoop
         var text = RequiredSpeechText(request, "text", 4_000);
         var rate = OptionalDouble(request, "rate") ?? 1;
         if (rate is < 0.5 or > 2) throw new InvalidOperationException("rate must be between 0.5 and 2.");
+        var expressiveness = Math.Clamp(OptionalInt(request, "expressiveness") ?? 50, 0, 100);
         var provider = OptionalString(request, "provider");
         if (!string.IsNullOrWhiteSpace(provider))
         {
@@ -90,12 +91,12 @@ public static partial class AgentHostLoop
         }
         if (selectedModelId?.Equals("piper", StringComparison.OrdinalIgnoreCase) == true)
         {
-            var audio = PiperVoiceRuntime.SynthesizeDataUrlAsync(text, rate).GetAwaiter().GetResult();
+            var audio = PiperVoiceRuntime.SynthesizeDataUrlAsync(text, rate, expressiveness).GetAwaiter().GetResult();
             return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "piper-local", interruptible = true, audioDataUrl = audio });
         }
         if (selectedModelId?.Equals("chatterbox", StringComparison.OrdinalIgnoreCase) == true)
         {
-            var audio = ChatterboxVoiceRuntime.SynthesizeDataUrlAsync(text, rate).GetAwaiter().GetResult();
+            var audio = ChatterboxVoiceRuntime.SynthesizeDataUrlAsync(text, rate, expressiveness).GetAwaiter().GetResult();
             return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "chatterbox-nano-local", interruptible = true, audioDataUrl = audio });
         }
         if (selectedModelId is not null && (selectedModelId.Equals("pocket-tts", StringComparison.OrdinalIgnoreCase) || selectedModelId.Equals("pocket-tts-low-resource", StringComparison.OrdinalIgnoreCase)))
@@ -106,8 +107,7 @@ public static partial class AgentHostLoop
         if (selectedModelId?.Equals("qwen3-tts", StringComparison.OrdinalIgnoreCase) == true)
         {
             var speaker = OptionalString(request, "speaker");
-            var profileId = OptionalString(request, "profileId");
-            var audio = Qwen3TtsVoiceRuntime.SynthesizeDataUrlAsync(text, rate, speaker, profileId).GetAwaiter().GetResult();
+            var audio = Qwen3TtsVoiceRuntime.SynthesizeDataUrlAsync(text, rate, speaker, expressiveness).GetAwaiter().GetResult();
             return new(ProtocolVersion, request.Id, true, new { spoken = true, engine = "qwen3-tts-local", interruptible = true, audioDataUrl = audio });
         }
         var engine = voice.Speak(text, rate);

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AgentRequest } from "../../services/agentClient";
 import type { ChatAttachment, DesktopConversation, DesktopQueuedMessage } from "../../../shared/contracts";
 import type { Message } from "../../app/types";
-import { currentSpeechGeneration, speakNativeResponse, stopNativeSpeech } from "../../services/nativeTts";
+import { currentSpeechGeneration, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech } from "../../services/nativeTts";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR } from "../../services/localOnly";
 import { extractVideoFrameAttachments, isVideoAttachment, videoMediaType } from "./videoFrameExtractor";
 
@@ -203,6 +203,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const hasImageAttachment = messageAttachments.some((attachment) => attachment.mediaType?.startsWith("image/"));
     const responseModel = hasImageAttachment ? readPreferredModel("vision", model) : model;
     const progressChannel = crypto.randomUUID();
+    const voiceExpressiveness = speakReply ? selectedVoiceSettings().expressiveness : undefined;
     let streamedText = "";
     let speechBuffer = "";
     let speechCancelled = false;
@@ -236,7 +237,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     });
     let response: Awaited<ReturnType<typeof request>>;
     try {
-      response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), streamResponse: true, progressChannel, ...(documentsOnly ? { documentsOnly: true } : {}) });
+      response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), streamResponse: true, progressChannel, ...(speakReply ? { voiceMode: true, voiceExpressiveness } : {}), ...(documentsOnly ? { documentsOnly: true } : {}) });
     } catch (error) {
       setBusy(false);
       onError(error instanceof Error ? error.message : "The model request failed.");

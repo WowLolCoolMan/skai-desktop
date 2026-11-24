@@ -49,15 +49,15 @@ public static class VoiceModelCatalog
         {
             SupportsStreaming = false, SupportsEmotion = false, AvailabilityNote = "Install the local runtime and checksum-verified model files from Marketplace."
         },
-        new("chatterbox", "Chatterbox Nano", "English expressive speech using its built-in voice. The upstream supports reference-voice cloning, but Skai does not expose custom reference audio yet.", "Chatterbox-TTS 0.1.7 · PyTorch 2.6 CPU", "MIT model / MIT runtime", "~1.9 GB weights; 6 GB free disk recommended", false, false, "https://huggingface.co/ResembleAI/chatterbox-nano")
+        new("chatterbox", "Chatterbox Nano", "Expressive English speech with native laugh, chuckle, cough, and breath cues using its built-in voice.", "Chatterbox-TTS 0.1.7 · PyTorch 2.6 CPU", "MIT model / MIT runtime", "~1.9 GB weights; 6 GB free disk recommended", false, false, "https://huggingface.co/ResembleAI/chatterbox-nano")
         {
-            AdapterAvailable = true, SupportsVoiceCloning = true, SupportsEmotion = true,
-            AvailabilityNote = "Installed through Skai's isolated CPU runtime with pinned and verified local weights. The warm worker remains resident while Skai runs; custom reference audio is not exposed yet."
+            AdapterAvailable = true, SupportsVoiceCloning = false, SupportsEmotion = false, SupportsAudioEffects = true,
+            AvailabilityNote = "Installed through Skai's isolated CPU runtime with pinned and verified local weights. Native paralinguistic cues are supported; this adapter uses the model's built-in voice and does not expose reference-audio cloning."
         },
-        new("qwen3-tts", "Qwen3-TTS 0.6B CustomVoice", "Offline multilingual speech with nine preset speakers and expressive style instructions. This Skai adapter synthesizes complete audio clips; it does not expose cloning or audio streaming.", "qwen-tts 0.1.1 · PyTorch 2.6 CPU", "Apache-2.0 model / Apache-2.0 runtime", "~2.5 GB weights + isolated Python runtime; 8 GB free disk recommended", false, false, "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice")
+        new("qwen3-tts", "Qwen3-TTS 0.6B CustomVoice", "Offline multilingual speech with nine preset speakers and sampling-based vocal variation. This Skai adapter synthesizes complete audio clips; it does not expose cloning or audio streaming.", "qwen-tts 0.1.1 · PyTorch 2.6 CPU", "Apache-2.0 model / Apache-2.0 runtime", "~2.5 GB weights + isolated Python runtime; 8 GB free disk recommended", false, false, "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice")
         {
-            AdapterAvailable = true, SupportsEmotion = true,
-            AvailabilityNote = "Skai installs a pinned CPU runtime and verifies the immutable 0.6B CustomVoice model files. Nine preset speakers are supported. Each request returns a complete WAV; reference-voice cloning and audio-frame streaming are not available in this adapter."
+            AdapterAvailable = true, SupportsEmotion = false,
+            AvailabilityNote = "Skai installs a pinned CPU runtime and verifies the immutable 0.6B CustomVoice model files. The upstream 0.6B model ignores style instructions; Skai maps expressiveness to its documented sampling controls. Nine preset speakers are supported. Each request returns a complete WAV; reference-voice cloning and audio-frame streaming are not available in this adapter."
         },
         new("omnivoice", "OmniVoice", "Omnilingual zero-shot speech synthesis with broad language coverage.", "PyTorch", "Upstream model terms", "Model-dependent", false, false, "https://github.com/k2-fsa/OmniVoice")
         {

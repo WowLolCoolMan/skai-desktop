@@ -47,14 +47,15 @@ internal static class PiperVoiceRuntime
         lock (Gate) return new { installed = IsInstalled, status = IsInstalled ? "installed" : installState, step = installStep, error = installError };
     }
 
-    public static async Task<string> SynthesizeDataUrlAsync(string text, double rate)
+    public static async Task<string> SynthesizeDataUrlAsync(string text, double rate, int expressiveness)
     {
         if (!IsInstalled) throw new InvalidOperationException("Install Piper from Marketplace before selecting it for speech.");
         var output = Path.Combine(Path.GetTempPath(), $"skai-piper-{Guid.NewGuid():N}.wav");
-        const string script = "import sys, wave\nfrom piper import PiperVoice, SynthesisConfig\nmodel, text, output, rate = sys.argv[1:]\nvoice = PiperVoice.load(model)\nwith wave.open(output, 'wb') as wav:\n voice.synthesize_wav(text, wav, syn_config=SynthesisConfig(length_scale=1.0 / float(rate)))\n";
+        var amount = Math.Clamp(expressiveness, 0, 100) / 100d;
+        const string script = "import sys, wave\nfrom piper import PiperVoice, SynthesisConfig\nmodel, text, output, rate, noise, noise_w = sys.argv[1:]\nvoice = PiperVoice.load(model)\nwith wave.open(output, 'wb') as wav:\n voice.synthesize_wav(text, wav, syn_config=SynthesisConfig(length_scale=1.0 / float(rate), noise_scale=float(noise), noise_w_scale=float(noise_w)))\n";
         try
         {
-            await RunAsync(PythonPath, ["-c", script, ModelPath, text, output, rate.ToString(System.Globalization.CultureInfo.InvariantCulture)], TimeSpan.FromMinutes(3), trackSpeech: true).ConfigureAwait(false);
+            await RunAsync(PythonPath, ["-c", script, ModelPath, text, output, rate.ToString(System.Globalization.CultureInfo.InvariantCulture), (0.55 + amount * 0.3).ToString(System.Globalization.CultureInfo.InvariantCulture), (0.65 + amount * 0.45).ToString(System.Globalization.CultureInfo.InvariantCulture)], TimeSpan.FromMinutes(3), trackSpeech: true).ConfigureAwait(false);
             return "data:audio/wav;base64," + Convert.ToBase64String(await File.ReadAllBytesAsync(output).ConfigureAwait(false));
         }
         finally { try { File.Delete(output); } catch { } }

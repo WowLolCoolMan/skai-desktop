@@ -100,24 +100,16 @@ internal static class Qwen3TtsVoiceRuntime
         }
     }
 
-    public static async Task<string> SynthesizeDataUrlAsync(string text, double rate, string? speaker, string? profileId)
+    public static async Task<string> SynthesizeDataUrlAsync(string text, double rate, string? speaker, int expressiveness)
     {
         if (!IsInstalled) throw new InvalidOperationException("Install Qwen3-TTS 0.6B CustomVoice from Marketplace before selecting it for speech.");
         var selectedSpeaker = Speakers.FirstOrDefault(item => item.Equals(speaker, StringComparison.OrdinalIgnoreCase)) ?? "Ryan";
         var language = LanguageFor(selectedSpeaker);
-        var instruction = profileId?.ToLowerInvariant() switch
-        {
-            "skai-warm" => "Speak in a warm, gentle tone.",
-            "skai-direct" => "Speak clearly and directly with crisp pacing.",
-            "skai-calm" => "Speak calmly with relaxed pacing.",
-            _ => "",
-        };
-
         await WorkerGate.WaitAsync().ConfigureAwait(false);
         try
         {
             var activeWorker = await EnsureWorkerAsync().ConfigureAwait(false);
-            var message = JsonSerializer.Serialize(new { text = text[..Math.Min(text.Length, 1_200)], speaker = selectedSpeaker, language, instruct = instruction, rate = Math.Clamp(rate, 0.5, 2) });
+            var message = JsonSerializer.Serialize(new { text = text[..Math.Min(text.Length, 1_200)], speaker = selectedSpeaker, language, rate = Math.Clamp(rate, 0.5, 2), expressiveness = Math.Clamp(expressiveness, 0, 100) });
             await activeWorker.StandardInput.WriteLineAsync(message).ConfigureAwait(false);
             await activeWorker.StandardInput.FlushAsync().ConfigureAwait(false);
             string? line;
@@ -167,7 +159,7 @@ internal static class Qwen3TtsVoiceRuntime
             try
             {
                 var activeWorker = await EnsureWorkerAsync().ConfigureAwait(false);
-                await activeWorker.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { text = "Skai local speech is ready.", speaker = "Ryan", language = "English", instruct = "", rate = 1.0 })).ConfigureAwait(false);
+                await activeWorker.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { text = "Skai local speech is ready.", speaker = "Ryan", language = "English", rate = 1.0, expressiveness = 50 })).ConfigureAwait(false);
                 await activeWorker.StandardInput.FlushAsync().ConfigureAwait(false);
                 var sample = await activeWorker.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromMinutes(5)).ConfigureAwait(false)
                     ?? throw new InvalidOperationException("Qwen3-TTS exited before its local synthesis check.");
@@ -341,7 +333,8 @@ for line in sys.stdin:
  try:
   request=json.loads(line)
   with contextlib.redirect_stdout(sys.stderr):
-   wavs, sample_rate=model.generate_custom_voice(text=request['text'], speaker=request['speaker'], language=request['language'], instruct=request.get('instruct') or None, non_streaming_mode=True)
+   amount=max(0.0, min(1.0, float(request.get('expressiveness', 50))/100.0))
+   wavs, sample_rate=model.generate_custom_voice(text=request['text'], speaker=request['speaker'], language=request['language'], do_sample=True, temperature=0.72 + amount*0.38, top_p=0.82 + amount*0.16, non_streaming_mode=True)
    audio=wavs[0]
    buffer=io.BytesIO()
    sf.write(buffer, audio, sample_rate, format='WAV', subtype='PCM_16')

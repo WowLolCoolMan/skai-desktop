@@ -87,12 +87,12 @@ async function run() {
 
   const voices = await request("voice.models");
   const model = voices.result?.models?.find(item => item.id === "qwen3-tts");
-  if (!voices.ok || !model?.installed || !model.adapterAvailable || !model.supportsEmotion || model.supportsStreaming || model.supportsVoiceCloning || model.supportsAudioEffects) {
+  if (!voices.ok || !model?.installed || !model.adapterAvailable || model.supportsEmotion || model.supportsStreaming || model.supportsVoiceCloning || model.supportsAudioEffects) {
     throw new Error(`Qwen3-TTS readiness or capability reporting was incorrect: ${JSON.stringify(model)}`);
   }
 
-  const first = assertWav(await request("voice.speak", { text: "Skai local speech acceptance passed.", modelId: "qwen3-tts", speaker: "Ryan" }, 5 * 60_000), "Ryan");
-  const second = assertWav(await request("voice.speak", { text: "Local speech is ready.", modelId: "qwen3-tts", speaker: "Aiden" }, 5 * 60_000), "Aiden");
+  const first = assertWav(await request("voice.speak", { text: "Skai local speech acceptance passed.", modelId: "qwen3-tts", speaker: "Ryan", expressiveness: 20 }, 5 * 60_000), "Ryan low expressiveness");
+  const second = assertWav(await request("voice.speak", { text: "Local speech is ready.", modelId: "qwen3-tts", speaker: "Aiden", expressiveness: 85 }, 5 * 60_000), "Aiden high expressiveness");
 
   const ongoing = request("voice.speak", { text: "Cancellation check. ".repeat(250), modelId: "qwen3-tts", speaker: "Ryan" }, 5 * 60_000);
   await new Promise(resolve => setTimeout(resolve, 1_000));
