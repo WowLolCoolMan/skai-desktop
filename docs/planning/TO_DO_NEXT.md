@@ -50,6 +50,10 @@ Mark an item done only when the linked workflow has evidence.
    assistant messages, while Skai keeps Edit on user prompts and offers Fork
    from here for assistant replies. Evidence and the intentional role-specific
    difference are recorded in the Revision 4 README.
+   Reference #5 now has a 1440×900 result screenshot and a real local
+   Qwen3 14B documents-only inference smoke; it cites both synthetic attached
+   files and matches the objective outcomes. The direct packaged composer
+   attach → Documents-only → send flow still needs interaction evidence.
    `npm run desktop:typecheck`, `npm run build`, and `npm run package:electron`
    passed after the bridge change. Next action: finish screenshot-by-screenshot matching of the 30
    supported Revision 4 workflow references and their distinct states, then

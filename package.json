@@ -68,6 +68,7 @@
     "smoke:conversation-search": "node scripts/smoke-conversation-search.cjs",
     "smoke:conversation-metadata": "node scripts/smoke-conversation-metadata.cjs",
     "smoke:chat-queue": "node scripts/smoke-chat-queue.cjs",
+    "smoke:documents-only": "node scripts/smoke-documents-only.cjs",
     "smoke:memory": "node scripts/smoke-memory.cjs",
     "smoke:pdf-attachment": "node scripts/smoke-pdf-attachment.cjs",
     "test": "dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj",

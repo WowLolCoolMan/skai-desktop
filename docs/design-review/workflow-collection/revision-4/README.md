@@ -76,21 +76,38 @@ preserves the familiar role-specific pattern while exposing the same prompt
 revision path. This is a deliberate small label/action difference, not a
 missing queue or message workflow.
 
+### Document-grounded Chat — reference #5
+
+The packaged result state is captured in
+[document-grounded Chat evidence](evidence-chat-documents-1440.png). The seeded
+thread keeps both attachment names with the user question and shows the answer
+citing `Plan.pdf` and `Results.xlsx`. Separately,
+`npm run smoke:documents-only` passed real local inference with Qwen3 14B using
+two isolated synthetic attachments; it checked the three objective outcomes
+and both source filenames. This is protocol/inference evidence, not proof of
+the composer attachment and Documents-only toggle interaction. The composer
+clears attachments and turns the per-message mode off after send, so the
+result-state capture shows the source documents on the sent turn while the
+composer is ready for the next turn. The direct UI attach → Documents-only →
+send flow remains open for acceptance.
+
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
 Focused interaction smokes passed for queueing, search/import, task handoff and
 journal/schedules, project file/terminal flows, Memory, MCP, Marketplace, and
 Voice Workbench. These results do not close the reference-by-reference review:
-the document-grounded response, Voice Mode, GitHub,
+the document-grounded composer interaction, Voice Mode, GitHub,
 model download review, and remaining route-specific states still need paired
 screenshots and interaction evidence. See the active acceptance queue for the
 specific model-cache and persona quality limitations.
 
 This is route and representative-flow evidence, not proof that every numbered
 image has been matched. Several references describe distinct states within one
-route. Reference #4 now has paired screenshots and interaction evidence. The
-remaining acceptance work is to capture and compare the other states
-individually, especially document grounding, Voice
+route. Reference #4 now has paired screenshots and interaction evidence.
+Reference #5 has a result screenshot and local-inference evidence, while its
+composer interaction still needs direct packaged UI coverage. The remaining
+acceptance work is to capture and compare the other states individually,
+especially Voice
 Mode, task planning/progress, schedules, project creation, GitHub, model
 inspection/download review, Marketplace install and voice details, MCP
 approval, image generation/edit history, multimodal attachments, Voice

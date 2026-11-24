@@ -61,6 +61,13 @@ what they cover.
   The reference shows Edit on the assistant; Skai assigns Edit to user prompts
   and Fork from here to assistant replies, keeping the same revision workflow
   with role-appropriate actions.
+- Reference #5 now has a packaged 1440×900 result-state screenshot with both
+  attached document names and the response's source filenames. Added
+  `npm run smoke:documents-only`, which ran the Agent Host against local Qwen3
+  14B using isolated synthetic Plan.pdf and Results.xlsx content; the answer
+  matched the Q2, 12,480-user, and 5.6% outcomes and cited both files. The
+  screenshot is seeded from the same fixture. Direct composer attachment,
+  Documents-only toggle, and send interaction still needs a packaged UI check.
 
 ## Revision 4 implementation pass — 2026-11-23
 

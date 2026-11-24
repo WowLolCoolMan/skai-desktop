@@ -184,7 +184,8 @@ async function main() {
   // Long, awkward content: long titles, unbroken tokens, wide code, tables, many chats, long project names.
   phase = "seed";
   const captureMode = process.env.UI_MATRIX_CAPTURE === "1";
-  const exerciseChatActions = process.env.UI_MATRIX_EXERCISE_CHAT === "1";
+  const exerciseChatActions = process.env.UI_MATRIX_EXERCISE_CHAT_ACTIONS === "1";
+  const exerciseDocuments = process.env.UI_MATRIX_EXERCISE_DOCUMENTS === "1";
   const includeCodingFixture = process.env.UI_MATRIX_EXERCISE_CHAT !== "1";
   const longWord = captureMode ? "" : "Supercalifragilisticexpialidocious_".repeat(5);
   const longTitle = captureMode ? "Plan a simple herb garden" : "Investigate why the tiled window squeezes the composer when the conversation title is extremely long and keeps going";
@@ -206,6 +207,7 @@ async function main() {
     results.push(project);
     if (project.ok && ${includeCodingFixture}) results.push(await r("conversation.save", { title: "Review the starter project", mode: "Coding Agent", responseMode: "coding", projectId: project.result?.id, messages: [{ role: "user", content: "Review this project structure and suggest the next small improvement." }, { role: "assistant", content: "I’ll inspect the existing files, then outline a focused change and how to verify it." }] }));
     if (${captureMode} && results[0]?.result?.id) results.push(await r("conversation.save", { id: results[0].result.id, title: ${JSON.stringify(longTitle)}, mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Help me plan a low-maintenance herb garden for a sunny patio." }, { role: "assistant", content: "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." }] }));
+    if (${captureMode} && ${exerciseDocuments}) results.push(await r("conversation.save", { title: "Plan and results summary", mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Based only on the attached plan and results, what were the objectives and did we meet them?", attachments: [{ fileName: "Plan.pdf", content: "Objectives: deliver the MVP by the end of Q2; reach at least 10,000 active users; achieve a conversion rate of at least 5%." }, { fileName: "Results.xlsx", content: "MVP delivered in Q2. Active users: 12,480. Conversion rate: 5.6%." }] }, { role: "assistant", content: "According to Plan.pdf, the objectives were to deliver the MVP by Q2, reach at least 10,000 active users, and reach a conversion rate of at least 5%. Results.xlsx reports delivery in Q2, 12,480 active users, and a 5.6% conversion rate, so all three objectives were met. Sources: Plan.pdf (objectives); Results.xlsx (outcomes)." }] }));
     if (${captureMode} && ${exerciseChatActions}) for (const text of ["Add a week-by-week planting schedule.", "Include a simple materials checklist.", "Estimate the monthly watering routine."]) results.push(await r("chat.queue.enqueue", { text }));
     if (${captureMode}) for (const card of [
       { name: "Default", roles: "General-purpose assistant", instructions: "Be clear, practical, and adaptable to the user's task." },
@@ -316,8 +318,9 @@ async function main() {
           const importAvailable = await cdp.evaluate(`Boolean([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.includes('Import conversations')))`).catch(() => false);
           if (!importAvailable) throw new Error("Chat options did not expose conversation import.");
           await clickInRenderer(cdp, ".overflow-menu-trigger[aria-label='Chat options']");
-          await cdp.evaluate(`([...document.querySelectorAll('.sidebar-history-row')].find((row) => row.innerText.includes('Plan a simple herb garden'))?.querySelector('.sidebar-history-item')?.click(), 1)`);
-          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            const chatTitle = process.env.UI_MATRIX_EXERCISE_DOCUMENTS === "1" ? "Plan and results summary" : "Plan a simple herb garden";
+            await cdp.evaluate(`([...document.querySelectorAll('.sidebar-history-row')].find((row) => row.innerText.includes(${JSON.stringify(chatTitle)}))?.querySelector('.sidebar-history-item')?.click(), 1)`);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && process.env.UI_MATRIX_EXERCISE_CHAT_ACTIONS === "1") {
             const initialQueue = await cdp.evaluate(`document.querySelector('.queued-messages')?.innerText ?? ''`);
             if (!initialQueue.includes("Add a week-by-week planting schedule.") || !initialQueue.includes("Estimate the monthly watering routine.")) throw new Error(`Chat reference flow did not restore its queued follow-ups: ${initialQueue}`);
             await cdp.evaluate(`document.querySelector("button[aria-label='Edit queued message 1']")?.click(); 1`);
@@ -353,6 +356,10 @@ async function main() {
             const copyConfirmed = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if (document.querySelector('.chat-message.assistant .message-actions')?.innerText.includes('Copied')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!copyConfirmed) throw new Error(`Copy did not provide message-level confirmation (origin ${pageOrigin}, clipboard API ${await cdp.evaluate("Boolean(navigator.clipboard?.writeText)")}).`);
             await sleep(1500); // Capture the resting Copy label, after its confirmation has been verified.
+          }
+          if (process.env.UI_MATRIX_CAPTURE === "1" && process.env.UI_MATRIX_EXERCISE_DOCUMENTS === "1") {
+            const groundedState = await cdp.evaluate(`({ thread: document.querySelector('.chat-layout')?.innerText ?? '', attachments: [...document.querySelectorAll('.chat-message.user')].flatMap((message) => [...message.querySelectorAll('.attachment-list')].map((item) => item.innerText)).join(' ') })`);
+            if (!groundedState.thread.includes("12,480") || !groundedState.thread.includes("5.6%") || !groundedState.thread.includes("Plan.pdf") || !groundedState.thread.includes("Results.xlsx") || !groundedState.attachments.includes("Plan.pdf") || !groundedState.attachments.includes("Results.xlsx")) throw new Error(`The document-grounded Chat reference state did not restore both attachments, outcomes, and source names: ${JSON.stringify(groundedState)}`);
           }
         }
         const states = route === "settings" ? settingsCategories : [null];
