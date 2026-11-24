@@ -77,7 +77,7 @@ function request(method, params, onProgress) {
   const id = `smoke-${nextId++}`;
   child.stdin.write(`${JSON.stringify({ v: 1, id, method, params })}\n`);
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out waiting for ${method}.`)); }, 10_000);
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out waiting for ${method}.`)); }, method === "airllm.status" ? 30_000 : 10_000);
     pending.set(id, { onProgress, resolve: response => { clearTimeout(timer); resolve(response); } });
   });
 }

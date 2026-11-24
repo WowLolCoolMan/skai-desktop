@@ -8,8 +8,9 @@ const desktopRoot = path.join(__dirname, "..", "apps", "desktop");
 const electronBinary = require(path.join(desktopRoot, "node_modules", "electron"));
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-voice-workbench-smoke-"));
 const profileDir = path.join(temp, "profile");
+const appDataDir = path.join(temp, "appdata");
 const fixturesDir = path.join(temp, "fixtures");
-fs.mkdirSync(fixturesDir, { recursive: true });
+for (const directory of [profileDir, appDataDir, fixturesDir, path.join(temp, "localappdata"), path.join(temp, "config"), path.join(temp, "data"), path.join(temp, "cache")]) fs.mkdirSync(directory, { recursive: true });
 const env = {
   ...process.env,
   SKAI_ELECTRON_SMOKE: "true",
@@ -96,7 +97,7 @@ async function main() {
   if (build.status !== 0) throw new Error("The Voice Workbench smoke could not build the current desktop renderer.");
 
   const port = await getFreePort();
-  child = spawn(electronBinary, [".", `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`], {
+  child = spawn(electronBinary, [".", `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`, `--skai-isolated-smoke-app-data=${appDataDir}`], {
     cwd: desktopRoot, env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
   });
   child.stdout.on("data", (chunk) => { output += chunk.toString(); });

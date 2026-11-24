@@ -58,6 +58,16 @@ The offline smoke confirms the recovery message and does not download the
 multi-gigabyte model. This remains an acceptance blocker for the generated
 result/edit/history-persistence flow.
 
+After the Image changes, the packaged layout matrix captured all 20 routes at
+1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
+Focused interaction smokes passed for queueing, search/import, task handoff and
+journal/schedules, project file/terminal flows, Memory, MCP, Marketplace, and
+Voice Workbench. These results do not close the reference-by-reference review:
+the distinct message actions, document-grounded response, Voice Mode, GitHub,
+model download review, and remaining route-specific states still need paired
+screenshots and interaction evidence. See the active acceptance queue for the
+specific model-cache and persona quality limitations.
+
 This is route and representative-flow evidence, not proof that every numbered
 image has been matched. Several references describe distinct states within one
 route. The remaining acceptance work is to capture and compare those states

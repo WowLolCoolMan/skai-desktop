@@ -33,6 +33,23 @@ what they cover.
   `.incomplete` blobs. The smoke was kept offline and did not download the
   several-gigabyte model. Rerun after completing the local model cache to verify
   generation, image-to-image edit, and history persistence.
+- A fresh packaged 1440×900 route capture passed for all 20 routes in the dark,
+  expanded-sidebar variant. Focused smokes passed for Chat queue, conversation
+  search/import, task planner handoff, task journaling and schedules, project
+  browser/terminal/editor, PDF attachment validation, Memory, REA MCP,
+  Marketplace host, and the Voice Workbench clip lifecycle. Persona UI
+  selection/start was covered by the earlier interaction matrix. A local
+  David Lynch persona run created all nine profile fields on Qwen3 14B and
+  respected the 2010 cutoff, while its reply missed the smoke's phrase matcher;
+  LFM3 2B matched the opening style but made unsupported claims about 2011.
+  These are model-content findings, and the broad suite also defaults to the
+  uninstalled `llama3.2` model on this machine.
+- Three focused smoke harnesses were repaired after live packaged runs exposed
+  stale assumptions: isolated Electron app-data launch in Image and Task
+  Re-plan, current Images selectors and actions, and Voice Workbench's isolated
+  app-data switch. AirLLM status in the Agent Host smoke now has enough time for
+  its local Python/Torch import; the packaged Agent Host smoke then passed its
+  schedule, memory, persona, voice-protocol, and task lifecycle checks.
 
 ## Revision 4 implementation pass — 2026-11-23
 

@@ -62,7 +62,21 @@ Mark an item done only when the linked workflow has evidence.
    packaged missing-model recovery state passed and says how to retry after
    downloading the model. Resume generation with
    `npm run smoke:image:workflow` after the cache is complete. Evidence files
-   are in the Revision 4 collection. See
+   are in the Revision 4 collection. A fresh packaged 1440×900 capture of all
+   20 routes passed in one dark/expanded variant with no runtime or layout
+   findings. Focused workflow smokes also passed for chat queue, conversation
+   search/import, task re-plan handoff, task journal/schedule lifecycle,
+   project browser/terminal/editor, PDF validation, Memory, REA MCP, Marketplace
+   host, and Voice Workbench. These test protocol/UI behavior but do not provide
+   the missing per-reference screenshots or prove document-grounded answers.
+   Persona UI selection/start-conversation is covered by the earlier packaged
+   matrix smoke. Current local persona model checks were inconsistent: Qwen3
+   14B generated all profile fields and respected the 2010 cutoff, but the chat
+   phrase matcher rejected a surreal response; LFM3 2B produced a fitting
+   opening but made unsupported 2011 claims. The broad persona script's default
+   `llama3.2` model is not installed on this PC. Continue with user review of
+   persona answer quality instead of treating this as a navigation failure.
+   See
    [Revision 4 review status](../design-review/workflow-collection/revision-4/README.md).
 2. **Real microphone voice — In progress · Codex.** Packaged Windows smoke
    feeds a deterministic spoken fixture through Chromium microphone capture,
@@ -129,7 +143,7 @@ Mark an item done only when the linked workflow has evidence.
    On 2026-11-23, live ComfyUI acceptance on this PC passed
    checkpoint discovery, workflow submission, progress polling, cancellation
    with an empty queue afterward, image-to-image source upload, edited PNG
-    retrieval, and payload validation using `Juggernaut-XL_v9.safetensors` on
+   retrieval, and payload validation using `Juggernaut-XL_v9.safetensors` on
     the RX 7900 XTX. On 2026-11-23, Windows GPU Engine counters matched the
     ComfyUI Python process and measured compute-engine utilization peaking at
     86.89% during live generation, with copy-engine activity also observed.

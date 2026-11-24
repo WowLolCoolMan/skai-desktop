@@ -13,13 +13,37 @@ const port = 19322;
 const timeoutMs = 20_000;
 const prefillKey = "skai.chat.taskPrefill";
 const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), "skai-task-replan-"));
+const appDataDir = path.join(profileRoot, "appdata");
+const electronDataDir = path.join(profileRoot, "electron");
+const agentProfile = path.join(profileRoot, "agent-profile");
+for (const directory of [appDataDir, electronDataDir, agentProfile]) fs.mkdirSync(directory, { recursive: true });
 
 if (!fs.existsSync(executable)) {
   console.error(`Electron artifact does not exist: ${executable}`);
   process.exit(1);
 }
 
-const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${profileRoot}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), env: { ...process.env, SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${electronDataDir}`, `--skai-isolated-smoke-app-data=${appDataDir}`, "--disable-gpu", ...displayBackendArgs], { cwd: path.dirname(executable), env: {
+  ...process.env,
+  SKAI_ELECTRON_SMOKE: "true",
+  SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
+  APPDATA: appDataDir,
+  LOCALAPPDATA: path.join(profileRoot, "localappdata"),
+  XDG_CONFIG_HOME: path.join(profileRoot, "config"),
+  XDG_DATA_HOME: path.join(profileRoot, "data"),
+  XDG_CACHE_HOME: path.join(profileRoot, "cache"),
+  SRAI_SETTINGS_PATH: path.join(agentProfile, "settings.json"),
+  SRAI_MCP_CONNECTIONS_PATH: path.join(agentProfile, "mcp-connections.json"),
+  SRAI_CONVERSATIONS_PATH: path.join(agentProfile, "conversations.json"),
+  SRAI_MEMORY_PATH: path.join(agentProfile, "memory.json"),
+  SRAI_CORPUS_PATH: path.join(agentProfile, "document-corpus.json"),
+  SRAI_CHAT_QUEUE_PATH: path.join(agentProfile, "chat-queue.json"),
+  SRAI_TASKS_PATH: path.join(agentProfile, "agent-tasks.json"),
+  SRAI_SCHEDULED_TASKS_PATH: path.join(agentProfile, "scheduled-tasks.json"),
+  SRAI_PROJECTS_PATH: path.join(agentProfile, "projects.json"),
+  SRAI_UNDO_PATH: path.join(agentProfile, "workspace-undo.json"),
+  SRAI_OPERATIONS_PATH: path.join(agentProfile, "operations.json"),
+}, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk.toString(); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
@@ -56,18 +80,29 @@ async function main() {
   while (Date.now() < deadline) {
     try {
       const targets = await fetchJson(`http://127.0.0.1:${port}/json/list`);
-      target = targets.find((item) => item.type === "page" && item.title?.includes("Skai Desktop") && !item.url?.includes("?pet=1"));
+      target = targets.find((item) => item.type === "page" && item.title?.includes("Skai") && !item.url?.includes("?pet=1"));
       if (target) break;
     } catch { /* The packaged window is still starting. */ }
     await sleep(250);
   }
   if (!target) throw new Error(`Packaged Electron did not expose the main page before timeout. Output: ${output.slice(-2_000)}`);
 
-  const staged = await evaluate(target, `localStorage.setItem(${JSON.stringify(prefillKey)}, JSON.stringify({ title: "Recover local task", instruction: "Review the failed result and produce a verified local plan.", environment: "local" })); location.hash = "#/workbench"; window.dispatchEvent(new PopStateEvent("popstate")); "staged"`);
+  const readyChat = await evaluate(target, `(async () => {
+    location.hash = "#/chat"; window.dispatchEvent(new PopStateEvent("popstate"));
+    for (let i = 0; i < 40 && !document.querySelector('.chat-page'); i++) await new Promise((resolve) => setTimeout(resolve, 100));
+    const trigger = document.querySelector(".overflow-menu-trigger[aria-label='Chat options']");
+    if (!document.querySelector('.chat-layout.has-chat-tools')) {
+      if (!trigger) return false;
+      trigger.click();
+      for (let i = 0; i < 30 && !document.querySelector('.overflow-menu-item'); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+      [...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent.includes('Show task tools'))?.click();
+    }
+    for (let i = 0; i < 30 && !document.querySelector('.chat-task-composer'); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+    return Boolean(document.querySelector('.chat-task-composer'));
+  })()`);
+  if (!readyChat) throw new Error("Could not enable the Chat task planner from Chat options.");
+  const staged = await evaluate(target, `localStorage.setItem(${JSON.stringify(prefillKey)}, JSON.stringify({ title: "Recover local task", instruction: "Review the failed result and produce a verified local plan.", environment: "local" })); window.dispatchEvent(new Event('skai:task-prefill')); "staged"`);
   if (staged !== "staged") throw new Error(`Could not stage the task handoff: ${JSON.stringify(staged)}`);
-  await sleep(250);
-  const navigated = await evaluate(target, `location.hash = "#/chat"; window.dispatchEvent(new PopStateEvent("popstate")); "navigated"`);
-  if (navigated !== "navigated") throw new Error("Could not navigate to Chat for the task re-plan handoff.");
 
   let state;
   const renderDeadline = Date.now() + 8_000;
