@@ -11,6 +11,9 @@ import { TerminalPanel } from "../terminal/TerminalPanel";
 import { ProjectFileTree } from "./ProjectFileTree";
 import { CodingTaskInspector } from "./CodingTaskInspector";
 import { CodingSideChat } from "./CodingSideChat";
+import { CodingPaneTabs } from "./CodingPaneTabs";
+import { useCodingPaneWorkspace, type CodingPanePanel } from "./useCodingPaneWorkspace";
+import { reorderItem } from "../../app/reorderItem";
 import type { Message } from "../../app/types";
 
 function terminalStorageKey(projectId: string) {
@@ -27,36 +30,6 @@ function activeFileStorageKey(projectId: string) {
 
 function fileExplorerStorageKey(projectId: string) {
   return `skai.coding.fileExplorerVisible.${projectId}`;
-}
-
-type CodingPanePanel = "editor" | "files" | "side-chat" | "changes";
-type CodingPanePage = { id: string; panel: CodingPanePanel; filePath?: string };
-const DEFAULT_CODING_PANE_PAGES: CodingPanePage[] = [
-  { id: "coding-side-chat", panel: "side-chat" },
-  { id: "coding-editor", panel: "editor" },
-  { id: "coding-files", panel: "files" },
-  { id: "coding-changes", panel: "changes" },
-];
-
-function codingPanePagesStorageKey(projectId: string) {
-  return `skai.coding.panePages.${projectId}`;
-}
-
-function codingPanePagesVersionStorageKey(projectId: string) {
-  return `skai.coding.panePagesVersion.${projectId}`;
-}
-
-function codingPaneActivePageStorageKey(projectId: string) {
-  return `skai.coding.activePanePage.${projectId}`;
-}
-
-function codingSplitOpenStorageKey(projectId: string) {
-  return `skai.coding.splitOpen.${projectId}`;
-}
-
-function codingPanePageTitle(page: CodingPanePage) {
-  if (page.filePath) return page.filePath.split(/[\\/]/).pop() ?? page.filePath;
-  return page.panel === "side-chat" ? "Side chat" : page.panel === "editor" ? "Editor" : page.panel === "files" ? "Files" : "Changes";
 }
 
 function languageForPath(path: string | null) {
@@ -185,11 +158,8 @@ export function CodingSessionView({ conversation, messages, onNewWorkspaceTab, o
   const [taskInspectorOpen, setTaskInspectorOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<"sources" | "changes" | "activity" | "terminal">("sources");
   const [workspaceView, setWorkspaceView] = useState<"chat" | "files">("chat");
-  const [codingPanePages, setCodingPanePages] = useState<CodingPanePage[]>(DEFAULT_CODING_PANE_PAGES);
-  const [activeCodingPanePageId, setActiveCodingPanePageId] = useState("coding-editor");
-  const [codingPanePagesLoadedProject, setCodingPanePagesLoadedProject] = useState<string | null>(null);
-  const [codingSplitOpen, setCodingSplitOpen] = useState(false);
-  const [codingSplitLoadedProject, setCodingSplitLoadedProject] = useState<string | null>(null);
+  const codingPane = useCodingPaneWorkspace(selectedProject.id);
+  const { pages: codingPanePages, activePageId: activeCodingPanePageId, panel: workspacePanel, isSplitOpen: codingSplitOpen } = codingPane;
   const [panelMode, setPanelMode] = useState<"editor" | "diff" | "preview">("editor");
   const [gitMessage, setGitMessage] = useState("Update local project");
   const [pullRequestOpen, setPullRequestOpen] = useState(false);
@@ -219,24 +189,6 @@ export function CodingSessionView({ conversation, messages, onNewWorkspaceTab, o
   useEffect(() => { setSelectedGitPaths(gitStatus?.changes.map((change) => change.path) ?? []); }, [gitPathKey]);
   useEffect(() => { setPreflight(null); setPreflightMessage(""); }, [selectedProject.id]);
   useEffect(() => {
-    let pages = DEFAULT_CODING_PANE_PAGES;
-    try {
-      const stored = JSON.parse(localStorage.getItem(codingPanePagesStorageKey(selectedProject.id)) ?? "null");
-      if (Array.isArray(stored)) {
-        const validPanels: CodingPanePanel[] = ["editor", "files", "side-chat", "changes"];
-        const validPages = stored.filter((page): page is CodingPanePage => page && typeof page === "object" && typeof page.id === "string" && validPanels.includes(page.panel) && (page.filePath === undefined || typeof page.filePath === "string"));
-        if (validPages.length) pages = validPages.slice(0, 24);
-      }
-      if (localStorage.getItem(codingPanePagesVersionStorageKey(selectedProject.id)) !== "5") localStorage.setItem(codingPanePagesVersionStorageKey(selectedProject.id), "5");
-    } catch { /* use the standard project pages */ }
-    const storedActiveId = localStorage.getItem(codingPaneActivePageStorageKey(selectedProject.id));
-    setCodingPanePages(pages);
-    setActiveCodingPanePageId(storedActiveId && pages.some((page) => page.id === storedActiveId) ? storedActiveId : pages.find((page) => page.panel === "editor")?.id ?? pages[0].id);
-    setCodingPanePagesLoadedProject(selectedProject.id);
-    setCodingSplitOpen(localStorage.getItem(codingSplitOpenStorageKey(selectedProject.id)) === "true");
-    setCodingSplitLoadedProject(selectedProject.id);
-  }, [selectedProject.id]);
-  useEffect(() => {
     setFileExplorerVisible(localStorage.getItem(fileExplorerStorageKey(selectedProject.id)) !== "false");
     setFileExplorerProjectLoaded(selectedProject.id);
   }, [selectedProject.id]);
@@ -244,48 +196,9 @@ export function CodingSessionView({ conversation, messages, onNewWorkspaceTab, o
     if (fileExplorerProjectLoaded !== selectedProject.id) return;
     localStorage.setItem(fileExplorerStorageKey(selectedProject.id), String(fileExplorerVisible));
   }, [fileExplorerProjectLoaded, fileExplorerVisible, selectedProject.id]);
-  useEffect(() => {
-    if (codingPanePagesLoadedProject !== selectedProject.id) return;
-    localStorage.setItem(codingPanePagesStorageKey(selectedProject.id), JSON.stringify(codingPanePages));
-    localStorage.setItem(codingPaneActivePageStorageKey(selectedProject.id), activeCodingPanePageId);
-  }, [activeCodingPanePageId, codingPanePages, codingPanePagesLoadedProject, selectedProject.id]);
-  useEffect(() => {
-    if (codingSplitLoadedProject !== selectedProject.id) return;
-    localStorage.setItem(codingSplitOpenStorageKey(selectedProject.id), String(codingSplitOpen));
-  }, [codingSplitLoadedProject, codingSplitOpen, selectedProject.id]);
-
-  const activeCodingPanePage = codingPanePages.find((page) => page.id === activeCodingPanePageId) ?? codingPanePages[0] ?? null;
-  const workspacePanel = activeCodingPanePage?.panel ?? null;
-  const selectCodingPanePage = (page: CodingPanePage) => setActiveCodingPanePageId(page.id);
-  const addCodingPanePage = (panel: CodingPanePanel, filePath?: string) => {
-    const id = filePath ? `coding-file-${filePath}` : `coding-${panel}`;
-    setCodingPanePages((current) => {
-      if (current.some((page) => page.id === id)) return current;
-      return [...current, { id, panel, ...(filePath ? { filePath } : {}) }].slice(-24);
-    });
-    setActiveCodingPanePageId(id);
+  const openCodingPanePanel = (panel: CodingPanePanel, filePath?: string) => {
+    codingPane.openPanel(panel, filePath ?? (panel === "editor" ? selectedFile ?? undefined : undefined));
     setTaskInspectorOpen(false);
-  };
-  const closeCodingPanePage = (pageId: string) => {
-    if (codingPanePages.length <= 1) return;
-    const index = codingPanePages.findIndex((page) => page.id === pageId);
-    const remaining = codingPanePages.filter((page) => page.id !== pageId);
-    setCodingPanePages(remaining);
-    if (activeCodingPanePageId === pageId) setActiveCodingPanePageId(remaining[Math.min(index, remaining.length - 1)]?.id ?? remaining[0].id);
-  };
-  const reorderCodingPanePage = (sourceId: string, targetId: string) => setCodingPanePages((current) => {
-    const from = current.findIndex((page) => page.id === sourceId);
-    const to = current.findIndex((page) => page.id === targetId);
-    if (from < 0 || to < 0 || from === to) return current;
-    const reordered = [...current];
-    const [moved] = reordered.splice(from, 1);
-    reordered.splice(to, 0, moved);
-    return reordered;
-  });
-  const openCodingPanePanel = (panel: CodingPanePanel) => {
-    setCodingSplitOpen(true);
-    if (panel === "editor" && selectedFile) { addCodingPanePage("editor", selectedFile); return; }
-    addCodingPanePage(panel);
   };
 
   const runPreflight = async () => {
@@ -353,7 +266,7 @@ export function CodingSessionView({ conversation, messages, onNewWorkspaceTab, o
   }, [fileBusy, hasChanges, inspectorTab, onSaveFile, selectedFile, taskInspectorOpen]);
 
   const openFile = (path: string) => {
-    setCodingSplitOpen(true);
+    codingPane.ensureSplitOpen();
     setOpenTabs((current) => current.includes(path) ? current : [...current, path]);
     localStorage.setItem(activeFileStorageKey(selectedProject.id), path);
     activeFileRestoreRef.current = `${selectedProject.id}:${path}`;
@@ -362,8 +275,7 @@ export function CodingSessionView({ conversation, messages, onNewWorkspaceTab, o
 
   const openFilePage = (path: string) => {
     openFile(path);
-    setCodingSplitOpen(true);
-    addCodingPanePage("editor", path);
+    openCodingPanePanel("editor", path);
   };
 
   const openChangedFile = (path: string) => {
@@ -390,15 +302,7 @@ export function CodingSessionView({ conversation, messages, onNewWorkspaceTab, o
     window.requestAnimationFrame(() => document.getElementById(`coding-file-tab-${index}`)?.focus());
   };
 
-  const reorderFileTab = (sourcePath: string, targetPath: string) => setOpenTabs((current) => {
-    const from = current.indexOf(sourcePath);
-    const to = current.indexOf(targetPath);
-    if (from < 0 || to < 0 || from === to) return current;
-    const reordered = [...current];
-    const [moved] = reordered.splice(from, 1);
-    reordered.splice(to, 0, moved);
-    return reordered;
-  });
+  const reorderFileTab = (sourcePath: string, targetPath: string) => setOpenTabs((current) => reorderItem(current, sourcePath, targetPath, (path) => path));
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const nextIndex = event.key === "ArrowRight" ? (index + 1) % openTabs.length
@@ -444,23 +348,10 @@ export function CodingSessionView({ conversation, messages, onNewWorkspaceTab, o
     </section>
   </aside>;
 
-  const paneMenuItems = [
-    { label: "Side chat", onSelect: () => openCodingPanePanel("side-chat") },
-    { label: selectedFile ? `Editor · ${selectedFile.split(/[\\/]/).pop()}` : "Editor", onSelect: () => openCodingPanePanel("editor") },
-    { label: "Files", onSelect: () => openCodingPanePanel("files") },
-    { label: "Changes", onSelect: () => openCodingPanePanel("changes") },
-  ];
-  const paneTabStrip = codingSplitOpen ? <div className="workspace-tab-strip coding-pane-tab-strip is-split-open" role="group" aria-label="Right workspace pages">
-    <div className="workspace-tab-list">{codingPanePages.map((page) => <div className={`workspace-tab${page.id === activeCodingPanePageId ? " is-active" : ""}`} key={page.id} draggable onDragStart={(event) => { event.dataTransfer.setData("text/skai-coding-pane", page.id); event.dataTransfer.effectAllowed = "move"; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const sourceId = event.dataTransfer.getData("text/skai-coding-pane"); if (sourceId) reorderCodingPanePage(sourceId, page.id); }} onAuxClick={(event) => { if (event.button === 1) closeCodingPanePage(page.id); }}>
-      <button className="workspace-tab-select" type="button" aria-current={page.id === activeCodingPanePageId ? "page" : undefined} title={codingPanePageTitle(page)} onClick={() => { selectCodingPanePage(page); if (page.filePath) openFile(page.filePath); }}><NavIcon name={page.panel === "side-chat" ? "chat" : page.panel === "changes" ? "activity" : page.panel === "files" ? "project" : "code"} /><span>{page.panel === "changes" && gitStatus?.changes.length ? `Changes · ${gitStatus.changes.length}` : codingPanePageTitle(page)}</span></button>
-      <button className="workspace-tab-close" type="button" aria-label={`Close ${codingPanePageTitle(page)}`} title="Close page" disabled={codingPanePages.length <= 1} onClick={() => closeCodingPanePage(page.id)}><NavIcon name="close" /></button>
-    </div>)}</div>
-    <OverflowMenu label="Add a page to the split view" icon={<NavIcon name="plus" />} items={[...paneMenuItems, { label: "Close split view", onSelect: () => setCodingSplitOpen(false) }]} />
-  </div> : <div className="coding-split-launcher"><OverflowMenu label="Add to split" items={paneMenuItems} /></div>;
   const paneTabHost = document.getElementById("coding-secondary-tab-group");
 
   return <>
-    {paneTabHost ? createPortal(paneTabStrip, paneTabHost) : null}
+    {paneTabHost ? createPortal(<CodingPaneTabs pages={codingPanePages} activePageId={activeCodingPanePageId} selectedFile={selectedFile} changeCount={gitStatus?.changes.length ?? 0} isSplitOpen={codingSplitOpen} onSelect={(page) => { codingPane.selectPage(page); if (page.filePath) openFile(page.filePath); }} onClose={codingPane.closePage} onReorder={codingPane.reorderPage} onOpenPanel={openCodingPanePanel} onCloseSplit={codingPane.closeSplitView} />, paneTabHost) : null}
     <div className="coding-project-context" aria-label="Project status"><div className={`git-summary${gitStatus?.hasConflicts ? " has-conflicts" : ""}`} aria-live="polite"><strong>{gitStatus ? gitStatus.branch : "Git status unavailable"}</strong><span>{gitStatus ? `${gitStatus.changes.length} change${gitStatus.changes.length === 1 ? "" : "s"}${gitStatus.hasConflicts ? " · conflicts" : ""}` : "Connect a Git repository to inspect changes"}</span></div><div className="coding-project-context-actions"><OverflowMenu label="Project actions" icon={<NavIcon name="more" />} items={[{ label: "Open activity", onSelect: () => { setInspectorTab("activity"); setWorkspaceView("chat"); setTaskInspectorOpen(true); } }, { label: "Open terminal", onSelect: () => { setInspectorTab("terminal"); setWorkspaceView("chat"); setTaskInspectorOpen(true); } }, { label: "New coding thread", onSelect: onNewWorkspaceTab }, { label: preflightBusy ? "Scanning project…" : "Run preflight", disabled: preflightBusy, onSelect: () => void runPreflight() }, { label: gitBusy ? "Refreshing Git…" : "Refresh Git status", disabled: gitBusy, onSelect: onRefreshGitStatus }]} /></div></div>
     {(preflight || preflightMessage) && <Card className="project-preflight" aria-label="Project preflight results"><div className="panel-heading"><div><p className="section-kicker">LOCAL PREFLIGHT</p><h3>{preflight ? "Project setup" : "Preflight status"}</h3></div><Button variant="ghost" onClick={() => { setPreflight(null); setPreflightMessage(""); }}>Dismiss</Button></div>{preflightMessage && <p role="status">{preflightMessage}</p>}{preflight && <><p>{preflight.manifests.length ? `Detected ${preflight.manifests.join(", ")}.` : "No supported dependency manifest was detected at the selected folder roots."}</p>{preflight.runtimes.length > 0 && <ul className="project-preflight-runtimes">{preflight.runtimes.map((runtime) => <li key={runtime.name}><strong>{runtime.name}</strong><span>{runtime.available ? "Available" : "Required runtime not found on PATH"}</span></li>)}</ul>}{preflight.suggestedChecks.length > 0 && <><strong>Suggested checks (not run)</strong><ul className="project-preflight-checks">{preflight.suggestedChecks.map((command) => <li key={command}><code>{command}</code></li>)}</ul></>}<small>{preflight.executionNote}</small></>}</Card>}
     <div className={`coding-session-grid is-${workspaceView}${codingSplitOpen ? " is-split-open" : ""}${panelMode === "diff" ? " is-reviewing-diff" : ""}${workspaceView === "files" && gitDiff ? " is-reviewing-git" : ""}`}>

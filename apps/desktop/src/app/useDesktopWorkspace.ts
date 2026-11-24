@@ -5,6 +5,7 @@ import type { AppRouteActions, AppRouteState } from "./AppRouteView";
 import { initializeNavigation, navigate, navigatePersonaWorkshop, readNavigationState, routeFromLocation, type NavigationState } from "./navigation";
 import type { ConnectionState, CorpusDocument, MemoryEntry, Model, Route, ThemeMode } from "./types";
 import { createAgentClient } from "../services/agentClient";
+import { reorderItem } from "./reorderItem";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR, localEndpointOrFallback, localProviderOrFallback } from "../services/localOnly";
 import { useChatWorkspace } from "../features/chat/useChatWorkspace";
 import { removeChatDraft } from "../features/chat/chatDraftStore";
@@ -303,15 +304,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   }, [activeWorkspaceTabId, closedWorkspaceTabs, selectWorkspaceTab, workspaceTabs]);
   const closeWorkspaceTab = useCallback((tabId: string) => closeWorkspaceTabs([tabId]), [closeWorkspaceTabs]);
   const reorderWorkspaceTab = useCallback((sourceId: string, targetId: string) => {
-    setWorkspaceTabs((current) => {
-      const from = current.findIndex((tab) => tab.id === sourceId);
-      const to = current.findIndex((tab) => tab.id === targetId);
-      if (from < 0 || to < 0 || from === to) return current;
-      const reordered = [...current];
-      const [moved] = reordered.splice(from, 1);
-      reordered.splice(to, 0, moved);
-      return reordered;
-    });
+    setWorkspaceTabs((current) => reorderItem(current, sourceId, targetId, (tab) => tab.id));
   }, []);
   const restoreWorkspaceTab = useCallback(() => {
     const [tab, ...remainingClosed] = closedWorkspaceTabs;
