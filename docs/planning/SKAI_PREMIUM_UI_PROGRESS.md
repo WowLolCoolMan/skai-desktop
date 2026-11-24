@@ -103,7 +103,7 @@ what they cover.
   allowed to expand into the vertical workspace scroll. Mobile Coding header
   and project actions now wrap without page-level horizontal overflow. The
   packaged matrix reported no clipped controls; typecheck, production build,
-  and Electron packaging passed. Remaining: capture and compare #15–#30,
+  and Electron packaging passed. Remaining: capture and compare #16–#30,
   and complete the direct document attachment → Documents-only → send flow.
 - Reference #9 now has packaged 1440×900 evidence in the Coding Activity
   drawer. The isolated fixture pauses a local task after four file writes;
