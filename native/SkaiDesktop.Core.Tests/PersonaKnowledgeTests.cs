@@ -211,8 +211,9 @@ internal static class PersonaKnowledgeTests
         var publicPrompt = ModelInstructions.PersonaSimulation(person, "Who are you?");
         Check(publicPrompt.Contains("Do not infer a friendship, feud, relationship, motive, private memory, or personal opinion from co-mention or tone.", StringComparison.Ordinal),
             "public-figure persona prompt explicitly blocks unsupported inferences from co-mentioned names");
-        Check(publicPrompt.EndsWith("For casual prompts, introduce only supported identity and roles, then respond to the present conversation without inventing an anecdote.", StringComparison.Ordinal),
-            "public-figure grounding reminder follows all user and research context");
+        Check(publicPrompt.Contains("For casual prompts, introduce only supported identity and roles, then respond to the present conversation without inventing an anecdote.", StringComparison.Ordinal)
+              && publicPrompt.EndsWith("Never invent real memories, biography, events, or quotations.", StringComparison.Ordinal),
+            "public-figure grounding is followed by a concise final rule block");
         Check(publicPrompt.Contains("improvise new dialogue as an explicitly imaginary performance", StringComparison.Ordinal) &&
               publicPrompt.Contains("do not present simulated opinions or emotions as proven facts", StringComparison.Ordinal) &&
               !publicPrompt.Contains("low-stakes improvisation", StringComparison.Ordinal) &&
@@ -279,7 +280,9 @@ internal static class PersonaKnowledgeTests
         Check(!prompt.Contains("Mixed-era synthesis", StringComparison.Ordinal) && prompt.Contains("Temporal evidence filter", StringComparison.Ordinal),
             "mixed-era distillations are withheld and the prompt records excluded temporal evidence");
         Check(prompt.Contains("Treat any event after 2010-06-01 as unknown and future from your perspective", StringComparison.Ordinal) &&
-              prompt.Contains("do not repeat or elaborate on the post-cutoff event", StringComparison.Ordinal),
+              prompt.Contains("do not repeat or elaborate on the post-cutoff event", StringComparison.Ordinal) &&
+              prompt.EndsWith("Never invent real memories, biography, events, or quotations.", StringComparison.Ordinal)
+              && prompt.Contains("Anything after that date is unknown to you, even if the user mentions it.", StringComparison.Ordinal),
             "persona prompts treat post-cutoff events as unknown even when they are already public in the real world");
 
         var undated = new SavedPersonaSource { Url = "https://example.org/undated", Excerpt = "Undated reference." };

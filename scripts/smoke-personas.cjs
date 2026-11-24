@@ -133,7 +133,7 @@ async function runSubject(subject) {
           ],
         }, 360_000));
         const cutoffReply = String(followup.result?.content ?? "");
-        const acknowledgesLimit = /\b(?:(?:don't|don’t|do not|can't|can’t|cannot) know|not aware|not sure|(?:can't|can’t|cannot) speak to|beyond my (?:knowledge|time)|outside my (?:knowledge|experience)|after my time|past my time|(?:i )?(?:wouldn't|wouldn’t|would not) know|i (?:do not|don't|don’t) claim to know|year that has not yet arrived)\b/i.test(cutoffReply);
+        const acknowledgesLimit = /\b(?:(?:don't|don’t|do not|can't|can’t|cannot) know|(?:don't|don’t|do not) have (?:any )?(?:information|knowledge)|have no (?:information|knowledge)|not aware|not sure|(?:can't|can’t|cannot) speak to|beyond my (?:knowledge|time)|outside my (?:knowledge|experience)|after my time|past my time|(?:i )?(?:wouldn't|wouldn’t|would not) know|i (?:do not|don't|don’t) claim to know|year that has not yet arrived)\b/i.test(cutoffReply);
         row.cutoffChat = { cutoff: effectiveCutoffDate, askedAbout: cutoffYear, secs: followupSecs, reply: cutoffReply.slice(0, 700), error: followup.error?.message };
         row.checks.cutoff = followup.ok && acknowledgesLimit;
       }

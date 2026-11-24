@@ -177,6 +177,7 @@ product decisions. A request-size limit does not prove 1M-token execution.
 
 ## Content generation and meetings
 
+- [ ] Local video creation and editing. (A Video navigation entry and planned-state workspace preview are present; generation, timeline editing, and export are not implemented.)
 - [ ] Deep research with autonomous multi-step web research and a report.
 - [x] Gems/personas saved as reusable AI configurations. (Bounded local persona save, activate/deactivate, delete, and future-chat prompt injection; bundled tools/knowledge and cloud sync remain open.)
 - [ ] Meeting notes with AI synthesis, including handwritten notes to structured summaries.

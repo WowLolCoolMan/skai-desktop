@@ -35,6 +35,10 @@ tokens instead of adding decorative controls or a second UI architecture.
   surface; avoid a second global icon rail and duplicate empty-state shortcuts.
 - Put thread-specific model and response controls near the conversation.
   Keep optional task planning and schedules available from the thread options.
+- In a Coding project, keep the agent thread visible beside Monaco by default;
+  allow the full Files workspace when the user wants to focus on project files.
+- Video is a planned destination only. Keep the page clearly labeled as planned
+  until local generation, editing, and export are implemented.
 - Collapse the workspace sidebar on narrow windows and provide a persistent
   top-bar control to reopen it. Use the same sidebar hierarchy on tool routes
   instead of removing navigation when the main work surface changes.

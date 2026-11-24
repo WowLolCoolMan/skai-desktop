@@ -1,4 +1,4 @@
-// Packaged UI matrix smoke: every route at window sizes from 1920x1080 down to 400x500 (tiling
+// Packaged UI matrix smoke: every route at window sizes from 1920x1080 down to 960x640 (tiling
 // splits), light/dark themes, sidebar expanded/collapsed, with deliberately long seeded content.
 // Fails on runtime errors, blank pages, page-level horizontal overflow, content off-screen or
 // bleeding out of its card, clipped text, controls that cannot be reached, and overlapping
@@ -124,6 +124,9 @@ const captureDirectory = path.join(__dirname, "..", ".tmp", "ui-matrix-review");
 const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [960, 640]];
 const testedRoutes = process.env.UI_MATRIX_ROUTE ? routes.filter((route) => process.env.UI_MATRIX_ROUTE.split(",").includes(route)) : routes;
 const requestedViewport = /^(\d+)x(\d+)$/.exec(process.env.UI_MATRIX_VIEWPORT || "");
+if (requestedViewport && (Number(requestedViewport[1]) < 960 || Number(requestedViewport[2]) < 640)) {
+  throw new Error("UI_MATRIX_VIEWPORT must be at least 960x640, the Electron window's supported minimum size.");
+}
 const testedViewports = requestedViewport ? [[Number(requestedViewport[1]), Number(requestedViewport[2])]] : viewports;
 const variants = process.env.UI_MATRIX_QUICK === "1" ? [["dark", "false"]] : [["dark", "false"], ["light", "false"], ["dark", "true"], ["light", "true"]];
 
@@ -174,8 +177,11 @@ async function main() {
       await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
       for (const route of testedRoutes) {
         phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/${route}`;
-        await cdp.evaluate(`location.hash = '#/${route}'; 1`);
-        await sleep(260);
+        const renderedRoute = route === "personas" || route === "persona-groups" ? "persona-workshop" : route === "plugins" ? "marketplace" : route === "workbench" ? "chat" : route;
+        await cdp.evaluate(`window.history.pushState(window.history.state, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
+        const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+        if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
+        await sleep(120);
         const states = route === "settings" ? settingsCategories : [null];
         for (const category of states) {
           if (category) {

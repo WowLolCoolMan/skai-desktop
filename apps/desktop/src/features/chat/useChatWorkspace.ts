@@ -140,6 +140,27 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const savedId = (response.result as { id: string }).id;
     setConversationId(savedId);
     localStorage.setItem("skai.conversation.active", savedId);
+    setConversations((current) => {
+      const existing = current.find((conversation) => conversation.id === savedId);
+      const saved: DesktopConversation = {
+        ...existing,
+        id: savedId,
+        title,
+        mode,
+        responseMode,
+        model,
+        modelProvider: provider,
+        modelSizeBytes: modelMetadata?.sizeBytes ?? null,
+        modelContextLength: modelMetadata?.contextLength ?? null,
+        messages: nextMessages,
+        updatedAt: new Date().toISOString(),
+        pinned: existing?.pinned ?? false,
+        archived: existing?.archived ?? false,
+        tags: existing?.tags ?? [],
+        ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name } : {}),
+      };
+      return [saved, ...current.filter((conversation) => conversation.id !== savedId)];
+    });
     return savedId;
   };
 
@@ -454,14 +475,14 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (selected.id !== conversationId) setAttachments([]);
     onError(null);
   };
-  const setResponseMode = (nextValue: ChatResponseMode) => {
+  const setResponseMode = (nextValue: ChatResponseMode, targetConversationId = conversationId) => {
     const next = normalizeResponseMode(nextValue);
     setResponseModeState(next);
     localStorage.setItem("skai.chat.responseMode", next);
-    if (!conversationId) return;
-    void request("conversation.metadata.save", { id: conversationId, responseMode: next }).then((result) => {
+    if (!targetConversationId) return;
+    void request("conversation.metadata.save", { id: targetConversationId, responseMode: next }).then((result) => {
       if (!result.ok) { onError(result.error?.message ?? "Response mode could not be saved."); return; }
-      setConversations((current) => current.map((conversation) => conversation.id === conversationId ? { ...conversation, responseMode: next } : conversation));
+      setConversations((current) => current.map((conversation) => conversation.id === targetConversationId ? { ...conversation, responseMode: next } : conversation));
     }).catch(() => onError("Response mode could not be saved."));
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;

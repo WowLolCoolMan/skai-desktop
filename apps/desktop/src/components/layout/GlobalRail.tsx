@@ -6,6 +6,7 @@ import { installedVoiceModels } from "../../services/nativeTts";
 const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = [
   { route: "chat", icon: "home", label: "Home" },
   { route: "images", icon: "image", label: "Images" },
+  { route: "video", icon: "video", label: "Video · planned" },
   { route: "usage", icon: "activity", label: "Usage" },
   { route: "marketplace", icon: "marketplace", label: "Marketplace" },
 ];
@@ -39,10 +40,16 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape); };
   }, [menuOpen]);
   const menuItems = useMemo(() => [
-    { route: "persona-workshop" as Route, label: "Skai Personas", icon: "sparkle" as NavIconName, unavailable: false },
-    { route: "memory" as Route, label: "Memory", icon: "memory" as NavIconName, unavailable: false },
-    { route: "voice-workbench" as Route, label: "Voice Workbench", icon: "activity" as NavIconName, unavailable: installedVoiceModels.length === 0 },
-    ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pet Workshop", icon: "sparkle" as NavIconName, unavailable: false }] : []),
+    { route: "projects" as Route, label: "Projects", icon: "project" as NavIconName, description: "Open a local workspace", unavailable: false },
+    { route: "coding" as Route, label: "Coding", icon: "code" as NavIconName, description: "Work with an agent and project files", unavailable: false },
+    { route: "models" as Route, label: "Models", icon: "model" as NavIconName, description: "Browse and manage local models", unavailable: false },
+    { route: "compare" as Route, label: "Compare", icon: "compare" as NavIconName, description: "Compare model responses", unavailable: false },
+    { route: "scheduled" as Route, label: "Scheduled", icon: "clock" as NavIconName, description: "Manage scheduled work", unavailable: false },
+    { route: "terminal" as Route, label: "Terminal", icon: "terminal" as NavIconName, description: "Run a project command", unavailable: false },
+    { route: "persona-workshop" as Route, label: "Personas", icon: "sparkle" as NavIconName, description: "Create and manage personas", unavailable: false },
+    { route: "memory" as Route, label: "Memory", icon: "memory" as NavIconName, description: "Review saved notes and documents", unavailable: false },
+    { route: "voice-workbench" as Route, label: "Voice Workbench", icon: "audio" as NavIconName, description: "Choose and preview local voices", unavailable: installedVoiceModels.length === 0 },
+    ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pets", icon: "sparkle" as NavIconName, description: "Customize your desktop companion", unavailable: false }] : []),
   ], [showPetWorkshop]);
   const filteredItems = menuItems.filter((item) => !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase()));
   const openExtra = (itemRoute: Route) => {
@@ -65,7 +72,7 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
           {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search extras" aria-label="Search extras" /></label>}
           {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PICK UP WHERE YOU LEFT OFF</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
           <div className="global-rail-extras-group"><p className="global-rail-extras-label">FEATURES</p>
-          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching extras.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.route === "memory" ? "Your saved notes and knowledge" : item.route === "voice-workbench" ? "Choose and preview local voices" : item.route === "persona-workshop" ? "Create personas, groups, and conversations" : "Customize your desktop companion"}</small></span>{item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
+          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching tools.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.description}</small></span>{item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
           </div>
         </section>}
       </div>

@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { AppRouteView } from "./app/AppRouteView";
 import { useDesktopWorkspace } from "./app/useDesktopWorkspace";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -14,14 +14,21 @@ import { AchievementToast } from "./components/overlays/AchievementToast";
 
 export default function App() {
   const workspace = useDesktopWorkspace();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileSidebarOpen(false); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileSidebarOpen]);
   const shellStyle = { "--skai-sidebar-width": `${workspace.sidebarWidth}px` } as CSSProperties;
   const mainContentRoute = workspace.route === "settings" ? workspace.settingsReturnRoute : workspace.routeState.route;
-  const hideThreadSidebar = workspace.route !== "chat" && workspace.route !== "coding";
-  return <ErrorBoundary><div className={`app-shell ${hideThreadSidebar ? "thread-sidebar-hidden" : ""}`} style={shellStyle}>
+  return <ErrorBoundary><div className={`app-shell ${workspace.workspaceTabs.length ? "has-workspace-tabs" : ""} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`} style={shellStyle}>
     <a className="skip-link" href="#main-content">Skip to content</a>
-    <Toolbar connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
+    <Toolbar connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onToggleSidebar={() => setMobileSidebarOpen((open) => !open)} sidebarOpen={mobileSidebarOpen} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
     <GlobalRail route={workspace.route} onNavigate={workspace.onNavigate} />
-    {!hideThreadSidebar && <Sidebar className="thread-sidebar" route={workspace.route} activeConversationId={workspace.routeState.conversationId} agentMode={workspace.agentMode} onAgentModeChange={workspace.setAgentMode} onNavigate={workspace.onNavigate} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onNewChat={workspace.startNewChat} onOpenProject={workspace.routeActions.onOpenProject} onSelectConversation={workspace.selectConversation} onConversationMetadata={workspace.updateConversationMetadata} />}
+    {mobileSidebarOpen && <button className="mobile-sidebar-backdrop" type="button" aria-label="Close workspace navigation" onClick={() => setMobileSidebarOpen(false)} />}
+    <Sidebar className={`workspace-sidebar ${mobileSidebarOpen ? "is-mobile-open" : ""}`} route={workspace.route} activeConversationId={workspace.routeState.conversationId} agentMode={workspace.agentMode} onAgentModeChange={workspace.setAgentMode} onNavigate={(route) => { workspace.onNavigate(route); setMobileSidebarOpen(false); }} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onNewChat={() => { workspace.startNewChat(); setMobileSidebarOpen(false); }} onOpenProject={(project) => { workspace.routeActions.onOpenProject(project); setMobileSidebarOpen(false); }} onSelectConversation={(id) => { workspace.selectConversation(id); setMobileSidebarOpen(false); }} onConversationMetadata={workspace.updateConversationMetadata} />
     <div className="workspace-tabs-hotkeys"><WorkspaceTabs tabs={workspace.workspaceTabs} tasks={workspace.routeState.tasks} activeId={workspace.activeWorkspaceTabId} onSelect={workspace.selectWorkspaceTab} onClose={workspace.closeWorkspaceTab} onNew={workspace.openNewWorkspaceTab} canRestore={workspace.canRestoreWorkspaceTab} onRestore={workspace.restoreWorkspaceTab} /></div>
     <main className="app-main">
       <div className="backdrop-effects" aria-hidden="true" />

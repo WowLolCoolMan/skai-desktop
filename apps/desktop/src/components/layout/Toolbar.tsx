@@ -17,11 +17,12 @@ function AppMenu({ label, items }: { label: string; items: MenuItem[] }) {
   </div>;
 }
 
-export function Toolbar({ connection, canGoBack, canGoForward, onBack, onForward, onRetryConnection, onNavigate, onNewChat, windowsTitleBarOverlay = false }: { connection: "checking" | "ready" | "error"; canGoBack: boolean; canGoForward: boolean; onBack: () => void; onForward: () => void; onRetryConnection: () => void; onNavigate: (route: Route) => void; onNewChat: () => void; windowsTitleBarOverlay?: boolean }) {
+export function Toolbar({ connection, canGoBack, canGoForward, onBack, onForward, onRetryConnection, onNavigate, onNewChat, onToggleSidebar, sidebarOpen = false, windowsTitleBarOverlay = false }: { connection: "checking" | "ready" | "error"; canGoBack: boolean; canGoForward: boolean; onBack: () => void; onForward: () => void; onRetryConnection: () => void; onNavigate: (route: Route) => void; onNewChat: () => void; onToggleSidebar?: () => void; sidebarOpen?: boolean; windowsTitleBarOverlay?: boolean }) {
   const [helpPanel, setHelpPanel] = useState<"shortcuts" | "about" | null>(null);
   const logoTaps = useRef(0);
   const navigate = (nextRoute: Route) => () => onNavigate(nextRoute);
   return <header className={`app-toolbar ${windowsTitleBarOverlay ? "is-titlebar-overlay" : ""}`}>
+    {onToggleSidebar && <button className="toolbar-sidebar-toggle" type="button" aria-label={sidebarOpen ? "Close workspace sidebar" : "Open workspace sidebar"} aria-expanded={sidebarOpen} aria-controls="workspace-sidebar" onClick={onToggleSidebar}><NavIcon name="more" /></button>}
     <button className="toolbar-brand" type="button" aria-label={`${PRODUCT_DISPLAY_NAME} logo`} title="Skai Desktop" onClick={() => { logoTaps.current += 1; if (logoTaps.current >= 7) { logoTaps.current = 0; unlockAchievement("mascot-fan"); } }}><img src={SKAI_WOLF_ICON} alt="" aria-hidden="true" /></button>
     <nav className="app-menu-bar" aria-label="Application menu">
       <AppMenu label="Skai" items={[{ label: "New chat", shortcut: "Ctrl+N", onSelect: onNewChat }, { label: "Projects", onSelect: navigate("projects"), separatorBefore: true }, { label: "Coding workspace", shortcut: "Ctrl+2", onSelect: navigate("coding") }]} />

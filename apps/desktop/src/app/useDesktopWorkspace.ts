@@ -250,6 +250,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       }
     }
     chat.selectConversation(id);
+    if (conversation?.mode === "Coding Agent") chat.setResponseMode("coding", conversation.id);
     onNavigate(destination);
   }, [chat, coding, onNavigate, workspaceTabs]);
   const openNewWorkspaceTab = useCallback(() => {
@@ -257,6 +258,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     setWorkspaceTabs((current) => [...current, tab].slice(-16));
     setActiveWorkspaceTabId(tab.id);
     chat.startNewChat();
+    chat.setResponseMode(agentMode === "Coding Agent" ? "coding" : "think");
     onNavigate("chat");
   }, [agentMode, chat, onNavigate]);
   const startNewChat = openNewWorkspaceTab;
@@ -268,8 +270,12 @@ export function useDesktopWorkspace(): DesktopWorkspace {
         setAgentModeState(conversation.mode === "Coding Agent" ? "Coding Agent" : "ChatBot");
         localStorage.setItem("skai.agentMode", conversation.mode === "Coding Agent" ? "Coding Agent" : "ChatBot");
         chat.selectConversation(tab.conversationId);
+        if (conversation.mode === "Coding Agent") chat.setResponseMode("coding", conversation.id);
       }
-    } else chat.startNewChat();
+    } else {
+      chat.startNewChat();
+      if (tab.route === "coding" || tab.title === "New coding thread") chat.setResponseMode("coding");
+    }
     const project = tab.projectId ? coding.projects.find((item) => item.id === tab.projectId) : null;
     if (project) void coding.selectProject(project);
     onNavigate(tab.route);
@@ -313,7 +319,13 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     setAgentModeState("Coding Agent");
     localStorage.setItem("skai.agentMode", "Coding Agent");
     const projectThread = chat.conversations.find((conversation) => conversation.projectId === project.id && (conversation.mode ?? "ChatBot") === "Coding Agent");
-    if (projectThread) chat.selectConversation(projectThread.id); else chat.startNewChat();
+    if (projectThread) {
+      chat.selectConversation(projectThread.id);
+      chat.setResponseMode("coding", projectThread.id);
+    } else {
+      chat.startNewChat();
+      chat.setResponseMode("coding");
+    }
     const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: project.name, route: "coding", conversationId: projectThread?.id ?? null, projectId: project.id };
     setWorkspaceTabs((current) => [...current, tab].slice(-16));
     setActiveWorkspaceTabId(tab.id);

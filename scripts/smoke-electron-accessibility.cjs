@@ -8,7 +8,7 @@ const defaultName = process.platform === "win32" ? "Skai Desktop.exe" : "Skai De
 const defaultRoot = path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : "linux"}-x64`);
 const executable = path.resolve(process.argv[2] || path.join(defaultRoot, defaultName));
 const axePath = path.join(__dirname, "..", "apps", "desktop", "node_modules", "axe-core", "axe.min.js");
-const defaultRoutes = ["chat", "settings", "marketplace", "plugins", "projects", "coding", "models", "compare", "images", "terminal", "memory", "usage", "pet-workshop", "voice-workbench", "workbench"];
+const defaultRoutes = ["chat", "settings", "marketplace", "plugins", "projects", "coding", "models", "compare", "images", "video", "terminal", "memory", "usage", "pet-workshop", "voice-workbench", "workbench"];
 const requestedRoutes = process.env.ACCESSIBILITY_ROUTES?.split(",").map((route) => route.trim()).filter(Boolean);
 const routes = requestedRoutes?.length ? requestedRoutes : defaultRoutes;
 const unknownRoutes = routes.filter((route) => !defaultRoutes.includes(route));

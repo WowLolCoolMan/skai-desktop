@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type NavIconName = "home" | "chat" | "code" | "activity" | "model" | "compare" | "image" | "marketplace" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "search" | "plus" | "document" | "audio" | "microphone" | "headset" | "clock" | "stop" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
+export type NavIconName = "home" | "chat" | "code" | "activity" | "model" | "compare" | "image" | "video" | "marketplace" | "sparkle" | "terminal" | "memory" | "settings" | "project" | "search" | "plus" | "document" | "audio" | "microphone" | "headset" | "clock" | "stop" | "arrow-right" | "arrow-up-right" | "chevron-left" | "chevron-right" | "refresh" | "close" | "more";
 
 export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVGSVGElement>) {
   const common = { fill: "none", stroke: "currentColor", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, strokeWidth: 1.65 };
@@ -13,6 +13,7 @@ export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVG
     case "model": content = <><circle {...common} cx="12" cy="12" r="7.5" /><path {...common} d="M12 4.5v15M4.5 12h15" /><circle {...common} cx="12" cy="12" r="2" /></> ; break;
     case "compare": content = <><rect {...common} x="3.5" y="4" width="7" height="16" rx="1.5" /><rect {...common} x="13.5" y="4" width="7" height="16" rx="1.5" /><path {...common} d="M7 8h.01M7 12h.01M17 8h.01M17 12h.01" /></> ; break;
     case "image": content = <><rect {...common} x="3" y="4" width="18" height="16" rx="2" /><circle {...common} cx="8" cy="9" r="1.5" /><path {...common} d="m4 17 5-5 3 3 2-2 6 5" /></> ; break;
+    case "video": content = <><rect {...common} x="3" y="5" width="13" height="14" rx="2" /><path {...common} d="m16 10 5-3v10l-5-3z" /></>; break;
     case "marketplace": content = <><path {...common} d="M4 9 5.5 4h13L20 9" /><path {...common} d="M5 9v11h14V9M9 20v-6h6v6" /><path {...common} d="M4 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0" /></> ; break;
     case "sparkle": content = <><path {...common} d="m12 3 1.4 5.6L19 10l-5.6 1.4L12 17l-1.4-5.6L5 10l5.6-1.4z" /><path {...common} d="m19 16 .6 2.4L22 19l-2.4.6L19 22l-.6-2.4L16 19l2.4-.6z" /></> ; break;
     case "terminal": content = <><path {...common} d="m4 6 6 6-6 6M13 18h7" /></> ; break;

@@ -21,9 +21,9 @@ Ordered around open acceptance blockers and the user's explicit priorities.
 Mark an item done only when the linked workflow has evidence.
 
 1. **UI and accessibility acceptance — In progress · Codex.** The freshly
-   packaged audit passes all 14 routes with zero WCAG violations or incomplete
-   checks; skip-link/main-landmark and popup relationships pass. The 17-route
-   layout matrix passes five window sizes and four theme/sidebar variants with
+   packaged audit passes all 16 routes with zero WCAG violations or incomplete
+   checks; skip-link/main-landmark and popup relationships pass. The 20-route
+   layout matrix passes five supported window sizes and four theme/sidebar variants with
    no runtime or layout failures. Packaged theme/contrast acceptance passes
    dark, light, system, custom-theme reload/recovery, and narrow-layout states;
    overflow acceptance passes 11 routes at five widths. Remaining work is
@@ -76,14 +76,16 @@ Mark an item done only when the linked workflow has evidence.
    Ubuntu 24.04 WSL acceptance pass filesystem, network, process, memory,
    timeout, and cancellation checks. Unsupported macOS execution remains
    fail-closed by design. See [architecture](../engineering/ARCHITECTURE.md).
-4. **Persona era acceptance — In progress · Codex.** Added an explicit prompt
-   rule treating post-cutoff events as unknown even when they are already public.
-   Native core acceptance passes, and a live David Lynch 2010-era multi-turn
-   smoke passes on Qwen3 14B. The same case fails on LFM3 Omni 2B (weak identity
-   and cutoff behavior). Product decision blocker: define the minimum supported
-   local model tier for persona mode. Owner: User. Next action: confirm whether
-   persona acceptance targets 14B-class models or must also pass on 2B-class
-   models; Codex will add model gating or continue low-tier tuning accordingly.
+4. **Persona era acceptance — In progress · Codex.** Persona mode accepts any
+   available chat model; there is no minimum-tier gate. The prompt gives a
+   concise final rule to honor the persona era cutoff, avoid invented memories,
+   and state uncertainty naturally. Native core acceptance passes. Live David
+   Lynch 2010-era checks pass on Qwen3 14B and LFM3 Omni 2B. The 2B model builds
+   a complete persona, answers in character, and correctly says it lacks
+   information about 2011. Its original answer was incorrectly marked failed
+   because the acceptance matcher did not recognize “I don't have information”;
+   the matcher now accepts that clear equivalent. Broader acceptance across
+   additional personas and model families remains open.
    See the [Smart Personas plan](implementation-plans/smart-personas.md).
 5. **Image runtime coverage — In progress · Codex.** Packaged Diffusers CPU
    acceptance passes. On 2026-11-23, live ComfyUI acceptance on this PC passed
