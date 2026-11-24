@@ -3272,6 +3272,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-heading { align-items: center; }
 .app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-heading h3 { font-size: var(--skai-text-sm); }
 .app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-heading p:not(.section-kicker) { display: none; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .chat-task-composer { gap: 8px; margin: 0; padding: 8px 10px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-fields { gap: 7px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-fields label { grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 7px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-fields input,
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-fields textarea { padding: 7px 9px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-fields textarea { height: 60px; min-height: 60px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .environment-picker { gap: 5px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .environment-options { gap: 6px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .environment-option { padding: 7px 9px; }
+.app-content-coding .coding-page-active .project-thread-panel .project-task-planner-slot .task-composer-footer { padding-top: 3px; }
 
 /* Scheduled local prompts use the task-list and empty-state layout from the reference. */
 .app-content-scheduled { min-height: 0; overflow: hidden; padding: 0; }
@@ -3742,4 +3752,32 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 640px) {
   .app-shell:has(.thread-sidebar.is-coding-agent) { grid-template-columns: 52px minmax(0, 1fr); }
   .app-shell:has(.thread-sidebar.is-coding-agent) > .app-main { grid-column: 2; }
+}
+
+/* Keep the Coding workspace controls inside a narrow renderer. */
+@media (max-width: 640px) {
+  .app-shell:has(.thread-sidebar.is-coding-agent) > .app-main { min-width: 0; }
+  .app-content-coding { min-width: 0; max-width: 100%; overflow-x: hidden; }
+  .app-content-coding .coding-page-active { min-width: 0; max-width: 100%; }
+  .app-content-coding .coding-page-active .coding-project-heading { flex-wrap: wrap; }
+  .app-content-coding .coding-page-active .coding-project-heading-main { max-width: 100%; }
+  .app-content-coding .coding-page-active .coding-project-heading-actions { flex: 1 1 100%; min-width: 0; flex-wrap: wrap; }
+  .app-content-coding .coding-page-active .coding-project-heading-actions select { width: min(190px, 58vw); min-width: 0; }
+  .app-content-coding .coding-page-active .coding-project-heading-actions .ui-button { max-width: 100%; }
+  .app-content-coding .coding-page-active .coding-project-context { width: 100%; min-width: 0; align-items: stretch; flex-direction: column; overflow: hidden; }
+  .app-content-coding .coding-page-active .coding-project-context-actions { display: flex; width: 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-start; gap: 6px; }
+  .app-content-coding .coding-page-active .coding-project-context-actions > * { min-width: 0; max-width: 100%; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .app-content-coding:has(.project-task-planner-slot .chat-task-composer.is-open) { overflow-y: auto; }
+  .app-content-coding .coding-page-active:has(.project-task-planner-slot .chat-task-composer.is-open) { height: auto; min-height: 100%; flex: 0 0 auto; }
+  .app-content-coding .coding-session-grid.is-chat:has(.project-task-planner-slot .chat-task-composer.is-open) { min-height: 0; flex: 0 0 auto; grid-template-rows: auto auto; overflow: visible; }
+  .app-content-coding .coding-session-grid.is-chat:has(.project-task-planner-slot .chat-task-composer.is-open) > .project-thread-panel { height: auto; min-height: 0; overflow: visible; }
+  .app-content-coding .project-thread-panel:has(.project-task-planner-slot .chat-task-composer.is-open) .chat-page,
+  .app-content-coding .project-thread-panel:has(.project-task-planner-slot .chat-task-composer.is-open) .chat-layout,
+  .app-content-coding .project-thread-panel:has(.project-task-planner-slot .chat-task-composer.is-open) .chat-column { height: auto; min-height: 0; flex: 0 0 auto; overflow: visible; }
+  .app-content-coding .project-thread-panel:has(.project-task-planner-slot .chat-task-composer.is-open) .conversation-surface { height: auto; min-height: 0; overflow: visible; }
+  .app-content-coding .project-thread-panel:has(.project-task-planner-slot .chat-task-composer.is-open) .message-list { min-height: 0; max-height: 220px; overflow-y: auto; }
 }

@@ -68,6 +68,29 @@ what they cover.
   matched the Q2, 12,480-user, and 5.6% outcomes and cited both files. The
   screenshot is seeded from the same fixture. Direct composer attachment,
   Documents-only toggle, and send interaction still needs a packaged UI check.
+- Reference #7 now has a packaged 1440×900 search-result screenshot. The
+  isolated UI flow filtered to matching garden conversations, opened a result,
+  and confirmed the search query stayed in place. `npm run
+  smoke:conversation-import` passed preview-only inspection, collision
+  handling, legacy-context stripping, and idempotent repeat import. Skai keeps
+  search in the conversation sidebar and the selected thread open; Revision 4
+  draws it as a standalone search page. The sidebar pattern is more compact and
+  keeps the familiar conversation context visible.
+- Reference #8 now has a packaged 1440×900 Coding Agent task-plan screenshot.
+  The project-scoped UI flow filled a task title and brief, saved the plan in
+  the linked conversation, and confirmed it was reviewable without starting a
+  run. Its first capture revealed that the planner pushed the composer below
+  the visible area. The project-thread form now uses a shorter editable brief,
+  aligned labels, and tighter spacing; `npm run desktop:typecheck`, `npm run
+  build`, and `npm run package:electron` passed, and the rebuilt packaged
+  matrix reports no unreachable controls. The local project is selected in the
+  workspace header; approval-before-run remains checked by default. The same
+  project-thread plan/save/close flow passed at 390×844 after the planner was
+  allowed to expand into the vertical workspace scroll. Mobile Coding header
+  and project actions now wrap without page-level horizontal overflow. The
+  packaged matrix reported no clipped controls; typecheck, production build,
+  and Electron packaging passed. Remaining: capture and compare #6 and #9–#30,
+  and complete the direct document attachment → Documents-only → send flow.
 
 ## Revision 4 implementation pass — 2026-11-23
 

@@ -91,6 +91,40 @@ result-state capture shows the source documents on the sent turn while the
 composer is ready for the next turn. The direct UI attach → Documents-only →
 send flow remains open for acceptance.
 
+### Conversation search and import — reference #7
+
+The packaged 1440×900 search result is captured in
+[Chat search evidence](evidence-chat-search-1440.png). Searching `garden`
+filters local conversation history to matching titles, selecting a result
+opens that conversation while preserving the query, and the existing import
+preview flow remains in Chat options. The packaged search and import checks
+passed. Revision 4 depicts search as a full-page destination; Skai keeps search
+in the conversation sidebar and opens the chosen result in the active thread.
+That follows the compact conversation-sidebar pattern used by desktop AI chat
+workspaces while keeping the current conversation in context.
+
+### Project task plan — reference #8
+
+The packaged 1440×900 project-scoped planner is captured in
+[Coding task-plan evidence](evidence-coding-task-plan-1440.png). The focused
+Coding Agent flow opened the local project thread's planner, filled a task title
+and brief, saved the plan to the conversation, and received confirmation that
+the plan is saved for review; saving did not start execution. The first capture
+showed the composer clipped below the planner. The embedded planner now uses a
+compact two-row form and shorter brief field so the composer stays visible; the
+rebuilt packaged matrix passes without unreachable-control findings.
+
+The project name is already selected in the workspace header, so the plan form
+does not repeat a project dropdown. Skai also defaults to requiring approval
+before a local run starts, while the reference shows that optional switch off.
+These choices keep project context visible and execution approval explicit.
+The focused packaged flow also passed at 390×844: the planner expands into the
+vertical workspace scroll, saves for review, then closes back to the compact
+Coding thread. The Coding header/actions now wrap within the mobile viewport;
+the matrix reported no clipped controls or horizontal overflow. Desktop
+`npm run desktop:typecheck`, `npm run build`, and `npm run package:electron`
+passed after the layout changes.
+
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
 Focused interaction smokes passed for queueing, search/import, task handoff and
@@ -105,7 +139,10 @@ This is route and representative-flow evidence, not proof that every numbered
 image has been matched. Several references describe distinct states within one
 route. Reference #4 now has paired screenshots and interaction evidence.
 Reference #5 has a result screenshot and local-inference evidence, while its
-composer interaction still needs direct packaged UI coverage. The remaining
+composer interaction still needs direct packaged UI coverage. References #7
+and #8 now have packaged screenshots and their search/import and local-plan
+flows exercised. The
+remaining
 acceptance work is to capture and compare the other states individually,
 especially Voice
 Mode, task planning/progress, schedules, project creation, GitHub, model

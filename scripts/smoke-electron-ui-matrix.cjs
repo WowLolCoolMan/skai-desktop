@@ -67,7 +67,7 @@ function connect(url) {
 }
 
 async function clickInRenderer(cdp, selector) {
-  const point = await cdp.evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) return null; const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
+  const point = await cdp.evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
   if (!point) throw new Error(`UI interaction target was not found: ${selector}`);
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
   await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", clickCount: 1 });
@@ -75,7 +75,7 @@ async function clickInRenderer(cdp, selector) {
 }
 
 async function clickButtonText(cdp, text, scope = "body") {
-  const point = await cdp.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(scope)}); const element = [...(root?.querySelectorAll('button') ?? [])].find((button) => button.innerText.trim() === ${JSON.stringify(text)}); if (!element || element.disabled) return null; const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
+  const point = await cdp.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(scope)}); const element = [...(root?.querySelectorAll('button') ?? [])].find((button) => button.innerText.trim() === ${JSON.stringify(text)}); if (!element || element.disabled) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
   if (!point) throw new Error(`UI button was not found or is disabled: ${text}`);
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
   await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", clickCount: 1 });
@@ -186,6 +186,8 @@ async function main() {
   const captureMode = process.env.UI_MATRIX_CAPTURE === "1";
   const exerciseChatActions = process.env.UI_MATRIX_EXERCISE_CHAT_ACTIONS === "1";
   const exerciseDocuments = process.env.UI_MATRIX_EXERCISE_DOCUMENTS === "1";
+  const exerciseChatSearch = process.env.UI_MATRIX_EXERCISE_CHAT_SEARCH === "1";
+  const exerciseTaskPlan = process.env.UI_MATRIX_EXERCISE_TASK_PLAN === "1";
   const includeCodingFixture = process.env.UI_MATRIX_EXERCISE_CHAT !== "1";
   const longWord = captureMode ? "" : "Supercalifragilisticexpialidocious_".repeat(5);
   const longTitle = captureMode ? "Plan a simple herb garden" : "Investigate why the tiled window squeezes the composer when the conversation title is extremely long and keeps going";
@@ -208,6 +210,11 @@ async function main() {
     if (project.ok && ${includeCodingFixture}) results.push(await r("conversation.save", { title: "Review the starter project", mode: "Coding Agent", responseMode: "coding", projectId: project.result?.id, messages: [{ role: "user", content: "Review this project structure and suggest the next small improvement." }, { role: "assistant", content: "I’ll inspect the existing files, then outline a focused change and how to verify it." }] }));
     if (${captureMode} && results[0]?.result?.id) results.push(await r("conversation.save", { id: results[0].result.id, title: ${JSON.stringify(longTitle)}, mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Help me plan a low-maintenance herb garden for a sunny patio." }, { role: "assistant", content: "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." }] }));
     if (${captureMode} && ${exerciseDocuments}) results.push(await r("conversation.save", { title: "Plan and results summary", mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Based only on the attached plan and results, what were the objectives and did we meet them?", attachments: [{ fileName: "Plan.pdf", content: "Objectives: deliver the MVP by the end of Q2; reach at least 10,000 active users; achieve a conversion rate of at least 5%." }, { fileName: "Results.xlsx", content: "MVP delivered in Q2. Active users: 12,480. Conversion rate: 5.6%." }] }, { role: "assistant", content: "According to Plan.pdf, the objectives were to deliver the MVP by Q2, reach at least 10,000 active users, and reach a conversion rate of at least 5%. Results.xlsx reports delivery in Q2, 12,480 active users, and a 5.6% conversion rate, so all three objectives were met. Sources: Plan.pdf (objectives); Results.xlsx (outcomes)." }] }));
+    if (${captureMode} && ${exerciseChatSearch}) for (const item of [
+      { title: "Garden planning", query: "What should I plant in my garden this spring?", answer: "Here is a simple garden plan with plant suggestions and timing." },
+      { title: "Vegetable garden tips", query: "How can I improve my vegetable garden?", answer: "Focus on good soil, sunlight, and consistent watering." },
+      { title: "Backyard garden ideas", query: "Share a few backyard garden ideas.", answer: "Try raised beds and low-maintenance plants for your backyard." },
+    ]) results.push(await r("conversation.save", { title: item.title, messages: [{ role: "user", content: item.query }, { role: "assistant", content: item.answer }] }));
     if (${captureMode} && ${exerciseChatActions}) for (const text of ["Add a week-by-week planting schedule.", "Include a simple materials checklist.", "Estimate the monthly watering routine."]) results.push(await r("chat.queue.enqueue", { text }));
     if (${captureMode}) for (const card of [
       { name: "Default", roles: "General-purpose assistant", instructions: "Be clear, practical, and adaptable to the user's task." },
@@ -247,6 +254,23 @@ async function main() {
           await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
           const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
+          if (process.env.UI_MATRIX_EXERCISE_TASK_PLAN === "1") {
+            await clickButtonText(cdp, "Plan task", ".project-thread-panel");
+            const plannerReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-task-planner-slot:not([hidden]) form')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!plannerReady) throw new Error("The project Coding Agent thread did not open its local task planner.");
+            await cdp.evaluate(`(() => { const fields = document.querySelectorAll('.project-task-planner-slot form input:not([type="checkbox"]), .project-task-planner-slot form textarea'); const set = (element, value) => { const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); }; set(fields[0], 'Add tests for API client'); set(fields[1], 'Write focused unit tests for the new API client, covering core methods, error handling, and edge cases.'); return fields.length; })()`);
+            const planDraftReady = await cdp.evaluate(`(() => { const fields = document.querySelectorAll('.project-task-planner-slot form input:not([type="checkbox"]), .project-task-planner-slot form textarea'); return fields.length >= 2 && fields[0].value === 'Add tests for API client' && fields[1].value.includes('core methods'); })()`);
+            if (!planDraftReady) throw new Error("The project task planner did not accept its task title and brief.");
+            if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(captureDirectory, "coding-task-plan-1440.png"), Buffer.from(screenshot.data, "base64"));
+            }
+            await clickButtonText(cdp, "Save plan in thread", ".project-task-planner-slot");
+            const planSaved = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.project-task-planner-slot [role="status"]')?.textContent.includes('Plan saved to this conversation for review')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!planSaved) throw new Error(`Saving the project task plan did not confirm it for review in the conversation: ${JSON.stringify(await cdp.evaluate(`(() => ({ status: document.querySelector('.project-task-planner-slot [role="status"]')?.textContent, planner: document.querySelector('.project-task-planner-slot')?.innerText, saveDisabled: document.querySelector('.project-task-planner-slot button[type="submit"]')?.disabled }))()`))}`);
+            if (width < 640) await clickButtonText(cdp, "Close planner", ".project-thread-panel");
+          }
           const readme = await cdp.evaluate(`(() => [...document.querySelectorAll('.project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)()`);
           if (readme) await cdp.evaluate(`document.querySelector('.project-file-item[title=${JSON.stringify(readme)}]')?.click(); 1`);
           await sleep(500);
@@ -294,7 +318,7 @@ async function main() {
         }
         if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT === "1") {
           const activeChatClass = await cdp.evaluate(`document.querySelector('.chat-page')?.className ?? ''`);
-          if (!activeChatClass.includes("is-coding-agent")) {
+          if (!activeChatClass.includes("is-coding-agent") && process.env.UI_MATRIX_EXERCISE_CHAT_SEARCH !== "1") {
             const responseButtons = await cdp.evaluate(`([...document.querySelectorAll('.chat-response-mode-options button')].map((button) => button.textContent?.trim()))`);
             if (!responseButtons.includes("Coding")) throw new Error("A regular Chat thread did not render its response-mode controls.");
             await cdp.evaluate(`([...document.querySelectorAll('.chat-response-mode-options button')].find((button) => button.textContent?.trim() === 'Coding')?.click(), 1)`);
@@ -305,6 +329,17 @@ async function main() {
           await cdp.evaluate(`(() => { const input = document.querySelector('.sidebar-search'); if (!input) return false; const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, 'garden'); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
           const filteredHistory = await cdp.evaluate(`document.querySelector('.sidebar-history-list')?.innerText ?? ''`);
           if (!filteredHistory.includes("Plan a simple herb garden") || filteredHistory.includes("Review the starter project")) throw new Error(`Conversation search did not filter the local history as expected: ${filteredHistory}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && process.env.UI_MATRIX_EXERCISE_CHAT_SEARCH === "1") {
+            for (const title of ["Garden planning", "Vegetable garden tips", "Backyard garden ideas"]) if (!filteredHistory.includes(title)) throw new Error(`Conversation search omitted the matching result ${title}: ${filteredHistory}`);
+            await cdp.evaluate(`([...document.querySelectorAll('.sidebar-history-row')].find((row) => row.innerText.includes('Garden planning'))?.querySelector('.sidebar-history-item')?.click(), 1)`);
+            const selectedSearchResult = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.chat-message.assistant')?.innerText.includes('simple garden plan')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!selectedSearchResult) throw new Error("Selecting a filtered conversation did not open its matching chat thread.");
+            const activeSearch = await cdp.evaluate(`document.querySelector('.sidebar-search')?.value ?? ''`);
+            if (activeSearch !== "garden") throw new Error(`Opening a search result unexpectedly cleared the search query: ${activeSearch}`);
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "chat-search-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
           await cdp.evaluate(`(() => { const input = document.querySelector('.sidebar-search'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true })); return 1; })()`);
           await clickInRenderer(cdp, ".overflow-menu-trigger[aria-label='Chat options']");
           await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.includes('Show task tools'))?.click(), 1)`);
@@ -368,6 +403,9 @@ async function main() {
             await cdp.evaluate(`([...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === ${JSON.stringify(category)})?.click(), 1)`);
             await sleep(90);
             phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
+          }
+          if (route === "coding" && width < 640) {
+            await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-coding', '.coding-session-grid', '.project-thread-panel .message-list']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return 1; })()`);
           }
           const issues = await cdp.evaluate(PROBE);
           if (process.env.UI_MATRIX_LAYOUT_DEBUG === "1" && width < 640) {

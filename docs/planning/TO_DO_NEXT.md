@@ -54,8 +54,16 @@ Mark an item done only when the linked workflow has evidence.
    Qwen3 14B documents-only inference smoke; it cites both synthetic attached
    files and matches the objective outcomes. The direct packaged composer
    attach → Documents-only → send flow still needs interaction evidence.
-   `npm run desktop:typecheck`, `npm run build`, and `npm run package:electron`
-   passed after the bridge change. Next action: finish screenshot-by-screenshot matching of the 30
+   Reference #7 has a packaged search-result screenshot; filtered result
+   selection preserves the query, and the conversation-import preview/collision
+   smoke passes. The remaining screenshot reviews still include #6 and #9–#30.
+   Reference #8 now has a project-scoped task-plan screenshot and packaged
+   open → edit brief → save for review flow at desktop and 390×844; it does not
+   start a run. The desktop planner is compact, while the mobile planner opens
+   into the vertical workspace scroll. Coding header/actions wrap on mobile;
+   the rebuilt packaged matrix found no clipped controls or horizontal
+   overflow. `npm run desktop:typecheck`, `npm run build`, and
+   `npm run package:electron` passed. Next action: finish screenshot-by-screenshot matching of the 30
    supported Revision 4 workflow references and their distinct states, then
    add interaction evidence for document grounding,
    voice, plans/schedules, GitHub, model review, Marketplace, MCP, image/media,

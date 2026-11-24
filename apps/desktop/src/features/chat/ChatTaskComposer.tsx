@@ -79,7 +79,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
       {showToggle && <Button variant="secondary" type="button" aria-expanded={open} aria-controls="chat-task-composer-fields" onClick={() => setLocalOpen((value) => !value)}>{open ? "Hide planner" : "Plan a task"}</Button>}
     </div>
     {open && <form id="chat-task-composer-fields" onSubmit={(event) => void submit(event)}>
-      <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={5} onChange={(event) => setInstruction(event.target.value)} required /></label></div>
+      <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={3} onChange={(event) => setInstruction(event.target.value)} required /></label></div>
       <EnvironmentPicker value={environment} onChange={setEnvironment} />
       <label className="task-require-approval"><input type="checkbox" checked={requiresApproval} onChange={(event) => setRequiresApproval(event.target.checked)} /> Require approval before starting the local agent run</label>
       <div className="task-composer-footer"><span role="status">{status || "Review the brief before saving the plan."}</span><Button variant="primary" type="submit" disabled={busy || !title.trim() || !instruction.trim()}>{busy ? "Saving plan…" : "Save plan in thread"}</Button></div>
