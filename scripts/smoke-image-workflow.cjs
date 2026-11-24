@@ -51,6 +51,10 @@ async function main() {
       ...process.env,
       SKAI_ELECTRON_SMOKE: "true",
       HF_HUB_OFFLINE: "1",
+      // Keep the real user model cache visible even though the desktop profile
+      // and LOCALAPPDATA are redirected for smoke isolation.
+      HF_HUB_CACHE: modelCache,
+      HUGGINGFACE_HUB_CACHE: modelCache,
       SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
       APPDATA: appDataDir,
       LOCALAPPDATA: path.join(userDataDir, "localappdata"),
@@ -290,7 +294,11 @@ async function main() {
     await evaluate(target, "document.querySelector('.visuals-gallery-item').click(); true");
     await waitFor(target, "[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Use for edit')", "generated output inspector");
     await evaluate(target, "[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Use for edit').click(); true");
-    await waitFor(target, "document.querySelector('.visuals-workshop-page')?.classList.contains('is-editing') && document.querySelector('.visuals-edit-source-preview img')", "history image reopened for editing");
+    const reopened = await waitFor(target, "(() => { const page = document.querySelector('.visuals-workshop-page'); const preview = document.querySelector('.visuals-edit-source-preview img'); const error = document.querySelector('[role=alert]')?.textContent?.trim(); if (page?.classList.contains('is-editing') && preview) return JSON.stringify({ editing: true, source: preview.naturalWidth, prompt: Boolean(document.querySelector('#visuals-prompt')) }); return error ? JSON.stringify({ editing: false, error, selected: document.querySelector('.visuals-output-caption')?.innerText ?? null, tool: page?.className }) : null; })()", "history image reopened for editing", 45_000).catch(async () => {
+      const state = await evaluate(target, "JSON.stringify({ page: document.querySelector('.visuals-workshop-page')?.className, activeTool: document.querySelector('.visuals-tool-tab.is-active')?.innerText ?? null, storedTool: localStorage.getItem('skai.visuals.tool'), output: document.querySelector('.visuals-output-caption')?.innerText ?? null, action: document.querySelector('.visuals-output-caption button')?.innerText ?? null, alert: document.querySelector('[role=alert]')?.innerText ?? null, source: document.querySelector('.visuals-source-image')?.innerText ?? null, history: [...document.querySelectorAll('.visuals-gallery-item')].map((item) => ({ selected: item.getAttribute('aria-pressed'), label: item.getAttribute('aria-label') })) })");
+      throw new Error(`The Use for edit action did not switch to Edit: ${state}`);
+    });
+    if (reopened.includes('"editing":false')) throw new Error(`The saved image could not be reopened for editing: ${reopened}`);
     await setPrompt("The same vase with a green leaf beside it, same cream studio backdrop.");
     await evaluate(target, "document.querySelector('.visuals-composer-action button').click(); true");
     await waitFor(target, "document.querySelectorAll('.visuals-gallery-item').length === 2", "edited output retained beside source");

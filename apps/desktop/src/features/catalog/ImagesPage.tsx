@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, StatusBadge } from "../../components/ui/Primitives";
 import type { AgentResponse, ChatAttachment } from "../../../shared/contracts";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
@@ -100,6 +100,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const usesBuiltInImageEngine = activeTool === "image" || activeTool === "edit";
   const generationProvider: ImageProvider = usesBuiltInImageEngine ? selectedProvider : "comfyui";
   const [selectedImage, setSelectedImage] = useState<ImageResult | null>(null);
+  const preserveImageSelectionRef = useRef(false);
   const [workflowName, setWorkflowName] = useState("");
   const [selectedWorkflowName, setSelectedWorkflowName] = useState("");
   const [importingWorkflow, setImportingWorkflow] = useState(false);
@@ -144,6 +145,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const importWorkflow = async () => { setWorkflowError(null); setImportingWorkflow(true); try { const imported = await onImportWorkflow(); if (!imported) return; setSavedWorkflows((current) => [{ name: imported.name, workflow: imported.workflow }, ...current.filter((item) => item.name !== imported.name)].slice(0, 12)); setSelectedWorkflowName(imported.name); setWorkflowName(imported.name); onChange("workflow", imported.workflow); } catch (error) { setWorkflowError(error instanceof Error ? error.message : "The workflow could not be imported."); } finally { setImportingWorkflow(false); } };
   const useHistoryImageForEdit = async () => {
     if (!selectedImage || reopeningImage) return;
+    preserveImageSelectionRef.current = true;
     setReopeningImage(true);
     setWorkflowError(null);
     try {
@@ -155,6 +157,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
     } finally { setReopeningImage(false); }
   };
   const chooseTool = (tool: VisualTool) => {
+    if (tool !== "edit") preserveImageSelectionRef.current = false;
     const nextWorkflow = toolWorkflows[tool] ?? ((tool === "image" || tool === "edit") ? workflow : "");
     setActiveTool(tool);
     localStorage.setItem("skai.visuals.tool", tool);
@@ -181,12 +184,16 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const canGenerate = Boolean(prompt.trim() && !busy && (generationProvider === "diffusers"
     ? imageRuntime?.dependenciesAvailable
     : endpoint.trim() && workflow.includes("{{prompt}}") && (!workflow.includes("{{image}}") || sourceImage) && (!sourceImage || workflow.includes("{{image}}"))));
-  useEffect(() => { setSelectedImage(images[0] ?? null); }, [images]);
+  useEffect(() => { if (!preserveImageSelectionRef.current) setSelectedImage(images[0] ?? null); }, [images]);
+  const generate = (source?: ChatAttachment, options?: { provider: ImageProvider; prompt: string }) => {
+    preserveImageSelectionRef.current = false;
+    onGenerate(source, options);
+  };
   return <div className={`feature-page image-studio-page visuals-workshop-page${activeTool === "edit" ? " is-editing" : ""}${activeTool === "image" && images.length === 0 ? " is-generate-empty" : ""}`}>
     <h1 className="visuals-page-title">Images</h1>
     <nav className="visuals-toolstrip" aria-label="Visuals Workshop tools">
       {visualTools.slice(0, 2).map((tool) => <button key={tool.id} type="button" className={`visuals-tool-tab${activeTool === tool.id ? " is-active" : ""}`} aria-pressed={activeTool === tool.id} onClick={() => chooseTool(tool.id)}><NavIcon name={tool.icon} /><span>{tool.label}</span></button>)}
-      <details className="visuals-more-tools" open={toolsMenuOpen} onToggle={(event) => setToolsMenuOpen(event.currentTarget.open)}><summary aria-label="More image tools">More tools{activeTool !== "image" && activeTool !== "edit" ? ` · ${activeToolDetails.label}` : ""}</summary><div className="visuals-more-tools-menu" role="group" aria-label="Additional image tools">{visualTools.slice(2).map((tool) => <button key={tool.id} type="button" className={`visuals-tool-tab${activeTool === tool.id ? " is-active" : ""}${tool.comingSoon ? " is-coming-soon" : ""}`} disabled={tool.comingSoon} aria-pressed={activeTool === tool.id} title={tool.comingSoon ? `${tool.label} generation is coming soon` : undefined} onClick={() => { chooseTool(tool.id); setToolsMenuOpen(false); }}><NavIcon name={tool.icon} /><span>{tool.label}</span>{tool.comingSoon && <small>Soon</small>}</button>)}</div></details>
+      <details className="visuals-more-tools" open={toolsMenuOpen} onToggle={(event) => setToolsMenuOpen(event.currentTarget.open)}><summary>More tools{activeTool !== "image" && activeTool !== "edit" ? ` · ${activeToolDetails.label}` : ""}</summary><div className="visuals-more-tools-menu" role="group" aria-label="Additional image tools">{visualTools.slice(2).map((tool) => <button key={tool.id} type="button" className={`visuals-tool-tab${activeTool === tool.id ? " is-active" : ""}${tool.comingSoon ? " is-coming-soon" : ""}`} disabled={tool.comingSoon} aria-pressed={activeTool === tool.id} title={tool.comingSoon ? `${tool.label} generation is coming soon` : undefined} onClick={() => { chooseTool(tool.id); setToolsMenuOpen(false); }}><NavIcon name={tool.icon} /><span>{tool.label}</span>{tool.comingSoon && <small>Soon</small>}</button>)}</div></details>
     </nav>
     <div className="visuals-main">
       <main className="visuals-stage" aria-label={`${activeToolDetails.label} workspace`}>
@@ -195,7 +202,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
           {selectedImage ? <div className={`visuals-output visuals-output-${mediaTypeOf(selectedImage)}`}>{renderMedia(selectedImage)}<div className="visuals-output-caption"><span>{selectedImage.prompt || selectedImage.fileName}</span><div><a className="ui-button ui-button-secondary" href={selectedImage.url} download={selectedImage.fileName}>Download</a>{mediaTypeOf(selectedImage) === "image" && <Button variant="secondary" type="button" disabled={reopeningImage} onClick={() => void useHistoryImageForEdit()}>{reopeningImage ? "Opening…" : "Use for edit"}</Button>}</div></div></div> : busy ? <div className="visuals-generation-state"><span className="visuals-generation-spinner" aria-hidden="true" /><h2>{cancelRequested ? "Stopping safely" : `Creating ${activeToolDetails.label.toLowerCase()}`}</h2><p>{progress.at(-1) ?? "Waiting for the local runtime…"}</p>{progress.length > 1 && <small>{progress.at(-2)}</small>}</div> : activeTool === "edit" && sourceImageUrl ? <div className="visuals-edit-source-preview"><img src={sourceImageUrl} alt={`Source image: ${sourceImage?.fileName ?? "selected image"}`} /><span>Source image</span></div> : <div className="visuals-empty-state"><span className="visuals-empty-mark"><NavIcon name={activeToolDetails.icon} /></span><h2>{activeTool === "video" ? "Describe a scene to animate" : activeTool === "music" ? "Describe the sound you want to make" : `${activeToolDetails.label} something new`}</h2><p>{activeToolDetails.note}</p><div className="visuals-suggestions">{(activeTool === "video" ? ["a wave breaking on rocks in slow motion, cinematic", "timelapse of clouds over a mountain range"] : activeTool === "music" ? ["warm ambient piano with soft tape texture", "upbeat electronic track with a deep bass line"] : promptRecipes.map((recipe) => recipe.prompt)).map((suggestion) => <button type="button" key={suggestion} onClick={() => onChange("prompt", suggestion)}>{suggestion}</button>)}</div></div>}
         </section>
       </main>
-      <aside className="visuals-gallery" aria-label="Generated media gallery"><div className="visuals-gallery-heading"><NavIcon name="image" /><strong>Gallery</strong><span>{images.length}</span></div><div className="visuals-gallery-items">{images.length ? images.map((image) => <button key={`${image.createdAt ?? ""}:${image.url}`} type="button" className={`visuals-gallery-item${selectedImage?.url === image.url ? " is-selected" : ""}`} aria-label={`Open ${mediaTypeOf(image)} ${image.fileName}`} aria-pressed={selectedImage?.url === image.url} onClick={() => setSelectedImage(image)}>{renderMedia(image, true)}<small>{mediaTypeOf(image)}</small></button>) : <p className="visuals-gallery-empty">Your generated work appears here.</p>}</div></aside>
+      <aside className="visuals-gallery" aria-label="Generated media gallery"><div className="visuals-gallery-heading"><NavIcon name="image" /><strong>Gallery</strong><span>{images.length}</span></div><div className="visuals-gallery-items">{images.length ? images.map((image) => <button key={`${image.createdAt ?? ""}:${image.url}`} type="button" className={`visuals-gallery-item${selectedImage?.url === image.url ? " is-selected" : ""}`} aria-label={`Open ${mediaTypeOf(image)} ${image.fileName}`} aria-pressed={selectedImage?.url === image.url} onClick={() => { preserveImageSelectionRef.current = true; setSelectedImage(image); }}>{renderMedia(image, true)}<small>{mediaTypeOf(image)}</small></button>) : <p className="visuals-gallery-empty">Your generated work appears here.</p>}</div></aside>
     </div>
     <section className="visuals-controls" aria-label="Generation controls">
       <div className="visuals-control-summary"><span>{activeToolDetails.note}</span>{usesBuiltInImageEngine ? <><StatusBadge tone={imageRuntime?.dependenciesAvailable ? "success" : "warning"}>{imageRuntime?.dependenciesAvailable ? "Local runtime ready" : "Runtime setup needed"}</StatusBadge><label>Image engine<select value={selectedProvider} onChange={(event) => onChange("provider", event.target.value)}><option value="diffusers">Stable Diffusion Turbo</option><option value="comfyui">ComfyUI workflow</option></select></label></> : <StatusBadge tone="neutral">Local ComfyUI workflow</StatusBadge>}</div>
@@ -209,7 +216,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
           {workflowError && <p className="form-error" role="alert">{workflowError}</p>}
           <label>ComfyUI API workflow<textarea value={workflow} onChange={(event) => setToolWorkflow(event.target.value)} placeholder="Import a local ComfyUI API workflow containing {{prompt}}." rows={5} /><small>ComfyUI video and audio workflows work when their output nodes save supported files. Video and music model packs or custom nodes must be installed in your local ComfyUI first. Source-image workflows use {"{{image}}"}.</small><div className="workflow-save-row"><input value={workflowName} onChange={(event) => setWorkflowName(event.target.value)} placeholder="Workflow name" maxLength={80} aria-label="Workflow name" /><Button variant="secondary" type="button" disabled={!workflow.trim() || !workflowName.trim()} onClick={saveWorkflow}>Save workflow</Button></div></label>
         </>}
-      </div></details></div><div className="visuals-composer-action">{busy ? <Button variant="secondary" type="button" disabled={cancelRequested} onClick={() => void onCancel()}>{cancelRequested ? "Stopping…" : "Cancel"}</Button> : <Button variant="primary" type="button" disabled={!canGenerate} onClick={() => onGenerate(sourceImage ?? undefined, { provider: generationProvider, prompt })}>{generationProvider === "diffusers" ? activeTool === "edit" ? "Edit image" : "Create image" : `Create ${activeToolDetails.label.toLowerCase()}`}<NavIcon name="sparkle" /></Button>}</div></div>
+      </div></details></div><div className="visuals-composer-action">{busy ? <Button variant="secondary" type="button" disabled={cancelRequested} onClick={() => void onCancel()}>{cancelRequested ? "Stopping…" : "Cancel"}</Button> : <Button variant="primary" type="button" disabled={!canGenerate} onClick={() => generate(sourceImage ?? undefined, { provider: generationProvider, prompt })}>{generationProvider === "diffusers" ? activeTool === "edit" ? "Edit image" : "Create image" : `Create ${activeToolDetails.label.toLowerCase()}`}<NavIcon name="sparkle" /></Button>}</div></div>
     </section>
   </div>;
 }
