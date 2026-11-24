@@ -61,7 +61,7 @@ function connect(url) {
     open: new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); }),
     send,
     on: (listener) => listeners.push(listener),
-    evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(`evaluate: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`); return result.result?.value; },
+    evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(`evaluate: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text} in ${expression.slice(0, 260)}`); return result.result?.value; },
     close: () => socket.close(),
   };
 }
@@ -184,6 +184,7 @@ async function main() {
   // Long, awkward content: long titles, unbroken tokens, wide code, tables, many chats, long project names.
   phase = "seed";
   const captureMode = process.env.UI_MATRIX_CAPTURE === "1";
+  const exerciseChatActions = process.env.UI_MATRIX_EXERCISE_CHAT === "1";
   const includeCodingFixture = process.env.UI_MATRIX_EXERCISE_CHAT !== "1";
   const longWord = captureMode ? "" : "Supercalifragilisticexpialidocious_".repeat(5);
   const longTitle = captureMode ? "Plan a simple herb garden" : "Investigate why the tiled window squeezes the composer when the conversation title is extremely long and keeps going";
@@ -205,6 +206,7 @@ async function main() {
     results.push(project);
     if (project.ok && ${includeCodingFixture}) results.push(await r("conversation.save", { title: "Review the starter project", mode: "Coding Agent", responseMode: "coding", projectId: project.result?.id, messages: [{ role: "user", content: "Review this project structure and suggest the next small improvement." }, { role: "assistant", content: "I’ll inspect the existing files, then outline a focused change and how to verify it." }] }));
     if (${captureMode} && results[0]?.result?.id) results.push(await r("conversation.save", { id: results[0].result.id, title: ${JSON.stringify(longTitle)}, mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Help me plan a low-maintenance herb garden for a sunny patio." }, { role: "assistant", content: "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." }] }));
+    if (${captureMode} && ${exerciseChatActions}) for (const text of ["Add a week-by-week planting schedule.", "Include a simple materials checklist.", "Estimate the monthly watering routine."]) results.push(await r("chat.queue.enqueue", { text }));
     if (${captureMode}) for (const card of [
       { name: "Default", roles: "General-purpose assistant", instructions: "Be clear, practical, and adaptable to the user's task." },
       { name: "Release Engineer", roles: "Helps with releases, readiness, and ops", instructions: "Be concise, practical, and safety-minded. Focus on release planning, readiness checks, risk, and operations." },
@@ -315,6 +317,43 @@ async function main() {
           if (!importAvailable) throw new Error("Chat options did not expose conversation import.");
           await clickInRenderer(cdp, ".overflow-menu-trigger[aria-label='Chat options']");
           await cdp.evaluate(`([...document.querySelectorAll('.sidebar-history-row')].find((row) => row.innerText.includes('Plan a simple herb garden'))?.querySelector('.sidebar-history-item')?.click(), 1)`);
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            const initialQueue = await cdp.evaluate(`document.querySelector('.queued-messages')?.innerText ?? ''`);
+            if (!initialQueue.includes("Add a week-by-week planting schedule.") || !initialQueue.includes("Estimate the monthly watering routine.")) throw new Error(`Chat reference flow did not restore its queued follow-ups: ${initialQueue}`);
+            await cdp.evaluate(`document.querySelector("button[aria-label='Edit queued message 1']")?.click(); 1`);
+            await sleep(180);
+            const editedQueue = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const value = document.querySelector('textarea[aria-label="Message your model"]')?.value ?? ''; const queue = document.querySelector('.queued-messages')?.innerText ?? ''; if (value === "Add a week-by-week planting schedule." && !queue.includes("Add a week-by-week planting schedule.")) return { value, remaining: queue }; await new Promise((r) => setTimeout(r, 50)); } return { value: document.querySelector('textarea[aria-label="Message your model"]')?.value ?? '', remaining: document.querySelector('.queued-messages')?.innerText ?? '' }; })()`);
+            if (editedQueue.value !== "Add a week-by-week planting schedule." || !editedQueue.remaining.includes("Include a simple materials checklist.") || editedQueue.remaining.includes("Add a week-by-week planting schedule.")) throw new Error(`Editing a queued prompt did not move its text into the composer and remove only that queue item: ${JSON.stringify(editedQueue)}`);
+            await cdp.evaluate(`document.querySelector("button[aria-label='Remove queued message 2']")?.click(); 1`);
+            await sleep(180);
+            const removedQueue = await cdp.evaluate(`document.querySelector('.queued-messages')?.innerText ?? ''`);
+            if (!removedQueue.includes("Include a simple materials checklist.") || removedQueue.includes("Estimate the monthly watering routine.")) throw new Error(`Removing a queued follow-up removed the wrong item: ${removedQueue}`);
+            const composerReady = await cdp.evaluate(`Boolean(document.querySelector('textarea[aria-label="Message your model"]'))`);
+            if (!composerReady) throw new Error("Chat composer was not available after editing its queued prompt.");
+            await cdp.evaluate(`(() => { const input = document.querySelector('textarea[aria-label="Message your model"]'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true })); return 1; })()`);
+            const userMessage = await cdp.evaluate(`Boolean(document.querySelector('.chat-message.user'))`);
+            if (!userMessage) throw new Error("The seeded user message was missing from the active chat.");
+            await clickButtonText(cdp, "Edit", ".chat-message.user");
+            const userEditOpened = await cdp.evaluate(`Boolean(document.querySelector('.message-edit-form textarea[aria-label="Edit user message"]'))`);
+            if (!userEditOpened) throw new Error("The user message Edit action did not open its inline editor.");
+            await cdp.evaluate(`([...document.querySelectorAll('.message-edit-form button')].find((button) => button.innerText.trim() === 'Cancel')?.click(), 1)`);
+            const userEditClosed = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if (!document.querySelector('.message-edit-form')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!userEditClosed) throw new Error("Cancel did not close the inline user-message editor.");
+            const assistant = await cdp.evaluate(`Boolean(document.querySelector('.chat-message.assistant'))`);
+            if (!assistant) throw new Error("The seeded assistant response was missing from the active chat.");
+            const assistantPoint = await cdp.evaluate(`(() => { const r = document.querySelector('.chat-message.assistant').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+            await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: assistantPoint.x, y: assistantPoint.y });
+            const assistantActions = await cdp.evaluate(`([...document.querySelectorAll('.chat-message.assistant .message-actions button')].map((button) => button.innerText.trim()))`);
+            if (!assistantActions.includes("Copy") || !assistantActions.includes("Retry") || !assistantActions.includes("Fork from here")) throw new Error(`Assistant message actions were incomplete: ${assistantActions.join(", ")}`);
+            const pageOrigin = await cdp.evaluate("location.origin");
+            await cdp.send("Browser.grantPermissions", { origin: pageOrigin, permissions: ["clipboardReadWrite", "clipboardSanitizedWrite"] });
+            const bridgeCopy = await cdp.evaluate(`(async () => { try { return await window.skaiAgent?.clipboard?.writeText("Revision 4 clipboard smoke"); } catch (error) { return { error: error.message }; } })()`);
+            if (bridgeCopy !== true) throw new Error(`Electron clipboard bridge did not confirm a write: ${JSON.stringify(bridgeCopy)} (exposed ${await cdp.evaluate("Boolean(window.skaiAgent?.clipboard?.writeText)")}).`);
+            await cdp.evaluate(`([...document.querySelectorAll('.chat-message.assistant .message-actions button')].find((button) => button.innerText.trim() === 'Copy')?.click(), 1)`);
+            const copyConfirmed = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if (document.querySelector('.chat-message.assistant .message-actions')?.innerText.includes('Copied')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!copyConfirmed) throw new Error(`Copy did not provide message-level confirmation (origin ${pageOrigin}, clipboard API ${await cdp.evaluate("Boolean(navigator.clipboard?.writeText)")}).`);
+            await sleep(1500); // Capture the resting Copy label, after its confirmation has been verified.
+          }
         }
         const states = route === "settings" ? settingsCategories : [null];
         for (const category of states) {

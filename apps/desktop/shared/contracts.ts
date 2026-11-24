@@ -357,6 +357,10 @@ export interface PluginDownloadsBridge {
   openFolder(): Promise<boolean>;
 }
 
+export interface ClipboardBridge {
+  writeText(text: string): Promise<boolean>;
+}
+
 // Theme: validated theme data sent by the main process (electron/theme-service.cjs).
 export type ThemeGradient = { gradient: "solid"; color: string } | { gradient: "linear" | "radial" | "conic"; angle: number; stops: { color: string; at: number }[] };
 export type ThemeFont = { family?: string[]; size?: number; weight?: number; lineHeight?: number; letterSpacing?: number };
@@ -383,6 +387,7 @@ export interface AgentBridge {
     createLocalUrl(mediaType: "video/mp4" | "video/webm" | "audio/mp4" | "audio/webm" | "audio/mpeg" | "audio/wav" | "audio/ogg", content: string): Promise<string>;
     revokeLocalUrl(url: string): Promise<boolean>;
   };
+  clipboard?: ClipboardBridge;
   onTrayOpenConversation?(handler: (id: string) => void): () => void;
   onTrayNewChat?(handler: () => void): () => void;
   pet?: PetBridge;

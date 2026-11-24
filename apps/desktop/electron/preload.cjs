@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld("skaiAgent", {
     createLocalUrl: (mediaType, content) => ipcRenderer.invoke("media:create-local-url", { mediaType: String(mediaType), content: String(content) }),
     revokeLocalUrl: (url) => ipcRenderer.invoke("media:revoke-local-url", String(url)),
   },
+  clipboard: {
+    writeText: (text) => ipcRenderer.invoke("clipboard:write-text", String(text)),
+  },
   onTrayOpenConversation: (handler) => {
     const listener = (_event, id) => handler(String(id));
     ipcRenderer.on("tray:open-conversation", listener);

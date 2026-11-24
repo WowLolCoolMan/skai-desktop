@@ -240,13 +240,14 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   };
 
   const copyMessage = async (content: string, index: number) => {
-    if (!navigator.clipboard) return;
-    try {
-      await navigator.clipboard.writeText(content);
+    let copied = false;
+    try { if (navigator.clipboard) { await navigator.clipboard.writeText(content); copied = true; } } catch { /* Try the protected Electron clipboard bridge below. */ }
+    if (!copied) {
+      try { copied = await window.skaiAgent?.clipboard?.writeText(content) ?? false; } catch { /* Clipboard access may be unavailable in this runtime. */ }
+    }
+    if (copied) {
       setCopiedMessage(index);
       window.setTimeout(() => setCopiedMessage((current) => current === index ? null : current), 1400);
-    } catch {
-      // Clipboard access can be unavailable in a hardened desktop context.
     }
   };
 

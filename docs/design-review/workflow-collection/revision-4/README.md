@@ -58,20 +58,39 @@ The offline smoke confirms the recovery message and does not download the
 multi-gigabyte model. This remains an acceptance blocker for the generated
 result/edit/history-persistence flow.
 
+### Chat queue and message actions — reference #4
+
+The packaged 1440×900 Chat state and its 390×844 layout are captured in
+[desktop evidence](evidence-chat-queue-actions-1440.png) and
+[mobile evidence](evidence-chat-queue-actions-390.png). The throwaway-profile
+interaction check restores a seeded thread and queue, edits a queued prompt into
+the composer, removes a different queued item, opens and cancels the user's
+inline edit, and verifies assistant Copy, Retry, and Fork actions. Copy now
+falls back to a bounded, main-window-only Electron clipboard bridge when the
+renderer clipboard write is unavailable. The packaged smoke confirms the
+action and Copy confirmation at both sizes, with no matrix layout findings.
+
+The reference labels assistant actions Copy / Retry / Edit. Skai keeps Edit on
+the user's own prompt and offers Fork from here on assistant replies; this
+preserves the familiar role-specific pattern while exposing the same prompt
+revision path. This is a deliberate small label/action difference, not a
+missing queue or message workflow.
+
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
 Focused interaction smokes passed for queueing, search/import, task handoff and
 journal/schedules, project file/terminal flows, Memory, MCP, Marketplace, and
 Voice Workbench. These results do not close the reference-by-reference review:
-the distinct message actions, document-grounded response, Voice Mode, GitHub,
+the document-grounded response, Voice Mode, GitHub,
 model download review, and remaining route-specific states still need paired
 screenshots and interaction evidence. See the active acceptance queue for the
 specific model-cache and persona quality limitations.
 
 This is route and representative-flow evidence, not proof that every numbered
 image has been matched. Several references describe distinct states within one
-route. The remaining acceptance work is to capture and compare those states
-individually, especially queued/message actions, document grounding, Voice
+route. Reference #4 now has paired screenshots and interaction evidence. The
+remaining acceptance work is to capture and compare the other states
+individually, especially document grounding, Voice
 Mode, task planning/progress, schedules, project creation, GitHub, model
 inspection/download review, Marketplace install and voice details, MCP
 approval, image generation/edit history, multimodal attachments, Voice

@@ -42,9 +42,18 @@ Mark an item done only when the linked workflow has evidence.
    no runtime error. The latest packaged matrix covered 20 routes at 1440×900
    in four dark/light and sidebar variants; Chat and Coding passed at 390×844,
    including an active Coding project, with no page-level overflow or clipped
-   controls. Next action: finish screenshot-by-screenshot matching of the 30
+   controls. Reference #4 now has paired packaged screenshots at 1440×900 and
+   390×844 plus isolated interaction coverage for queued-message edit/remove,
+   user-message edit/cancel, and assistant Copy / Retry / Fork. Copy now falls
+   back to a size-bounded Electron clipboard bridge restricted to the main
+   window; confirmation passed at both sizes. The reference labels Edit on
+   assistant messages, while Skai keeps Edit on user prompts and offers Fork
+   from here for assistant replies. Evidence and the intentional role-specific
+   difference are recorded in the Revision 4 README.
+   `npm run desktop:typecheck`, `npm run build`, and `npm run package:electron`
+   passed after the bridge change. Next action: finish screenshot-by-screenshot matching of the 30
    supported Revision 4 workflow references and their distinct states, then
-   add interaction evidence for queue/message actions, document grounding,
+   add interaction evidence for document grounding,
    voice, plans/schedules, GitHub, model review, Marketplace, MCP, image/media,
    Memory, and Settings. Keep Video planned. The project file comparison is
    not a line-level diff; Git diff review remains the line-level review
@@ -68,7 +77,7 @@ Mark an item done only when the linked workflow has evidence.
    search/import, task re-plan handoff, task journal/schedule lifecycle,
    project browser/terminal/editor, PDF validation, Memory, REA MCP, Marketplace
    host, and Voice Workbench. These test protocol/UI behavior but do not provide
-   the missing per-reference screenshots or prove document-grounded answers.
+   the other missing per-reference screenshots or prove document-grounded answers.
    Persona UI selection/start-conversation is covered by the earlier packaged
    matrix smoke. Current local persona model checks were inconsistent: Qwen3
    14B generated all profile fields and respected the 2010 cutoff, but the chat

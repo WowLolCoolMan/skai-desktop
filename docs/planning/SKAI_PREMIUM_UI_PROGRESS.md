@@ -50,6 +50,17 @@ what they cover.
   app-data switch. AirLLM status in the Agent Host smoke now has enough time for
   its local Python/Torch import; the packaged Agent Host smoke then passed its
   schedule, memory, persona, voice-protocol, and task lifecycle checks.
+- Added packaged Chat coverage for reference #4. The 1440×900 and 390×844
+  screenshots show the active thread, queued follow-up, composer, and message
+  actions. The isolated flow edits one queue item into the draft, removes a
+  different item, opens/cancels the user's message editor, and verifies
+  assistant Copy / Retry / Fork. The first live smoke exposed that Electron's
+  renderer clipboard can reject writes; Chat now falls back to a size-bounded
+  clipboard IPC route restricted to the main application window. The rebuilt
+  app confirmed Copy and showed its confirmation state at both viewport sizes.
+  The reference shows Edit on the assistant; Skai assigns Edit to user prompts
+  and Fork from here to assistant replies, keeping the same revision workflow
+  with role-appropriate actions.
 
 ## Revision 4 implementation pass — 2026-11-23
 
@@ -89,9 +100,11 @@ what they cover.
 ### Waiting for acceptance
 
 - Compare each of the 30 supported Revision 4 workflow references against its
-  matching live state and record screenshot plus interaction evidence. The 20
-  route matrix renders screens but does not by itself prove all 30 workflows.
-- Add focused interaction checks for references #4–#19 and #21–#29 where the
+  matching live state and record screenshot plus interaction evidence. #4 now
+  has paired desktop/mobile screenshots and a packaged queue/message action
+  flow. The 20 route matrix renders screens but does not by itself prove all
+  30 workflows.
+- Add focused interaction checks for references #5–#19 and #21–#29 where the
   matching state is not covered above, especially document grounding, Voice
   Mode, task/schedule lifecycle, GitHub, model-download review, Marketplace
   voice installation, MCP approval, image edit/history, multimodal input,
