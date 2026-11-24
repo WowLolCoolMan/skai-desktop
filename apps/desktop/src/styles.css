@@ -445,14 +445,17 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .coding-diff-preview { display: flex; flex-direction: column; width: 100%; min-height: 330px; height: 540px; overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-code-surface); }
 .coding-diff-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 14px; border-bottom: 1px solid var(--skai-color-border); background: var(--skai-color-code-surface); color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 650; }
 .coding-diff-lines { flex: 1 1 auto; min-height: 0; overflow: auto; font: 12px/1.7 var(--skai-font-mono); }
-.coding-diff-line { display: grid; grid-template-columns: 48px 48px 28px minmax(0, 1fr); min-width: max-content; min-height: 23px; color: var(--skai-color-text); }
-.coding-diff-number { padding: 0 8px; border-right: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); text-align: right; user-select: none; }
+.coding-diff-line { display: grid; grid-template-columns: repeat(2, minmax(390px, 1fr)); min-width: 780px; min-height: 23px; color: var(--skai-color-text); }
+.coding-diff-cell { display: grid; grid-template-columns: 42px 22px minmax(0, 1fr); min-width: 0; }
+.coding-diff-cell + .coding-diff-cell { border-left: 1px solid var(--skai-color-border); }
+.coding-diff-number { padding: 0 7px; border-right: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); text-align: right; user-select: none; }
 .coding-diff-marker { color: var(--skai-color-text-muted); text-align: center; user-select: none; }
-.coding-diff-line code { padding-right: 18px; white-space: pre; }
-.coding-diff-line.is-removed { background: color-mix(in srgb, #e46b72 18%, transparent); }
-.coding-diff-line.is-removed .coding-diff-marker { color: #e8898f; }
-.coding-diff-line.is-added { background: color-mix(in srgb, #55b987 18%, transparent); }
-.coding-diff-line.is-added .coding-diff-marker { color: #68c99a; }
+.coding-diff-cell code { min-width: 0; padding: 0 12px; overflow: hidden; text-overflow: clip; white-space: pre; }
+.coding-diff-cell.is-removed { background: color-mix(in srgb, #e46b72 18%, transparent); }
+.coding-diff-cell.is-removed .coding-diff-marker { color: #e8898f; }
+.coding-diff-cell.is-added { background: color-mix(in srgb, #55b987 18%, transparent); }
+.coding-diff-cell.is-added .coding-diff-marker { color: #68c99a; }
+.coding-diff-cell.is-empty { background: color-mix(in srgb, var(--skai-color-border) 12%, transparent); }
 .app-content-coding .coding-page-active .monaco-editor-shell, .app-content-coding .coding-page-active .monaco-diff-shell, .app-content-coding .coding-page-active .coding-diff-preview { min-height: 0; height: 100%; }
 .ui-empty-visual { display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: 14px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 28%, var(--skai-color-border)); border-radius: var(--skai-radius-2xl); background: color-mix(in srgb, var(--skai-color-accent) 8%, var(--skai-color-surface-soft)); }.ui-empty-visual img { display: block; width: 44px; height: 44px; object-fit: contain; }
 
@@ -506,6 +509,8 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .git-change-summary li b { color: var(--skai-color-accent-text); }
 .git-change-summary li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .git-change-list li label { display: grid; grid-template-columns: auto 28px minmax(0, 1fr); align-items: center; gap: 7px; min-width: 0; cursor: pointer; }
+.git-change-list li { display: block; }
+.git-change-list li label { width: 100%; }
 .git-change-list li input { margin: 0; accent-color: var(--skai-color-accent); }
 .git-change-summary.has-conflicts { border-color: color-mix(in srgb, var(--skai-color-danger) 40%, var(--skai-color-border)); }
 .git-change-summary.has-conflicts li b, .git-change-summary.has-conflicts > small { color: var(--skai-color-danger); }
@@ -816,6 +821,9 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .project-thread-panel .conversation-surface { display: flex; width: 100%; height: auto; min-height: 0; flex: 1 1 0; flex-direction: column; overflow: hidden; }
 .project-thread-panel .conversation-surface .chat-empty-surface { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
 .project-thread-panel .chat-task-composer { flex: 0 0 auto; }
+.project-thread-panel .message-meta { flex-wrap: wrap; gap: 4px 8px; }
+.project-thread-panel .message-actions { flex-wrap: wrap; }
+.project-thread-panel .message-actions .ui-button { flex: 0 0 auto; white-space: nowrap; }
 .project-thread-panel .composer-card { position: static; z-index: auto; width: 100%; flex: 0 0 auto; margin: 0; }
 .project-thread-panel .chat-empty-surface { display: flex; align-items: center; justify-content: center; }
 .project-thread-panel .chat-start-screen { justify-items: start; width: 100%; gap: 6px; margin: 0; padding: 16px; text-align: left; }
@@ -826,10 +834,12 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .coding-session-grid > * { min-width: 0; }
 @container (max-width: 1280px) {
   .coding-session-grid { grid-template-columns: minmax(290px, .82fr) minmax(0, 1.18fr); }
+  .coding-session-grid.is-reviewing-diff { grid-template-columns: minmax(250px, .62fr) minmax(0, 1.38fr); }
   .coding-session-grid > .coding-task-inspector { grid-column: 1 / -1; width: 100%; min-width: 0; max-height: 280px; }
 }
 @container (max-width: 720px) {
   .coding-session-grid { grid-template-columns: minmax(0, 1fr); }
+  .coding-session-grid.is-reviewing-diff { grid-template-columns: minmax(0, 1fr); }
   .coding-session-grid > .coding-task-inspector { grid-column: auto; max-height: 340px; }
 }
 .coding-verification-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; min-width: 0; }
@@ -3545,6 +3555,33 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas: "files";
 }
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git > .coding-project-browser {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-change-summary {
+  display: grid;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "summary diff" "files diff" "actions diff";
+  align-content: stretch;
+  gap: 10px 14px;
+  overflow: hidden;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-change-summary > div:first-child { grid-area: summary; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .coding-project-browser > .file-summary { display: none; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-change-summary > .git-change-list { grid-area: files; max-height: none; align-content: start; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-change-summary > .git-review-actions { grid-area: actions; align-content: start; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-review-actions input { flex-basis: 100%; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-diff-preview { grid-area: diff; min-height: 0; max-height: none; height: 100%; overflow-wrap: normal; font-size: var(--skai-text-xs); line-height: 1.55; white-space: pre; }
+.app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .project-file-layout { display: none; }
+@container (max-width: 720px) {
+  .app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-change-summary { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto minmax(320px, 1fr); grid-template-areas: "summary" "files" "actions" "diff"; overflow: visible; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-files.is-reviewing-git .git-diff-preview { height: min(52vh, 420px); }
+}
 
 /* Coding Agent opens as a thread with Monaco kept alongside it. */
 .app-content-coding .coding-page-active .coding-session-grid.is-chat {
@@ -3554,6 +3591,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   gap: 10px;
   min-height: 0;
   overflow: hidden;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-reviewing-diff {
+  grid-template-columns: minmax(300px, .65fr) minmax(0, 1.35fr);
 }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel,
 .app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser {

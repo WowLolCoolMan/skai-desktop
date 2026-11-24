@@ -23,6 +23,7 @@ if (!fs.existsSync(executable)) {
 const port = 19331;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
 const exerciseTaskProgress = process.env.UI_MATRIX_EXERCISE_TASK_PROGRESS === "1";
+const exerciseGitReview = process.env.UI_MATRIX_EXERCISE_GIT_REVIEW === "1";
 const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1";
 const exerciseScheduledPage = process.env.UI_MATRIX_EXERCISE_SCHEDULED_PAGE === "1";
 const exerciseProjectCreate = process.env.UI_MATRIX_EXERCISE_PROJECT_CREATE === "1";
@@ -251,15 +252,22 @@ async function main() {
     fs.writeFileSync(path.join(seedProject, "src", "plant.ts"), "export const plants = ['basil', 'thyme'];\n");
     fs.writeFileSync(path.join(seedProject, "src", "styles.css"), ":root { --garden-gap: 12px; }\n");
     fs.writeFileSync(path.join(seedProject, "src", "utils.ts"), "export const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));\n");
+  }
+  if (exerciseTaskProgress || exerciseGitReview) {
     const runGit = (args) => {
       const result = spawnSync("git", args, { cwd: seedProject, encoding: "utf8", windowsHide: true });
-      if (result.status !== 0) throw new Error(`Could not prepare the isolated Coding task Git fixture (${args.join(" ")}): ${result.stderr || result.error?.message || result.status}`);
+      if (result.status !== 0) throw new Error(`Could not prepare the isolated Coding Git fixture (${args.join(" ")}): ${result.stderr || result.error?.message || result.status}`);
     };
     runGit(["init"]);
     runGit(["config", "user.name", "Revision 4 UI Smoke"]);
     runGit(["config", "user.email", "revision4-ui-smoke@localhost"]);
     runGit(["add", "."]);
     runGit(["commit", "-m", "Initial Revision 4 project fixture"]);
+    if (exerciseGitReview) {
+      fs.appendFileSync(path.join(seedProject, "README.md"), "\nLocal review note: clarify setup steps.\n");
+      fs.appendFileSync(path.join(seedProject, "src", "index.ts"), "\nexport const gardenSpacing = 12;\n");
+      fs.writeFileSync(path.join(seedProject, "src", "plan.ts"), "export const gardenPlan = { columns: 2, spacing: 12 };\n");
+    }
   }
   const seeded = await cdp.evaluate(`(async () => {
     const r = (m, p) => window.skaiAgent.request(m, p);
@@ -479,8 +487,10 @@ async function main() {
             const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
             fs.writeFileSync(path.join(captureDirectory, "coding-project-diff-1440.png"), Buffer.from(screenshot.data, "base64"));
           }
-          const diffReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-diff-line.is-added') && document.querySelector('.coding-diff-line.is-context'))`);
-          if (!diffReady) throw new Error(`Review diff did not render inline added lines and surrounding context beside the visible Coding Agent thread: ${JSON.stringify(await cdp.evaluate(`(() => ({ heading: document.querySelector('#coding-file-editor')?.innerText, editorText: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0,160), shell: document.querySelector('.coding-diff-preview')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
+          const diffReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-diff-cell.is-added') && document.querySelector('.coding-diff-cell.is-context') && document.querySelectorAll('.coding-diff-line > .coding-diff-cell').length >= 2 && document.querySelector('.coding-diff-header')?.innerText.includes('Original') && document.querySelector('.coding-diff-header')?.innerText.includes('Working copy'))`);
+          if (!diffReady) throw new Error(`Review diff did not render a side-by-side comparison with additions and context beside the Coding Agent thread: ${JSON.stringify(await cdp.evaluate(`(() => ({ heading: document.querySelector('#coding-file-editor')?.innerText, editorText: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0,160), shell: document.querySelector('.coding-diff-preview')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
+          const reviewLayout = await cdp.evaluate(`(() => { const thread = document.querySelector('.project-thread-panel')?.getBoundingClientRect(); const editor = document.querySelector('.coding-project-browser')?.getBoundingClientRect(); return { thread: thread?.width ?? 0, editor: editor?.width ?? 0 }; })()`);
+          if (width >= 1100 && reviewLayout.editor <= reviewLayout.thread) throw new Error(`The Coding change view did not give its side-by-side diff more room than chat: ${JSON.stringify(reviewLayout)}`);
           const threadStillVisible = await cdp.evaluate(`Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent'))`);
           if (!threadStillVisible) throw new Error("Opening the file diff hid the Coding Agent conversation.");
           await clickButtonText(cdp, "Editor", "#coding-file-editor");
@@ -493,6 +503,29 @@ async function main() {
           await cdp.evaluate(`([...document.querySelectorAll('#coding-file-editor button')].find((button) => button.textContent?.trim() === 'Undo')?.click(), 1)`);
           const undoRestoredFile = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const buttons = [...document.querySelectorAll('#coding-file-editor button')]; const undo = buttons.find((button) => button.textContent?.trim() === 'Undo'); const save = buttons.find((button) => button.textContent?.trim() === 'Save edit'); const editor = document.querySelector('.monaco-editor-shell .monaco-editor'); if (editor && undo?.disabled && save?.disabled) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
           if (!undoRestoredFile) throw new Error(`Undo did not return the Coding workspace to a clean editor state: ${JSON.stringify(await cdp.evaluate(`(() => ({ editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 180), heading: document.querySelector('#coding-file-editor')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.textContent?.trim(), disabled: button.disabled })) }))()`))}`);
+          if (exerciseGitReview) {
+            await clickInRenderer(cdp, '.coding-workspace-tabs button:nth-child(2)');
+            const gitChangesReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.git-change-summary')?.innerText.includes('3 changed files')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
+            if (!gitChangesReady) throw new Error(`The seeded Git project did not show its three local changes: ${JSON.stringify(await cdp.evaluate(`document.querySelector('.git-change-summary')?.innerText ?? document.body.innerText.slice(0, 300)`))}`);
+            const selectedChanges = await cdp.evaluate(`(() => { const rows = [...document.querySelectorAll('.git-change-list li')]; for (const row of rows) { const checkbox = row.querySelector('input[type="checkbox"]'); const shouldSelect = row.innerText.includes('README.md') || row.innerText.includes('src/index.ts'); if (!checkbox) return false; if (checkbox.checked !== shouldSelect) checkbox.click(); } return [...document.querySelectorAll('.git-change-list li')].map((row) => ({ path: row.innerText, checked: row.querySelector('input')?.checked })); })()`);
+            if (!Array.isArray(selectedChanges) || selectedChanges.filter((item) => item.checked).length !== 2) throw new Error(`The Git review list did not allow two of three changes to be selected: ${JSON.stringify(selectedChanges)}`);
+            await clickButtonText(cdp, 'Review diff', '.coding-project-browser');
+            const gitDiffReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const diff = document.querySelector('.git-diff-preview')?.innerText ?? ''; if (diff.includes('README.md') && diff.includes('gardenSpacing')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
+            if (!gitDiffReady) throw new Error(`The selected Git changes did not produce a diff preview: ${JSON.stringify(await cdp.evaluate(`document.querySelector('.git-diff-preview')?.innerText ?? 'no diff preview'`))}`);
+            const selectedDiffOnly = await cdp.evaluate(`(() => { const diff = document.querySelector('.git-diff-preview')?.innerText ?? ''; return diff.includes('README.md') && diff.includes('gardenSpacing') && !diff.includes('src/plan.ts'); })()`);
+            if (!selectedDiffOnly) throw new Error('The Git diff preview included a file outside the two selected changes.');
+            if (process.env.UI_MATRIX_CAPTURE === '1' && width === 1440 && height === 900) {
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+              fs.writeFileSync(path.join(captureDirectory, 'coding-git-review-1440.png'), Buffer.from(screenshot.data, 'base64'));
+            }
+            const commitMessageSet = await cdp.evaluate(`(() => { const input = document.querySelector('.git-review-actions input[aria-label="Local Git commit message"]'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Review selected garden changes'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            if (!commitMessageSet) throw new Error('The local Git review did not expose its commit message field.');
+            await clickButtonText(cdp, 'Commit 2 selected', '.git-review-actions');
+            const selectedCommitReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const summary = document.querySelector('.git-change-summary')?.innerText ?? ''; if (summary.includes('1 changed file') && summary.includes('README.md') === false && summary.includes('src/plan.ts')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+            if (!selectedCommitReady) throw new Error(`Committing two selected files did not leave only the unselected file changed: ${JSON.stringify(await cdp.evaluate(`document.querySelector('.git-change-summary')?.innerText ?? 'no Git summary'`))}`);
+            await cdp.evaluate(`(() => { for (const element of document.querySelectorAll('*')) if (element.scrollTop) element.scrollTop = 0; window.scrollTo(0, 0); return 1; })()`);
+          }
         }
         if (route === "persona-workshop" && process.env.UI_MATRIX_EXERCISE_PERSONA === "1") {
           const personaReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-library-picker > button')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);

@@ -21,8 +21,9 @@ Ordered around open acceptance blockers and the user's explicit priorities.
 Mark an item done only when the linked workflow has evidence.
 
 1. **UI and accessibility acceptance — In progress · Codex.** The freshly
-   packaged audit passes all 16 routes with zero WCAG violations or incomplete
-   checks; skip-link/main-landmark and popup relationships pass. The 20-route
+   packaged audit passes all 16 routes with zero WCAG violations; axe reports
+   one incomplete contrast check for decorative symbol-only icons on Pet
+   Workshop. Skip-link/main-landmark and popup relationships pass. The 20-route
    layout matrix passes five supported window sizes and four theme/sidebar variants with
    no runtime or layout failures. Packaged theme/contrast acceptance passes
    dark, light, system, custom-theme reload/recovery, and narrow-layout states;
@@ -36,7 +37,7 @@ Mark an item done only when the linked workflow has evidence.
    Revision 4 implementation work now includes distinct Persona and Pet
    Workshop pages, a simpler Pet overview, Monaco beside the Coding Agent
    thread, and responsive Chat/Coding layouts. The file editor's Review diff
-   action now opens a read-only inline comparison with context, additions,
+   action now opens a read-only side-by-side comparison with context, additions,
    deletions, and line numbers. The Coding flow passes edit, compare, save,
    and undo with no runtime error. The latest packaged matrix covered 20 routes
    at 1440×900
@@ -56,8 +57,8 @@ Mark an item done only when the linked workflow has evidence.
    attach → Documents-only → send flow still needs interaction evidence.
    Reference #7 has a packaged search-result screenshot; filtered result
    selection preserves the query, and the conversation-import preview/collision
-   smoke passes. References #13 and #14 now have packaged Coding thread/editor
-   and inline diff evidence; the remaining screenshot reviews cover #15–#30.
+   smoke passes. References #13–15 now have packaged Coding thread/editor and
+   Git review evidence; the remaining screenshot reviews cover #16–#30.
    Reference #6 now has a packaged active-listening screenshot and an isolated
    start → local listening → End workflow check. Skai keeps Voice Mode in the
    current Chat thread rather than adding the reference's standalone page; the
@@ -79,8 +80,8 @@ Mark an item done only when the linked workflow has evidence.
    executor. The executor now receives it; the isolated Agent Host regression
    and packaged Stop workflow both reach Cancelled and close the in-flight
    request. Remaining: compare mobile task progress and review references
-   #15–30. References #13 and #14 now have packaged Coding thread/editor and
-   inline diff evidence with a save/undo interaction smoke. Reference #10 now
+   #16–30. References #13–15 now have packaged Coding thread/editor,
+   side-by-side diff, and Git review evidence. Reference #10 now
    has a packaged 1440×900 screenshot and flow:
    open a saved conversation, open Details, configure a prompt/local time/weekly
    repeat, save, and confirm it appears under that thread. The screenshot shows
@@ -98,13 +99,15 @@ Mark an item done only when the linked workflow has evidence.
    project; a Windows native-picker run created and opened a temporary project.
    Remaining: mobile project creation and direct Open folder smoke.
    Next action: finish screenshot-by-screenshot matching of the 30
-   supported Revision 4 workflow references and their distinct states; #13
-   and #14 now have paired desktop evidence, so continue with #15. Then
+   supported Revision 4 workflow references and their distinct states; #13–15
+   now have paired desktop evidence, so continue with #16. Then
    add interaction evidence for document grounding,
    voice, plans/schedules, GitHub, model review, Marketplace, MCP, image/media,
    Memory, and Settings. Keep Video planned. Reference #14 now has a read-only
-   inline diff with additions, deletions, context, and line numbers; Git diff
-   remains the repository-level review surface. Do not close this item until
+   side-by-side diff with additions, deletions, context, and line numbers.
+   Reference #15 verifies selected-file diff review and commit while preserving
+   unselected files and unrelated staged work; Git diff remains the
+   repository-level review surface. Do not close this item until
    the remaining flows have evidence and
    the references have been visually reviewed. On 2026-11-24, Image Generate
    and Edit were refined against references #24–25: the page now foregrounds
@@ -113,13 +116,14 @@ Mark an item done only when the linked workflow has evidence.
    switches into Edit when a history image is reopened. Packaged #24 Generate
    screenshots passed at 1440×900 and 390×844; the #25 seeded history-to-edit
    flow passed at 1440×900 with both source previews, the Edit action, and 0px
-   horizontal overflow. The runtime was ready, but real inference remains
-   blocked because the local `stabilityai/sd-turbo` cache contains only partial
-   `.incomplete` blobs. The smoke does not download 5.2 GB of weights. The
-   packaged missing-model recovery state passed and says how to retry after
-   downloading the model. Resume generation with
-   `npm run smoke:image:workflow` after the cache is complete. Evidence files
-   are in the Revision 4 collection. A fresh packaged 1440×900 capture of all
+   horizontal overflow. The complete packaged local workflow now passes on
+   2026-11-24: cancellation, real 512×512 SD Turbo generation, history
+   selection, reopening the generated result in Edit, a second image edit,
+   and history persistence after reload. A history update racing with Edit
+   previously reselected an output and covered the source preview; deliberate
+   history selections now remain stable until a new generation begins. The
+   seeded Edit flow also passes on the rebuilt package. Evidence files are in
+   the Revision 4 collection. A fresh packaged 1440×900 capture of all
    20 routes passed in one dark/expanded variant with no runtime or layout
    findings. Focused workflow smokes also passed for chat queue, conversation
    search/import, task re-plan handoff, task journal/schedule lifecycle,
@@ -195,16 +199,19 @@ Mark an item done only when the linked workflow has evidence.
     additional personas and model families remains open. A 2026-11-24 rerun at
     the stricter 2010-06-01 cutoff found 14 sources and 60 attributed lines but
     produced no accepted draft fields; repeat at this cutoff and diagnose draft
-    reliability before closing persona acceptance.
+   reliability before closing persona acceptance. Two fresh Qwen3 14B retries
+   on 2026-11-24 varied: one drafted all nine fields but claimed awareness
+   through 2010 and speculated about 2011 despite a 2010-06-01 cutoff; another
+   had the local model server close its stream during drafting and returned no
+   fields. Neither passed the strict cutoff acceptance.
    See the [Smart Personas plan](implementation-plans/smart-personas.md).
-5. **Image runtime coverage — In progress · Codex.** A prior packaged Diffusers CPU
-   acceptance passed. On 2026-11-24, the local Diffusers Python dependencies
-   reported ready, cancellation passed, and the missing-model recovery flow
-   passed; actual generation was blocked because the `stabilityai/sd-turbo`
-   cache contains only partial `.incomplete` blobs. No model download was
-   started. Complete or provide the local model cache, then rerun
-   `npm run smoke:image:workflow` for generation → edit → history persistence.
-   UI-only history → Edit acceptance passes with a seeded 512×512 local image.
+5. **Image runtime coverage — In progress · Codex.** The packaged local
+   Diffusers workflow passed on 2026-11-24 using the cached `stabilityai/sd-turbo`
+   model: cancellation, real 512×512 generation, history selection, reopen in
+   Edit, second generation, and persisted history after reload. The seeded
+   history → Edit layout check also passes on the rebuilt package. Remaining:
+   validate GPU/offload behavior on more hardware. Repeat with
+   `npm run smoke:image:comfy-live` where a supported ComfyUI setup is available.
    On 2026-11-23, live ComfyUI acceptance on this PC passed
    checkpoint discovery, workflow submission, progress polling, cancellation
    with an empty queue afterward, image-to-image source upload, edited PNG
@@ -254,8 +261,10 @@ Mark an item done only when the linked workflow has evidence.
    Skai Agent Host, validates its 207-tool manifest, invokes one explicitly
    read-only tool, revokes the process, and confirms the revoked connection is
    unusable. REA data and npm cache are isolated from the normal user profile.
-   Remaining: verify the other MCP and voice adapters against their documented
-   license/runtime requirements.
+   On 2026-11-24, isolated clean-install Piper and Kokoro acceptance each
+   verified pinned runtime/model/license files and produced valid local WAV
+   output (102,956 and 118,924 bytes). Remaining: verify the other MCP and
+   voice adapters against their documented license/runtime requirements.
    Saved ComfyUI workflows can be reviewed and activated inside Marketplace.
 10. **GitHub workflow acceptance — Blocked on test account · Owner: User.** Core
     tests cover permission denial, network failure, request cancellation,

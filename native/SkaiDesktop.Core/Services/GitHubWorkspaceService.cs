@@ -227,6 +227,8 @@ public sealed partial class GitHubWorkspaceService
             }
             var commit = await RunGitAsync(root, ["commit", "-m", message], null, TimeSpan.FromMinutes(2), cancellationToken, temporaryIndex).ConfigureAwait(false);
             EnsureSuccess(commit, "Git could not create the commit. Check your Git author name and email in Git settings.");
+            var refreshIndex = await RunGitAsync(root, ["reset", "--quiet", "HEAD", "--", .. paths], null, TimeSpan.FromMinutes(2), cancellationToken).ConfigureAwait(false);
+            EnsureSuccess(refreshIndex, "The selected commit was created, but Git could not refresh its index. Review the working tree before continuing.");
             return commit.StandardOutput.Trim();
         }
         finally

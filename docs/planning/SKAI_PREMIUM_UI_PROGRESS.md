@@ -7,14 +7,19 @@ what they cover.
 
 ## Targeted Revision 4 continuity pass — 2026-11-24
 
-- References #13–14 now have paired packaged desktop evidence. #13 captures
-  the project Coding Agent thread beside Monaco with a project file open. #14
-  captures a unified inline diff beside that same thread, with context and
-  additions. The isolated Coding smoke opened the file, edited it, reviewed
-  the inline diff, returned to Monaco, saved, and undid the edit back to a
-  clean editor state. `npm run desktop:typecheck`, `npm run build`, and an
-  isolated Electron package passed; the focused 1440×900 packaged smoke passed
-  with no renderer errors. Mobile comparison and #15–30 remain open.
+- References #13–15 now have paired packaged desktop evidence. #13 captures
+  the project Coding Agent thread beside Monaco. #14 captures a side-by-side
+  file comparison beside that thread, with the editor widened to about two
+  thirds of the workspace. #15 captures selected-file Git review and commit.
+  Packaged Coding flows opened the file, edited it, reviewed the comparison,
+  saved, undid, selected two Git changes, previewed only those paths, and
+  committed them while retaining the unselected change. The Git fix forwards
+  selected paths to diff review and refreshes committed paths in the normal
+  index without disturbing unrelated staged changes. Typecheck, production
+  build, Electron packaging, native core checks, and focused 1440×900 Coding
+  and Git smokes passed with no renderer errors. The #14 flow also passed at
+  390×844 with no page overflow; mobile Git review and references #16–30
+  remain open.
 
 - Refined Images against references #24–25. Generate and Edit are the two
   primary modes, secondary ComfyUI tools are under More tools, and the local
@@ -123,7 +128,8 @@ what they cover.
   selected it, and exercised Pause → Resume → Cancel; the task detail reflected
   each state. The page keeps standalone prompts distinct from conversation
   schedules and says local prompts do not automatically access project files.
-  References #13 and #14 now have packaged captures and Coding thread/editor interaction evidence; the next reference is #15.
+  References #13–15 now have packaged captures and Coding editor/Git review
+  flows; the next reference is #16.
 - Reference #12 now has packaged 1440×900 screenshots of the simplified
   Create project dialog and opened Coding workspace. The Projects header offers
   Open folder and New project; the table shows names and paths, and new project
@@ -149,9 +155,9 @@ what they cover.
   before the advanced editor.
 - Kept the Coding Agent thread beside Monaco on desktop. The Monaco editor
   now has a project/file-specific model identity. Review diff now shows a
-  read-only inline comparison with context, additions, deletions, and line
-  numbers. The packaged Coding smoke verifies editor → diff → editor, save,
-  and undo. Git diff remains the repository-level review surface.
+  read-only side-by-side comparison with context, additions, deletions, and
+  line numbers. The packaged Coding smoke verifies editor → diff → editor,
+  save, and undo. Git diff remains the repository-level review surface.
 - Tightened mobile Coding context actions and kept the editor/chat workspace
   scrollable within the work surface.
 - Kept Video labeled as a planned future destination; no generation or editing

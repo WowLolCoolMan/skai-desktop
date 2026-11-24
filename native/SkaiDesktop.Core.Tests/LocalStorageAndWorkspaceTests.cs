@@ -340,6 +340,7 @@ internal static class LocalStorageAndWorkspaceTests
             Check(!committedFiles.Contains("pre-staged-user-work.md", StringComparison.Ordinal) && stagedFiles.Contains("pre-staged-user-work.md", StringComparison.Ordinal), "GitHub selected commit excludes unrelated staged changes and preserves the existing index");
             var afterReviewStatus = await gitReviewService.GetStatusAsync(gitReviewPath);
             Check(afterReviewStatus.Changes.Any(change => change.Path == "secrets.json") && afterReviewStatus.Changes.Any(change => change.Path == "pre-staged-user-work.md"), "GitHub review selectively stages safe normal, rename, and workflow changes");
+            Check(!afterReviewStatus.Changes.Any(change => change.Path == "README.md" || change.Path == renamedNotesName || change.Path == ".github/workflows/ci.yml"), "GitHub selected commit refreshes committed paths in the normal Git index");
 
             var commandRunner = new WorkspaceCommandRunner();
             var commandResponse = "Check the result first.\n<workspace-command cwd=\"src\" timeout-seconds=\"999\">  printf 'one\\ntwo'  </workspace-command>\n<workspace-command>echo next</workspace-command>";
