@@ -51,12 +51,13 @@ packaged screens are captured here:
 - [Edit with source and history · 1440×900](evidence-image-edit-1440.png)
 
 The seeded history-to-edit interaction passed at 1440×900 with both source
-previews and zero horizontal overflow. Image generation itself remains
-unverified on this profile: the Python runtime is installed, but the local
-`stabilityai/sd-turbo` model cache contains only partial `.incomplete` blobs.
-The offline smoke confirms the recovery message and does not download the
-multi-gigabyte model. This remains an acceptance blocker for the generated
-result/edit/history-persistence flow.
+previews and zero horizontal overflow. The packaged local runtime then passed
+real generation and edit acceptance: cancel a run, generate a 512×512 image,
+select it from history, reopen it in Edit, generate an edited result, and
+confirm both images persist after reloading the app. During this test, a late
+history update could replace the image the user had selected for Edit and hide
+the source preview. History selection now remains stable across background
+updates until a new generation starts. The packaged smoke passed with that fix.
 
 ### Chat queue and message actions — reference #4
 
@@ -162,9 +163,9 @@ project's Activity drawer beside the Coding Agent thread rather than navigating
 to a separate task page.
 
 The per-reference pass remains open for mobile task-progress behavior and
-references #15–30. References #13 and #14 now have packaged desktop captures
-and a focused Coding workspace flow; the remaining reference-specific states
-still need comparison and interaction evidence.
+references #16–30. References #13–15 now have packaged desktop captures and
+focused Coding workspace flows; the remaining reference-specific states still
+need comparison and interaction evidence.
 
 ### Schedule from a conversation — reference #10
 
@@ -213,15 +214,29 @@ This matches the reference's core chat-plus-editor workflow. The persistent
 Skai navigation rail and workspace tabs remain visible around the project.
 Mobile layout and further keyboard/accessibility review remain open.
 
-### Inline file diff — reference #14
+### Side-by-side file diff — reference #14
 
-The packaged [inline diff capture](evidence-coding-inline-diff-1440.png) keeps
-the Coding Agent thread visible beside a unified file comparison with line
-numbers, context, and green additions. The smoke edited the seeded README,
-opened the inline diff, returned to Monaco, saved the change, and used Undo to
-restore a clean editor state. The comparison is a read-only local view; Git
-diff remains the source for repository change review. At 1440×900, the thread
-and editor columns remain usable together. Mobile comparison remains open.
+The packaged [side-by-side diff capture](evidence-coding-side-by-side-diff-1440.png)
+keeps the Coding Agent thread beside a wider Monaco review surface, with the
+original file on the left and the working copy on the right. The smoke edited
+the seeded README, opened the comparison, returned to Monaco, saved the change,
+and used Undo to restore a clean editor state. The local comparison is
+read-only; Git diff remains the source for repository change review. At
+1440×900, the editor receives more room than the thread. The edit → compare →
+editor → save → undo workflow also passes at 390×844 with no page overflow.
+
+### Git review and selected commit — reference #15
+
+The packaged [Git review capture](evidence-coding-git-review-1440.png) shows
+the selected project's changed files and unified diff in a focused review
+surface. The focused disposable-project flow seeded three changes, selected
+README.md and src/index.ts, confirmed the diff excluded the unselected new
+file, entered a commit message, and committed only those two paths. The
+remaining unselected file stayed in the working tree; committed paths returned
+to a clean status while unrelated staged work remained preserved. The review
+panel uses the existing Files workspace in Coding, keeping repository actions
+with the project. At 1440×900 the file list and commit controls stay in a left
+rail beside a large diff pane. Mobile Git review remains open.
 
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
