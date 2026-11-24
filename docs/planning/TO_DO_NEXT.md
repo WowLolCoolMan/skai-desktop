@@ -56,7 +56,7 @@ Mark an item done only when the linked workflow has evidence.
    attach → Documents-only → send flow still needs interaction evidence.
    Reference #7 has a packaged search-result screenshot; filtered result
    selection preserves the query, and the conversation-import preview/collision
-   smoke passes. The remaining screenshot reviews now cover #12–#30.
+   smoke passes. The remaining screenshot reviews now cover #13–#30.
    Reference #6 now has a packaged active-listening screenshot and an isolated
    start → local listening → End workflow check. Skai keeps Voice Mode in the
    current Chat thread rather than adding the reference's standalone page; the
@@ -73,11 +73,12 @@ Mark an item done only when the linked workflow has evidence.
    files, confirms their live appearance in the Coding Activity drawer and Git
    status; the Stop action displays immediate Stopping feedback. Changed paths
    persist during execution, and task cards distinguish Queued, Running,
-   Verifying, and Completed. Native core cancellation tests pass, but the
-   packaged held-model fixture did not close its in-flight request after Stop,
-   leaving the task Running. Waiting: investigate Agent Host cancellation,
-   verify end-to-end Stop, compare mobile task progress, and review references
-   #12–30. Reference #10 now has a packaged 1440×900 screenshot and flow:
+   Verifying, and Completed. On 2026-11-24, a held local-model request exposed
+   that the Coding Agent did not pass its cancellation token to the durable
+   executor. The executor now receives it; the isolated Agent Host regression
+   and packaged Stop workflow both reach Cancelled and close the in-flight
+   request. Remaining: compare mobile task progress and review references
+   #13–30. Reference #10 now has a packaged 1440×900 screenshot and flow:
    open a saved conversation, open Details, configure a prompt/local time/weekly
    repeat, save, and confirm it appears under that thread. The screenshot shows
    the Details rail beside the active conversation. A 390×844 Chat layout smoke
@@ -87,6 +88,12 @@ Mark an item done only when the linked workflow has evidence.
    Reference #11 now has a packaged 1440×900 standalone-schedule screenshot.
    The packaged flow created a standalone weekly run, then paused, resumed,
    and cancelled it; each state appeared in the selected schedule details.
+   Reference #12 now has packaged create-dialog and opened-workspace screenshots.
+   The Projects page presents New project and Open folder side by side, searches
+   recent projects by name/path, and simplifies new project setup to a name and
+   one folder. Packaged acceptance checks both entry points and opens a listed
+   project; a Windows native-picker run created and opened a temporary project.
+   Remaining: mobile project creation and direct Open folder smoke.
    Next action: finish screenshot-by-screenshot matching of the 30
    supported Revision 4 workflow references and their distinct states, then
    add interaction evidence for document grounding,
@@ -159,11 +166,12 @@ Mark an item done only when the linked workflow has evidence.
    acceptance passed the full microphone, local Whisper, long-reply playback,
    barge-in, and follow-up flow with this implementation. Speech engines still
    synthesize a whole audio clip per text chunk; actual incremental audio-frame
-   streaming remains open. Keep the path local. Separate voice-expressiveness
-   work is currently present as uncommitted working-copy changes across Chat,
-   Settings, native voice models, and Agent Host adapters. Review and test that
-   work independently before including it in a push; it is not part of the
-   Revision 4 UI commits.
+   streaming remains open. Keep the path local. Local voice expressiveness
+   controls are now committed and pushed: users can adjust speaking style in
+   Voice Mode and Settings, and supported local adapters receive their own
+   sampling controls. Adapter smokes passed for expressive and restrained
+   output. Remaining: true incremental audio-frame streaming and subjective
+   speech-quality review across devices and voices.
    See the
    [voice architecture](../engineering/ELECTRON_CSHARP_VOICE_ARCHITECTURE.md).
 3. **Cross-profile Coding Agent sandbox — Done · Codex.** Windows PSEC and
@@ -178,8 +186,11 @@ Mark an item done only when the linked workflow has evidence.
    a complete persona, answers in character, and correctly says it lacks
    information about 2011. Its original answer was incorrectly marked failed
    because the acceptance matcher did not recognize “I don't have information”;
-   the matcher now accepts that clear equivalent. Broader acceptance across
-   additional personas and model families remains open.
+    the matcher now accepts that clear equivalent. Broader acceptance across
+    additional personas and model families remains open. A 2026-11-24 rerun at
+    the stricter 2010-06-01 cutoff found 14 sources and 60 attributed lines but
+    produced no accepted draft fields; repeat at this cutoff and diagnose draft
+    reliability before closing persona acceptance.
    See the [Smart Personas plan](implementation-plans/smart-personas.md).
 5. **Image runtime coverage — In progress · Codex.** A prior packaged Diffusers CPU
    acceptance passed. On 2026-11-24, the local Diffusers Python dependencies

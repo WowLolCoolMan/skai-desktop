@@ -498,6 +498,41 @@ async function run() {
   pendingSmokeServers.delete(queueModelServer);
   if (!cancelledTask || cancelledTask.status !== "cancelled" || queueRequests !== requestsBeforeCancellation + 1)
     throw new Error(`Queued task cancellation did not stop the waiting task before execution: ${JSON.stringify({ cancelledTask, queueRequests, requestsBeforeCancellation })}`);
+  let heldModelRequestReceived = false;
+  let resolveHeldModelRequestClosed;
+  const heldModelRequestClosed = new Promise(resolve => { resolveHeldModelRequestClosed = resolve; });
+  const heldModelServer = http.createServer((request, response) => {
+    request.resume();
+    request.on("end", () => {
+      heldModelRequestReceived = true;
+      response.once("close", resolveHeldModelRequestClosed);
+    });
+  });
+  pendingSmokeServers.add(heldModelServer);
+  await new Promise(resolve => heldModelServer.listen(0, "127.0.0.1", resolve));
+  const heldModelSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${heldModelServer.address().port}/v1`, model: "held-model-smoke", provider: "Ollama" });
+  if (!heldModelSettings.ok) throw new Error("settings.save could not prepare the held-model cancellation endpoint.");
+  const heldModelTask = await request("tasks.plan", { title: "Running cancellation smoke", instruction: "Wait for the held local model request to be cancelled." });
+  if (!heldModelTask.ok || !heldModelTask.result?.id) throw new Error(`Could not plan the held-model cancellation task: ${JSON.stringify(heldModelTask)}`);
+  const heldModelQueued = await request("tasks.queue", { id: heldModelTask.result.id });
+  if (!heldModelQueued.ok) throw new Error(`Could not queue the held-model cancellation task: ${JSON.stringify(heldModelQueued)}`);
+  const heldModelExecution = await request("tasks.execute", { id: heldModelTask.result.id });
+  if (!heldModelExecution.ok) throw new Error(`Could not execute the held-model cancellation task: ${JSON.stringify(heldModelExecution)}`);
+  for (let attempt = 0; attempt < 100 && !heldModelRequestReceived; attempt += 1) await new Promise(resolve => setTimeout(resolve, 50));
+  if (!heldModelRequestReceived) throw new Error("The held-model cancellation fixture never received a model request.");
+  const runningCancellation = await request("tasks.cancel", { id: heldModelTask.result.id });
+  if (!runningCancellation.ok || runningCancellation.result?.cancellationRequested !== true) throw new Error(`Running cancellation was not acknowledged: ${JSON.stringify(runningCancellation)}`);
+  let heldModelTerminal = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const snapshot = await request("tasks.list");
+    heldModelTerminal = snapshot.result?.find(item => item.id === heldModelTask.result.id) ?? null;
+    if (heldModelTerminal && ["cancelled", "failed", "completed"].includes(heldModelTerminal.status)) break;
+  }
+  await Promise.race([heldModelRequestClosed, new Promise((_, reject) => setTimeout(() => reject(new Error("Cancellation left the held model HTTP request open.")), 5_000))]);
+  await new Promise(resolve => heldModelServer.close(resolve));
+  pendingSmokeServers.delete(heldModelServer);
+  if (heldModelTerminal?.status !== "cancelled") throw new Error(`Running cancellation did not reach its terminal state: ${JSON.stringify(heldModelTerminal)}`);
   const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
   if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Only the Local environment")) throw new Error("tasks.plan accepted an unsupported environment.");
   let scheduledRequests = 0;
@@ -532,7 +567,7 @@ async function run() {
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
   await new Promise(resolve => scheduledModelServer.close(resolve));
   pendingSmokeServers.delete(scheduledModelServer);
-  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, two-persona group replies, local task planning, scheduled automation lifecycle, and direct host lifecycle.");
+  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, held-model task cancellation, scheduled automation lifecycle, and direct host lifecycle.");
 }
 
 async function stopHost() {
