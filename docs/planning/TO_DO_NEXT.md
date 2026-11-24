@@ -56,7 +56,7 @@ Mark an item done only when the linked workflow has evidence.
    attach → Documents-only → send flow still needs interaction evidence.
    Reference #7 has a packaged search-result screenshot; filtered result
    selection preserves the query, and the conversation-import preview/collision
-   smoke passes. The remaining screenshot reviews still include #9–#30.
+   smoke passes. The remaining screenshot reviews now cover #10–#30.
    Reference #6 now has a packaged active-listening screenshot and an isolated
    start → local listening → End workflow check. Skai keeps Voice Mode in the
    current Chat thread rather than adding the reference's standalone page; the
@@ -68,7 +68,17 @@ Mark an item done only when the linked workflow has evidence.
    into the vertical workspace scroll. Coding header/actions wrap on mobile;
    the rebuilt packaged matrix found no clipped controls or horizontal
    overflow. `npm run desktop:typecheck`, `npm run build`, and
-   `npm run package:electron` passed. Next action: finish screenshot-by-screenshot matching of the 30
+   `npm run package:electron` passed. Reference #9 now has a packaged
+   1440×900 task-progress capture. An isolated local model writes four project
+   files, confirms their live appearance in the Coding Activity drawer and Git
+   status; the Stop action displays immediate Stopping feedback. Changed paths
+   persist during execution, and task cards distinguish Queued, Running,
+   Verifying, and Completed. Native core cancellation tests pass, but the
+   packaged held-model fixture did not close its in-flight request after Stop,
+   leaving the task Running. Waiting: investigate Agent Host cancellation,
+   verify end-to-end Stop, compare mobile task progress, and review references
+   #10–30.
+   Next action: finish screenshot-by-screenshot matching of the 30
    supported Revision 4 workflow references and their distinct states, then
    add interaction evidence for document grounding,
    voice, plans/schedules, GitHub, model review, Marketplace, MCP, image/media,

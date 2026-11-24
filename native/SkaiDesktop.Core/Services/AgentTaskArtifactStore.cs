@@ -15,6 +15,7 @@ public sealed class AgentTaskArtifactStore
     public const int MaxArtifactLabelCharacters = 160;
     public const int MaxDependencies = 8;
     public const int MaxArtifactLabels = 8;
+    public const int MaxChangedFiles = 128;
     public const int MaxWorktreePathCharacters = 4_096;
     public const int MaxWorktreeBranchCharacters = 256;
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { WriteIndented = true, MaxDepth = 12 };
@@ -84,6 +85,24 @@ public sealed class AgentTaskArtifactStore
     public AgentTaskArtifact Deny(string id) => Transition(id, AgentTaskStatuses.AwaitingApproval, AgentTaskStatuses.Cancelled, "Approval denied locally; no execution was started.");
 
     public AgentTaskArtifact Get(string id) => Copy(Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist."));
+
+    /// <summary>Persists a successfully edited project path while the task is still running so it can be reviewed immediately.</summary>
+    public AgentTaskArtifact RecordChangedFile(string id, string relativePath)
+    {
+        lock (StoreGate)
+        {
+            var tasks = Load().ToList();
+            var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+            if (task.Status != AgentTaskStatuses.Running) throw new InvalidOperationException("Changed files can only be recorded for a running task.");
+            var normalized = Normalize(relativePath, MaxWorktreePathCharacters, "changed file path");
+            if (task.ChangedFiles.Contains(normalized, StringComparer.Ordinal)) return Copy(task);
+            if (task.ChangedFiles.Count >= MaxChangedFiles) throw new InvalidOperationException($"A task can record at most {MaxChangedFiles} changed files.");
+            task.ChangedFiles.Add(normalized);
+            task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            Save(tasks);
+            return Copy(task);
+        }
+    }
 
     public AgentTaskArtifact AttachWorktree(string id, string repositoryRoot, string path, string branch)
     {
@@ -344,6 +363,8 @@ public sealed class AgentTaskArtifactStore
             if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Running or AgentTaskStatuses.Verifying or AgentTaskStatuses.Completed or AgentTaskStatuses.Failed or AgentTaskStatuses.Cancelled or AgentTaskStatuses.Blocked)) throw new InvalidDataException("The agent task store contains an invalid status.");
             if (task.ResultSummary is not null) Normalize(task.ResultSummary, MaxResultCharacters, "task result");
             NormalizeLabels(task.ArtifactLabels);
+            if (task.ChangedFiles.Count > MaxChangedFiles) throw new InvalidDataException("The agent task has too many changed files.");
+            task.ChangedFiles = task.ChangedFiles.Select(path => Normalize(path, MaxWorktreePathCharacters, "changed file path")).Distinct(StringComparer.Ordinal).ToList();
             NormalizeOptional(task.WorktreeRepositoryRoot, MaxWorktreePathCharacters, "worktree repository root");
             NormalizeOptional(task.WorktreePath, MaxWorktreePathCharacters, "worktree path");
             NormalizeOptional(task.WorktreeBranch, MaxWorktreeBranchCharacters, "worktree branch");

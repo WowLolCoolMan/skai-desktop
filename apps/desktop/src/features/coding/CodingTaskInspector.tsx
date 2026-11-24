@@ -14,18 +14,22 @@ type CodingTaskInspectorProps = {
   onReviewChanges: (paths?: string[]) => void;
   onLoadProjectChecks: (projectId?: string) => void;
   onRunProjectCheck: (projectId: string, taskId: string, checkId: string) => Promise<unknown>;
+  onCancelTask: (taskId: string) => void;
 };
 
 function statusLabel(status: string) {
   switch (status) {
     case "running":
+      return "Running";
     case "verifying":
-      return "Active";
+      return "Verifying";
     case "queued":
       return "Queued";
     case "completed":
     case "succeeded":
       return "Complete";
+    case "cancelled":
+      return "Stopped";
     case "failed":
     case "blocked":
       return "Needs attention";
@@ -41,10 +45,21 @@ function statusTone(status: string) {
   return "complete";
 }
 
-export function CodingTaskInspector({ projectId, tasks, projectChecks, projectChecksBusy, projectCheckBusy, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges, onLoadProjectChecks, onRunProjectCheck }: CodingTaskInspectorProps) {
+const taskStages = ["Queued", "Running", "Verifying", "Completed"] as const;
+
+function taskStageIndex(status: string) {
+  if (status === "running") return 1;
+  if (status === "verifying") return 2;
+  if (status === "completed" || status === "succeeded") return 3;
+  if (status === "failed" || status === "blocked") return 1;
+  return 0;
+}
+
+export function CodingTaskInspector({ projectId, tasks, projectChecks, projectChecksBusy, projectCheckBusy, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges, onLoadProjectChecks, onRunProjectCheck, onCancelTask }: CodingTaskInspectorProps) {
   const recentTasks = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedCheckId, setSelectedCheckId] = useState("");
+  const [stoppingTaskIds, setStoppingTaskIds] = useState<string[]>([]);
   const changedPaths = gitStatus?.changes.map((change) => change.path) ?? [];
   const attentionCount = tasks.filter((task) => task.status === "failed" || task.status === "blocked").length;
   const activeCount = tasks.filter((task) => task.status === "running" || task.status === "verifying").length;
@@ -74,7 +89,10 @@ export function CodingTaskInspector({ projectId, tasks, projectChecks, projectCh
     <section className="coding-task-inspector-section">
       <div className="coding-task-inspector-section-heading"><div><p className="section-kicker">THREAD TASKS</p><strong>{tasks.length ? "Recent work" : "No task activity"}</strong></div>{tasks.length > 8 && <span>8+</span>}</div>
       {recentTasks.length ? <div className="coding-task-list">{recentTasks.map((task) => <article className="coding-task-item" key={task.id}>
-        <div className="coding-task-item-heading"><strong>{task.title}</strong><span className={`coding-task-status-pill is-${statusTone(task.status)}`}>{statusLabel(task.status)}</span></div>
+        <div className="coding-task-item-heading"><strong>{task.title}</strong><div className="coding-task-item-controls"><span className={`coding-task-status-pill is-${statusTone(task.status)}`}>{statusLabel(task.status)}</span>{(task.status === "running" || task.status === "verifying") && <Button variant="ghost" type="button" disabled={stoppingTaskIds.includes(task.id)} onClick={() => { setStoppingTaskIds((ids) => ids.includes(task.id) ? ids : [...ids, task.id]); onCancelTask(task.id); }}>{stoppingTaskIds.includes(task.id) ? "Stopping…" : "Stop"}</Button>}</div></div>
+        {task.status === "cancelled" ? <small>Stopped before verification.</small> : <ol className="coding-task-progress" aria-label={`Task progress: ${statusLabel(task.status)}`}>
+          {taskStages.map((stage, index) => <li key={stage} className={index < taskStageIndex(task.status) ? "is-complete" : index === taskStageIndex(task.status) ? "is-current" : ""} aria-current={index === taskStageIndex(task.status) ? "step" : undefined}><span aria-hidden="true" />{stage}</li>)}
+        </ol>}
         <p className="coding-task-instruction">{task.instruction}</p>
         {task.resultSummary && <p className="coding-task-result"><strong>Result</strong> {task.resultSummary}</p>}
         {task.changedFiles?.length ? <details className="coding-task-files"><summary>{task.changedFiles.length} changed file{task.changedFiles.length === 1 ? "" : "s"}</summary><ul>{task.changedFiles.slice(0, 12).map((path) => <li key={path}><code>{path}</code></li>)}</ul>{task.changedFiles.length > 12 && <small>And {task.changedFiles.length - 12} more</small>}</details> : <small>No changed files recorded</small>}

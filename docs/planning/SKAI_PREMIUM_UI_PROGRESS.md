@@ -89,8 +89,18 @@ what they cover.
   allowed to expand into the vertical workspace scroll. Mobile Coding header
   and project actions now wrap without page-level horizontal overflow. The
   packaged matrix reported no clipped controls; typecheck, production build,
-  and Electron packaging passed. Remaining: capture and compare #9–#30,
+  and Electron packaging passed. Remaining: capture and compare #10–#30,
   and complete the direct document attachment → Documents-only → send flow.
+- Reference #9 now has packaged 1440×900 evidence in the Coding Activity
+  drawer. The isolated fixture pauses a local task after four file writes;
+  changed paths persist while running, appear in the task card and Git status,
+  and the card shows Queued → Running → Verifying → Completed plus a Stop
+  action with immediate Stopping feedback. The packaged smoke verifies those
+  visible states. The held-model fixture did not close its in-flight request
+  after Stop, so end-to-end cancellation remains an open Agent Host issue;
+  native core cancellation tests pass. The drawer keeps this review beside the
+  Coding Agent thread. Mobile comparison for task progress and references
+  #10–30 are still waiting.
 - Reference #6 now has a packaged 1440×900 active Voice Mode screenshot. The
   UI smoke starts from the Chat composer, waits for local listening, verifies
   the visible End control, and closes the session using a fake microphone;

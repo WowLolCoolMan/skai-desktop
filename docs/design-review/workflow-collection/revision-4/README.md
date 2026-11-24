@@ -144,6 +144,29 @@ the matrix reported no clipped controls or horizontal overflow. Desktop
 `npm run desktop:typecheck`, `npm run build`, and `npm run package:electron`
 passed after the layout changes.
 
+### Coding task progress and review — reference #9
+
+The packaged 1440×900 active task state is captured in
+[Coding task-progress evidence](evidence-coding-task-progress-1440.png). An
+isolated local-model fixture writes four files in a temporary Git project and
+pauses before verification. The Coding Activity panel shows the four changed
+paths while the task is still running, the queued → running → verifying →
+completed progress line, and a Stop action with immediate “Stopping…” feedback.
+The packaged interaction smoke checks the live file list, Git status, and
+button feedback. Changed paths persist as each write completes instead of
+appearing only after the task ends. The end-to-end cancellation check is still
+open: the UI sends the cancel request, but a held local-model HTTP request did
+not close in the packaged fixture, leaving the task in Running. Native core
+cancellation tests pass; the Agent Host cancellation path needs investigation.
+This page keeps task review in the
+project's Activity drawer beside the Coding Agent thread rather than navigating
+to a separate task page.
+
+The per-reference pass remains open for reference #9 cancellation, mobile
+task-progress behavior, and references #10–30. This is desktop evidence only;
+the remaining reference-specific page states still need comparison and
+interaction evidence.
+
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
 Focused interaction smokes passed for queueing, search/import, task handoff and
@@ -164,7 +187,7 @@ flows exercised. The
 remaining
 acceptance work is to capture and compare the other states individually,
 especially Voice
-Mode, task planning/progress, schedules, project creation, GitHub, model
+Mode, task scheduling, schedules, project creation, GitHub, model
 inspection/download review, Marketplace install and voice details, MCP
 approval, image generation/edit history, multimodal attachments, Voice
 Workbench, Memory/document corpus, and Settings/Usage. Do not mark the

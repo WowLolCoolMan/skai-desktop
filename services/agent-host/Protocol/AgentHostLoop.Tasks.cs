@@ -384,6 +384,7 @@ public static partial class AgentHostLoop
                         }
                         var undoId = Guid.NewGuid().ToString("N");
                         undoStore.Add(undoStore.Load(), new WorkspaceUndoEntry(undoId, DateTimeOffset.UtcNow, project.Name, root, path, receipt.PreviousContent, receipt.AppliedHash));
+                        CreateTaskStore().RecordChangedFile(task.Id, path);
                         AppendTaskJournalEvent(task, "tool.write_file.completed", new Dictionary<string, string> { ["path"] = path, ["undoId"] = undoId, ["sha256"] = receipt.AppliedHash });
                         if (!changedFiles.Contains(path, StringComparer.Ordinal)) changedFiles.Add(path);
                         verificationRepairRequired = false;
@@ -428,6 +429,7 @@ public static partial class AgentHostLoop
                         }
                         var undoId = Guid.NewGuid().ToString("N");
                         undoStore.Add(undoStore.Load(), new WorkspaceUndoEntry(undoId, DateTimeOffset.UtcNow, project.Name, root, path, receipt.PreviousContent, receipt.AppliedHash));
+                        CreateTaskStore().RecordChangedFile(task.Id, path);
                         AppendTaskJournalEvent(task, "tool.replace_text.completed", new Dictionary<string, string> { ["path"] = path, ["undoId"] = undoId, ["sha256"] = receipt.AppliedHash });
                         if (!changedFiles.Contains(path, StringComparer.Ordinal)) changedFiles.Add(path);
                         verificationRepairRequired = false;

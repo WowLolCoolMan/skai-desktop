@@ -6,8 +6,9 @@
 //
 //   node scripts/smoke-electron-ui-matrix.cjs [packaged executable]
 //   (Linux CI: run under xvfb-run; set UI_MATRIX_QUICK=1 for a single theme/sidebar variant)
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 const { resolveDisplayBackend } = require("../apps/desktop/electron/linux-windowing.cjs");
@@ -21,6 +22,46 @@ if (!fs.existsSync(executable)) {
 }
 const port = 19331;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
+const exerciseTaskProgress = process.env.UI_MATRIX_EXERCISE_TASK_PROGRESS === "1";
+let taskProgressRequests = 0;
+let taskProgressServerProblem = "";
+let resolveTaskProgressPaused;
+const taskProgressPaused = new Promise((resolve) => { resolveTaskProgressPaused = resolve; });
+const taskProgressServer = exerciseTaskProgress ? http.createServer((request, response) => {
+  let body = "";
+  request.setEncoding("utf8");
+  request.on("data", (chunk) => { body += chunk; });
+  request.on("end", () => {
+    if (!request.url?.endsWith("/chat/completions")) { taskProgressServerProblem = `Unexpected local model route ${request.url}`; response.writeHead(404).end(); return; }
+    taskProgressRequests += 1;
+    if (taskProgressRequests > 8) { resolveTaskProgressPaused(); return; }
+    const files = ["src/layout.ts", "src/plant.ts", "src/styles.css", "src/utils.ts"];
+    const fileIndex = Math.floor((taskProgressRequests - 1) / 2);
+    let action;
+    if (taskProgressRequests % 2 === 1) action = { action: "read_file", path: files[fileIndex] };
+    else {
+      const parsed = JSON.parse(body);
+      const readResult = [...(parsed.messages ?? [])].reverse().find((message) => message.role === "user" && String(message.content).includes(`READ RESULT for ${files[fileIndex]} `));
+      const hash = String(readResult?.content ?? "").match(/SHA-256 ([A-Fa-f0-9]{64})/)?.[1];
+      if (!hash) { taskProgressServerProblem = `Could not find current SHA-256 for ${files[fileIndex]} in messages: ${JSON.stringify(parsed.messages?.slice(-4))}`; response.writeHead(422).end("Expected read_file result with current SHA-256"); return; }
+      const content = files[fileIndex].endsWith(".css")
+        ? `:root { --garden-gap: ${12 + fileIndex * 4}px; }\n/* Reviewed local layout update */\n`
+        : `export const gardenLayout = { file: ${JSON.stringify(files[fileIndex])}, columns: ${2 + fileIndex}, spacing: ${12 + fileIndex * 4} };\n`;
+      action = { action: "write_file", path: files[fileIndex], content, expectedHash: hash };
+    }
+    response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(action) } }] })}\n\ndata: [DONE]\n\n`);
+  });
+}) : null;
+let taskProgressEndpoint = "";
+let taskProgressTaskId = "";
+const taskProgressServerReady = taskProgressServer ? new Promise((resolve, reject) => {
+  taskProgressServer.once("error", reject);
+  taskProgressServer.listen(0, "127.0.0.1", () => {
+    taskProgressEndpoint = `http://127.0.0.1:${taskProgressServer.address().port}/v1`;
+    resolve();
+  });
+}) : Promise.resolve();
 const env = { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true", XDG_CONFIG_HOME: path.join(temp, "config"), XDG_DATA_HOME: path.join(temp, "data"), XDG_CACHE_HOME: path.join(temp, "cache"), APPDATA: path.join(temp, "appdata"), LOCALAPPDATA: path.join(temp, "localappdata") };
 for (const dir of ["config", "data", "cache", "appdata", "localappdata"]) fs.mkdirSync(path.join(temp, dir), { recursive: true });
 const agentProfile = path.join(temp, "agent-profile");
@@ -196,6 +237,21 @@ async function main() {
   fs.writeFileSync(path.join(seedProject, "README.md"), "# Starter project\n\nUse the Coding Agent thread to review the project, then inspect README.md in the docked editor.\n");
   fs.mkdirSync(path.join(seedProject, "src"), { recursive: true });
   fs.writeFileSync(path.join(seedProject, "src", "index.ts"), "export function greet(name: string) {\n  return `Hello, ${name}`;\n}\n");
+  if (exerciseTaskProgress) {
+    fs.writeFileSync(path.join(seedProject, "src", "layout.ts"), "export const gardenLayout = { columns: 2, spacing: 12 };\n");
+    fs.writeFileSync(path.join(seedProject, "src", "plant.ts"), "export const plants = ['basil', 'thyme'];\n");
+    fs.writeFileSync(path.join(seedProject, "src", "styles.css"), ":root { --garden-gap: 12px; }\n");
+    fs.writeFileSync(path.join(seedProject, "src", "utils.ts"), "export const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));\n");
+    const runGit = (args) => {
+      const result = spawnSync("git", args, { cwd: seedProject, encoding: "utf8", windowsHide: true });
+      if (result.status !== 0) throw new Error(`Could not prepare the isolated Coding task Git fixture (${args.join(" ")}): ${result.stderr || result.error?.message || result.status}`);
+    };
+    runGit(["init"]);
+    runGit(["config", "user.name", "Revision 4 UI Smoke"]);
+    runGit(["config", "user.email", "revision4-ui-smoke@localhost"]);
+    runGit(["add", "."]);
+    runGit(["commit", "-m", "Initial Revision 4 project fixture"]);
+  }
   const seeded = await cdp.evaluate(`(async () => {
     const r = (m, p) => window.skaiAgent.request(m, p);
     const results = [];
@@ -245,6 +301,8 @@ async function main() {
           await clickInRenderer(cdp, ".coding-no-project button");
           const projectsReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.title.endsWith(' · projects')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectsReady) throw new Error("Coding workflow could not open Projects.");
+          const projectActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.project-directory-open-action')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!projectActionReady) throw new Error(`Coding workflow could not render the seeded project row: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, directory: document.querySelector('.project-directory')?.innerText ?? '', rows: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText), body: document.body.innerText.slice(0, 500) }))()`))}`);
           await clickInRenderer(cdp, ".project-directory-open-action");
           const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-workspace-tabs')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectReady) throw new Error("Coding workflow could not open the seeded project.");
@@ -255,6 +313,42 @@ async function main() {
           await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
           const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
+          if (exerciseTaskProgress) {
+            await taskProgressServerReady;
+            const planned = await cdp.evaluate(`(async () => { const request = (method, params) => window.skaiAgent.request(method, params); const projectId = document.querySelector('.coding-project-heading-actions select')?.value; if (!projectId) return { error: 'No active project ID.' }; const settings = await request('settings.save', { provider: 'Local API', endpoint: ${JSON.stringify(taskProgressEndpoint)}, model: 'revision4-progress-fixture' }); if (!settings.ok) return { error: settings.error?.message ?? 'Could not configure isolated fixture model.' }; const task = await request('tasks.plan', { title: 'Update garden layout code', instruction: 'Review the garden layout files, make a focused update to each of the four source files, then pause before verification so the changes can be reviewed.', projectId, model: 'revision4-progress-fixture', modelProvider: 'Local API', modelSizeBytes: 1, modelContextLength: 4096, requiresApproval: false }); if (!task.ok) return { error: task.error?.message ?? 'Could not create project task.' }; const queued = await request('tasks.queue', { id: task.result.id }); if (!queued.ok) return { error: queued.error?.message ?? 'Could not queue project task.' }; const execution = await request('tasks.execute', { id: task.result.id }); if (!execution.ok) return { error: execution.error?.message ?? 'Could not start project task.' }; return { id: task.result.id, status: execution.result?.status }; })()`);
+            if (planned?.error || !planned?.id) throw new Error(`Could not start the isolated task progress workflow: ${planned?.error ?? JSON.stringify(planned)}`);
+            taskProgressTaskId = planned.id;
+            const pausedAtReview = await Promise.race([taskProgressPaused.then(() => true), sleep(10_000).then(() => false)]);
+            if (!pausedAtReview) {
+              const currentTasks = await cdp.evaluate(`(async () => { const response = await window.skaiAgent.request('tasks.list'); return response.ok ? response.result : response; })()`);
+              throw new Error(`The local Coding Agent did not reach the review pause after writing four files (${taskProgressRequests} model calls; ${taskProgressServerProblem || "no server protocol error"}): ${JSON.stringify(currentTasks)}`);
+            }
+            const liveTask = await cdp.evaluate(`(async () => { const response = await window.skaiAgent.request('tasks.list'); return response.ok ? response.result.find((item) => item.id === ${JSON.stringify(taskProgressTaskId)}) : null; })()`);
+            const expectedChangedFiles = ["src/layout.ts", "src/plant.ts", "src/styles.css", "src/utils.ts"];
+            if (liveTask?.status !== "running" || expectedChangedFiles.some((file) => !liveTask.changedFiles?.includes(file)) || liveTask.activity?.filter((item) => item.type === "tool.write_file.completed").length !== 4) throw new Error(`The local task did not produce the expected running review state: ${JSON.stringify({ status: liveTask?.status, changedFiles: liveTask?.changedFiles, writeEvents: liveTask?.activity?.filter((item) => item.type === "tool.write_file.completed").length })}`);
+            await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
+            await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.includes('Refresh Git status'))?.click(), 1)`);
+            const gitRefreshed = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.coding-project-context .git-summary')?.innerText.includes('4 changes')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+            if (!gitRefreshed) throw new Error("The four agent-written files did not appear in the selected project's Git status.");
+            await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
+            await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.includes('Open activity'))?.click(), 1)`);
+            const taskActivityVisible = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.coding-task-drawer .coding-task-item')?.innerText.includes('Update garden layout code')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+            if (!taskActivityVisible) throw new Error("The active project task did not appear in the Coding Activity drawer.");
+            await cdp.evaluate(`(() => { const summary = [...document.querySelectorAll('.coding-task-files summary')].find((item) => item.textContent?.includes('4 changed files')); summary?.click(); return Boolean(summary); })()`);
+            const reviewState = await cdp.evaluate(`(() => ({ task: document.querySelector('.coding-task-drawer .coding-task-item')?.innerText ?? '', changedFiles: document.querySelector('.coding-task-drawer .coding-task-files')?.innerText ?? '', git: document.querySelector('.coding-project-context .git-summary')?.innerText ?? '' }))()`);
+            if (!reviewState.task.toLowerCase().includes('running') || expectedChangedFiles.some((file) => !reviewState.changedFiles.includes(file)) || !reviewState.git.includes('4 changes')) throw new Error(`The project activity review did not show its live status and four changed files: ${JSON.stringify(reviewState)}`);
+            if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(captureDirectory, "coding-task-progress-1440.png"), Buffer.from(screenshot.data, "base64"));
+            }
+            await cdp.evaluate(`document.querySelector('.coding-task-item-controls button')?.click()`);
+            const stopFeedback = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if (document.querySelector('.coding-task-item-controls button')?.textContent?.includes('Stopping')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!stopFeedback) throw new Error("The Stop action did not show its cancellation-in-progress state.");
+          }
+          // The task-progress fixture has its own assertions and screenshot; keep it isolated
+          // from the editor keyboard smoke so failures in either workflow stay attributable.
+          if (exerciseTaskProgress) continue;
           if (process.env.UI_MATRIX_EXERCISE_TASK_PLAN === "1") {
             await clickButtonText(cdp, "Plan task", ".project-thread-panel");
             const plannerReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-task-planner-slot:not([hidden]) form')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
@@ -493,6 +587,10 @@ async function main() {
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
+  if (taskProgressServer) {
+    taskProgressServer.closeAllConnections();
+    await new Promise((resolve) => taskProgressServer.close(() => resolve()));
+  }
   if (process.platform === "win32" && child.pid) {
     const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
     await new Promise((resolve) => { killer.once("close", resolve); killer.once("error", resolve); });

@@ -23,7 +23,20 @@ internal static class AgentTaskArtifactTests
             Check(preview?.Id == first.Id && store.Load().Single(task => task.Id == first.Id).Status == AgentTaskStatuses.Queued, "agent task readiness preview is dependency-aware and non-mutating");
             var claimedFirst = store.TryClaimReady();
             Check(claimedFirst?.Id == first.Id && claimedFirst.Status == AgentTaskStatuses.Running, "queued root agent task can be claimed without dispatching external work");
+            store.RecordChangedFile(first.Id, "src/layout.ts");
+            var runningWithChanges = store.RecordChangedFile(first.Id, "src/layout.ts");
+            Check(runningWithChanges.Status == AgentTaskStatuses.Running && runningWithChanges.ChangedFiles.SequenceEqual(["src/layout.ts"]), "successful edits are persisted immediately on a running task and duplicate paths are ignored");
+            try
+            {
+                store.RecordChangedFile(second.Id, "src/plant.ts");
+                throw new Exception("Expected changed files on a proposed task to be rejected.");
+            }
+            catch (InvalidOperationException)
+            {
+                Check(true, "changed-file progress is accepted only after a task has started");
+            }
             store.Complete(first.Id, "Routing evidence reviewed.", ["local-review"]);
+            Check(store.Get(first.Id).ChangedFiles.SequenceEqual(["src/layout.ts"]), "the terminal task result retains files recorded during its running state");
             store.Queue(second.Id);
             var claimedSecond = store.TryClaimReady();
             Check(claimedSecond?.Id == second.Id, "dependent agent task becomes claimable only after its prerequisite completes");
