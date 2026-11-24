@@ -162,8 +162,9 @@ project's Activity drawer beside the Coding Agent thread rather than navigating
 to a separate task page.
 
 The per-reference pass remains open for mobile task-progress behavior and
-references #13–30. This is desktop evidence only; the remaining
-reference-specific page states still need comparison and interaction evidence.
+references #15–30. References #13 and #14 now have packaged desktop captures
+and a focused Coding workspace flow; the remaining reference-specific states
+still need comparison and interaction evidence.
 
 ### Schedule from a conversation — reference #10
 
@@ -200,6 +201,27 @@ reference. The 1440×900 matrix found no layout or runtime issues.
 Packaged 1440×900 captures show the [Create project dialog](evidence-project-create-1440.png) and the [opened project workspace](evidence-project-open-1440.png). The Projects page now puts **Open folder** beside **New project**, searches recent projects by name or path, and lists each project with its folder path. Creating a project asks for a name and one local folder; project settings retain the existing instructions and multi-folder editing controls. The packaged flow checks both entry points, the compact name/folder dialog, and opening a listed project into Coding. On Windows, the real native folder picker was exercised with a temporary fixture, and the project was created and opened. The already-running app showed stale dialog copy; the packaged screenshots and smoke are from the freshly built source.
 
 Reference #12 is still a visual approximation: the persistent workspace sidebar and tabs remain visible around Projects, while the reference shows a standalone full-page surface. Review that shared-shell difference during the remaining continuity pass. Mobile project creation and direct Open folder flow still need focused acceptance.
+
+### Coding project session — reference #13
+
+The packaged [Coding project session capture](evidence-coding-project-session-1440.png)
+shows a project thread and Monaco editor side by side, with the project file
+tree, open file tab, and inline workspace controls. The focused packaged flow
+restored a seeded project conversation, opened README.md in the editor beside
+its Coding Agent thread, and confirmed the editor was available at 1440×900.
+This matches the reference's core chat-plus-editor workflow. The persistent
+Skai navigation rail and workspace tabs remain visible around the project.
+Mobile layout and further keyboard/accessibility review remain open.
+
+### Inline file diff — reference #14
+
+The packaged [inline diff capture](evidence-coding-inline-diff-1440.png) keeps
+the Coding Agent thread visible beside a unified file comparison with line
+numbers, context, and green additions. The smoke edited the seeded README,
+opened the inline diff, returned to Monaco, saved the change, and used Undo to
+restore a clean editor state. The comparison is a read-only local view; Git
+diff remains the source for repository change review. At 1440×900, the thread
+and editor columns remain usable together. Mobile comparison remains open.
 
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
