@@ -27,6 +27,7 @@ const exerciseGitReview = process.env.UI_MATRIX_EXERCISE_GIT_REVIEW === "1";
 const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1";
 const exerciseScheduledPage = process.env.UI_MATRIX_EXERCISE_SCHEDULED_PAGE === "1";
 const exerciseProjectCreate = process.env.UI_MATRIX_EXERCISE_PROJECT_CREATE === "1";
+const exerciseCodingPanels = process.env.UI_MATRIX_EXERCISE_CODING_PANELS === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
 let resolveTaskProgressPaused;
@@ -176,11 +177,11 @@ const PROBE = String.raw`(() => {
     const intentional = s.textOverflow === 'ellipsis' || el.matches('input,textarea,select,img,svg') ;
     if (!intentional && !sx && el.matches('button,a,h1,h2,h3,h4,p,strong,small,label,span,li,td,th') && el.scrollWidth > el.clientWidth + 1 && /(hidden|clip)/.test(s.overflowX + s.overflow)) issues.clipped.push(describe(el));
     // Bleed: content wider than the nearest boxed ancestor that does not clip or scroll it.
-    if (!sx && !el.matches('img,svg')) {
+          if (!sx && !el.matches('img,svg')) {
       for (let a = el.parentElement; a && a.id !== 'root'; a = a.parentElement) {
         const as = getComputedStyle(a);
         if (/(hidden|clip|auto|scroll)/.test(as.overflowX)) break;
-        if (isBox(a)) { const ar = a.getBoundingClientRect(); if (!positioned(el, a) && (r.right > ar.right + 2 || r.left < ar.left - 2)) issues.bleed.push({ ...describe(el), container: describe(a).el, by: Math.round(Math.max(r.right - ar.right, ar.left - r.left)) }); break; }
+            if (isBox(a) && !a.matches('.global-rail-more')) { const ar = a.getBoundingClientRect(); if (!positioned(el, a) && (r.right > ar.right + 2 || r.left < ar.left - 2)) issues.bleed.push({ ...describe(el), container: describe(a).el, by: Math.round(Math.max(r.right - ar.right, ar.left - r.left)) }); break; }
       }
     }
     // Unreachable: a control hidden by an ancestor that clips (not scrolls), or below the fold with nothing able to scroll.
@@ -400,7 +401,7 @@ async function main() {
           }
           await cdp.evaluate(`document.querySelector('.dialog-actions button[type="button"]')?.click()`);
           await cdp.evaluate(`document.querySelector('.project-directory-open-action')?.click()`);
-          const projectWorkspaceReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-heading strong') && document.querySelector('.coding-workspace-tabs')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          const projectWorkspaceReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-heading strong') && document.querySelector('.coding-secondary-tab-group .workspace-tab')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectWorkspaceReady) throw new Error("Projects could not open a selected project into its Coding workspace.");
           if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
             const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
@@ -417,7 +418,7 @@ async function main() {
             if (!projectActionReady) throw new Error(`Coding workflow could not render the seeded project row: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, directory: document.querySelector('.project-directory')?.innerText ?? '', rows: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText), body: document.body.innerText.slice(0, 500) }))()`))}`);
             await clickInRenderer(cdp, ".project-directory-open-action");
           }
-          const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-workspace-tabs')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-secondary-tab-group .workspace-tab')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectReady) throw new Error("Coding workflow could not open the seeded project.");
           const seededCodingThreadVisible = await cdp.evaluate(`Boolean([...document.querySelectorAll('.sidebar-project-thread')].find((button) => button.innerText.trim() === 'Review the starter project'))`);
           if (!seededCodingThreadVisible) await cdp.evaluate(`document.querySelector('button[aria-label="Expand Skai Starter Project"]')?.click(); 1`);
@@ -426,6 +427,70 @@ async function main() {
           await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
           const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
+          if (exerciseCodingPanels && width === 1440 && height === 900) {
+            const panelTabs = await cdp.evaluate(`([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].map((button) => button.textContent?.trim()))`);
+            if (!['Editor', 'Side chat', 'Changes'].every((tab) => panelTabs.some((label) => label.startsWith(tab))) || panelTabs.some((label) => label.startsWith('Files'))) throw new Error(`Coding workspace page list should keep Files inside Editor: ${JSON.stringify(panelTabs)}`);
+            const pageGroups = await cdp.evaluate(`(() => { const shell = document.querySelector('.workspace-tabs-hotkeys.is-coding-split'); const main = shell?.querySelector(':scope > .workspace-tab-strip')?.getBoundingClientRect(); const side = shell?.querySelector(':scope > .coding-secondary-tab-group')?.getBoundingClientRect(); const rect = (value) => value && ({ x: value.x, y: value.y, width: value.width, height: value.height, right: value.right }); return { shellClass: shell?.className, display: shell && getComputedStyle(shell).display, columns: shell && getComputedStyle(shell).gridTemplateColumns, main: rect(main), side: rect(side), sideTabs: shell?.querySelectorAll('.coding-secondary-tab-group .workspace-tab').length ?? 0 }; })()`);
+            const pageGroupsReady = pageGroups.main && pageGroups.side && pageGroups.main.width > 250 && pageGroups.side.width > 250 && Math.abs(pageGroups.main.y - pageGroups.side.y) < 2 && pageGroups.main.right <= pageGroups.side.x + 2;
+            if (!pageGroupsReady) throw new Error(`The main thread and right workspace pages are not managed as two aligned tab groups: ${JSON.stringify(pageGroups)}`);
+            const assertMainChat = async (mode) => {
+              const state = await cdp.evaluate(`(() => ({ visible: Boolean(document.querySelector('.project-thread-panel:not([hidden]) .chat-page.is-coding-agent')), thread: document.querySelector('.project-thread-panel:not([hidden])')?.innerText?.slice(0, 180) ?? '' }))()`);
+              if (!state.visible) throw new Error(`Main coding chat was hidden after switching to ${mode}: ${JSON.stringify(state)}`);
+            };
+            const capturePanel = async (name) => {
+              if (process.env.UI_MATRIX_CAPTURE !== "1") return;
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(captureDirectory, `coding-panel-${name}-1440.png`), Buffer.from(screenshot.data, "base64"));
+            };
+            const selectPanel = async (label) => {
+              const selected = await cdp.evaluateWith(function (expected) { const button = [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].find((item) => item.textContent?.trim().startsWith(expected)); if (!button) return false; button.click(); return true; }, label);
+              if (!selected) throw new Error(`Could not find the ${label} workspace page.`);
+              const active = await cdp.evaluate(`(async (expected) => { for (let i = 0; i < 40; i++) { const tab = [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab')].find((item) => item.querySelector('.workspace-tab-select')?.textContent?.trim().startsWith(expected)); if (tab?.classList.contains('is-active')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })(${JSON.stringify(label)})`);
+              if (!active) throw new Error(`${label} panel did not become active: ${JSON.stringify(await cdp.evaluate(`(() => [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab')].map((tab) => ({ label: tab.querySelector('.workspace-tab-select')?.textContent?.trim(), active: tab.classList.contains('is-active') })))()`))}`);
+              await assertMainChat(label);
+            };
+            await selectPanel("Editor");
+            const editorExplorerReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel .project-file-layout .project-file-explorer') && document.querySelector('.coding-project-browser.is-editor-panel .coding-explorer-project-files'))`);
+            if (!editorExplorerReady) throw new Error("Editor did not show the project file tree on its right side.");
+            await capturePanel("editor-with-files");
+            await selectPanel("Side chat");
+            const sideChatReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-side-chat') && document.querySelector('.coding-side-chat textarea[aria-label="Message the Coding side chat"]'))`);
+            if (!sideChatReady) throw new Error("Side chat did not open its project-scoped subagent composer.");
+            await cdp.evaluate(`(() => { const field = document.querySelector('.coding-side-chat textarea'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, 'Review the project architecture'); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return field.value; })()`);
+            const sideDraftWorks = await cdp.evaluate(`document.querySelector('.coding-side-chat textarea')?.value === 'Review the project architecture' && !document.querySelector('.coding-side-chat button[type="submit"]')?.disabled`);
+            if (!sideDraftWorks) throw new Error("Side chat did not accept a focused subagent instruction.");
+            await capturePanel("side-chat");
+            await selectPanel("Editor");
+            const readmeButton = await cdp.evaluate(`([...document.querySelectorAll('.coding-project-browser.is-editor-panel .project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)`);
+            if (!readmeButton) throw new Error("The inline project file tree did not show the seeded README.md.");
+            await cdp.evaluateWith(function (fileName) { [...document.querySelectorAll('.coding-project-browser.is-editor-panel .project-file-item')].find((item) => item.title === fileName)?.click(); return 1; }, readmeButton);
+            const monacoReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-browser.is-editor-panel .monaco-editor') && document.querySelector('.coding-project-browser.is-editor-panel .file-editor-heading')?.innerText.includes('README.md') && document.querySelector('.coding-project-browser.is-editor-panel .project-file-explorer')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!monacoReady) throw new Error("Selecting a project file did not open Monaco beside the file tree in the Editor pane.");
+            const hideFiles = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Hide file explorer"]'))`);
+            if (!hideFiles) throw new Error("The editor did not expose a hide control for the file tree.");
+            await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Hide file explorer"]')?.click()`);
+            const filesHidden = await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel')?.classList.contains('is-file-explorer-hidden') && !document.querySelector('.coding-project-browser.is-editor-panel .project-file-explorer')`);
+            if (!filesHidden) throw new Error("Hiding the file explorer did not expand the editor pane.");
+            await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Show file explorer"]')?.click()`);
+            const filesRestored = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { const panel = document.querySelector('.coding-project-browser.is-editor-panel'); if (panel && !panel.classList.contains('is-file-explorer-hidden') && getComputedStyle(panel.querySelector('.project-file-explorer')).display !== 'none') return true; await new Promise((r) => setTimeout(r, 40)); } return false; })()`);
+            if (!filesRestored) throw new Error("The file explorer could not be restored after hiding it.");
+            await assertMainChat("Editor with Monaco and file tree");
+            await capturePanel("monaco-with-files");            await selectPanel("Changes");
+            const changesReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-changes-panel h3')?.textContent === 'Changes' && (document.querySelector('.coding-project-browser.is-changes-panel .git-change-summary') || document.querySelector('.coding-project-browser.is-changes-panel [role="alert"]') || document.querySelector('.coding-project-browser.is-changes-panel [role="status"]') || document.querySelector('.coding-project-browser.is-changes-panel .coding-change-empty')))`);
+            if (!changesReady) throw new Error("Changes panel did not show Git review status alongside the main chat.");
+            await capturePanel("changes");
+            const closeChanges = await cdp.evaluate(`Boolean(document.querySelector('.coding-secondary-tab-group .workspace-tab-close[aria-label="Close Changes"]'))`);
+            if (!closeChanges) throw new Error("The Changes page was missing its close control.");
+            await cdp.evaluate(`document.querySelector('.coding-secondary-tab-group .workspace-tab-close[aria-label="Close Changes"]')?.click()`);
+            const changesClosed = await cdp.evaluate(`![...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Changes'))`);
+            if (!changesClosed) throw new Error("Closing a right-side Changes page did not remove it from that tab group.");
+            await cdp.evaluate(`document.querySelector('.coding-pane-tab-strip button[aria-label="Open a right workspace page"]')?.click()`);
+            await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.trim() === 'Changes')?.click(), 1)`);
+            const changesReopened = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Changes'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!changesReopened) throw new Error("The right-pane page menu did not reopen a closed Changes page.");
+            await selectPanel("Editor");
+          }
           if (exerciseTaskProgress) {
             await taskProgressServerReady;
             const planned = await cdp.evaluateWith(async function (endpoint) { const request = (method, params) => window.skaiAgent.request(method, params); const projectId = document.querySelector('.coding-project-heading-actions select')?.value; if (!projectId) return { error: 'No active project ID.' }; const settings = await request('settings.save', { provider: 'Local API', endpoint, model: 'revision4-progress-fixture' }); if (!settings.ok) return { error: settings.error?.message ?? 'Could not configure isolated fixture model.' }; const task = await request('tasks.plan', { title: 'Update garden layout code', instruction: 'Review the garden layout files, make a focused update to each of the four source files, then pause before verification so the changes can be reviewed.', projectId, model: 'revision4-progress-fixture', modelProvider: 'Local API', modelSizeBytes: 1, modelContextLength: 4096, requiresApproval: false }); if (!task.ok) return { error: task.error?.message ?? 'Could not create project task.' }; const queued = await request('tasks.queue', { id: task.result.id }); if (!queued.ok) return { error: queued.error?.message ?? 'Could not queue project task.' }; const execution = await request('tasks.execute', { id: task.result.id }); if (!execution.ok) return { error: execution.error?.message ?? 'Could not start project task.' }; return { id: task.result.id, status: execution.result?.status }; }, taskProgressEndpoint);
@@ -524,7 +589,7 @@ async function main() {
           const undoRestoredFile = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const buttons = [...document.querySelectorAll('#coding-file-editor button')]; const undo = buttons.find((button) => button.textContent?.trim() === 'Undo'); const save = buttons.find((button) => button.textContent?.trim() === 'Save edit'); const editor = document.querySelector('.monaco-editor-shell .monaco-editor'); if (editor && undo?.disabled && save?.disabled) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
           if (!undoRestoredFile) throw new Error(`Undo did not return the Coding workspace to a clean editor state: ${JSON.stringify(await cdp.evaluate(`(() => ({ editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 180), heading: document.querySelector('#coding-file-editor')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.textContent?.trim(), disabled: button.disabled })) }))()`))}`);
           if (exerciseGitReview) {
-            await clickInRenderer(cdp, '.coding-workspace-tabs button:nth-child(2)');
+            await clickButtonText(cdp, 'Changes', '.coding-secondary-tab-group');
             const gitChangesReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.git-change-summary')?.innerText.includes('3 changed files')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
             if (!gitChangesReady) throw new Error(`The seeded Git project did not show its three local changes: ${JSON.stringify(await cdp.evaluate(`document.querySelector('.git-change-summary')?.innerText ?? document.body.innerText.slice(0, 300)`))}`);
             const selectedChanges = await cdp.evaluate(`(() => { const rows = [...document.querySelectorAll('.git-change-list li')]; for (const row of rows) { const checkbox = row.querySelector('input[type="checkbox"]'); const shouldSelect = row.innerText.includes('README.md') || row.innerText.includes('src/index.ts'); if (!checkbox) return false; if (checkbox.checked !== shouldSelect) checkbox.click(); } return [...document.querySelectorAll('.git-change-list li')].map((row) => ({ path: row.innerText, checked: row.querySelector('input')?.checked })); })()`);

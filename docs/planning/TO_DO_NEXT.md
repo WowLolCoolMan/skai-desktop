@@ -108,6 +108,17 @@ Mark an item done only when the linked workflow has evidence.
    Reference #15 verifies selected-file diff review and commit while preserving
    unselected files and unrelated staged work; Git diff remains the
    repository-level review surface. Do not close this item until
+   On 2026-11-24, a packaged Coding smoke verified separate main and right
+   workspace tab groups, Side chat, Editor/Monaco, Changes, and the persistent
+   main thread. The project-file tree currently remains inside Editor; the
+   Revision 4 example shows Files as its own right-side page, so that exact
+   workflow remains open. The 20-route × five-size × four theme/sidebar
+   packaged matrix passes with no runtime or layout findings. Remaining:
+   implement Files as a peer page per the user-provided Codex examples, exercise
+   Side chat against an isolated model fixture, verify page switching at mobile
+   widths, and visually review references #16–30. See the panel evidence and acceptance notes in the
+   Revision 4 README.
+   Do not close this item until
    the remaining flows have evidence and
    the references have been visually reviewed. On 2026-11-24, Image Generate
    and Edit were refined against references #24–25: the page now foregrounds

@@ -5,10 +5,10 @@ import { installedVoiceModels } from "../../services/nativeTts";
 
 const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = [
   { route: "chat", icon: "home", label: "Home" },
+  { route: "projects", icon: "project", label: "Projects" },
+  { route: "scheduled", icon: "clock", label: "Scheduled" },
+  { route: "coding", icon: "code", label: "Coding" },
   { route: "images", icon: "image", label: "Images" },
-  { route: "video", icon: "video", label: "Video · planned" },
-  { route: "usage", icon: "activity", label: "Usage" },
-  { route: "marketplace", icon: "marketplace", label: "Marketplace" },
 ];
 
 const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];
@@ -40,11 +40,11 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape); };
   }, [menuOpen]);
   const menuItems = useMemo(() => [
-    { route: "projects" as Route, label: "Projects", icon: "project" as NavIconName, description: "Open a local workspace", unavailable: false },
-    { route: "coding" as Route, label: "Coding", icon: "code" as NavIconName, description: "Work with an agent and project files", unavailable: false },
     { route: "models" as Route, label: "Models", icon: "model" as NavIconName, description: "Browse and manage local models", unavailable: false },
     { route: "compare" as Route, label: "Compare", icon: "compare" as NavIconName, description: "Compare model responses", unavailable: false },
-    { route: "scheduled" as Route, label: "Scheduled", icon: "clock" as NavIconName, description: "Manage scheduled work", unavailable: false },
+    { route: "video" as Route, label: "Video · planned", icon: "video" as NavIconName, description: "Video tools planned for a future release", unavailable: false },
+    { route: "marketplace" as Route, label: "Marketplace", icon: "marketplace" as NavIconName, description: "Browse available tools", unavailable: false },
+    { route: "usage" as Route, label: "Usage", icon: "activity" as NavIconName, description: "Review local model usage", unavailable: false },
     { route: "terminal" as Route, label: "Terminal", icon: "terminal" as NavIconName, description: "Run a project command", unavailable: false },
     { route: "persona-workshop" as Route, label: "Personas", icon: "sparkle" as NavIconName, description: "Create and manage personas", unavailable: false },
     { route: "memory" as Route, label: "Memory", icon: "memory" as NavIconName, description: "Review saved notes and documents", unavailable: false },

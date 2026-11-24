@@ -76,7 +76,7 @@ if (!fs.existsSync(path.join(desktopRoot, "dist", "index.html"))) throw new Erro
     return Math.max(latest, entry.isDirectory() ? newestMtime(full) : fs.statSync(full).mtimeMs);
   }, 0);
   const sourceMtime = Math.max(...["src", "shared"].map((dir) => newestMtime(path.join(desktopRoot, dir))), fs.statSync(path.join(desktopRoot, "index.html")).mtimeMs);
-  const builtMtime = fs.statSync(path.join(desktopRoot, "dist", "index.html")).mtimeMs;
+  const builtMtime = newestMtime(path.join(desktopRoot, "dist"));
   if (builtMtime < sourceMtime) throw new Error("The Electron renderer build is older than apps/desktop/src. Run npm run desktop:build first so the package matches the sources.");
 }
 

@@ -451,3 +451,28 @@ and cross-platform acceptance.
   1440×900; the header, preference rail, preview, gallery, and save action were
   visible without clipping. Native-window interaction and route-by-route visual
   acceptance remain open; this does not close the professional UI pass.
+
+### Coding workspace right-pane continuity — 2026-11-24
+
+- Replaced the Coding `Side chat +` global-tab switch with a persistent project
+  workspace that keeps the main Coding Agent thread visible and provides a
+  second, independently managed right-side page group. The current right pages
+  are Editor, Side chat, and Changes; the project-file tree is inside Editor.
+  Revision 4 shows Files as a separate page, so that exact layout still needs
+  review before this workflow can be marked as reference-matched.
+- Side chat submits a project-scoped Coding task to the existing local task
+  queue/executor, displays its status/result, supports stopping active work,
+  and links changed files back into Monaco. Changes without a Git repository
+  show an inline unavailable message; refresh remains available in Project
+  actions.
+- Added `UI_MATRIX_EXERCISE_CODING_PANELS=1` to the packaged Electron matrix.
+  The focused 1440×900 flow switched the right-side pages, asserted the main
+  chat remained visible, accepted a Side chat draft, opened `README.md` in
+  Monaco, and exercised save/undo and Changes. Captures show the two top-level
+  tab groups aligned in one row. `npm run desktop:typecheck`, `npm run build`,
+  `npm run package:electron`, and the packaged UI matrix passed; the matrix
+  covered 20 routes × five window sizes × four theme/sidebar variants.
+- Remaining acceptance: implement Files as a peer page per the user-provided
+  Revision 4 examples, exercise a Side chat task with an isolated model fixture,
+  run the right-page states at mobile widths, and compare captures against the
+  supplied references. See the Revision 4 README for images and scope.

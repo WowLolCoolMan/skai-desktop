@@ -15,6 +15,16 @@ import { AchievementToast } from "./components/overlays/AchievementToast";
 export default function App() {
   const workspace = useDesktopWorkspace();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => localStorage.getItem("skai.sidebar.collapsed") !== "true");
+  const [compactViewport, setCompactViewport] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 640px)");
+    const update = () => setCompactViewport(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => { localStorage.setItem("skai.sidebar.collapsed", String(!desktopSidebarOpen)); }, [desktopSidebarOpen]);
   useEffect(() => {
     if (!mobileSidebarOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileSidebarOpen(false); };
@@ -23,13 +33,26 @@ export default function App() {
   }, [mobileSidebarOpen]);
   const shellStyle = { "--skai-sidebar-width": `${workspace.sidebarWidth}px` } as CSSProperties;
   const mainContentRoute = workspace.route === "settings" ? workspace.settingsReturnRoute : workspace.routeState.route;
-  return <ErrorBoundary><div className={`app-shell ${workspace.workspaceTabs.length ? "has-workspace-tabs" : ""} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`} style={shellStyle}>
+  const workspaceTabsVisible = workspace.route === "chat" || workspace.route === "coding";
+  const codingSplitOpen = workspaceTabsVisible && workspace.route === "coding" && Boolean(workspace.routeState.selectedProject);
+  useEffect(() => {
+    const toggleWithShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.key.toLowerCase() !== "s") return;
+      event.preventDefault();
+      if (compactViewport) setMobileSidebarOpen((open) => !open);
+      else setDesktopSidebarOpen((open) => !open);
+    };
+    window.addEventListener("keydown", toggleWithShortcut);
+    return () => window.removeEventListener("keydown", toggleWithShortcut);
+  }, [compactViewport]);
+  const isSidebarOpen = compactViewport ? mobileSidebarOpen : desktopSidebarOpen;
+  return <ErrorBoundary><div className={`app-shell ${workspaceTabsVisible && workspace.workspaceTabs.length ? "has-workspace-tabs" : ""} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""} ${desktopSidebarOpen ? "" : "workspace-sidebar-collapsed"}`} style={shellStyle}>
     <a className="skip-link" href="#main-content">Skip to content</a>
-    <Toolbar connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onToggleSidebar={() => setMobileSidebarOpen((open) => !open)} sidebarOpen={mobileSidebarOpen} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
+    <Toolbar connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onToggleSidebar={() => { if (compactViewport) setMobileSidebarOpen((open) => !open); else setDesktopSidebarOpen((open) => !open); }} sidebarOpen={isSidebarOpen} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
     <GlobalRail route={workspace.route} onNavigate={workspace.onNavigate} />
     {mobileSidebarOpen && <button className="mobile-sidebar-backdrop" type="button" aria-label="Close workspace navigation" onClick={() => setMobileSidebarOpen(false)} />}
     <Sidebar className={`workspace-sidebar ${mobileSidebarOpen ? "is-mobile-open" : ""}`} route={workspace.route} activeConversationId={workspace.routeState.conversationId} agentMode={workspace.agentMode} onAgentModeChange={workspace.setAgentMode} onNavigate={(route) => { workspace.onNavigate(route); setMobileSidebarOpen(false); }} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onNewChat={() => { workspace.startNewChat(); setMobileSidebarOpen(false); }} onOpenProject={(project) => { workspace.routeActions.onOpenProject(project); setMobileSidebarOpen(false); }} onSelectConversation={(id) => { workspace.selectConversation(id); setMobileSidebarOpen(false); }} onConversationMetadata={workspace.updateConversationMetadata} />
-    <div className="workspace-tabs-hotkeys"><WorkspaceTabs tabs={workspace.workspaceTabs} tasks={workspace.routeState.tasks} activeId={workspace.activeWorkspaceTabId} onSelect={workspace.selectWorkspaceTab} onClose={workspace.closeWorkspaceTab} onNew={workspace.openNewWorkspaceTab} canRestore={workspace.canRestoreWorkspaceTab} onRestore={workspace.restoreWorkspaceTab} /></div>
+    {workspaceTabsVisible && <div className={`workspace-tabs-hotkeys${codingSplitOpen ? " is-coding-split" : ""}`}><WorkspaceTabs tabs={workspace.workspaceTabs} tasks={workspace.routeState.tasks} activeId={workspace.activeWorkspaceTabId} onSelect={workspace.selectWorkspaceTab} onClose={workspace.closeWorkspaceTab} onNew={workspace.openNewWorkspaceTab} canRestore={workspace.canRestoreWorkspaceTab} onRestore={workspace.restoreWorkspaceTab} />{codingSplitOpen && <div id="coding-secondary-tab-group" className="coding-secondary-tab-group" />}</div>}
     <main className="app-main">
       <div className="backdrop-effects" aria-hidden="true" />
       <div id="main-content" tabIndex={0} className={`app-content ${workspace.route === "settings" ? "is-settings-underlay" : ""} ${mainContentRoute === "chat" ? "app-content-chat" : ""} ${mainContentRoute === "compare" ? "app-content-compare" : ""} ${["coding", "projects"].includes(mainContentRoute) ? "app-content-coding" : ""} ${mainContentRoute === "images" ? "app-content-images" : ""} ${mainContentRoute === "marketplace" ? "app-content-marketplace" : ""} ${mainContentRoute === "plugins" ? "app-content-plugins" : ""} ${mainContentRoute === "terminal" ? "app-content-terminal" : ""} ${mainContentRoute === "scheduled" ? "app-content-scheduled" : ""}`}><AppRouteView state={{ ...workspace.routeState, route: mainContentRoute }} actions={workspace.routeActions} />{workspace.error && <div className="global-error" role="alert"><span>{workspace.error}</span><button type="button" onClick={workspace.dismissError} aria-label="Dismiss notification">Dismiss</button></div>}{workspace.health && <span className="sr-only">{workspace.health.service} protocol {workspace.health.protocolVersion}</span>}</div>

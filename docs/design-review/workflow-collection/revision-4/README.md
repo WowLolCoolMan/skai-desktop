@@ -238,6 +238,37 @@ panel uses the existing Files workspace in Coding, keeping repository actions
 with the project. At 1440×900 the file list and commit controls stay in a left
 rail beside a large diff pane. Mobile Git review remains open.
 
+### Coding workspace panel continuity — user-provided Codex examples
+
+The Coding Agent thread stays mounted on the left while the right workspace
+uses its own page group beside the main chat/project tabs. **Editor** docks
+Monaco and a collapsible project-file tree; **Side chat** provides a
+project-scoped subagent task composer and task status/results; **Changes** shows
+local Git review state. Side chat starts a Coding task through the existing
+local task queue/executor, and file links in its result return to Monaco.
+
+The current Revision 4 examples also show **Files** as a separate right-side
+page. Skai currently keeps the file tree inside Editor, so that particular
+page-for-page workflow is still an acceptance gap in this audit.
+
+The packaged panel smoke at 1440×900 verified the three right-side pages,
+confirmed the main thread remained visible after each switch, typed and enabled
+a Side chat task draft, opened `README.md` in Monaco, and checked the Changes
+surface. Current captures are:
+
+- [Side chat beside the main thread](evidence-coding-panel-side-chat-1440.png)
+- [Editor/Monaco with the project-file tree beside the main thread](evidence-coding-panel-monaco-1440.png)
+- [Changes beside the main thread](evidence-coding-panel-changes-1440.png)
+
+The full packaged matrix passed 20 routes at five window sizes across dark and
+light themes with expanded and collapsed sidebars, with no runtime errors or
+layout findings. The panel-specific interaction pass is
+desktop-only; mobile panel switching remains open. Side chat’s task composer
+and task-runner connection are implemented, but an isolated model-backed
+subagent execution has not yet been exercised by this panel smoke. Changes
+without a Git repository show an inline status message and can be refreshed
+through Project actions.
+
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
 Focused interaction smokes passed for queueing, search/import, task handoff and

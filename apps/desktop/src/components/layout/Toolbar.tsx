@@ -22,7 +22,7 @@ export function Toolbar({ connection, canGoBack, canGoForward, onBack, onForward
   const logoTaps = useRef(0);
   const navigate = (nextRoute: Route) => () => onNavigate(nextRoute);
   return <header className={`app-toolbar ${windowsTitleBarOverlay ? "is-titlebar-overlay" : ""}`}>
-    {onToggleSidebar && <button className="toolbar-sidebar-toggle" type="button" aria-label={sidebarOpen ? "Close workspace sidebar" : "Open workspace sidebar"} aria-expanded={sidebarOpen} aria-controls="workspace-sidebar" onClick={onToggleSidebar}><NavIcon name="more" /></button>}
+    {onToggleSidebar && <button className="toolbar-sidebar-toggle" type="button" aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} title="Toggle sidebar (Ctrl+Shift+S)" aria-expanded={sidebarOpen} aria-controls="workspace-sidebar" onClick={onToggleSidebar}><NavIcon name="sidebar" /></button>}
     <button className="toolbar-brand" type="button" aria-label={`${PRODUCT_DISPLAY_NAME} logo`} title="Skai Desktop" onClick={() => { logoTaps.current += 1; if (logoTaps.current >= 7) { logoTaps.current = 0; unlockAchievement("mascot-fan"); } }}><img src={SKAI_WOLF_ICON} alt="" aria-hidden="true" /></button>
     <nav className="app-menu-bar" aria-label="Application menu">
       <AppMenu label="Skai" items={[{ label: "New chat", shortcut: "Ctrl+N", onSelect: onNewChat }, { label: "Projects", onSelect: navigate("projects"), separatorBefore: true }, { label: "Coding workspace", shortcut: "Ctrl+2", onSelect: navigate("coding") }]} />
