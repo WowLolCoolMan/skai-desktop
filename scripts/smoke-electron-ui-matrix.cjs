@@ -114,12 +114,32 @@ function connect(url) {
     send,
     on: (listener) => listeners.push(listener),
     evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(`evaluate: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text} in ${expression.slice(0, 260)}`); return result.result?.value; },
+    evaluateWith: async (functionDeclaration, ...values) => {
+      // Send runtime values as CDP arguments, never as generated JavaScript source.
+      if (typeof functionDeclaration !== "function") throw new TypeError("evaluateWith requires a static function declaration.");
+      const global = await send("Runtime.evaluate", { expression: "globalThis", returnByValue: false });
+      const objectId = global.result?.objectId;
+      if (!objectId) throw new Error("Could not access the renderer execution context.");
+      try {
+        const result = await send("Runtime.callFunctionOn", {
+          objectId,
+          functionDeclaration: functionDeclaration.toString(),
+          arguments: values.map((value) => ({ value })),
+          returnByValue: true,
+          awaitPromise: true,
+        });
+        if (result.exceptionDetails) throw new Error(`evaluateWith: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`);
+        return result.result?.value;
+      } finally {
+        try { await send("Runtime.releaseObject", { objectId }); } catch { /* Releasing a test-only remote handle is best effort. */ }
+      }
+    },
     close: () => socket.close(),
   };
 }
 
 async function clickInRenderer(cdp, selector) {
-  const point = await cdp.evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
+  const point = await cdp.evaluateWith(function (selector) { const element = document.querySelector(selector); if (!element) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; }, selector);
   if (!point) throw new Error(`UI interaction target was not found: ${selector}`);
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
   await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", clickCount: 1 });
@@ -127,7 +147,7 @@ async function clickInRenderer(cdp, selector) {
 }
 
 async function clickButtonText(cdp, text, scope = "body") {
-  const point = await cdp.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(scope)}); const element = [...(root?.querySelectorAll('button') ?? [])].find((button) => button.innerText.trim() === ${JSON.stringify(text)}); if (!element || element.disabled) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()`);
+  const point = await cdp.evaluateWith(function (text, scope) { const root = document.querySelector(scope); const element = [...(root?.querySelectorAll('button') ?? [])].find((button) => button.innerText.trim() === text); if (!element || element.disabled) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; }, text, scope);
   if (!point) throw new Error(`UI button was not found or is disabled: ${text}`);
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
   await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", clickCount: 1 });
@@ -269,36 +289,36 @@ async function main() {
       fs.writeFileSync(path.join(seedProject, "src", "plan.ts"), "export const gardenPlan = { columns: 2, spacing: 12 };\n");
     }
   }
-  const seeded = await cdp.evaluate(`(async () => {
+  const seeded = await cdp.evaluateWith(async function(captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions) {
     const r = (m, p) => window.skaiAgent.request(m, p);
     const results = [];
-    results.push(await r("conversation.save", { title: ${JSON.stringify(longTitle)}, messages: [{ role: "user", content: ${JSON.stringify(captureMode ? "Help me plan a low-maintenance herb garden for a sunny patio." : `Unbroken token: ${longWord}`)} }, { role: "assistant", content: ${JSON.stringify(captureMode ? "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." : "Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40))} }] }));
-    if (!${captureMode}) {
-      results.push(await r("conversation.save", { title: ${JSON.stringify(longWord)}, messages: [{ role: "user", content: "short" }] }));
+    results.push(await r("conversation.save", { title: longTitle, messages: [{ role: "user", content: captureMode ? "Help me plan a low-maintenance herb garden for a sunny patio." : `Unbroken token: ${longWord}` }, { role: "assistant", content: captureMode ? "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." : "Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40) }] }));
+    if (!captureMode) {
+      results.push(await r("conversation.save", { title: longWord, messages: [{ role: "user", content: "short" }] }));
       for (let i = 0; i < 25; i++) await r("conversation.save", { title: "Filler conversation number " + i, messages: [{ role: "user", content: "filler " + i }] });
     }
-    results.push(await r("tasks.plan", { title: ${JSON.stringify(captureMode ? "Review garden layout options" : longTitle)}, instruction: ${JSON.stringify(captureMode ? "Compare container sizes and sunlight needs before suggesting a layout." : `Instruction ${longWord}`)}, environment: "local" }));
-    results.push(await r("scheduled.create", { prompt: ${JSON.stringify(captureMode ? "Review the herb garden plan" : `${longTitle} ${longWord}`)}, dueAt: new Date(Date.now() + 3600000).toISOString(), repeatEveryMinutes: 60 }));
-    const project = await r("project.save", { name: ${JSON.stringify(captureMode ? "Skai Starter Project" : "Revision 4 coding fixture")}, folderPaths: [${JSON.stringify(seedProject)}] });
+    results.push(await r("tasks.plan", { title: captureMode ? "Review garden layout options" : longTitle, instruction: captureMode ? "Compare container sizes and sunlight needs before suggesting a layout." : `Instruction ${longWord}`, environment: "local" }));
+    results.push(await r("scheduled.create", { prompt: captureMode ? "Review the herb garden plan" : `${longTitle} ${longWord}`, dueAt: new Date(Date.now() + 3600000).toISOString(), repeatEveryMinutes: 60 }));
+    const project = await r("project.save", { name: captureMode ? "Skai Starter Project" : "Revision 4 coding fixture", folderPaths: [seedProject] });
     results.push(project);
-    if (project.ok && ${includeCodingFixture}) results.push(await r("conversation.save", { title: "Review the starter project", mode: "Coding Agent", responseMode: "coding", projectId: project.result?.id, messages: [{ role: "user", content: "Review this project structure and suggest the next small improvement." }, { role: "assistant", content: "I’ll inspect the existing files, then outline a focused change and how to verify it." }] }));
-    if (${captureMode} && results[0]?.result?.id) results.push(await r("conversation.save", { id: results[0].result.id, title: ${JSON.stringify(longTitle)}, mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Help me plan a low-maintenance herb garden for a sunny patio." }, { role: "assistant", content: "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." }] }));
-    if (${captureMode} && ${exerciseChatSchedule} && results[0]?.result?.id) results.push(await r("scheduled.create", { prompt: "Give me a weekly summary of key updates, progress, and next steps.", conversationId: results[0].result.id, dueAt: new Date(Date.now() + 86400000).toISOString(), repeatEveryMinutes: 10080, workspaceMode: "ChatBot" }));
-    if (${captureMode} && ${exerciseDocuments}) results.push(await r("conversation.save", { title: "Plan and results summary", mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Based only on the attached plan and results, what were the objectives and did we meet them?", attachments: [{ fileName: "Plan.pdf", content: "Objectives: deliver the MVP by the end of Q2; reach at least 10,000 active users; achieve a conversion rate of at least 5%." }, { fileName: "Results.xlsx", content: "MVP delivered in Q2. Active users: 12,480. Conversion rate: 5.6%." }] }, { role: "assistant", content: "According to Plan.pdf, the objectives were to deliver the MVP by Q2, reach at least 10,000 active users, and reach a conversion rate of at least 5%. Results.xlsx reports delivery in Q2, 12,480 active users, and a 5.6% conversion rate, so all three objectives were met. Sources: Plan.pdf (objectives); Results.xlsx (outcomes)." }] }));
-    if (${captureMode} && ${exerciseChatSearch}) for (const item of [
+    if (project.ok && includeCodingFixture) results.push(await r("conversation.save", { title: "Review the starter project", mode: "Coding Agent", responseMode: "coding", projectId: project.result?.id, messages: [{ role: "user", content: "Review this project structure and suggest the next small improvement." }, { role: "assistant", content: "I’ll inspect the existing files, then outline a focused change and how to verify it." }] }));
+    if (captureMode && results[0]?.result?.id) results.push(await r("conversation.save", { id: results[0].result.id, title: longTitle, mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Help me plan a low-maintenance herb garden for a sunny patio." }, { role: "assistant", content: "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." }] }));
+    if (captureMode && exerciseChatSchedule && results[0]?.result?.id) results.push(await r("scheduled.create", { prompt: "Give me a weekly summary of key updates, progress, and next steps.", conversationId: results[0].result.id, dueAt: new Date(Date.now() + 86400000).toISOString(), repeatEveryMinutes: 10080, workspaceMode: "ChatBot" }));
+    if (captureMode && exerciseDocuments) results.push(await r("conversation.save", { title: "Plan and results summary", mode: "ChatBot", responseMode: "think", messages: [{ role: "user", content: "Based only on the attached plan and results, what were the objectives and did we meet them?", attachments: [{ fileName: "Plan.pdf", content: "Objectives: deliver the MVP by the end of Q2; reach at least 10,000 active users; achieve a conversion rate of at least 5%." }, { fileName: "Results.xlsx", content: "MVP delivered in Q2. Active users: 12,480. Conversion rate: 5.6%." }] }, { role: "assistant", content: "According to Plan.pdf, the objectives were to deliver the MVP by Q2, reach at least 10,000 active users, and reach a conversion rate of at least 5%. Results.xlsx reports delivery in Q2, 12,480 active users, and a 5.6% conversion rate, so all three objectives were met. Sources: Plan.pdf (objectives); Results.xlsx (outcomes)." }] }));
+    if (captureMode && exerciseChatSearch) for (const item of [
       { title: "Garden planning", query: "What should I plant in my garden this spring?", answer: "Here is a simple garden plan with plant suggestions and timing." },
       { title: "Vegetable garden tips", query: "How can I improve my vegetable garden?", answer: "Focus on good soil, sunlight, and consistent watering." },
       { title: "Backyard garden ideas", query: "Share a few backyard garden ideas.", answer: "Try raised beds and low-maintenance plants for your backyard." },
     ]) results.push(await r("conversation.save", { title: item.title, messages: [{ role: "user", content: item.query }, { role: "assistant", content: item.answer }] }));
-    if (${captureMode} && ${exerciseChatActions}) for (const text of ["Add a week-by-week planting schedule.", "Include a simple materials checklist.", "Estimate the monthly watering routine."]) results.push(await r("chat.queue.enqueue", { text }));
-    if (${captureMode}) for (const card of [
+    if (captureMode && exerciseChatActions) for (const text of ["Add a week-by-week planting schedule.", "Include a simple materials checklist.", "Estimate the monthly watering routine."]) results.push(await r("chat.queue.enqueue", { text }));
+    if (captureMode) for (const card of [
       { name: "Default", roles: "General-purpose assistant", instructions: "Be clear, practical, and adaptable to the user's task." },
       { name: "Release Engineer", roles: "Helps with releases, readiness, and ops", instructions: "Be concise, practical, and safety-minded. Focus on release planning, readiness checks, risk, and operations." },
       { name: "Code Reviewer", roles: "Reviews code and suggests improvements", instructions: "Prioritize correctness, security, and maintainability. Explain findings with file and line references." },
       { name: "Tech Writer", roles: "Drafts and edits clear technical docs", instructions: "Use plain language, organize information clearly, and preserve technical accuracy." },
     ]) results.push(await r("persona.save", { persona: { ...card, sourceMode: "own-material", subjectType: "character", voice: "Friendly and clear", personality: "Patient, focused, and direct", thinkingStyle: "Work step by step and explain important choices", interactionStyle: "Ask for missing context only when it affects the result", values: "Clarity, accuracy, and useful next steps", knowledge: "Use the supplied material and task context", evidenceBoundaries: "State uncertainty and do not invent unsupported facts", sourceMaterial: card.instructions } }));
     return results;
-  })()`);
+  }, captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions);
   if (!Array.isArray(seeded) || seeded.some((result) => result?.ok !== true)) throw new Error(`Seeding the throwaway profile failed: ${JSON.stringify(seeded)}`);
 
   const findings = [];
@@ -408,7 +428,7 @@ async function main() {
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
           if (exerciseTaskProgress) {
             await taskProgressServerReady;
-            const planned = await cdp.evaluate(`(async () => { const request = (method, params) => window.skaiAgent.request(method, params); const projectId = document.querySelector('.coding-project-heading-actions select')?.value; if (!projectId) return { error: 'No active project ID.' }; const settings = await request('settings.save', { provider: 'Local API', endpoint: ${JSON.stringify(taskProgressEndpoint)}, model: 'revision4-progress-fixture' }); if (!settings.ok) return { error: settings.error?.message ?? 'Could not configure isolated fixture model.' }; const task = await request('tasks.plan', { title: 'Update garden layout code', instruction: 'Review the garden layout files, make a focused update to each of the four source files, then pause before verification so the changes can be reviewed.', projectId, model: 'revision4-progress-fixture', modelProvider: 'Local API', modelSizeBytes: 1, modelContextLength: 4096, requiresApproval: false }); if (!task.ok) return { error: task.error?.message ?? 'Could not create project task.' }; const queued = await request('tasks.queue', { id: task.result.id }); if (!queued.ok) return { error: queued.error?.message ?? 'Could not queue project task.' }; const execution = await request('tasks.execute', { id: task.result.id }); if (!execution.ok) return { error: execution.error?.message ?? 'Could not start project task.' }; return { id: task.result.id, status: execution.result?.status }; })()`);
+            const planned = await cdp.evaluateWith(async function (endpoint) { const request = (method, params) => window.skaiAgent.request(method, params); const projectId = document.querySelector('.coding-project-heading-actions select')?.value; if (!projectId) return { error: 'No active project ID.' }; const settings = await request('settings.save', { provider: 'Local API', endpoint, model: 'revision4-progress-fixture' }); if (!settings.ok) return { error: settings.error?.message ?? 'Could not configure isolated fixture model.' }; const task = await request('tasks.plan', { title: 'Update garden layout code', instruction: 'Review the garden layout files, make a focused update to each of the four source files, then pause before verification so the changes can be reviewed.', projectId, model: 'revision4-progress-fixture', modelProvider: 'Local API', modelSizeBytes: 1, modelContextLength: 4096, requiresApproval: false }); if (!task.ok) return { error: task.error?.message ?? 'Could not create project task.' }; const queued = await request('tasks.queue', { id: task.result.id }); if (!queued.ok) return { error: queued.error?.message ?? 'Could not queue project task.' }; const execution = await request('tasks.execute', { id: task.result.id }); if (!execution.ok) return { error: execution.error?.message ?? 'Could not start project task.' }; return { id: task.result.id, status: execution.result?.status }; }, taskProgressEndpoint);
             if (planned?.error || !planned?.id) throw new Error(`Could not start the isolated task progress workflow: ${planned?.error ?? JSON.stringify(planned)}`);
             taskProgressTaskId = planned.id;
             const pausedAtReview = await Promise.race([taskProgressPaused.then(() => true), sleep(10_000).then(() => false)]);
@@ -416,7 +436,7 @@ async function main() {
               const currentTasks = await cdp.evaluate(`(async () => { const response = await window.skaiAgent.request('tasks.list'); return response.ok ? response.result : response; })()`);
               throw new Error(`The local Coding Agent did not reach the review pause after writing four files (${taskProgressRequests} model calls; ${taskProgressServerProblem || "no server protocol error"}): ${JSON.stringify(currentTasks)}`);
             }
-            const liveTask = await cdp.evaluate(`(async () => { const response = await window.skaiAgent.request('tasks.list'); return response.ok ? response.result.find((item) => item.id === ${JSON.stringify(taskProgressTaskId)}) : null; })()`);
+            const liveTask = await cdp.evaluateWith(async function (taskId) { const response = await window.skaiAgent.request('tasks.list'); return response.ok ? response.result.find((item) => item.id === taskId) : null; }, taskProgressTaskId);
             const expectedChangedFiles = ["src/layout.ts", "src/plant.ts", "src/styles.css", "src/utils.ts"];
             if (liveTask?.status !== "running" || expectedChangedFiles.some((file) => !liveTask.changedFiles?.includes(file)) || liveTask.activity?.filter((item) => item.type === "tool.write_file.completed").length !== 4) throw new Error(`The local task did not produce the expected running review state: ${JSON.stringify({ status: liveTask?.status, changedFiles: liveTask?.changedFiles, writeEvents: liveTask?.activity?.filter((item) => item.type === "tool.write_file.completed").length })}`);
             await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
@@ -438,7 +458,7 @@ async function main() {
             await cdp.evaluate(`document.querySelector('.coding-task-item-controls button')?.click()`);
             const stopFeedback = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if (document.querySelector('.coding-task-item-controls button')?.textContent?.includes('Stopping')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!stopFeedback) throw new Error("The Stop action did not show its cancellation-in-progress state.");
-            const terminalTask = await cdp.evaluate(`(async (taskId) => { let lastResponse; for (let i = 0; i < 100; i++) { lastResponse = await window.skaiAgent.request('tasks.list', {}); const task = lastResponse.ok ? lastResponse.result.find((item) => item.id === taskId) : null; if (task && ['cancelled', 'failed', 'completed'].includes(task.status)) return { task, tasksOk: lastResponse.ok }; await new Promise((r) => setTimeout(r, 100)); } return { taskId, tasksOk: lastResponse?.ok, error: lastResponse?.error, tasks: lastResponse?.result?.map((item) => ({ id: item.id, status: item.status, title: item.title })) }; })(${JSON.stringify(taskProgressTaskId)})`);
+            const terminalTask = await cdp.evaluateWith(async function (taskId) { let lastResponse; for (let i = 0; i < 100; i++) { lastResponse = await window.skaiAgent.request('tasks.list', {}); const task = lastResponse.ok ? lastResponse.result.find((item) => item.id === taskId) : null; if (task && ['cancelled', 'failed', 'completed'].includes(task.status)) return { task, tasksOk: lastResponse.ok }; await new Promise((r) => setTimeout(r, 100)); } return { taskId, tasksOk: lastResponse?.ok, error: lastResponse?.error, tasks: lastResponse?.result?.map((item) => ({ id: item.id, status: item.status, title: item.title })) }; }, taskProgressTaskId);
             if (terminalTask?.task?.status !== "cancelled") throw new Error(`Stop did not move the held-model task to Cancelled: ${JSON.stringify(terminalTask)}`);
             await Promise.race([taskProgressCancelled, new Promise((_, reject) => setTimeout(() => reject(new Error("Stop marked the task cancelled but left the held model request open.")), 5_000))]);
           }
@@ -463,7 +483,7 @@ async function main() {
             if (width < 640) await clickButtonText(cdp, "Close planner", ".project-thread-panel");
           }
           const readme = await cdp.evaluate(`(() => [...document.querySelectorAll('.project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)()`);
-          if (readme) await cdp.evaluate(`document.querySelector('.project-file-item[title=${JSON.stringify(readme)}]')?.click(); 1`);
+          if (readme) await cdp.evaluateWith(function (fileName) { [...document.querySelectorAll('.project-file-item')].find((item) => item.title === fileName)?.click(); return 1; }, readme);
           const editorReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.monaco-editor-shell .monaco-editor')) return true; await new Promise((r) => setTimeout(r, 75)); } return false; })()`);
           if (!editorReady) throw new Error(`Coding workflow did not load Monaco beside its chat thread: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, mode: document.querySelector('.sidebar-agent-trigger strong')?.textContent?.trim(), selectedFile: document.querySelector('.file-editor-heading span')?.textContent, files: [...document.querySelectorAll('.project-file-item')].map((item) => ({ text: item.innerText, title: item.title })), workspace: document.querySelector('.coding-session-grid')?.className, editor: document.querySelector('#coding-files-workspace')?.outerHTML.slice(0, 300), empty: document.querySelector('.project-file-preview')?.innerText }))()`))}`);
           if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
@@ -536,7 +556,7 @@ async function main() {
         }
         await sleep(process.env.UI_MATRIX_CAPTURE === "1" ? 350 : 120);
         if (process.env.UI_MATRIX_CAPTURE === "1" && (route === "marketplace" || route === "memory")) {
-          const settled = await cdp.evaluate(`(async () => { const pending = ${JSON.stringify(route === "memory" ? "Loading memory…" : "Loading Marketplace…")}; for (let i = 0; i < 60; i++) { if (!document.body.innerText.includes(pending)) return true; await new Promise((r) => setTimeout(r, 100)); } return !document.body.innerText.includes(pending); })()`);
+          const settled = await cdp.evaluateWith(async function (pending) { for (let i = 0; i < 60; i++) { if (!document.body.innerText.includes(pending)) return true; await new Promise((r) => setTimeout(r, 100)); } return !document.body.innerText.includes(pending); }, route === "memory" ? "Loading memory…" : "Loading Marketplace…");
           if (!settled) console.warn(`[capture] #/${route} remained in its loading state after 6 seconds; checking the connected native feature.`);
         }
         if (process.env.UI_MATRIX_CAPTURE === "1" && route === "images") {
@@ -580,7 +600,7 @@ async function main() {
           if (!importAvailable) throw new Error("Chat options did not expose conversation import.");
           await clickInRenderer(cdp, ".overflow-menu-trigger[aria-label='Chat options']");
             const chatTitle = process.env.UI_MATRIX_EXERCISE_DOCUMENTS === "1" ? "Plan and results summary" : "Plan a simple herb garden";
-            await cdp.evaluate(`([...document.querySelectorAll('.sidebar-history-row')].find((row) => row.innerText.includes(${JSON.stringify(chatTitle)}))?.querySelector('.sidebar-history-item')?.click(), 1)`);
+            await cdp.evaluateWith(function (title) { [...document.querySelectorAll('.sidebar-history-row')].find((row) => row.innerText.includes(title))?.querySelector('.sidebar-history-item')?.click(); return 1; }, chatTitle);
           if (process.env.UI_MATRIX_CAPTURE === "1" && process.env.UI_MATRIX_EXERCISE_CHAT_ACTIONS === "1") {
             const initialQueue = await cdp.evaluate(`document.querySelector('.queued-messages')?.innerText ?? ''`);
             if (!initialQueue.includes("Add a week-by-week planting schedule.") || !initialQueue.includes("Estimate the monthly watering routine.")) throw new Error(`Chat reference flow did not restore its queued follow-ups: ${initialQueue}`);
@@ -646,7 +666,7 @@ async function main() {
         const states = route === "settings" ? settingsCategories : [null];
         for (const category of states) {
           if (category) {
-            await cdp.evaluate(`([...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === ${JSON.stringify(category)})?.click(), 1)`);
+            await cdp.evaluateWith(function (category) { [...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === category)?.click(); return 1; }, category);
             await sleep(90);
             phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
           }

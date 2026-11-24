@@ -40,8 +40,10 @@ type InlineDiffRow = { kind: "context" | "removed" | "added"; oldLine: number | 
 type SplitDiffRow = { original: InlineDiffRow | null; working: InlineDiffRow | null };
 
 function inlineDiffRows(original: string, working: string): InlineDiffRow[] {
-  const before = original.split("\n");
-  const after = working.split("\n");
+  // Monaco normalizes edited text to LF while Windows files often use CRLF.
+  // Ignore that representation difference so a one-line edit stays one-line.
+  const before = original.replace(/\r\n/g, "\n").split("\n");
+  const after = working.replace(/\r\n/g, "\n").split("\n");
   if (before.length * after.length > 250_000) return [
     ...before.map((text, index) => ({ kind: "removed" as const, oldLine: index + 1, newLine: null, text })),
     ...after.map((text, index) => ({ kind: "added" as const, oldLine: null, newLine: index + 1, text })),
