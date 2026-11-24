@@ -1209,7 +1209,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .project-directory-search .nav-icon { width: 15px; height: 15px; }
 .project-directory-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--skai-color-text); background: transparent; font: inherit; }
 .project-directory-table { border-top: 1px solid var(--skai-color-border); }
-.project-directory-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1.1fr) 86px 38px; align-items: center; gap: 18px; min-height: 62px; padding: 0 12px; border-bottom: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+.project-directory-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1.1fr) 38px; align-items: center; gap: 18px; min-height: 62px; padding: 0 12px; border-bottom: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
 .project-directory-head { min-height: 38px; font-size: var(--skai-text-xs); }
 .project-directory-row > * { min-width: 0; }
 .project-directory-open { display: flex; align-items: center; gap: 11px; overflow: hidden; padding: 8px 0; border: 0; color: var(--skai-color-text); background: transparent; font-size: var(--skai-text-md); text-align: left; }

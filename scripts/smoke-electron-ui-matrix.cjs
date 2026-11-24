@@ -25,9 +25,12 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
 const exerciseTaskProgress = process.env.UI_MATRIX_EXERCISE_TASK_PROGRESS === "1";
 const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1";
 const exerciseScheduledPage = process.env.UI_MATRIX_EXERCISE_SCHEDULED_PAGE === "1";
+const exerciseProjectCreate = process.env.UI_MATRIX_EXERCISE_PROJECT_CREATE === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
 let resolveTaskProgressPaused;
+let resolveTaskProgressCancelled;
+const taskProgressCancelled = new Promise((resolve) => { resolveTaskProgressCancelled = resolve; });
 const taskProgressPaused = new Promise((resolve) => { resolveTaskProgressPaused = resolve; });
 const taskProgressServer = exerciseTaskProgress ? http.createServer((request, response) => {
   let body = "";
@@ -36,7 +39,11 @@ const taskProgressServer = exerciseTaskProgress ? http.createServer((request, re
   request.on("end", () => {
     if (!request.url?.endsWith("/chat/completions")) { taskProgressServerProblem = `Unexpected local model route ${request.url}`; response.writeHead(404).end(); return; }
     taskProgressRequests += 1;
-    if (taskProgressRequests > 8) { resolveTaskProgressPaused(); return; }
+    if (taskProgressRequests > 8) {
+      resolveTaskProgressPaused();
+      response.once("close", () => resolveTaskProgressCancelled());
+      return;
+    }
     const files = ["src/layout.ts", "src/plant.ts", "src/styles.css", "src/utils.ts"];
     const fileIndex = Math.floor((taskProgressRequests - 1) / 2);
     let action;
@@ -350,13 +357,38 @@ async function main() {
           const cancelled = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.scheduled-detail-panel')?.innerText.includes('cancelled')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!cancelled) throw new Error("Cancel schedule did not move the standalone task into its terminal state.");
         }
+        if (route === "projects" && exerciseProjectCreate) {
+          const projectEntryPoints = await cdp.evaluate(`(() => [...document.querySelectorAll('.project-directory-page .page-header button')].map((button) => button.textContent?.trim()))()`);
+          if (!projectEntryPoints.includes("Open folder") || !projectEntryPoints.includes("New project")) throw new Error(`Projects page entry points did not match the expected create/open workflow: ${JSON.stringify(projectEntryPoints)}`);
+          await cdp.evaluate(`([...document.querySelectorAll('.project-directory-page .page-header button')].find((button) => button.textContent?.includes('New project')))?.click()`);
+          const createDialogReady = await cdp.evaluate(`Boolean(document.querySelector('#new-project-title')?.textContent?.trim() === 'Create project' && document.querySelector('.dialog-folders') && document.querySelector('.dialog-folders-heading')?.textContent?.includes('Folder') && [...document.querySelectorAll('.dialog-folders button')].some((button) => /Choose folder/.test(button.textContent ?? '')) && ![...document.querySelectorAll('[role="dialog"] label')].some((label) => label.textContent?.trim() === 'Instructions'))`);
+          if (!createDialogReady) throw new Error(`Create did not open the new-project dialog: ${JSON.stringify(await cdp.evaluate(`(() => ({ page: document.querySelector('.project-directory-page')?.innerText?.slice(0, 300), header: document.querySelector('.project-directory-page .page-header')?.innerText, buttons: [...(document.querySelector('.project-directory-page .page-header')?.querySelectorAll('button') ?? [])].map((button) => button.innerText), title: document.querySelector('#new-project-title')?.textContent, dialog: document.querySelector('[role="dialog"]')?.innerText }))()`))}`);
+          const folderPickerAvailable = await cdp.evaluate(`Boolean([...document.querySelectorAll('.dialog-folders button')].find((button) => button.textContent?.includes('Choose folder')))`);
+          if (!folderPickerAvailable) throw new Error("The project dialog did not expose its Add folder action.");
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "project-create-dialog-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await cdp.evaluate(`document.querySelector('.dialog-actions button[type="button"]')?.click()`);
+          await cdp.evaluate(`document.querySelector('.project-directory-open-action')?.click()`);
+          const projectWorkspaceReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-heading strong') && document.querySelector('.coding-workspace-tabs')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!projectWorkspaceReady) throw new Error("Projects could not open a selected project into its Coding workspace.");
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "project-open-workspace-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+        }
         if (route === "coding" && process.env.UI_MATRIX_EXERCISE_CODING === "1") {
-          await clickInRenderer(cdp, ".coding-no-project button");
-          const projectsReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.title.endsWith(' · projects')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-          if (!projectsReady) throw new Error("Coding workflow could not open Projects.");
-          const projectActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.project-directory-open-action')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-          if (!projectActionReady) throw new Error(`Coding workflow could not render the seeded project row: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, directory: document.querySelector('.project-directory')?.innerText ?? '', rows: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText), body: document.body.innerText.slice(0, 500) }))()`))}`);
-          await clickInRenderer(cdp, ".project-directory-open-action");
+          const needsProject = await cdp.evaluate(`Boolean(document.querySelector('.coding-no-project button'))`);
+          if (needsProject) {
+            await clickInRenderer(cdp, ".coding-no-project button");
+            const projectsReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.title.endsWith(' · projects')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!projectsReady) throw new Error("Coding workflow could not open Projects.");
+            const projectActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.project-directory-open-action')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!projectActionReady) throw new Error(`Coding workflow could not render the seeded project row: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, directory: document.querySelector('.project-directory')?.innerText ?? '', rows: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText), body: document.body.innerText.slice(0, 500) }))()`))}`);
+            await clickInRenderer(cdp, ".project-directory-open-action");
+          }
           const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-workspace-tabs')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectReady) throw new Error("Coding workflow could not open the seeded project.");
           const seededCodingThreadVisible = await cdp.evaluate(`Boolean([...document.querySelectorAll('.sidebar-project-thread')].find((button) => button.innerText.trim() === 'Review the starter project'))`);
@@ -398,6 +430,9 @@ async function main() {
             await cdp.evaluate(`document.querySelector('.coding-task-item-controls button')?.click()`);
             const stopFeedback = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if (document.querySelector('.coding-task-item-controls button')?.textContent?.includes('Stopping')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!stopFeedback) throw new Error("The Stop action did not show its cancellation-in-progress state.");
+            const terminalTask = await cdp.evaluate(`(async (taskId) => { let lastResponse; for (let i = 0; i < 100; i++) { lastResponse = await window.skaiAgent.request('tasks.list', {}); const task = lastResponse.ok ? lastResponse.result.find((item) => item.id === taskId) : null; if (task && ['cancelled', 'failed', 'completed'].includes(task.status)) return { task, tasksOk: lastResponse.ok }; await new Promise((r) => setTimeout(r, 100)); } return { taskId, tasksOk: lastResponse?.ok, error: lastResponse?.error, tasks: lastResponse?.result?.map((item) => ({ id: item.id, status: item.status, title: item.title })) }; })(${JSON.stringify(taskProgressTaskId)})`);
+            if (terminalTask?.task?.status !== "cancelled") throw new Error(`Stop did not move the held-model task to Cancelled: ${JSON.stringify(terminalTask)}`);
+            await Promise.race([taskProgressCancelled, new Promise((_, reject) => setTimeout(() => reject(new Error("Stop marked the task cancelled but left the held model request open.")), 5_000))]);
           }
           // The task-progress fixture has its own assertions and screenshot; keep it isolated
           // from the editor keyboard smoke so failures in either workflow stay attributable.

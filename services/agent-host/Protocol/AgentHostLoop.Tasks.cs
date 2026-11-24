@@ -472,7 +472,7 @@ public static partial class AgentHostLoop
             if (string.IsNullOrWhiteSpace(summary)) throw new InvalidOperationException("The local model did not return a final summary.");
             var labels = changedFiles.Count == 0 ? new[] { "local-model-response" } : changedFiles.ToArray();
             return new AgentTaskExecutionResult(NormalizeTaskSummary(summary), labels);
-        }).ConfigureAwait(false);
+        }, cancellationToken).ConfigureAwait(false);
         if (finalTask.Status == AgentTaskStatuses.Completed)
         {
             SetTaskJournalStatus(finalTask, AgentTaskStatuses.Completed);

@@ -89,18 +89,17 @@ what they cover.
   allowed to expand into the vertical workspace scroll. Mobile Coding header
   and project actions now wrap without page-level horizontal overflow. The
   packaged matrix reported no clipped controls; typecheck, production build,
-  and Electron packaging passed. Remaining: capture and compare #12–#30,
+  and Electron packaging passed. Remaining: capture and compare #13–#30,
   and complete the direct document attachment → Documents-only → send flow.
 - Reference #9 now has packaged 1440×900 evidence in the Coding Activity
   drawer. The isolated fixture pauses a local task after four file writes;
   changed paths persist while running, appear in the task card and Git status,
   and the card shows Queued → Running → Verifying → Completed plus a Stop
   action with immediate Stopping feedback. The packaged smoke verifies those
-  visible states. The held-model fixture did not close its in-flight request
-  after Stop, so end-to-end cancellation remains an open Agent Host issue;
-  native core cancellation tests pass. The drawer keeps this review beside the
-  Coding Agent thread. Mobile comparison for task progress and references
-  #12–30 are still waiting.
+  visible states. Passing the cancellation token to the durable executor fixed
+  the held-model case: the Agent Host regression and packaged Stop flow both
+  reach Cancelled and close the in-flight request. The drawer keeps this review
+  beside the Coding Agent thread. Mobile comparison remains open.
 - Reference #10 now has packaged 1440×900 evidence with the Details rail open
   beside a saved Chat thread. The flow configures and saves a local-time weekly
   run, then confirms it appears in that conversation's schedule list. Comparing
@@ -115,7 +114,14 @@ what they cover.
   selected it, and exercised Pause → Resume → Cancel; the task detail reflected
   each state. The page keeps standalone prompts distinct from conversation
   schedules and says local prompts do not automatically access project files.
-  Remaining screenshot review starts at #12.
+  Remaining screenshot review starts at #13.
+- Reference #12 now has packaged 1440×900 screenshots of the simplified
+  Create project dialog and opened Coding workspace. The Projects header offers
+  Open folder and New project; the table shows names and paths, and new project
+  setup asks only for a name and one local folder. Packaged acceptance checks
+  both entry points and opening a listed project. The Windows native picker was
+  exercised with a temporary folder and the resulting project opened in Coding.
+  Remaining: mobile project creation and focused direct Open folder testing.
 - Reference #6 now has a packaged 1440×900 active Voice Mode screenshot. The
   UI smoke starts from the Chat composer, waits for local listening, verifies
   the visible End control, and closes the session using a fake microphone;

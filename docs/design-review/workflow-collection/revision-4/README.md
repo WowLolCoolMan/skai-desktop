@@ -152,20 +152,18 @@ isolated local-model fixture writes four files in a temporary Git project and
 pauses before verification. The Coding Activity panel shows the four changed
 paths while the task is still running, the queued → running → verifying →
 completed progress line, and a Stop action with immediate “Stopping…” feedback.
-The packaged interaction smoke checks the live file list, Git status, and
-button feedback. Changed paths persist as each write completes instead of
-appearing only after the task ends. The end-to-end cancellation check is still
-open: the UI sends the cancel request, but a held local-model HTTP request did
-not close in the packaged fixture, leaving the task in Running. Native core
-cancellation tests pass; the Agent Host cancellation path needs investigation.
+The packaged interaction smoke checks the live file list, Git status, button
+feedback, and task cancellation. Changed paths persist as each write completes
+instead of appearing only after the task ends. The held-model fixture now
+reaches Cancelled and closes its pending request; both the Agent Host smoke and
+task-progress UI smoke pass. Mobile task-progress behavior remains open.
 This page keeps task review in the
 project's Activity drawer beside the Coding Agent thread rather than navigating
 to a separate task page.
 
-The per-reference pass remains open for reference #9 cancellation, mobile
-task-progress behavior, and references #12–30. This is desktop evidence only;
-the remaining reference-specific page states still need comparison and
-interaction evidence.
+The per-reference pass remains open for mobile task-progress behavior and
+references #13–30. This is desktop evidence only; the remaining
+reference-specific page states still need comparison and interaction evidence.
 
 ### Schedule from a conversation — reference #10
 
@@ -196,6 +194,12 @@ flow created a standalone weekly prompt, selected it, then paused, resumed, and
 cancelled it; all three state changes appeared in the details view. This keeps
 standalone automations separate from conversation schedules as in the
 reference. The 1440×900 matrix found no layout or runtime issues.
+
+### Projects create and open — reference #12
+
+Packaged 1440×900 captures show the [Create project dialog](evidence-project-create-1440.png) and the [opened project workspace](evidence-project-open-1440.png). The Projects page now puts **Open folder** beside **New project**, searches recent projects by name or path, and lists each project with its folder path. Creating a project asks for a name and one local folder; project settings retain the existing instructions and multi-folder editing controls. The packaged flow checks both entry points, the compact name/folder dialog, and opening a listed project into Coding. On Windows, the real native folder picker was exercised with a temporary fixture, and the project was created and opened. The already-running app showed stale dialog copy; the packaged screenshots and smoke are from the freshly built source.
+
+Reference #12 is still a visual approximation: the persistent workspace sidebar and tabs remain visible around Projects, while the reference shows a standalone full-page surface. Review that shared-shell difference during the remaining continuity pass. Mobile project creation and direct Open folder flow still need focused acceptance.
 
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
