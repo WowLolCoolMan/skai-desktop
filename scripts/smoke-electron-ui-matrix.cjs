@@ -434,7 +434,7 @@ async function main() {
           }
           await cdp.evaluate(`document.querySelector('.dialog-actions button[type="button"]')?.click()`);
           await cdp.evaluate(`document.querySelector('.project-directory-open-action')?.click()`);
-          const projectWorkspaceReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-heading strong') && document.querySelector('.coding-secondary-tab-group .workspace-tab')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          const projectWorkspaceReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-heading strong') && document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectWorkspaceReady) throw new Error("Projects could not open a selected project into its Coding workspace.");
           if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
             const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
@@ -451,7 +451,7 @@ async function main() {
             if (!projectActionReady) throw new Error(`Coding workflow could not render the seeded project row: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, directory: document.querySelector('.project-directory')?.innerText ?? '', rows: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText), body: document.body.innerText.slice(0, 500) }))()`))}`);
             await clickInRenderer(cdp, ".project-directory-open-action");
           }
-          const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-secondary-tab-group .workspace-tab')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectReady) throw new Error("Coding workflow could not open the seeded project.");
           const seededCodingThreadVisible = await cdp.evaluate(`Boolean([...document.querySelectorAll('.sidebar-project-thread')].find((button) => button.innerText.trim() === 'Review the starter project'))`);
           if (!seededCodingThreadVisible) await cdp.evaluate(`document.querySelector('button[aria-label="Expand Skai Starter Project"]')?.click(); 1`);
@@ -461,11 +461,53 @@ async function main() {
           const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
           if (exerciseCodingPanels && width === 1440 && height === 900) {
+            const singlePane = await cdp.evaluate(`(() => { const grid = document.querySelector('.coding-session-grid.is-chat'); const main = document.querySelector('.project-thread-panel'); const side = document.querySelector('.coding-project-browser'); const addSplit = document.querySelector('.coding-split-launcher button[aria-label="Add to split"]'); return { splitOpen: grid?.classList.contains('is-split-open') ?? true, columns: grid && getComputedStyle(grid).gridTemplateColumns, mainWidth: main?.getBoundingClientRect().width ?? 0, sideDisplay: side && getComputedStyle(side).display, addSplit: Boolean(addSplit), launcherWidth: addSplit?.getBoundingClientRect().width ?? 0, launcherText: addSplit?.textContent?.trim() ?? '' }; })()`);
+            if (singlePane.splitOpen || !singlePane.addSplit || singlePane.launcherWidth < 90 || singlePane.launcherText !== "Add to split" || singlePane.sideDisplay !== "none" || singlePane.mainWidth < 800) throw new Error(`A Coding Agent project should start as a full-width main chat with an optional split control: ${JSON.stringify(singlePane)}`);
+            const splitLauncher = await cdp.evaluate(`document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')?.click(); true`);
+            const sideChatChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const choice = [...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((item) => item.textContent.trim() === 'Side chat'); if (choice) { choice.click(); return true; } await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
+            if (!splitLauncher || !sideChatChoice) throw new Error("Could not add Side chat from the optional split control.");
+            const splitReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-pane-tab-strip.is-split-open .workspace-tab-select')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!splitReady) throw new Error("Adding Side chat did not open the second pane.");
             const panelTabs = await cdp.evaluate(`([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].map((button) => button.textContent?.trim()))`);
-            if (!['Editor', 'Side chat', 'Changes'].every((tab) => panelTabs.some((label) => label.startsWith(tab))) || panelTabs.some((label) => label.startsWith('Files'))) throw new Error(`Coding workspace page list should keep Files inside Editor: ${JSON.stringify(panelTabs)}`);
+            if (!['Editor', 'Files', 'Side chat', 'Changes'].every((tab) => panelTabs.some((label) => label.startsWith(tab)))) throw new Error(`The split should expose Side chat, Editor, Files, and Changes as separate pages: ${JSON.stringify(panelTabs)}`);
             const pageGroups = await cdp.evaluate(`(() => { const shell = document.querySelector('.workspace-tabs-hotkeys.is-coding-split'); const main = shell?.querySelector(':scope > .workspace-tab-strip')?.getBoundingClientRect(); const side = shell?.querySelector(':scope > .coding-secondary-tab-group')?.getBoundingClientRect(); const rect = (value) => value && ({ x: value.x, y: value.y, width: value.width, height: value.height, right: value.right }); return { shellClass: shell?.className, display: shell && getComputedStyle(shell).display, columns: shell && getComputedStyle(shell).gridTemplateColumns, main: rect(main), side: rect(side), sideTabs: shell?.querySelectorAll('.coding-secondary-tab-group .workspace-tab').length ?? 0 }; })()`);
             const pageGroupsReady = pageGroups.main && pageGroups.side && pageGroups.main.width > 250 && pageGroups.side.width > 250 && Math.abs(pageGroups.main.y - pageGroups.side.y) < 2 && pageGroups.main.right <= pageGroups.side.x + 2;
             if (!pageGroupsReady) throw new Error(`The main thread and right workspace pages are not managed as two aligned tab groups: ${JSON.stringify(pageGroups)}`);
+            const tabActions = await cdp.evaluate(`(async () => {
+              const list = document.querySelector('.workspace-tabs-hotkeys > .workspace-tab-strip .workspace-tab-list');
+              const tabs = () => [...(list?.querySelectorAll(':scope > .workspace-tab') ?? [])];
+              const before = tabs().map((tab) => tab.dataset.workspaceTabId);
+              if (!list || before.length < 2 || before.some((id) => !id)) return { ok: false, reason: 'Expected at least two addressable workspace tabs.' };
+              const drag = (sourceId, targetId) => {
+                const source = tabs().find((tab) => tab.dataset.workspaceTabId === sourceId);
+                const target = tabs().find((tab) => tab.dataset.workspaceTabId === targetId);
+                const data = new DataTransfer();
+                source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: data }));
+                target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data }));
+                target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data }));
+              };
+              drag(before[0], before[1]);
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              const moved = tabs().map((tab) => tab.dataset.workspaceTabId);
+              const reorderWorked = moved[0] === before[1] && moved[1] === before[0];
+              drag(before[0], before[1]);
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              const restoredOrder = tabs().map((tab) => tab.dataset.workspaceTabId);
+              const menuTab = tabs().find((tab) => tab.classList.contains('is-active'));
+              menuTab.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 120 }));
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              const menu = document.querySelector('.workspace-tab-context-menu');
+              const menuWorked = Boolean(menu?.querySelector('[role="menuitem"]') && [...menu.querySelectorAll('[role="menuitem"]')].some((item) => item.textContent.includes('Close other tabs')));
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+              const activeBefore = tabs().findIndex((tab) => tab.classList.contains('is-active'));
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, bubbles: true }));
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              const switched = tabs().findIndex((tab) => tab.classList.contains('is-active')) !== activeBefore;
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, shiftKey: true, bubbles: true }));
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              return { ok: reorderWorked && before.join('|') === restoredOrder.join('|') && menuWorked && switched, reorderWorked, orderRestored: before.join('|') === restoredOrder.join('|'), menuWorked, switched };
+            })()`);
+            if (!tabActions.ok) throw new Error(`Workspace tabs did not behave like a desktop tab bar: ${JSON.stringify(tabActions)}`);
             const assertMainChat = async (mode) => {
               const state = await cdp.evaluate(`(() => ({ visible: Boolean(document.querySelector('.project-thread-panel:not([hidden]) .chat-page.is-coding-agent')), thread: document.querySelector('.project-thread-panel:not([hidden])')?.innerText?.slice(0, 180) ?? '' }))()`);
               if (!state.visible) throw new Error(`Main coding chat was hidden after switching to ${mode}: ${JSON.stringify(state)}`);
@@ -509,7 +551,13 @@ async function main() {
             const filesRestored = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { const panel = document.querySelector('.coding-project-browser.is-editor-panel'); if (panel && !panel.classList.contains('is-file-explorer-hidden') && getComputedStyle(panel.querySelector('.project-file-explorer')).display !== 'none') return true; await new Promise((r) => setTimeout(r, 40)); } return false; })()`);
             if (!filesRestored) throw new Error("The file explorer could not be restored after hiding it.");
             await assertMainChat("Editor with Monaco and file tree");
-            await capturePanel("monaco-with-files");            await selectPanel("Changes");
+            await capturePanel("monaco-with-files");
+            await selectPanel("Files");
+            const standaloneFilesReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-files-panel .is-standalone-files-page .coding-explorer-project-files'))`);
+            if (!standaloneFilesReady) throw new Error("Files did not open as its own right-pane page.");
+            await assertMainChat("Files");
+            await capturePanel("files");
+            await selectPanel("Changes");
             const changesReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-changes-panel h3')?.textContent === 'Changes' && (document.querySelector('.coding-project-browser.is-changes-panel .git-change-summary') || document.querySelector('.coding-project-browser.is-changes-panel [role="alert"]') || document.querySelector('.coding-project-browser.is-changes-panel [role="status"]') || document.querySelector('.coding-project-browser.is-changes-panel .coding-change-empty')))`);
             if (!changesReady) throw new Error("Changes panel did not show Git review status alongside the main chat.");
             await capturePanel("changes");
@@ -518,11 +566,17 @@ async function main() {
             await cdp.evaluate(`document.querySelector('.coding-secondary-tab-group .workspace-tab-close[aria-label="Close Changes"]')?.click()`);
             const changesClosed = await cdp.evaluate(`![...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Changes'))`);
             if (!changesClosed) throw new Error("Closing a right-side Changes page did not remove it from that tab group.");
-            await cdp.evaluate(`document.querySelector('.coding-pane-tab-strip button[aria-label="Open a right workspace page"]')?.click()`);
+            await cdp.evaluate(`document.querySelector('.coding-pane-tab-strip button[aria-label="Add a page to the split view"]')?.click()`);
             await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.trim() === 'Changes')?.click(), 1)`);
             const changesReopened = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Changes'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!changesReopened) throw new Error("The right-pane page menu did not reopen a closed Changes page.");
             await selectPanel("Editor");
+            await cdp.evaluate(`document.querySelector('.coding-pane-tab-strip button[aria-label="Add a page to the split view"]')?.click()`);
+            const closeSplitChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const choice = [...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((item) => item.textContent.trim() === 'Close split view'); if (choice) { choice.click(); return true; } await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
+            if (!closeSplitChoice) throw new Error("The split view could not be closed from its page menu.");
+            const splitClosed = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const grid = document.querySelector('.coding-session-grid.is-chat'); if (grid && !grid.classList.contains('is-split-open') && getComputedStyle(document.querySelector('.coding-project-browser')).display === 'none' && document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!splitClosed) throw new Error("Closing split view did not restore the full-width main chat.");
+            await capturePanel("single-chat");
           }
           if (exerciseTaskProgress) {
             await taskProgressServerReady;

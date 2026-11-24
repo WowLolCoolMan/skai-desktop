@@ -35,6 +35,8 @@ export type DesktopWorkspace = {
   openNewWorkspaceTab: () => void;
   selectWorkspaceTab: (tab: WorkspaceSessionTab) => void;
   closeWorkspaceTab: (tabId: string) => void;
+  closeWorkspaceTabs: (tabIds: string[]) => void;
+  reorderWorkspaceTab: (sourceId: string, targetId: string) => void;
   restoreWorkspaceTab: () => void;
   connection: ConnectionState;
   health: RuntimeHealth | null;
@@ -280,22 +282,37 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     if (project) void coding.selectProject(project);
     onNavigate(tab.route);
   }, [chat, coding, onNavigate]);
-  const closeWorkspaceTab = useCallback((tabId: string) => {
-    const closingTab = workspaceTabs.find((item) => item.id === tabId);
-    if (closingTab) {
-      const next = [closingTab, ...closedWorkspaceTabs.filter((item) => item.id !== tabId)];
-      for (const evicted of next.slice(10)) void removeChatDraft(evicted.id);
-      setClosedWorkspaceTabs(next.slice(0, 10));
-    }
-    if (workspaceTabs.length <= 1) {
+  const closeWorkspaceTabs = useCallback((tabIds: string[]) => {
+    const closing = workspaceTabs.filter((item) => tabIds.includes(item.id));
+    if (!closing.length) return;
+    const nextClosed = [...closing.slice().reverse(), ...closedWorkspaceTabs.filter((item) => !tabIds.includes(item.id))];
+    for (const evicted of nextClosed.slice(10)) void removeChatDraft(evicted.id);
+    setClosedWorkspaceTabs(nextClosed.slice(0, 10));
+    const remaining = workspaceTabs.filter((item) => !tabIds.includes(item.id));
+    if (!remaining.length) {
       const replacement: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: "New chat", route: "chat", conversationId: null, projectId: null };
-      setWorkspaceTabs([replacement]); setActiveWorkspaceTabId(replacement.id); chat.startNewChat(); onNavigate("chat"); return;
+      setWorkspaceTabs([replacement]);
+      selectWorkspaceTab(replacement);
+      return;
     }
-    const index = workspaceTabs.findIndex((item) => item.id === tabId);
-    const remaining = workspaceTabs.filter((item) => item.id !== tabId);
     setWorkspaceTabs(remaining);
-    if (activeWorkspaceTabId === tabId) selectWorkspaceTab(remaining[Math.min(Math.max(index, 0), remaining.length - 1)]);
-  }, [activeWorkspaceTabId, chat, closedWorkspaceTabs, onNavigate, selectWorkspaceTab, workspaceTabs]);
+    if (tabIds.includes(activeWorkspaceTabId)) {
+      const oldIndex = workspaceTabs.findIndex((item) => item.id === activeWorkspaceTabId);
+      selectWorkspaceTab(remaining[Math.min(Math.max(oldIndex, 0), remaining.length - 1)]);
+    }
+  }, [activeWorkspaceTabId, closedWorkspaceTabs, selectWorkspaceTab, workspaceTabs]);
+  const closeWorkspaceTab = useCallback((tabId: string) => closeWorkspaceTabs([tabId]), [closeWorkspaceTabs]);
+  const reorderWorkspaceTab = useCallback((sourceId: string, targetId: string) => {
+    setWorkspaceTabs((current) => {
+      const from = current.findIndex((tab) => tab.id === sourceId);
+      const to = current.findIndex((tab) => tab.id === targetId);
+      if (from < 0 || to < 0 || from === to) return current;
+      const reordered = [...current];
+      const [moved] = reordered.splice(from, 1);
+      reordered.splice(to, 0, moved);
+      return reordered;
+    });
+  }, []);
   const restoreWorkspaceTab = useCallback(() => {
     const [tab, ...remainingClosed] = closedWorkspaceTabs;
     if (!tab) return;
@@ -605,5 +622,5 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   routeActions.onDiscoverModels = discoverModels;
   routeActions.onImportWorkflow = importImageWorkflow;
   routeActions.onCancelImageGeneration = cancelImageGeneration;
-  return { routeState, routeActions, route, settingsReturnRoute, workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, selectWorkspaceTab, closeWorkspaceTab, restoreWorkspaceTab, connection, health, error, dismissError, retryConnection, conversations: chat.conversations, agentMode, setAgentMode, conversationQuery, setConversationQuery, sidebarWidth, resizeSidebar, commandOpen, openCommandPalette, closeCommandPalette, startNewChat, selectConversation, updateConversationMetadata: (id, patch) => chat.updateConversationMetadata(patch, id), onNavigate, canGoBack: navigation.index > 0, canGoForward: navigation.index < navigation.length - 1, goBack, goForward, petVisible, petWander, petInteractionDemo, setPetVisible, setPetWander };
+  return { routeState, routeActions, route, settingsReturnRoute, workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, selectWorkspaceTab, closeWorkspaceTab, closeWorkspaceTabs, reorderWorkspaceTab, restoreWorkspaceTab, connection, health, error, dismissError, retryConnection, conversations: chat.conversations, agentMode, setAgentMode, conversationQuery, setConversationQuery, sidebarWidth, resizeSidebar, commandOpen, openCommandPalette, closeCommandPalette, startNewChat, selectConversation, updateConversationMetadata: (id, patch) => chat.updateConversationMetadata(patch, id), onNavigate, canGoBack: navigation.index > 0, canGoForward: navigation.index < navigation.length - 1, goBack, goForward, petVisible, petWander, petInteractionDemo, setPetVisible, setPetWander };
 }
