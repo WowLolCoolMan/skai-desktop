@@ -10,6 +10,9 @@ namespace SkaiDesktop.AgentHost.Protocol;
 
 public static partial class AgentHostLoop
 {
+    private const int MaxCodingActions = 40;
+    private const int MaxCodingCommands = 12;
+
     private static AgentResponse ListTasks(AgentRequest request)
     {
         var tasks = CreateTaskStore().Load()
@@ -225,7 +228,7 @@ public static partial class AgentHostLoop
                 : WorkspaceFileContext.EnumerateTextFileBrowser(project.FolderPaths).Files;
             var system = project is null
                 ? "You are Skai's local coding agent. Work only from the user's prompt; do not claim file edits or commands. Return exactly one JSON object: {\"action\":\"done\",\"summary\":\"...\"}."
-                : "You are Skai's local coding agent. Use the available file and command tools; for Ollama, call the named tools directly. Use exactly one tool per turn. If the model endpoint does not return a native tool call, return the same action as one JSON object. First inspect the relevant source, tests, and project instructions with read_file. Before editing, derive a short checklist from the acceptance requirements and preserve details explicitly required by tests (including digits, suffixes, and meaningful name tokens). Make a focused implementation, then run the requested verification. On failure, compare each exact expected/actual value and fix only the failing behavior; rerun verification after the fix. Keep earlier passing behavior. Use replace_text for small unique edits with the latest SHA-256; write_file is for new files or a necessary complete rewrite. Do not use commands to inspect or edit files. Commands run in the selected project folder with a two-minute timeout. You may make at most 20 file or command actions and at most 8 commands. Never claim an action before its result returns; if a check still fails at the limit, report it honestly.";
+                : $"You are Skai's local coding agent. Use the available file and command tools; for Ollama, call the named tools directly. Use exactly one tool per turn. If the model endpoint does not return a native tool call, return the same action as one JSON object. First inspect the relevant source, tests, and project instructions with read_file. Before editing, derive a short checklist from the acceptance requirements and preserve details explicitly required by tests (including digits, suffixes, and meaningful name tokens). Make a focused implementation, then run the requested verification. On failure, compare each exact expected/actual value and fix only the failing behavior; rerun verification after the fix. Keep earlier passing behavior. Use replace_text for small unique edits with the latest SHA-256; write_file is for new files or a necessary complete rewrite. Do not use commands to inspect or edit files. Commands run in the selected project folder with a two-minute timeout. You may make at most {MaxCodingActions} file or command actions and at most {MaxCodingCommands} commands. Never claim an action before its result returns; if a check still fails at the limit, report it honestly.";
             var messages = new List<ChatMessage>
             {
                 new("system", system),
@@ -237,7 +240,7 @@ public static partial class AgentHostLoop
                 : null;
             var codingTools = useNativeOllamaTools ? CreateCodingTools() : null;
             string? summary = null;
-            for (var step = 0; step < 21; step++)
+            for (var step = 0; step <= MaxCodingActions; step++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 JsonDocument? parsedAction = null;
@@ -338,7 +341,7 @@ public static partial class AgentHostLoop
                     summary = proposedSummary;
                     break;
                 }
-                if (step >= 20) throw new InvalidOperationException("The coding agent reached its 20-action limit before finishing.");
+                if (step >= MaxCodingActions) throw new InvalidOperationException($"The coding agent reached its {MaxCodingActions}-action limit before finishing.");
                 if (project is null || root is null) throw new InvalidOperationException("This coding thread has no project. Choose a project before asking it to change files.");
                 switch (actionName)
                 {
@@ -443,7 +446,7 @@ public static partial class AgentHostLoop
                             messages.Add(new ChatMessage("user", "The previous verification command failed. This command was not run because no file has changed since that failure. Use write_file to fix the reported issue first; then rerun verification."));
                             break;
                         }
-                        if (++commandCount > 8) throw new InvalidOperationException("The coding agent reached its 8-command limit.");
+                        if (++commandCount > MaxCodingCommands) throw new InvalidOperationException($"The coding agent reached its {MaxCodingCommands}-command limit.");
                         var command = action.GetProperty("command").GetString() ?? throw new InvalidOperationException("The model omitted the command.");
                         var cwd = action.TryGetProperty("cwd", out var cwdValue) ? cwdValue.GetString() ?? "." : ".";
                         AppendTaskJournalEvent(task, "tool.command.started", new Dictionary<string, string> { ["workingDirectory"] = cwd });

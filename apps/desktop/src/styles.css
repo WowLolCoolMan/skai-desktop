@@ -3623,7 +3623,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 .app-shell:has(.app-sidebar.is-coding-agent) .sidebar-project-tree {
   flex: 0 0 auto;
-  max-height: 38vh;
+  max-height: min(28vh, 240px);
 }
 .app-content-coding .coding-page-active .coding-session-grid.is-files {
   grid-template-columns: minmax(0, 1fr);
