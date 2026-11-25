@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { ChatAttachment, DesktopQueuedMessage } from "../../../shared/contracts";
-import type { Route } from "../../app/types";
+import type { Model, Route } from "../../app/types";
 import { Button } from "../../components/ui/Primitives";
 import { NavIcon } from "../../components/ui/NavIcon";
 import { ModalDialog } from "../../components/ui/ModalDialog";
@@ -32,6 +32,7 @@ type ChatComposerProps = {
   provider: string;
   endpoint: string;
   model: string;
+  models: Model[];
   placeholder?: string;
   modelControl?: ReactNode;
   onEditQueued?: (index: number) => void;
@@ -41,7 +42,7 @@ type ChatComposerProps = {
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onEditQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access" }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onEditQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access" }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
 
@@ -67,6 +68,29 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const commandQuery = draft.match(/^\/([^\s]*)$/)?.[1] ?? null;
   const commandMatches = useMemo(() => commandQuery === null ? [] : composerCommands.filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery]);
   const activeCommandId = commandMatches[commandIndex] ? `composer-command-${commandMatches[commandIndex].id}` : undefined;
+  const computerVisionModel = useMemo(() => {
+    const fallback: Model = { model, provider, endpoint, vision: "unknown", capabilities: [] };
+    let preferred: { model?: unknown; provider?: unknown; endpoint?: unknown } = {};
+    try {
+      const stored = JSON.parse(localStorage.getItem("skai.preferredModels.v1") ?? "{}");
+      if (stored && typeof stored === "object" && stored.vision && typeof stored.vision === "object") preferred = stored.vision;
+    } catch { /* A missing or malformed preference falls back to discovered models. */ }
+    const preferredInventory = typeof preferred.model === "string"
+      ? models.find((item) => item.model === preferred.model && (!preferred.provider || item.provider === preferred.provider))
+      : undefined;
+    const supported = models.filter((item) => item.vision.toLowerCase() === "supported");
+    const sameProviderVision = supported.find((item) => (item.provider ?? provider) === provider);
+    if (preferredInventory?.vision.toLowerCase() === "supported") return preferredInventory;
+    if (sameProviderVision) return sameProviderVision;
+    if (supported[0]) return supported[0];
+    if (typeof preferred.model === "string") return {
+      ...fallback,
+      model: preferred.model,
+      provider: typeof preferred.provider === "string" ? preferred.provider : provider,
+      endpoint: typeof preferred.endpoint === "string" && preferred.endpoint ? preferred.endpoint : endpoint,
+    };
+    return preferredInventory ?? fallback;
+  }, [endpoint, model, models, provider]);
 
   useEffect(() => { setCommandIndex(0); }, [commandQuery]);
   useEffect(() => {
@@ -153,6 +177,10 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const startComputerTask = async () => {
     if (!computerTask.trim() || !selectedComputerScreen || computerBusy) return;
     if (!isLocalEndpoint(endpoint)) { setComputerStatus("Computer-use model calls require a local endpoint so screen contents stay on this device."); return; }
+    if (computerVisionModel.vision.toLowerCase() === "unsupported") {
+      setComputerStatus("Computer use needs a vision-capable model. Choose one in Models, then start the session again.");
+      return;
+    }
     computerStopRef.current = false;
     setComputerBusy(true); setComputerSteps([]); setComputerStatus("Starting a local computer-use session…");
     let currentScreen = selectedComputerScreen;
@@ -166,7 +194,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       for (let step = 0; step < 12; step += 1) {
         if (computerStopRef.current) break;
         setComputerStatus(`Model planning action ${step + 1} of 12…`);
-        const response = await window.skaiAgent.request("chat.complete", { provider, endpoint, model, messages, responseMode: "think", maxTokens: 350, timeoutSeconds: 60 });
+        const response = await window.skaiAgent.request("chat.complete", { provider: computerVisionModel.provider ?? provider, endpoint: computerVisionModel.endpoint ?? endpoint, model: computerVisionModel.model, modelContextLength: computerVisionModel.contextLength ?? null, messages, responseMode: "think", maxTokens: 350, timeoutSeconds: 60 });
         if (!response.ok) throw new Error(response.error?.message ?? "The local model could not plan a computer action.");
         const raw = (response.result as { content?: unknown }).content;
         if (typeof raw !== "string") throw new Error("The local model returned no action.");
@@ -268,7 +296,55 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
       </div>
     </div>
-        <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL COMPUTER CONTROL</p><h3 id="computer-use-title">Computer use</h3><p>Ask the local vision model to act on this display, or use the direct controls. Each action is shown below; stop ends the session after the current model response.</p></div><button type="button" onClick={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} aria-label="Close computer use">×</button></div>{computerScreens.length > 1 && <label className="computer-screen-picker">Display<select value={computerScreenId} onChange={(event) => { setComputerScreenId(event.target.value); setComputerPoint(null); }} aria-label="Select display">{computerScreens.map((screen) => <option value={screen.id} key={screen.id}>{screen.name}</option>)}</select></label>}{selectedComputerScreen && <button type="button" className="computer-screen-preview" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); const imageRatio = selectedComputerScreen.previewWidth / selectedComputerScreen.previewHeight; const boxRatio = rect.width / rect.height; const imageWidth = boxRatio > imageRatio ? rect.height * imageRatio : rect.width; const imageHeight = boxRatio > imageRatio ? rect.height : rect.width / imageRatio; const offsetX = (rect.width - imageWidth) / 2; const offsetY = (rect.height - imageHeight) / 2; setComputerPoint({ x: Math.max(0, Math.min(1, (event.clientX - rect.left - offsetX) / imageWidth)), y: Math.max(0, Math.min(1, (event.clientY - rect.top - offsetY) / imageHeight)) }); }} aria-label="Choose a point on the captured display"><img src={`data:image/png;base64,${selectedComputerScreen.content}`} alt={`Captured display: ${selectedComputerScreen.name}`} />{computerPoint && <span className="computer-point-marker" style={{ left: `${computerPoint.x * 100}%`, top: `${computerPoint.y * 100}%` }} />}</button>}{!selectedComputerScreen && <p className="settings-help">Capture a display to begin.</p>}<div className="computer-use-controls computer-use-agent"><input value={computerTask} onChange={(event) => setComputerTask(event.target.value)} maxLength={2000} placeholder="Describe what you want the local model to do…" aria-label="Computer-use task" /><Button variant={computerBusy ? "secondary" : "primary"} type="button" disabled={!selectedComputerScreen || !computerTask.trim()} onClick={() => computerBusy ? stopComputerTask() : void startComputerTask()}>{computerBusy ? "Stop session" : "Start session"}</Button><Button variant="secondary" type="button" disabled={computerBusy} onClick={() => void captureComputerScreens()}>Refresh screen</Button><Button variant="secondary" type="button" disabled={!selectedComputerScreen || attachments.length >= 5 || computerBusy} onClick={attachComputerScreenshot}>Attach screenshot</Button></div><div className="computer-use-controls"><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "left" })}>Click point</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "right" })}>Right click</Button><input value={computerText} onChange={(event) => setComputerText(event.target.value)} maxLength={2000} placeholder="Text to type into the selected app" aria-label="Text to type" /><Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerText || computerBusy} onClick={() => void runComputerAction({ action: "type", text: computerText })}>Type text</Button><select value={computerKey} onChange={(event) => setComputerKey(event.target.value)} aria-label="Key to press">{["Enter", "Tab", "Escape", "Backspace", "Delete", "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown", "Space"].map((key) => <option key={key}>{key}</option>)}</select><Button variant="secondary" type="button" disabled={!selectedComputerScreen || computerBusy} onClick={() => void runComputerAction({ action: "key", key: computerKey })}>Press key</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: 480 })}>Scroll up</Button><Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: -480 })}>Scroll down</Button></div>{computerSteps.length > 0 && <ol className="computer-use-steps" aria-label="Computer-use actions">{computerSteps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>}{computerStatus && <p className="computer-use-status" role="status">{computerBusy ? "Working… " : ""}{computerStatus}</p>}<div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setComputerOpen(false)}>Close</Button></div></ModalDialog>
+    <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog">
+      <div className="dialog-heading">
+        <div>
+          <p className="section-kicker">LOCAL COMPUTER CONTROL</p>
+          <h3 id="computer-use-title">Computer use</h3>
+          <p>Ask Skai to operate the selected display, or use the direct controls. Every action is followed by a fresh screen capture.</p>
+        </div>
+        <button type="button" onClick={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} aria-label="Close computer use">×</button>
+      </div>
+      <div className="computer-use-model" role="status">
+        <span>Vision model</span>
+        <strong>{computerVisionModel.displayName || computerVisionModel.model}</strong>
+        <small>{computerVisionModel.provider ?? provider} · local screenshot reasoning</small>
+      </div>
+      {computerScreens.length > 1 && <label className="computer-screen-picker">Display<select value={computerScreenId} onChange={(event) => { setComputerScreenId(event.target.value); setComputerPoint(null); }} aria-label="Select display">{computerScreens.map((screen) => <option value={screen.id} key={screen.id}>{screen.name}</option>)}</select></label>}
+      {selectedComputerScreen && <button type="button" className="computer-screen-preview" onClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const imageRatio = selectedComputerScreen.previewWidth / selectedComputerScreen.previewHeight;
+        const boxRatio = rect.width / rect.height;
+        const imageWidth = boxRatio > imageRatio ? rect.height * imageRatio : rect.width;
+        const imageHeight = boxRatio > imageRatio ? rect.height : rect.width / imageRatio;
+        const offsetX = (rect.width - imageWidth) / 2;
+        const offsetY = (rect.height - imageHeight) / 2;
+        setComputerPoint({ x: Math.max(0, Math.min(1, (event.clientX - rect.left - offsetX) / imageWidth)), y: Math.max(0, Math.min(1, (event.clientY - rect.top - offsetY) / imageHeight)) });
+      }} aria-label="Choose a point on the captured display">
+        <img src={`data:image/png;base64,${selectedComputerScreen.content}`} alt={`Captured display: ${selectedComputerScreen.name}`} />
+        {computerPoint && <span className="computer-point-marker" style={{ left: `${computerPoint.x * 100}%`, top: `${computerPoint.y * 100}%` }} />}
+      </button>}
+      {!selectedComputerScreen && <p className="settings-help">Capture a display to begin.</p>}
+      <div className="computer-use-controls computer-use-agent">
+        <input value={computerTask} onChange={(event) => setComputerTask(event.target.value)} maxLength={2000} placeholder="Describe what you want Skai to do…" aria-label="Computer-use task" />
+        <Button variant={computerBusy ? "secondary" : "primary"} type="button" disabled={!selectedComputerScreen || !computerTask.trim()} onClick={() => computerBusy ? stopComputerTask() : void startComputerTask()}>{computerBusy ? "Stop session" : "Start session"}</Button>
+        <Button variant="secondary" type="button" disabled={computerBusy} onClick={() => void captureComputerScreens()}>Refresh screen</Button>
+        <Button variant="secondary" type="button" disabled={!selectedComputerScreen || attachments.length >= 5 || computerBusy} onClick={attachComputerScreenshot}>Attach screenshot</Button>
+      </div>
+      <div className="computer-use-controls">
+        <Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "left" })}>Click point</Button>
+        <Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "right" })}>Right click</Button>
+        <input value={computerText} onChange={(event) => setComputerText(event.target.value)} maxLength={2000} placeholder="Text to type into the selected app" aria-label="Text to type" />
+        <Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerText || computerBusy} onClick={() => void runComputerAction({ action: "type", text: computerText })}>Type text</Button>
+        <select value={computerKey} onChange={(event) => setComputerKey(event.target.value)} aria-label="Key to press">{["Enter", "Tab", "Escape", "Backspace", "Delete", "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown", "Space"].map((key) => <option key={key}>{key}</option>)}</select>
+        <Button variant="secondary" type="button" disabled={!selectedComputerScreen || computerBusy} onClick={() => void runComputerAction({ action: "key", key: computerKey })}>Press key</Button>
+        <Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: 480 })}>Scroll up</Button>
+        <Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "scroll", ...computerPoint!, delta: -480 })}>Scroll down</Button>
+      </div>
+      {computerSteps.length > 0 && <ol className="computer-use-steps" aria-label="Computer-use actions">{computerSteps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>}
+      {computerStatus && <p className="computer-use-status" role="status" aria-live="polite">{computerBusy ? "Working… " : ""}{computerStatus}</p>}
+      <div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setComputerOpen(false)}>Close</Button></div>
+    </ModalDialog>
     <ModalDialog open={handsFreeActive} onClose={endVoiceMode} titleId="voice-mode-title" className="ui-dialog voice-mode-dialog"><div className="voice-mode-session"><div className={`voice-mode-orb ${voiceListening ? "is-listening" : busy || voicePlaybackActive ? "is-speaking" : "is-preparing"}`} aria-hidden="true"><span /><span /><span /></div><p className="section-kicker">LOCAL VOICE MODE</p><h3 id="voice-mode-title">Voice conversation</h3><p className="voice-mode-state">{voiceTurnTranscribing ? "Transcribing on this device" : voiceListening && voicePlaybackActive ? "Listening for an interruption" : voiceListening ? "Listening on this device" : voicePlaybackActive ? "Skai is speaking" : busy ? "Skai is responding" : "Preparing the next turn"}</p><p className="voice-mode-detail">{voiceTurnTranscribing ? "Your microphone is paused while local Whisper transcribes this turn." : voiceListening && voicePlaybackActive ? "Start speaking to interrupt Skai. Your speech stays on this device." : voiceListening ? "Speak naturally, then pause. Local Whisper transcribes your words before they are sent." : voicePlaybackActive ? "Speak at any time to interrupt the spoken reply." : busy ? "The microphone will listen once the spoken reply starts." : "The next listening turn will start after local speech finishes."}</p><label className="voice-mode-expressiveness">Expressiveness <span>{voiceExpressiveness}%</span><input type="range" min="0" max="100" step="5" value={voiceExpressiveness} onChange={(event) => { const next = Number(event.target.value); setVoiceExpressiveness(next); saveVoiceSetting("expressiveness", next); }} /></label><p className="voice-mode-detail">Affects spoken reply style with any chat model. Voice tone controls vary by local speech engine.</p>{voiceError && <p className="composer-voice-error" role="status">{voiceError}</p>}<div className="voice-mode-session-actions">{(busy || voicePlaybackActive) && <Button variant="ghost" type="button" onClick={stopNativeSpeech}>Stop speaking</Button>}<Button variant="secondary" type="button" onClick={endVoiceMode}>End voice mode</Button></div></div></ModalDialog>
   </section>;
 }

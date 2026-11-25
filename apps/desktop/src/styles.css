@@ -636,6 +636,10 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .omni-input-options strong { font-size: var(--skai-text-md); }
 .omni-input-options span, .omni-input-options small { color: var(--skai-color-text-muted); line-height: 1.4; }
 .computer-use-dialog { width: min(980px, calc(100vw - 32px)); max-height: min(92vh, 1000px); overflow: auto; padding: 22px; }
+.computer-use-model { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 8px 10px; margin: 12px 0 4px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 24%, var(--skai-color-border)); border-radius: var(--skai-radius-md); background: color-mix(in srgb, var(--skai-color-accent) 6%, var(--skai-color-surface-soft)); }
+.computer-use-model > span { color: var(--skai-color-accent-text); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); letter-spacing: .08em; text-transform: uppercase; }
+.computer-use-model > strong { min-width: 0; overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.computer-use-model > small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
 .computer-screen-picker { display: flex !important; align-items: center; gap: 12px !important; margin: 14px 0; }
 .computer-screen-picker select, .computer-use-controls select { min-height: 38px; padding: 7px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
 .computer-screen-preview { position: relative; display: block; width: 100%; max-height: 56vh; margin: 14px 0; padding: 0; overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); cursor: crosshair; }
