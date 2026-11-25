@@ -51,15 +51,41 @@ Mark an item done only when the linked workflow has evidence.
    assistant messages, while Skai keeps Edit on user prompts and offers Fork
    from here for assistant replies. Evidence and the intentional role-specific
    difference are recorded in the Revision 4 README.
-   Reference #5 now has a 1440×900 result screenshot and a real local
-   Qwen3 14B documents-only inference smoke; it cites both synthetic attached
-   files and matches the objective outcomes. The direct packaged composer
-   attach → Documents-only → send flow still needs interaction evidence.
+   Reference #5 now has a 1440×900 result screenshot plus a packaged composer
+   capture and interaction smoke for drop → grounded prompt → Documents-only;
+   Send is enabled and a separate real local Qwen3 14B smoke verifies grounded
+   inference with two attachments and all objective outcomes.
    Reference #7 has a packaged search-result screenshot; filtered result
    selection preserves the query, and the conversation-import preview/collision
    smoke passes. References #13–15 now have packaged Coding thread/editor and
-   Git review evidence; the remaining screenshot reviews cover #16–#30.
-   Reference #6 now has a packaged active-listening screenshot and an isolated
+   Git review evidence. Reference #23 now passes packaged UI review with an
+   isolated loopback MCP server: connect, inspect a read-only tool, review JSON
+   arguments, explicitly approve the read, and verify its result. The MCP
+   inspector now stacks below its server summary instead of collapsing into a
+   narrow column. References #26–28 pass composer menu/Voice Mode, Voice
+   Workbench clip lifecycle, and Memory save/search/disable/export/remove
+   checks. See the Revision 4 README for captures and comparison notes. Open
+   open gaps include the unwired GitHub repo browse/clone workflow (#17) and
+   installed-voice inventory in the isolated packaged profile (#22). Reference
+   #18 now passes installed Qwen3 14B inspection, Use in chat, and real local
+   Documents-only inference; see the packaged evidence. Visual continuity review
+   continues for the remaining references. Reference #29's Usage and all 13
+   Settings categories pass desktop layout coverage; a focused packaged test
+   confirms Settings opens over Usage and returns cleanly when closed. #30 Pets
+   passes selection, visibility, customization, and return; #31 Video stays
+   visibly planned.
+   References #27–28 now have fresh packaged visual evidence: Voice Workbench
+   shows its compact eight-clip library, and Memory shows its reference-style
+   note-list/editor split plus the separate document-corpus view. Packaged
+   interaction checks cover voice search, duplicate clip names, local preview,
+   persistence/removal, note selection/editing, and corpus add/remove. The
+   corpus UI smoke found and fixed previously disconnected save/search/remove
+   actions. See the Revision 4 README for evidence. #17 GitHub repo listing/
+   clone remains the next environment/feature gap; #22's installed local voice
+   inventory remains unresolved in the isolated package profile.
+   References #1–3 now have paired 1440×900 shared-shell, selected-thread, and
+   new-chat evidence; the fresh-chat Project and Model Library shortcuts pass
+   navigation checks. Reference #6 now has a packaged active-listening screenshot and an isolated
    start → local listening → End workflow check. Skai keeps Voice Mode in the
    current Chat thread rather than adding the reference's standalone page; the
    variation and familiar in-thread workflow rationale are documented in the
@@ -79,16 +105,18 @@ Mark an item done only when the linked workflow has evidence.
    that the Coding Agent did not pass its cancellation token to the durable
    executor. The executor now receives it; the isolated Agent Host regression
    and packaged Stop workflow both reach Cancelled and close the in-flight
-   request. Remaining: compare mobile task progress and review references
-   #16–30. References #13–15 now have packaged Coding thread/editor,
+   request. The 390×844 task-progress flow also passes through the mobile
+   navigation drawer and Activity review, with cancellation and no overflow.
+   References #13–15 now have packaged Coding thread/editor,
    side-by-side diff, and Git review evidence. Reference #10 now
    has a packaged 1440×900 screenshot and flow:
    open a saved conversation, open Details, configure a prompt/local time/weekly
    repeat, save, and confirm it appears under that thread. The screenshot shows
    the Details rail beside the active conversation. A 390×844 Chat layout smoke
-   passes, but mobile schedule interaction remains open because the narrow
-   sidebar collapses the seeded conversation list in this fixture. Typecheck,
-   production build, and Electron package passed after the Chat rail fix.
+   passes. A focused 390×844 flow opens the navigation drawer, selects the
+   saved conversation, creates a weekly schedule from Details, and verifies the
+   saved row with no overflow. Typecheck, production build, and Electron package
+   passed after the Chat rail fix.
    Reference #11 now has a packaged 1440×900 standalone-schedule screenshot.
    The packaged flow created a standalone weekly run, then paused, resumed,
    and cancelled it; each state appeared in the selected schedule details.
@@ -97,26 +125,42 @@ Mark an item done only when the linked workflow has evidence.
    recent projects by name/path, and simplifies new project setup to a name and
    one folder. Packaged acceptance checks both entry points and opens a listed
    project; a Windows native-picker run created and opened a temporary project.
-   Remaining: mobile project creation and direct Open folder smoke.
+   A 390×844 packaged smoke also opens/closes the Create dialog and opens the
+   listed project into Coding. Remaining: direct native Open folder picker on a
+   mobile-sized window. The persistent project shell remains a documented
+   visual difference from the standalone reference.
    Next action: finish screenshot-by-screenshot matching of the 30
-   supported Revision 4 workflow references and their distinct states; #13–15
-   now have paired desktop evidence, so continue with #16. Then
-   add interaction evidence for document grounding,
+   supported Revision 4 workflow references and their distinct states; #13–16
+   now have interaction evidence. #16's dedicated Terminal workspace now
+   aligns the command runner with Setup and Files & Diffs; the packaged
+   preflight/command flow and 1440×900 composition check pass. #17 remains
+   unavailable in the desktop workflow because its browse/clone bridge is not
+   wired; see the required implementation in item 10. #18 now has an
+   installed Qwen3 14B selected-model/use-in-chat capture and successful local
+   inference; the #19 pull-review flow was tested and cancelled before any
+   download. A
+   390×844 smoke found and fixed the mobile Chat sidebar overlapping content;
+   Chat and Coding now pass the narrow layout and optional Coding panel checks.
+   Then add interaction evidence for document grounding,
    voice, plans/schedules, GitHub, model review, Marketplace, MCP, image/media,
    Memory, and Settings. Keep Video planned. Reference #14 now has a read-only
    side-by-side diff with additions, deletions, context, and line numbers.
    Reference #15 verifies selected-file diff review and commit while preserving
    unselected files and unrelated staged work; Git diff remains the
    repository-level review surface. Do not close this item until
-   On 2026-11-24, a packaged Coding smoke verified separate main and right
-   workspace tab groups, Side chat, Editor/Monaco, Changes, and the persistent
-   main thread. The project-file tree currently remains inside Editor; the
-   Revision 4 example shows Files as its own right-side page, so that exact
-   workflow remains open. The 20-route × five-size × four theme/sidebar
-   packaged matrix passes with no runtime or layout findings. Remaining:
-   implement Files as a peer page per the user-provided Codex examples, exercise
-   Side chat against an isolated model fixture, verify page switching at mobile
-   widths, and visually review references #16–30. See the panel evidence and acceptance notes in the
+   The Coding workspace now has peer right-side pages for Editor, Files, Side
+   chat, and Changes while keeping the main thread visible. The 20-route ×
+   five-size × four theme/sidebar packaged matrix passed. A focused packaged
+   smoke verified page switching, Monaco, Files, Changes, and the Side chat
+   draft. The dedicated overflow smoke caught a clipped Recent Projects
+   section label; its width rule is fixed, and overflow acceptance now passes
+   11 routes × five viewport widths. Accessibility smoke covered 16 routes
+   with zero WCAG violations; axe leaves decorative symbol-only contrast
+   checks incomplete. An isolated Local API fixture now completes a Side chat
+   read-and-report task through the composer; the 390×844 smoke switches among
+   right-side pages while retaining the main thread. Remaining: visually compare
+   reference #16's dedicated terminal layout and references #17–30. See the
+   panel evidence and acceptance notes in the
    Revision 4 README.
    Do not close this item until
    the remaining flows have evidence and
@@ -277,13 +321,15 @@ Mark an item done only when the linked workflow has evidence.
    output (102,956 and 118,924 bytes). Remaining: verify the other MCP and
    voice adapters against their documented license/runtime requirements.
    Saved ComfyUI workflows can be reviewed and activated inside Marketplace.
-10. **GitHub workflow acceptance — Blocked on test account · Owner: User.** Core
-    tests cover permission denial, network failure, request cancellation,
-    pending/slow-down retry, stale branch/conflict detection, and protected-token
-    persistence. Next action: provide an isolated test repository and scoped test
-    credential/device authorization for live consent-denial, access, clone
-    conflict, cancellation, and retry acceptance; no production repository will
-    be used as the fixture.
+10. **GitHub repository browse/clone flow — Not wired · Owner: Codex.** Core
+    device-flow, credential-store, API-client, and workspace service tests exist,
+    but the desktop protocol and renderer do not call them. The visible workflow
+    supports local Git review/push and pull-request creation through the CLI;
+    it has no account/repository picker or clone journey. Next action: wire the
+    native protocol and a compact repository picker into Projects, then verify
+    consent denial, access, repo selection/open, conflict, cancellation, and
+    retry using an isolated repository and scoped test authorization. Do not use
+    a production repository as a fixture.
 
 ## Next up
 
@@ -355,7 +401,10 @@ Mark an item done only when the linked workflow has evidence.
    rechecks its read-only tool set, and performs another approved read. The
    smoke also exercises loopback Streamable HTTP session negotiation, protocol
    header continuity, approved reads, denied writes, revocation, and fresh
-   session recovery. Figma and Supabase entries now state their exact local
+    session recovery. The packaged #23 UI flow also connects a disposable
+    loopback server, reviews `read_garden_plan` arguments before execution,
+    approves a read, and confirms its result; the first pass found and fixed
+    the narrow inspector layout. Figma and Supabase entries now state their exact local
    setup prerequisites and loopback routes; their live desktop/CLI servers
    were unavailable on the acceptance machine. Remaining: verify live setup,
    use, and revoke for those services when available, then cover additional
@@ -533,6 +582,24 @@ feature backtest. The detailed 2026-11-22 queue snapshot preserves prior notes.
   stale `aria-controls` references, and unlabeled non-semantic regions.
   The packaged theme contrast sweep is still required for visible text and
   themed native select options; gradients remain a manual visual check.
+
+- **2026-11-24:** Refactored ChatPage by extracting the thread activity history,
+  message timeline/scroll behavior, and per-tab draft hydration into separate
+  components and a hook. The packaged Coding UI matrix exposed a collapsed
+  Monaco pane at 390px and unreachable file-tree controls in the narrow split.
+  The compact shell now places the project sidebar in the mobile drawer and
+  makes the thread/editor split vertically scrollable. Renderer typecheck,
+  build, packaging, and focused Chat/Coding smoke passed; the full UI matrix
+  passed 20 routes × 5 window sizes × 4 variants, overflow passed 11 routes × 5
+  widths, and accessibility passed 16 routes with zero WCAG violations.
+  Final screenshot review also corrected task-history label spacing and widened
+  the code area in the Editor page. The 390×844 smoke switches among Side chat,
+  Editor, Files, and Changes while keeping the main thread available. Coding
+  file-tab hydration, active-file restore, keyboard navigation, reorder, and
+  close behavior are now encapsulated in `useCodingFileTabs`; focused editor and
+  project-browser protocol smokes passed after extraction.
+  Remaining: exercise a model-backed Side chat task and finish Revision 4
+  reference continuity.
 
 - **2026-11-23:** Packaged accessibility audit inspected 14 routes and found
   zero automated WCAG violations, zero serious/critical findings, a working

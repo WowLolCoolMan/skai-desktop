@@ -17,9 +17,10 @@ type TerminalPanelProps = {
   onRefreshSession?: () => Promise<boolean>;
   onCloseSession?: () => Promise<boolean>;
   onOpenCoding?: () => void;
+  onProjectChange?: (projectId: string) => void;
 };
 
-export function TerminalPanel({ projects, initialProjectId, busy, output, exitCode, sessionId, screen, compact = false, onRun, onStartSession, onWriteSession, onRefreshSession, onCloseSession, onOpenCoding }: TerminalPanelProps) {
+export function TerminalPanel({ projects, initialProjectId, busy, output, exitCode, sessionId, screen, compact = false, onRun, onStartSession, onWriteSession, onRefreshSession, onCloseSession, onOpenCoding, onProjectChange }: TerminalPanelProps) {
   const [projectId, setProjectId] = useState(initialProjectId ?? projects[0]?.id ?? "");
   const [cwd, setCwd] = useState(".");
   const [command, setCommand] = useState("");
@@ -44,7 +45,7 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
     </div>}
     {projects.length === 0 ? <EmptyState title="Select a project first" description="Terminal commands are bounded to a project. Open Coding Workspace to connect a folder before running anything." action={onOpenCoding ? <Button variant="secondary" onClick={onOpenCoding}>Open Coding Workspace</Button> : undefined} /> : <>
     <div className="terminal-controls">
-      <label>Project<select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Select a project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+      <label>Project<select value={projectId} onChange={(event) => { setProjectId(event.target.value); onProjectChange?.(event.target.value); }}><option value="">Select a project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
       <label>Working directory<input value={cwd} onChange={(event) => setCwd(event.target.value)} aria-label="Working directory" /></label>
     </div>
     <div className="terminal-command-row">

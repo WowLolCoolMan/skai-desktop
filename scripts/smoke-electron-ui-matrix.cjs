@@ -28,9 +28,14 @@ const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1
 const exerciseScheduledPage = process.env.UI_MATRIX_EXERCISE_SCHEDULED_PAGE === "1";
 const exerciseProjectCreate = process.env.UI_MATRIX_EXERCISE_PROJECT_CREATE === "1";
 const exerciseCodingPanels = process.env.UI_MATRIX_EXERCISE_CODING_PANELS === "1";
+const exerciseSideChat = process.env.UI_MATRIX_EXERCISE_SIDE_CHAT === "1";
+const exerciseProjectTerminal = process.env.UI_MATRIX_EXERCISE_PROJECT_TERMINAL === "1";
+const exerciseMcpReview = process.env.UI_MATRIX_EXERCISE_MCP_REVIEW === "1";
 const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
+let sideChatRequests = 0;
+let sideChatServerProblem = "";
 let resolveTaskProgressPaused;
 let resolveTaskProgressCancelled;
 const taskProgressCancelled = new Promise((resolve) => { resolveTaskProgressCancelled = resolve; });
@@ -71,6 +76,69 @@ const taskProgressServerReady = taskProgressServer ? new Promise((resolve, rejec
   taskProgressServer.once("error", reject);
   taskProgressServer.listen(0, "127.0.0.1", () => {
     taskProgressEndpoint = `http://127.0.0.1:${taskProgressServer.address().port}/v1`;
+    resolve();
+  });
+}) : Promise.resolve();
+const sideChatServer = exerciseSideChat ? http.createServer((request, response) => {
+  let body = "";
+  request.setEncoding("utf8");
+  request.on("data", (chunk) => { body += chunk; });
+  request.on("end", () => {
+    if (request.url?.endsWith("/models")) {
+      response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ data: [{ id: "revision4-sidechat-fixture", object: "model" }] }));
+      return;
+    }
+    if (!request.url?.endsWith("/chat/completions")) { sideChatServerProblem = `Unexpected local model route ${request.url}`; response.writeHead(404).end(); return; }
+    sideChatRequests += 1;
+    const messages = JSON.parse(body).messages ?? [];
+    let action;
+    if (sideChatRequests === 1) action = { action: "read_file", path: "README.md" };
+    else if (messages.some((message) => message.role === "user" && String(message.content).includes("READ RESULT for README.md "))) {
+      action = { action: "done", summary: "Side chat inspected README.md successfully using the isolated local model fixture." };
+    } else {
+      sideChatServerProblem = "The Side chat model fixture did not receive the README read result before completion.";
+      response.writeHead(422).end(sideChatServerProblem);
+      return;
+    }
+    response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(action) } }] })}\n\ndata: [DONE]\n\n`);
+  });
+}) : null;
+let sideChatEndpoint = "";
+const sideChatServerReady = sideChatServer ? new Promise((resolve, reject) => {
+  sideChatServer.once("error", reject);
+  sideChatServer.listen(0, "127.0.0.1", () => {
+    sideChatEndpoint = `http://127.0.0.1:${sideChatServer.address().port}/v1`;
+    resolve();
+  });
+}) : Promise.resolve();
+let mcpReviewSession = "";
+const mcpReviewServer = exerciseMcpReview ? http.createServer(async (incoming, response) => {
+  const chunks = [];
+  for await (const chunk of incoming) chunks.push(chunk);
+  let body;
+  try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+  catch { response.writeHead(400).end(); return; }
+  if (body.method === "initialize") {
+    mcpReviewSession = "skai-ui-review-session";
+    response.setHeader("Mcp-Session-Id", mcpReviewSession);
+    response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "Skai revision 4 review fixture", version: "1" } } }));
+    return;
+  }
+  if (incoming.headers["mcp-session-id"] !== mcpReviewSession) { response.writeHead(400).end("Missing MCP session"); return; }
+  const result = body.method === "tools/list"
+    ? { tools: [{ name: "read_garden_plan", description: "Read the fixture garden plan.", inputSchema: { type: "object", properties: { area: { type: "string" } }, required: ["area"] }, annotations: { readOnlyHint: true } }] }
+    : body.method === "tools/call" && body.params?.name === "read_garden_plan"
+      ? { content: [{ type: "text", text: `Fixture garden plan for ${body.params.arguments?.area ?? "unspecified area"}: inspect soil moisture before watering.` }] }
+      : null;
+  if (!result) { response.writeHead(404).end(); return; }
+  response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", id: body.id, result }));
+}) : null;
+let mcpReviewEndpoint = "";
+const mcpReviewServerReady = mcpReviewServer ? new Promise((resolve, reject) => {
+  mcpReviewServer.once("error", reject);
+  mcpReviewServer.listen(0, "127.0.0.1", () => {
+    mcpReviewEndpoint = `http://127.0.0.1:${mcpReviewServer.address().port}/mcp`;
     resolve();
   });
 }) : Promise.resolve();
@@ -259,6 +327,7 @@ async function main() {
   phase = "seed";
   const captureMode = process.env.UI_MATRIX_CAPTURE === "1";
   const exerciseChatActions = process.env.UI_MATRIX_EXERCISE_CHAT_ACTIONS === "1";
+  const exerciseChatBase = process.env.UI_MATRIX_EXERCISE_CHAT_BASE === "1";
   const exerciseDocuments = process.env.UI_MATRIX_EXERCISE_DOCUMENTS === "1";
   const exerciseChatSearch = process.env.UI_MATRIX_EXERCISE_CHAT_SEARCH === "1";
   const exerciseTaskPlan = process.env.UI_MATRIX_EXERCISE_TASK_PLAN === "1";
@@ -269,6 +338,7 @@ async function main() {
   fs.writeFileSync(path.join(seedProject, "README.md"), "# Starter project\n\nUse the Coding Agent thread to review the project, then inspect README.md in the docked editor.\n");
   fs.mkdirSync(path.join(seedProject, "src"), { recursive: true });
   fs.writeFileSync(path.join(seedProject, "src", "index.ts"), "export function greet(name: string) {\n  return `Hello, ${name}`;\n}\n");
+  if (exerciseProjectTerminal) fs.writeFileSync(path.join(seedProject, "package.json"), JSON.stringify({ name: "terminal-preflight-smoke", private: true, scripts: { build: "node -e \"require('node:fs').writeFileSync('preflight-marker.tmp', 'unexpected')\"" } }, null, 2));
   if (exerciseTaskProgress) {
     fs.writeFileSync(path.join(seedProject, "src", "layout.ts"), "export const gardenLayout = { columns: 2, spacing: 12 };\n");
     fs.writeFileSync(path.join(seedProject, "src", "plant.ts"), "export const plants = ['basil', 'thyme'];\n");
@@ -291,7 +361,7 @@ async function main() {
       fs.writeFileSync(path.join(seedProject, "src", "plan.ts"), "export const gardenPlan = { columns: 2, spacing: 12 };\n");
     }
   }
-  const seeded = await cdp.evaluateWith(async function(captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions) {
+  const seeded = await cdp.evaluateWith(async function(captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions, exerciseChatBase) {
     const r = (m, p) => window.skaiAgent.request(m, p);
     const results = [];
     results.push(await r("conversation.save", { title: longTitle, messages: [{ role: "user", content: captureMode ? "Help me plan a low-maintenance herb garden for a sunny patio." : `Unbroken token: ${longWord}` }, { role: "assistant", content: captureMode ? "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." : "Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40) }] }));
@@ -312,6 +382,11 @@ async function main() {
       { title: "Vegetable garden tips", query: "How can I improve my vegetable garden?", answer: "Focus on good soil, sunlight, and consistent watering." },
       { title: "Backyard garden ideas", query: "Share a few backyard garden ideas.", answer: "Try raised beds and low-maintenance plants for your backyard." },
     ]) results.push(await r("conversation.save", { title: item.title, messages: [{ role: "user", content: item.query }, { role: "assistant", content: item.answer }] }));
+    if (captureMode && exerciseChatBase) for (const item of [
+      { title: "Layout ideas", query: "How should I arrange the containers?", answer: "Group containers by sunlight needs and leave room to reach each plant." },
+      { title: "Plant list", query: "Which herbs work well in pots?", answer: "Basil, thyme, parsley, and chives all grow well in containers." },
+      { title: "Budget", query: "What supplies should I budget for?", answer: "Start with containers, potting mix, seeds or seedlings, and a watering can." },
+    ]) results.push(await r("conversation.save", { title: item.title, messages: [{ role: "user", content: item.query }, { role: "assistant", content: item.answer }] }));
     if (captureMode && exerciseChatActions) for (const text of ["Add a week-by-week planting schedule.", "Include a simple materials checklist.", "Estimate the monthly watering routine."]) results.push(await r("chat.queue.enqueue", { text }));
     if (captureMode) for (const card of [
       { name: "Default", roles: "General-purpose assistant", instructions: "Be clear, practical, and adaptable to the user's task." },
@@ -320,7 +395,7 @@ async function main() {
       { name: "Tech Writer", roles: "Drafts and edits clear technical docs", instructions: "Use plain language, organize information clearly, and preserve technical accuracy." },
     ]) results.push(await r("persona.save", { persona: { ...card, sourceMode: "own-material", subjectType: "character", voice: "Friendly and clear", personality: "Patient, focused, and direct", thinkingStyle: "Work step by step and explain important choices", interactionStyle: "Ask for missing context only when it affects the result", values: "Clarity, accuracy, and useful next steps", knowledge: "Use the supplied material and task context", evidenceBoundaries: "State uncertainty and do not invent unsupported facts", sourceMaterial: card.instructions } }));
     return results;
-  }, captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions);
+  }, captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions, exerciseChatBase);
   if (!Array.isArray(seeded) || seeded.some((result) => result?.ok !== true)) throw new Error(`Seeding the throwaway profile failed: ${JSON.stringify(seeded)}`);
 
   const findings = [];
@@ -331,12 +406,160 @@ async function main() {
     await cdp.evaluate("(async () => { for (let i = 0; i < 150 && !document.querySelector('[aria-label=\"Primary navigation\"]'); i++) await new Promise((r) => setTimeout(r, 100)); return 1; })()");
     for (const [width, height] of testedViewports) {
       await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 960 });
+      if (exerciseMcpReview) await mcpReviewServerReady;
       for (const route of testedRoutes) {
         phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/${route}`;
         const renderedRoute = route === "personas" || route === "persona-groups" ? "persona-workshop" : route === "plugins" ? "marketplace" : route === "workbench" ? "chat" : route;
         await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
         const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
         if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
+        if (route === "chat" && process.env.UI_MATRIX_CAPTURE === "1" && width === 390 && height === 844) {
+          fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+          const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+          fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-chat-shell-390.png"), Buffer.from(screenshot.data, "base64"));
+        }
+        if (route === "terminal" && exerciseProjectTerminal && width === 1440 && height === 900) {
+          const projectPicker = await cdp.evaluate(`Boolean(document.querySelector('.terminal-workspace-main .terminal-controls select'))`);
+          if (!projectPicker) throw new Error("The standalone Terminal route did not render its project selector.");
+          const selectedProject = await cdp.evaluateWith(function (name) {
+            const select = document.querySelector('.terminal-workspace-main .terminal-controls select');
+            const option = [...(select?.options ?? [])].find((item) => item.textContent?.trim() === name);
+            if (!select || !option) return false;
+            Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, option.value);
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }, captureMode ? "Skai Starter Project" : "Revision 4 coding fixture");
+          if (!selectedProject) throw new Error("Terminal could not select the seeded project.");
+          const workspaceReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const files = document.querySelector('.terminal-files-card'); if (files?.innerText.includes('README.md') && document.querySelector('.terminal-workspace-main input[aria-label="Terminal command"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!workspaceReady) throw new Error(`Terminal did not load the selected project's files and command field: ${JSON.stringify(await cdp.evaluate(`(() => ({ files: document.querySelector('.terminal-files-card')?.innerText, main: document.querySelector('.terminal-workspace-main')?.innerText?.slice(0, 400) }))()`))}`);
+          const workspaceGeometry = await cdp.evaluate(`(() => { const main = document.querySelector('.terminal-workspace-main')?.getBoundingClientRect(); const inspector = document.querySelector('.terminal-workspace-inspector')?.getBoundingClientRect(); const rect = (r) => r && ({ x: r.x, y: r.y, width: r.width, height: r.height, right: r.right }); return { main: rect(main), inspector: rect(inspector), columns: getComputedStyle(document.querySelector('.terminal-workspace-grid')).gridTemplateColumns }; })()`);
+          if (!workspaceGeometry.main || !workspaceGeometry.inspector || workspaceGeometry.main.width < 650 || workspaceGeometry.inspector.width < 260 || Math.abs(workspaceGeometry.main.y - workspaceGeometry.inspector.y) > 3) throw new Error(`Terminal, setup, and Files & Diffs did not share the intended workspace: ${JSON.stringify(workspaceGeometry)}`);
+          const preflightButton = [...await cdp.evaluate(`([...document.querySelectorAll('.terminal-inspector-card button')].map((button) => button.textContent?.trim()))`)];
+          if (!preflightButton.includes("Run preflight")) throw new Error(`Terminal setup did not offer preflight: ${JSON.stringify(preflightButton)}`);
+          await clickButtonText(cdp, "Run preflight", ".terminal-inspector-card");
+          const preflightReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const text = document.querySelector('.terminal-inspector-card')?.innerText ?? ''; if (text.includes('package.json') && text.includes('run build') && text.includes('Suggested checks')) return text; await new Promise((r) => setTimeout(r, 100)); } return null; })()`);
+          if (!preflightReady || fs.existsSync(path.join(seedProject, "preflight-marker.tmp"))) throw new Error(`Terminal preflight did not inspect read-only setup without executing suggestions: ${JSON.stringify(preflightReady)}`);
+          const command = process.platform === "win32" ? "Write-Output terminal-workspace-smoke" : "printf terminal-workspace-smoke";
+          await cdp.evaluateWith(function (value) { const input = document.querySelector('.terminal-workspace-main input[aria-label="Terminal command"]'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); }, command);
+          await clickButtonText(cdp, "Run command", ".terminal-workspace-main");
+          const result = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const text = document.querySelector('.terminal-workspace-main .terminal-result')?.innerText ?? ''; if (text.includes('terminal-workspace-smoke')) return text; await new Promise((r) => setTimeout(r, 100)); } return null; })()`);
+          if (!result?.includes("exit 0")) throw new Error(`Standalone Terminal did not run the explicit project-bounded command: ${JSON.stringify(result)}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-project-terminal-workspace-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          console.log(`[terminal-workspace] ${JSON.stringify({ layout: workspaceGeometry, preflight: "read-only", command, result: result.trim() })}`);
+        }
+        if (route === "models" && process.env.UI_MATRIX_EXERCISE_MODEL_REVIEW === "1" && width === 1440 && height === 900) {
+          const modelName = "qwen3:8b";
+          await cdp.evaluateWith(function (value) { const input = document.querySelector('input[aria-label="Ollama model name"]'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return true; }, modelName);
+          await clickButtonText(cdp, "Review download", ".model-install-card");
+          const review = await cdp.evaluate(`(() => { const dialog = document.querySelector('[role="dialog"][aria-label="Review local model download"]'); return dialog?.innerText ?? null; })()`);
+          if (!review?.includes(modelName) || !review.includes("local Ollama runtime") || !review.includes("No remote package verification")) throw new Error(`Local model download review did not disclose the target runtime and verification limits: ${JSON.stringify(review)}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-model-download-review-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await clickButtonText(cdp, "Cancel", '[role="dialog"][aria-label="Review local model download"]');
+          if (await cdp.evaluate(`Boolean(document.querySelector('[role="dialog"][aria-label="Review local model download"]'))`)) throw new Error("Cancelling the model download review left its confirmation open.");
+          console.log(`[model-download-review] ${JSON.stringify({ modelName, confirmation: "reviewed then cancelled; no download started" })}`);
+        }
+        if (route === "models" && process.env.UI_MATRIX_EXERCISE_MODEL_SELECTION === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          const installedModelReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if ([...document.querySelectorAll('.models-library-layout .catalog-row')].some((row) => row.innerText.includes('Qwen3 14B'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!installedModelReady) {
+            const inventoryDetails = await cdp.evaluate(`(async () => { const settings = await window.skaiAgent.request('settings.get'); const current = settings.ok ? settings.result : settings; const models = await window.skaiAgent.request('models.list', { provider: current.provider, endpoint: current.endpoint }); return { rows: [...document.querySelectorAll('.models-library-layout .catalog-row')].map((row) => row.innerText), visibleError: document.querySelector('.global-error')?.innerText ?? '', settings: current, discovered: models.ok ? models.result?.map((model) => ({ model: model.model, provider: model.provider, endpoint: model.endpoint })) : models }; })()`);
+            throw new Error(`The installed qwen3:14b model did not appear in the local Model Library: ${JSON.stringify(inventoryDetails)}`);
+          }
+          await cdp.evaluate(`([...document.querySelectorAll('.models-library-layout .catalog-row')].find((row) => row.innerText.includes('Qwen3 14B'))?.click(), 1)`);
+          const selectedModelDetails = await cdp.evaluate(`document.querySelector('.model-inspector')?.innerText ?? ''`);
+          if (!selectedModelDetails.includes('qwen3:14b') || !selectedModelDetails.includes('Ollama') || !selectedModelDetails.includes('Available locally')) throw new Error(`The installed-model inspector omitted its runtime or availability: ${JSON.stringify(selectedModelDetails)}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-model-installed-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await clickButtonText(cdp, "Use in chat", ".model-inspector");
+          const modelApplied = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.title.endsWith(' · chat') && localStorage.getItem('skai.model') === 'qwen3:14b') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!modelApplied) throw new Error("Choosing Use in chat did not open Chat with qwen3:14b selected.");
+          console.log(`[model-selection] ${JSON.stringify({ model: "qwen3:14b", runtime: "Ollama", available: true, selectedFor: "Chat" })}`);
+        }
+        if (route === "marketplace" && process.env.UI_MATRIX_EXERCISE_MARKETPLACE === "1" && width === 1440 && height === 900) {
+          const searchReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.plugins-search input') && document.querySelector('.plugins-catalog-item')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!searchReady) throw new Error("Marketplace Discover did not load its searchable local catalog.");
+          const searched = await cdp.evaluateWith(function (value) { const input = document.querySelector('.plugins-search input'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return true; }, "Qwen3.6-27B");
+          if (!searched) throw new Error("Marketplace Discover search field was unavailable.");
+          const matchReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.plugins-catalog-copy strong')].some((item) => item.textContent?.trim() === 'Qwen3.6-27B')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!matchReady) throw new Error(`Marketplace search did not filter to the known catalog listing: ${JSON.stringify(await cdp.evaluate(`document.querySelector('.plugins-catalog')?.innerText?.slice(0, 300)`))}`);
+          await cdp.evaluate(`([...document.querySelectorAll('.plugins-catalog-copy')].find((button) => button.querySelector('strong')?.textContent?.trim() === 'Qwen3.6-27B')?.click(), 1)`);
+          const details = await cdp.evaluate(`document.querySelector('.plugins-inspector')?.innerText ?? ''`);
+          const detailText = details.toLowerCase();
+          if (!details.includes("Qwen3.6-27B") || !detailText.includes("availability") || !detailText.includes("license")) throw new Error(`Marketplace listing details omitted the selected model's metadata: ${JSON.stringify(details.slice(0, 500))}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-marketplace-discover-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          console.log(`[marketplace-discovery] ${JSON.stringify({ query: "Qwen3.6-27B", selected: true, details: "availability and license visible" })}`);
+        }
+        if (route === "marketplace" && exerciseMcpReview && width === 1440 && height === 900) {
+          await cdp.evaluate(`(() => { const button = [...document.querySelectorAll('.plugins-customize-nav > button')].find((item) => item.textContent?.includes('Tools')); button?.click(); return Boolean(button); })()`);
+          const mcpPageReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 50; i++) { if (document.querySelector('.plugins-mcp-form input[aria-label="MCP server ID"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!mcpPageReady) throw new Error("Marketplace did not open the MCP server connect workflow.");
+          await cdp.evaluateWith(function (serverId, endpoint) {
+            const set = (input, value) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); };
+            set(document.querySelector('.plugins-mcp-form input[aria-label="MCP server ID"]'), serverId);
+            set(document.querySelector('.plugins-mcp-form input[aria-label="Local MCP endpoint"]'), endpoint);
+            return true;
+          }, "revision4-review-fixture", mcpReviewEndpoint);
+          await clickButtonText(cdp, "Connect and review tools", ".plugins-mcp-form");
+          const connected = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const row = document.querySelector('.plugins-connection.is-selected'); if (row?.innerText.includes('read_garden_plan')) return row.innerText; await new Promise((r) => setTimeout(r, 75)); } return null; })()`);
+          if (!connected?.includes("read_garden_plan") || !connected.includes("Explicit approval per call")) throw new Error(`The loopback MCP server did not connect and expose its tool for review: ${JSON.stringify(connected)}`);
+          await clickButtonText(cdp, "Review & run", ".plugins-tool-review");
+          const reviewed = await cdp.evaluate(`document.querySelector('.plugins-tool-call[aria-label="Review MCP tool call"]')?.innerText ?? ''`);
+          if (!reviewed.includes("read_garden_plan") || !reviewed.includes("Arguments (JSON)") || !reviewed.includes("read-only call")) throw new Error(`MCP call review omitted the tool identity, arguments, or read-only boundary: ${JSON.stringify(reviewed)}`);
+          await cdp.evaluate(`(() => { const field = document.querySelector('.plugins-tool-call textarea[aria-label="MCP tool arguments as JSON"]'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, '{"area":"north bed"}'); field.dispatchEvent(new Event('input', { bubbles: true })); return Boolean(field); })()`);
+          const reviewedArguments = await cdp.evaluate(`(async () => { await new Promise((resolve) => setTimeout(resolve, 160)); return document.querySelector('.plugins-tool-call textarea[aria-label="MCP tool arguments as JSON"]')?.value ?? null; })()`);
+          if (reviewedArguments !== '{"area":"north bed"}') throw new Error(`MCP review arguments did not remain visible before approval: ${JSON.stringify(reviewedArguments)}`);
+          const reviewVisibility = await cdp.evaluate(`(() => { const panel = document.querySelector('.plugins-main'); const card = document.querySelector('.plugins-tool-call'); card?.scrollIntoView({ block: 'center' }); const p = panel?.getBoundingClientRect(); const r = card?.getBoundingClientRect(); return p && r ? { panel: [p.left, p.top, p.right, p.bottom], card: [r.left, r.top, r.right, r.bottom], visible: r.top >= p.top && r.bottom <= p.bottom } : null; })()`);
+          if (!reviewVisibility?.visible) throw new Error(`MCP tool approval card could not be brought fully into view: ${JSON.stringify(reviewVisibility)}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-mcp-tool-review-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await clickButtonText(cdp, "Approve read and run", ".plugins-tool-call");
+          const result = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const text = document.querySelector('.plugins-tool-call-result')?.innerText ?? ''; if (text.includes('north bed')) return text; await new Promise((r) => setTimeout(r, 75)); } return null; })()`);
+          if (!result?.includes("inspect soil moisture before watering")) throw new Error(`The approved MCP read did not return its fixture result: ${JSON.stringify(result)}`);
+          await cdp.evaluate(`(() => { window.scrollTo(0, 0); document.querySelectorAll('.app-content, .plugins-main').forEach((element) => { element.scrollTop = 0; }); return true; })()`);
+          console.log(`[mcp-review] ${JSON.stringify({ connected: true, tool: "read_garden_plan", approval: "explicit read approval", result: result.trim() })}`);
+        }
+        if (route === "marketplace" && process.env.UI_MATRIX_EXERCISE_INSTALLED_VOICE === "1" && width === 1440 && height === 900) {
+          const opened = await cdp.evaluate(`(() => { const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Installed & updates'); if (!button) return false; button.click(); return true; })()`);
+          if (!opened) throw new Error("Marketplace did not expose Installed & updates.");
+          const inventoryReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 200; i++) { const layout = document.querySelector('.marketplace-installed-layout'); const refreshing = [...document.querySelectorAll('.marketplace-installed-pane .panel-heading .status-badge')].some((item) => item.innerText.includes('Refreshing')); if (layout && !refreshing) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!inventoryReady) throw new Error(`Installed & updates did not settle its local inventory: ${JSON.stringify(await cdp.evaluate(`({ status: [...document.querySelectorAll('.marketplace-installed-pane .panel-heading .status-badge')].map((item) => item.innerText), alerts: [...document.querySelectorAll('[role="alert"], .marketplace-honesty')].map((item) => item.innerText) })`))}`);
+          const voiceRows = await cdp.evaluate(`([...document.querySelectorAll('.marketplace-installed-group')].find((group) => group.querySelector('h4')?.textContent?.includes('Voice profiles'))?.innerText ?? '')`);
+          const inventoryStatus = await cdp.evaluate(`({ status: [...document.querySelectorAll('.marketplace-installed-pane .panel-heading .status-badge')].map((item) => item.innerText).join(' '), checking: [...document.querySelectorAll('.marketplace-installed-pane .ui-empty')].some((item) => item.textContent?.includes('Checking installed items')), inspectorChecking: document.querySelector('.marketplace-installed-inspector')?.innerText.includes('Checking installed items') ?? false })`);
+          if (inventoryStatus.status.includes('Refreshing') && (!inventoryStatus.checking || !inventoryStatus.inspectorChecking)) throw new Error(`Both inventory panes should show progress while local inventory is refreshing: ${JSON.stringify(inventoryStatus)}`);
+          if (/Piper|Kokoro/i.test(voiceRows)) {
+            const categoryChanged = await cdp.evaluate(`(() => { const select = document.querySelector('.marketplace-installed-filters select[aria-label="Filter installed items by category"]'); if (!select) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'Voice profiles'); select.dispatchEvent(new Event('input', { bubbles: true })); select.dispatchEvent(new Event('change', { bubbles: true })); return select.value === 'Voice profiles'; })()`);
+            if (!categoryChanged) throw new Error('Installed inventory did not expose its category filter.');
+            const name = /Piper/i.test(voiceRows) ? "Piper" : "Kokoro";
+            await cdp.evaluateWith(function (value) { const row = [...document.querySelectorAll('.marketplace-installed-model')].find((item) => item.querySelector('strong')?.textContent?.includes(value)); row?.click(); return Boolean(row); }, name);
+            const inspector = await cdp.evaluate(`document.querySelector('.marketplace-installed-inspector')?.innerText ?? ''`);
+            const layout = await cdp.evaluate(`(() => { const list = document.querySelector('.marketplace-installed-pane')?.getBoundingClientRect(); const detail = document.querySelector('.marketplace-installed-inspector')?.getBoundingClientRect(); const preview = document.querySelector('.marketplace-installed-inspector button[aria-label^="Preview "]'); const availability = document.querySelector('.marketplace-installed-voice-status')?.innerText ?? ''; return list && detail ? { list: { left: list.left, right: list.right, width: list.width }, detail: { left: detail.left, right: detail.right, width: detail.width }, previewEnabled: Boolean(preview && !preview.disabled), availability } : null; })()`);
+            if (!inspector.toLowerCase().includes(name.toLowerCase()) || !inspector.toLowerCase().includes("next step")) throw new Error(`Installed voice ${name} did not show its local details: ${JSON.stringify(inspector)}`);
+            if (!layout || layout.list.left >= layout.detail.left || layout.list.width <= layout.detail.width || !layout.previewEnabled || !layout.availability.includes('Local runtime') || !layout.availability.includes('Local playback')) throw new Error(`Installed voice list/detail workflow did not match the expected list-left, detail-right layout or provide an enabled preview: ${JSON.stringify(layout)}`);
+          }
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-marketplace-installed-voices-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          console.log(`[marketplace-installed-voice] ${JSON.stringify({ voiceRows: voiceRows.trim() || (inventoryStatus.status.includes('Refreshing') ? "Not loaded yet" : "No installed voice profiles returned by the local host"), inventoryStatus })}`);
+        }
         if (exerciseCodingCollapsedLayout && route === "chat" && width >= 761) {
           const layout = await cdp.evaluate(`(() => {
             const shell = document.querySelector('.app-shell');
@@ -369,10 +592,15 @@ async function main() {
             return true;
           }, layout);
         }
-        if (route === "chat" && exerciseChatSchedule) {
+        if (route === "chat" && exerciseChatSchedule && width === 390 && height === 844 && theme === "dark" && collapsed === "false") {
+          await clickInRenderer(cdp, '.toolbar-sidebar-toggle[aria-label="Show sidebar"]');
+          const mobileNavigationOpen = await cdp.evaluate(`Boolean(document.querySelector('.workspace-sidebar.is-mobile-open'))`);
+          if (!mobileNavigationOpen) throw new Error("The mobile workspace navigation drawer did not open for selecting a conversation.");
           await clickButtonText(cdp, "Plan a simple herb garden", ".sidebar-history-list");
           const conversationReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.chat-page .chat-thread-summary, .chat-page .chat-context-bar strong')?.textContent?.includes('Plan a simple herb garden')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!conversationReady) throw new Error("The seeded conversation did not open for the schedule workflow.");
+          const navigationClosed = await cdp.evaluate(`!document.querySelector('.workspace-sidebar.is-mobile-open')`);
+          if (!navigationClosed) throw new Error("Selecting a conversation did not dismiss the mobile navigation drawer.");
           await cdp.evaluate(`([...document.querySelectorAll('.chat-header-actions button')].find((button) => button.textContent?.trim() === 'Details')?.click())`);
           const schedulePanelReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { const rail = document.querySelector('.chat-rail'); if (rail && !rail.hidden && document.querySelector('.chat-schedules-panel')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!schedulePanelReady) throw new Error("Conversation Details did not show its local Scheduled runs panel.");
@@ -460,9 +688,42 @@ async function main() {
           await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
           const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
-          if (exerciseCodingPanels && width === 1440 && height === 900) {
+          if (exerciseProjectTerminal && width === 1440 && height === 900) {
+            await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
+            const preflightChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const item = [...document.querySelectorAll('.overflow-menu-item')].find((entry) => entry.textContent?.trim() === 'Run preflight'); if (item) { item.click(); return true; } await new Promise((resolve) => setTimeout(resolve, 25)); } return false; })()`);
+            if (!preflightChoice) throw new Error("Project actions did not expose Run preflight.");
+            const preflightReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const card = document.querySelector('.project-preflight'); if (card) return card.innerText; await new Promise((resolve) => setTimeout(resolve, 100)); } return null; })()`);
+            if (!preflightReady || !preflightReady.includes('package.json') || !preflightReady.includes('run build') || !preflightReady.includes('Suggested checks (not run)') || !preflightReady.includes('Node.js')) throw new Error(`Project preflight did not report the detected manifest, runtime, and unexecuted build check: ${JSON.stringify({ card: preflightReady, alerts: await cdp.evaluate(`([...document.querySelectorAll('[role="alert"],[role="status"]')].map((item) => item.innerText))`) })}`);
+            if (fs.existsSync(path.join(seedProject, "preflight-marker.tmp"))) throw new Error("Read-only project preflight ran the fixture's package script.");
+            if (process.env.UI_MATRIX_CAPTURE === "1") {
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(captureDirectory, "coding-preflight-1440.png"), Buffer.from(screenshot.data, "base64"));
+            }
+            await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
+            const terminalChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const item = [...document.querySelectorAll('.overflow-menu-item')].find((entry) => entry.textContent?.trim() === 'Open terminal'); if (item) { item.click(); return true; } await new Promise((resolve) => setTimeout(resolve, 25)); } return false; })()`);
+            if (!terminalChoice) throw new Error("Project actions did not expose Open terminal.");
+            const terminalReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-terminal-inspector input[aria-label="Terminal command"]') && document.querySelector('.coding-terminal-inspector button')) return true; await new Promise((resolve) => setTimeout(resolve, 50)); } return false; })()`);
+            if (!terminalReady) throw new Error("Open terminal did not show a command runner in the project workspace panel.");
+            const command = process.platform === "win32" ? "Write-Output terminal-ui-smoke" : "printf terminal-ui-smoke";
+            await cdp.evaluateWith(function (value) { const input = document.querySelector('.coding-terminal-inspector input[aria-label="Terminal command"]'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); }, command);
+            await clickButtonText(cdp, "Run command", ".coding-terminal-inspector");
+            const terminalResult = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const result = document.querySelector('.coding-terminal-inspector .terminal-result'); if (result?.innerText.includes('terminal-ui-smoke')) return result.innerText; await new Promise((resolve) => setTimeout(resolve, 100)); } return null; })()`);
+            if (!terminalResult || !terminalResult.includes('exit 0')) throw new Error(`The project terminal did not return a successful bounded command result: ${JSON.stringify(terminalResult)}`);
+            if (process.env.UI_MATRIX_CAPTURE === "1") {
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(captureDirectory, "coding-terminal-1440.png"), Buffer.from(screenshot.data, "base64"));
+            }
+            console.log(`[coding-project-terminal] ${JSON.stringify({ preflight: "read-only", command, result: terminalResult.trim() })}`);
+            await clickInRenderer(cdp, 'button[aria-label="Close project panel"]');
+            await cdp.evaluate(`document.querySelector('.project-preflight button')?.click(); 1`);
+            await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-coding']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return 1; })()`);
+          }
+          if (exerciseCodingPanels && ((width === 1440 && height === 900) || (width === 390 && height === 844))) {
+            const compactCodingPanels = width < 640;
             const singlePane = await cdp.evaluate(`(() => { const grid = document.querySelector('.coding-session-grid.is-chat'); const main = document.querySelector('.project-thread-panel'); const side = document.querySelector('.coding-project-browser'); const addSplit = document.querySelector('.coding-split-launcher button[aria-label="Add to split"]'); return { splitOpen: grid?.classList.contains('is-split-open') ?? true, columns: grid && getComputedStyle(grid).gridTemplateColumns, mainWidth: main?.getBoundingClientRect().width ?? 0, sideDisplay: side && getComputedStyle(side).display, addSplit: Boolean(addSplit), launcherWidth: addSplit?.getBoundingClientRect().width ?? 0, launcherText: addSplit?.textContent?.trim() ?? '' }; })()`);
-            if (singlePane.splitOpen || !singlePane.addSplit || singlePane.launcherWidth < 90 || singlePane.launcherText !== "Add to split" || singlePane.sideDisplay !== "none" || singlePane.mainWidth < 800) throw new Error(`A Coding Agent project should start as a full-width main chat with an optional split control: ${JSON.stringify(singlePane)}`);
+            if (singlePane.splitOpen || !singlePane.addSplit || singlePane.launcherWidth < (compactCodingPanels ? 60 : 90) || singlePane.launcherText !== "Add to split" || singlePane.sideDisplay !== "none" || singlePane.mainWidth < (compactCodingPanels ? 250 : 800)) throw new Error(`A Coding Agent project should start as a full-width main chat with an optional split control: ${JSON.stringify(singlePane)}`);
             const splitLauncher = await cdp.evaluate(`document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')?.click(); true`);
             const sideChatChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const choice = [...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((item) => item.textContent.trim() === 'Side chat'); if (choice) { choice.click(); return true; } await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
             if (!splitLauncher || !sideChatChoice) throw new Error("Could not add Side chat from the optional split control.");
@@ -471,7 +732,8 @@ async function main() {
             const panelTabs = await cdp.evaluate(`([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].map((button) => button.textContent?.trim()))`);
             if (!['Editor', 'Files', 'Side chat', 'Changes'].every((tab) => panelTabs.some((label) => label.startsWith(tab)))) throw new Error(`The split should expose Side chat, Editor, Files, and Changes as separate pages: ${JSON.stringify(panelTabs)}`);
             const pageGroups = await cdp.evaluate(`(() => { const shell = document.querySelector('.workspace-tabs-hotkeys.is-coding-split'); const main = shell?.querySelector(':scope > .workspace-tab-strip')?.getBoundingClientRect(); const side = shell?.querySelector(':scope > .coding-secondary-tab-group')?.getBoundingClientRect(); const rect = (value) => value && ({ x: value.x, y: value.y, width: value.width, height: value.height, right: value.right }); return { shellClass: shell?.className, display: shell && getComputedStyle(shell).display, columns: shell && getComputedStyle(shell).gridTemplateColumns, main: rect(main), side: rect(side), sideTabs: shell?.querySelectorAll('.coding-secondary-tab-group .workspace-tab').length ?? 0 }; })()`);
-            const pageGroupsReady = pageGroups.main && pageGroups.side && pageGroups.main.width > 250 && pageGroups.side.width > 250 && Math.abs(pageGroups.main.y - pageGroups.side.y) < 2 && pageGroups.main.right <= pageGroups.side.x + 2;
+            const pageGroupMinimum = compactCodingPanels ? 95 : 250;
+            const pageGroupsReady = pageGroups.main && pageGroups.side && pageGroups.main.width > pageGroupMinimum && pageGroups.side.width > pageGroupMinimum && Math.abs(pageGroups.main.y - pageGroups.side.y) < 2 && pageGroups.main.right <= pageGroups.side.x + 2;
             if (!pageGroupsReady) throw new Error(`The main thread and right workspace pages are not managed as two aligned tab groups: ${JSON.stringify(pageGroups)}`);
             const tabActions = await cdp.evaluate(`(async () => {
               const list = document.querySelector('.workspace-tabs-hotkeys > .workspace-tab-strip .workspace-tab-list');
@@ -516,7 +778,7 @@ async function main() {
               if (process.env.UI_MATRIX_CAPTURE !== "1") return;
               fs.mkdirSync(captureDirectory, { recursive: true });
               const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
-              fs.writeFileSync(path.join(captureDirectory, `coding-panel-${name}-1440.png`), Buffer.from(screenshot.data, "base64"));
+              fs.writeFileSync(path.join(captureDirectory, `coding-panel-${name}-${width}.png`), Buffer.from(screenshot.data, "base64"));
             };
             const selectPanel = async (label) => {
               const selected = await cdp.evaluateWith(function (expected) { const button = [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].find((item) => item.textContent?.trim().startsWith(expected)); if (!button) return false; button.click(); return true; }, label);
@@ -536,6 +798,49 @@ async function main() {
             const sideDraftWorks = await cdp.evaluate(`document.querySelector('.coding-side-chat textarea')?.value === 'Review the project architecture' && !document.querySelector('.coding-side-chat button[type="submit"]')?.disabled`);
             if (!sideDraftWorks) throw new Error("Side chat did not accept a focused subagent instruction.");
             await capturePanel("side-chat");
+            if (exerciseSideChat && width === 1440 && height === 900) {
+              await sideChatServerReady;
+              const sideChatConfigured = await cdp.evaluateWith(async function (endpoint) {
+                const request = (method, params) => window.skaiAgent.request(method, params);
+                const settings = await request("settings.save", { provider: "Local API", endpoint, model: "revision4-sidechat-fixture" });
+                if (!settings.ok) return { error: settings.error?.message ?? "Could not configure isolated Side chat fixture." };
+                return { ok: true };
+              }, sideChatEndpoint);
+              if (sideChatConfigured?.error || !sideChatConfigured?.ok) throw new Error(`Could not configure isolated Side chat execution: ${sideChatConfigured?.error ?? JSON.stringify(sideChatConfigured)}`);
+              await cdp.send("Page.reload", { ignoreCache: true });
+              const codingReadyAfterReload = await cdp.evaluate(`(async () => { for (let i = 0; i < 120; i++) { if (window.skaiAgent && document.querySelector('.coding-side-chat textarea[aria-label="Message the Coding side chat"]') && document.querySelector('.project-thread-panel .chat-page.is-coding-agent')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()`);
+              if (!codingReadyAfterReload) throw new Error("Coding workspace did not restore the Side chat and main thread after loading the isolated fixture model settings.");
+              await cdp.evaluate(`(() => { const sideChatTab = [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].find((button) => button.textContent?.trim().startsWith('Side chat')); sideChatTab?.click(); const field = document.querySelector('.coding-side-chat textarea[aria-label="Message the Coding side chat"]'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, 'Inspect README.md and report what the starter project is for.'); field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); return Boolean(field); })()`);
+              const actualSideChatDraft = await cdp.evaluate(`document.querySelector('.coding-side-chat textarea')?.value === 'Inspect README.md and report what the starter project is for.' && !document.querySelector('.coding-side-chat button[type="submit"]')?.disabled`);
+              if (!actualSideChatDraft) throw new Error("Side chat could not prepare the model-backed workflow after loading the isolated fixture settings.");
+              await clickButtonText(cdp, "Send task", ".coding-side-chat");
+              const sideTask = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const response = await window.skaiAgent.request('tasks.list'); const task = response.ok ? response.result.find((item) => item.title === 'Side chat · Inspect README.md and report what the starter project is for.') : null; if (task && task.status !== 'draft') return { id: task.id, status: task.status }; await new Promise((resolve) => setTimeout(resolve, 100)); } const response = await window.skaiAgent.request('tasks.list'); const settings = await window.skaiAgent.request('settings.get'); return { error: true, tasks: response.ok ? response.result.map((item) => ({ title: item.title, status: item.status, error: item.resultSummary })) : response, settings: settings.ok ? settings.result : settings, panel: document.querySelector('.coding-side-chat')?.innerText, draft: document.querySelector('.coding-side-chat textarea')?.value, composer: document.querySelector('.project-thread-panel .chat-composer')?.innerText ?? null, alerts: [...document.querySelectorAll('[role="alert"]')].map((item) => item.innerText) }; })()`);
+              if (sideTask?.error || !sideTask?.id) throw new Error(`Submitting the Side chat composer did not create and queue its project-scoped task: ${JSON.stringify(sideTask)}`);
+              const completedSideTask = await cdp.evaluateWith(async function (taskId) {
+                for (let i = 0; i < 200; i++) {
+                  const response = await window.skaiAgent.request("tasks.list");
+                  const task = response.ok ? response.result.find((item) => item.id === taskId) : null;
+                  if (task && ["completed", "failed", "blocked", "cancelled"].includes(task.status)) return task;
+                  await new Promise((resolve) => setTimeout(resolve, 100));
+                }
+                return null;
+              }, sideTask.id);
+              if (completedSideTask?.status !== "completed" || !completedSideTask.resultSummary?.includes("inspected README.md successfully")) throw new Error(`The isolated Side chat task did not complete with its model result: ${JSON.stringify(completedSideTask)}`);
+              if (sideChatRequests !== 2 || sideChatServerProblem) throw new Error(`The isolated Side chat fixture did not complete the read-then-summary workflow: ${JSON.stringify({ requests: sideChatRequests, problem: sideChatServerProblem })}`);
+              const sideTaskState = await cdp.evaluateWith(async function (summary, taskId) {
+                for (let i = 0; i < 40; i++) {
+                  const panel = document.querySelector('.coding-side-chat');
+                  const mainThread = document.querySelector('.project-thread-panel .chat-page.is-coding-agent');
+                  if (panel?.innerText.toLowerCase().includes("completed") && panel.innerText.includes(summary) && mainThread?.innerText.includes("Review this project structure")) return { visible: true };
+                  await new Promise((resolve) => setTimeout(resolve, 100));
+                }
+                const response = await window.skaiAgent.request("tasks.list");
+                return { visible: false, projectId: document.querySelector('.coding-project-heading-actions select')?.value, panel: document.querySelector('.coding-side-chat')?.innerText ?? null, mainThreadFound: Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent')), mainThread: document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText?.slice(0, 240) ?? null, task: response.ok ? response.result.find((item) => item.id === taskId) ?? null : response };
+              }, completedSideTask.resultSummary, sideTask.id);
+              if (!sideTaskState?.visible) throw new Error(`The completed Side chat result did not appear alongside the still-visible main Coding Agent thread: ${JSON.stringify(sideTaskState)}`);
+              await capturePanel("side-chat");
+              console.log(`[coding-side-chat] ${JSON.stringify({ status: completedSideTask.status, requests: sideChatRequests, changedFiles: completedSideTask.changedFiles, summary: completedSideTask.resultSummary })}`);
+            }
             await selectPanel("Editor");
             const readmeButton = await cdp.evaluate(`([...document.querySelectorAll('.coding-project-browser.is-editor-panel .project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)`);
             if (!readmeButton) throw new Error("The inline project file tree did not show the seeded README.md.");
@@ -711,8 +1016,80 @@ async function main() {
           const settled = await cdp.evaluateWith(async function (pending) { for (let i = 0; i < 60; i++) { if (!document.body.innerText.includes(pending)) return true; await new Promise((r) => setTimeout(r, 100)); } return !document.body.innerText.includes(pending); }, route === "memory" ? "Loading memory…" : "Loading Marketplace…");
           if (!settled) console.warn(`[capture] #/${route} remained in its loading state after 6 seconds; checking the connected native feature.`);
         }
+        if (route === "memory" && process.env.UI_MATRIX_EXERCISE_MEMORY === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          const noteText = "I prefer clear, practical workflow summaries with the next action stated first.";
+          const noteEntered = await cdp.evaluateWith(function (value) { const input = document.querySelector('textarea[aria-label="Memory content"]'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return true; }, noteText);
+          if (!noteEntered) throw new Error("Memory did not expose its explicit note editor.");
+          await clickButtonText(cdp, "Save memory", ".memory-editor");
+          const noteSaved = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.memory-entry')].some((entry) => entry.innerText.includes('clear, practical workflow summaries'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!noteSaved) throw new Error("Saving an explicit memory note did not add it to the saved-memory list.");
+          for (const supportingNote of ["Project context should stay scoped to its workspace.", "Use a friendly, direct tone."]) {
+            const entered = await cdp.evaluateWith(function (value) { const input = document.querySelector('textarea[aria-label="Memory content"]'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return true; }, supportingNote);
+            if (!entered) throw new Error("Memory did not accept the supporting reference notes.");
+            await clickButtonText(cdp, "Save memory", ".memory-editor");
+            const noteVisible = await cdp.evaluateWith(async function (value) { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.memory-entry')].some((entry) => entry.innerText.includes(value))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; }, supportingNote);
+            if (!noteVisible) throw new Error(`The supporting memory note was not saved: ${supportingNote}`);
+          }
+          await cdp.evaluate(`(() => { const entry = [...document.querySelectorAll('.memory-entry')].find((item) => item.innerText.includes('clear, practical workflow summaries')); entry?.querySelector('button')?.click(); return Boolean(entry); })()`);
+          const selectedNote = await cdp.evaluate(`(() => ({ value: document.querySelector('textarea[aria-label="Memory content"]')?.value, editing: Boolean(document.querySelector('.memory-entry.is-editing')), title: document.querySelector('.memory-editor-heading')?.innerText }))()`);
+          if (selectedNote.value !== noteText || !selectedNote.editing || !selectedNote.title?.includes('EDIT NOTE')) throw new Error(`Selecting the saved memory did not restore it to the editor: ${JSON.stringify(selectedNote)}`);
+          const referenceDirectory = path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4");
+          fs.mkdirSync(referenceDirectory, { recursive: true });
+          await cdp.evaluate(`(() => { for (const element of document.querySelectorAll('*')) if (element.scrollTop) element.scrollTop = 0; if (document.scrollingElement) document.scrollingElement.scrollTop = 0; window.scrollTo(0, 0); return 1; })()`);
+          let screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+          fs.writeFileSync(path.join(referenceDirectory, "evidence-memory-note-1440.png"), Buffer.from(screenshot.data, "base64"));
+          await cdp.evaluate(`([...document.querySelectorAll('.memory-view-tabs button')].find((button) => button.textContent.includes('Document corpus'))?.click(), 1)`);
+          const corpusReady = await cdp.evaluate(`Boolean(document.querySelector('input[aria-label="Document title"]') && document.querySelector('input[aria-label="Document source"]'))`);
+          if (!corpusReady) throw new Error("Memory did not open its separate document-corpus view.");
+          const corpusFilled = await cdp.evaluate(`(() => { const set = (selector, value, prototype) => { const input = document.querySelector(selector); if (!input) return false; Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return true; }; return set('input[aria-label="Document title"]', 'Workflow acceptance notes', HTMLInputElement.prototype) && set('input[aria-label="Document source"]', 'Revision 4 smoke fixture', HTMLInputElement.prototype) && set('textarea[aria-label="Document content"]', 'Keep the saved workflow note distinct from the local document corpus.', HTMLTextAreaElement.prototype); })()`);
+          if (!corpusFilled) throw new Error("The separate document-corpus form could not accept its local fixture.");
+          await clickButtonText(cdp, "Add document", ".corpus-panel");
+          const corpusSaved = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.corpus-list .memory-entry')].some((entry) => entry.innerText.includes('Workflow acceptance notes'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!corpusSaved) throw new Error("Adding the explicit local document did not show it in the corpus list.");
+          const corpusSearchSet = await cdp.evaluate(`(() => { const input = document.querySelector('input[aria-label="Search document corpus"]'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Workflow acceptance'); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+          if (!corpusSearchSet) throw new Error("The document corpus did not expose its search field.");
+          const corpusSearchWorks = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.corpus-list .memory-entry')].some((entry) => entry.innerText.includes('Workflow acceptance notes'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!corpusSearchWorks) throw new Error("Searching the local document corpus did not return the matching document.");
+          await cdp.evaluate(`(() => { const input = document.querySelector('input[aria-label="Search document corpus"]'); if (!input) return; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+          await cdp.evaluate(`(() => { for (const element of document.querySelectorAll('*')) if (element.scrollTop) element.scrollTop = 0; if (document.scrollingElement) document.scrollingElement.scrollTop = 0; window.scrollTo(0, 0); return 1; })()`);
+          screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+          fs.writeFileSync(path.join(referenceDirectory, "evidence-memory-corpus-1440.png"), Buffer.from(screenshot.data, "base64"));
+          await cdp.evaluate(`document.querySelector('.corpus-list .memory-entry button')?.click()`);
+          const corpusRemoved = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.corpus-panel')?.innerText.includes('No local documents')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!corpusRemoved) throw new Error("Removing the explicit local document did not clear it from the corpus.");
+          console.log(`[memory-workflow] ${JSON.stringify({ notesSaved: 3, selectedForEdit: true, documentSaved: true, documentSearch: true, documentRemoved: true, noteText })}`);
+        }
         if (process.env.UI_MATRIX_CAPTURE === "1" && route === "images") {
           await cdp.evaluate(`(async () => { for (let i = 0; i < 300; i++) { const status = document.querySelector('.visuals-runtime-settings .status-badge')?.textContent?.trim().toLowerCase(); if (status && status !== 'checking') return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+        }
+        if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT_BASE === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          const selectedThread = await cdp.evaluate(`(() => { const row = [...document.querySelectorAll('.sidebar-history-row')].find((item) => item.innerText.includes('Plan a simple herb garden')); row?.querySelector('.sidebar-history-item')?.click(); return Boolean(row); })()`);
+          if (!selectedThread) throw new Error("The shared-shell smoke could not find its seeded everyday conversation.");
+          const threadReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.chat-message.assistant')?.innerText.includes('Start with basil, thyme, and parsley')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!threadReady) throw new Error("Selecting the seeded recent conversation did not open its everyday Chat thread.");
+          const shellState = await cdp.evaluate(`({ active: document.querySelector('.sidebar-history-row.is-active .sidebar-history-item')?.innerText, title: document.querySelector('.chat-heading-copy strong')?.innerText, messages: document.querySelectorAll('.chat-message').length, composer: Boolean(document.querySelector('.composer-card textarea')), rail: Boolean(document.querySelector('.global-rail[aria-label="Global navigation"]')), recent: document.querySelectorAll('.sidebar-history-row').length })`);
+          if (!shellState.active?.includes('Plan a simple herb garden') || !shellState.title?.includes('Plan a simple herb garden') || shellState.messages < 2 || !shellState.composer || !shellState.rail || shellState.recent < 4) throw new Error(`The shared-shell and everyday Chat state was incomplete: ${JSON.stringify(shellState)}`);
+          const referenceDirectory = path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4");
+          fs.mkdirSync(referenceDirectory, { recursive: true });
+          let screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+          fs.writeFileSync(path.join(referenceDirectory, "evidence-shared-workspace-shell-1440.png"), Buffer.from(screenshot.data, "base64"));
+          fs.writeFileSync(path.join(referenceDirectory, "evidence-everyday-chat-thread-1440.png"), Buffer.from(screenshot.data, "base64"));
+          await clickInRenderer(cdp, ".new-chat-button");
+          const startReady = await cdp.evaluate(`(() => { const buttons = [...document.querySelectorAll('.chat-start-actions button')]; return Boolean(document.querySelector('.chat-start-screen h2') && buttons.length === 2 && buttons.every((button) => { const r = button.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(button).display !== 'none'; }) && document.querySelector('.composer-card textarea')); })()`);
+          if (!startReady) throw new Error("New chat did not show the project/model shortcuts and composer together.");
+          screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+          fs.writeFileSync(path.join(referenceDirectory, "evidence-new-chat-and-workspace-start-1440.png"), Buffer.from(screenshot.data, "base64"));
+          await clickInRenderer(cdp, ".chat-start-actions button:nth-child(1)");
+          const projectShortcut = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.project-directory-page')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!projectShortcut) throw new Error(`Open a project did not navigate from the new-chat start screen to Projects: ${JSON.stringify(await cdp.evaluate(`({ page: document.querySelector('.feature-page')?.className, title: document.querySelector('.chat-heading-copy strong')?.innerText, action: document.querySelector('.chat-start-actions button')?.innerText })`))}`);
+          await clickInRenderer(cdp, ".global-rail-destinations button[aria-label='Home']");
+          const returnedToStart = await cdp.evaluate(`Boolean(document.querySelector('.chat-start-screen h2'))`);
+          if (!returnedToStart) throw new Error("Returning from Projects did not restore the empty Chat start screen.");
+          await cdp.evaluate(`document.querySelector('.chat-start-actions button:nth-child(2)')?.click(); 1`);
+          const modelShortcut = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.models-page')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!modelShortcut) throw new Error(`Choose a model did not navigate from the new-chat start screen to Model Library: ${JSON.stringify(await cdp.evaluate(`({ page: document.querySelector('.feature-page')?.className, title: document.title, actions: document.querySelector('.chat-start-actions')?.innerText })`))}`);
+          await clickInRenderer(cdp, ".global-rail-destinations button[aria-label='Home']");
+          console.log(`[chat-base] ${JSON.stringify({ shell: "active conversation and persistent navigation", newChat: "project and model shortcuts", projectShortcut, modelShortcut, ...shellState })}`);
         }
         if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT === "1") {
           const activeChatClass = await cdp.evaluate(`document.querySelector('.chat-page')?.className ?? ''`);
@@ -794,6 +1171,34 @@ async function main() {
             const groundedState = await cdp.evaluate(`({ thread: document.querySelector('.chat-layout')?.innerText ?? '', attachments: [...document.querySelectorAll('.chat-message.user')].flatMap((message) => [...message.querySelectorAll('.attachment-list')].map((item) => item.innerText)).join(' ') })`);
             if (!groundedState.thread.includes("12,480") || !groundedState.thread.includes("5.6%") || !groundedState.thread.includes("Plan.pdf") || !groundedState.thread.includes("Results.xlsx") || !groundedState.attachments.includes("Plan.pdf") || !groundedState.attachments.includes("Results.xlsx")) throw new Error(`The document-grounded Chat reference state did not restore both attachments, outcomes, and source names: ${JSON.stringify(groundedState)}`);
           }
+          if (process.env.UI_MATRIX_EXERCISE_DOCUMENTS_COMPOSER === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            await cdp.evaluate(`(() => { const target = document.querySelector('.composer-card'); if (!target) return false; const transfer = new DataTransfer(); transfer.items.add(new File(['Local workflow fixture: delivery met all targets.'], 'Revision4-Workflow.txt', { type: 'text/plain' })); target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer })); return true; })()`);
+            const dropped = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.attachment-list-composer')?.innerText.includes('Revision4-Workflow.txt')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!dropped) throw new Error("Dropping the local text fixture did not attach it to the Chat composer.");
+            await cdp.evaluate(`(() => { const input = document.querySelector('.composer-card textarea'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'Based only on this attached workflow note, summarize the result.'); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await clickInRenderer(cdp, 'button[aria-label="Add to message"]');
+            await clickInRenderer(cdp, '[role="menuitemcheckbox"]');
+            await clickInRenderer(cdp, 'button[aria-label="Add to message"]');
+            const documentsOnlyChecked = await cdp.evaluate(`document.querySelector('[role="menuitemcheckbox"]')?.getAttribute('aria-checked') === 'true'`);
+            if (!documentsOnlyChecked) throw new Error("The Documents-only composer option did not remain checked after selection.");
+            await clickInRenderer(cdp, 'button[aria-label="Add to message"]');
+            const prepared = await cdp.evaluate(`(() => { const mode = document.querySelector('[role="menuitemcheckbox"]'); const send = document.querySelector('.composer-send-button[aria-label="Send message"]'); return { mode: mode?.getAttribute('aria-checked'), chip: document.querySelector('.composer-docs-chip')?.innerText ?? '', attachment: document.querySelector('.attachment-list-composer')?.innerText ?? '', prompt: document.querySelector('.composer-card textarea')?.value ?? '', sendEnabled: Boolean(send && !send.disabled) }; })()`);
+            if (!prepared.chip.includes("Docs only") || !prepared.attachment.includes("Revision4-Workflow.txt") || !prepared.prompt.includes("attached workflow note") || !prepared.sendEnabled) throw new Error(`Documents-only composer preparation was incomplete: ${JSON.stringify(prepared)}`);
+            if (process.env.UI_MATRIX_CAPTURE === "1") {
+              await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-chat', '.chat-column', '.message-list']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return true; })()`);
+              await sleep(120);
+              fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-chat-documents-composer-1440.png"), Buffer.from(screenshot.data, "base64"));
+            }
+            await clickInRenderer(cdp, 'button[aria-label="Remove Revision4-Workflow.txt"]');
+            await cdp.evaluate(`(() => { const input = document.querySelector('.composer-card textarea'); if (input) { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true })); } return true; })()`);
+            await clickInRenderer(cdp, 'button[aria-label="Add to message"]');
+            await clickInRenderer(cdp, '[role="menuitemcheckbox"]');
+            const cleanDraft = await cdp.evaluate(`!document.querySelector('.attachment-list-composer') && !document.querySelector('.composer-docs-chip')`);
+            if (!cleanDraft) throw new Error("The document composer smoke did not clean up its local fixture draft.");
+            console.log(`[documents-composer] ${JSON.stringify(prepared)}`);
+          }
         }
         if (route === "chat" && process.env.UI_MATRIX_EXERCISE_VOICE === "1") {
           await clickInRenderer(cdp, 'button[aria-label="Start voice mode"]');
@@ -815,6 +1220,35 @@ async function main() {
           const voiceSessionClosed = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (!document.querySelector('[aria-modal="true"] #voice-mode-title')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!voiceSessionClosed) throw new Error("End voice mode did not close the local voice session.");
         }
+        if (route === "chat" && process.env.UI_MATRIX_EXERCISE_OMNIMODAL === "1" && width === 1440 && height === 900) {
+          await clickInRenderer(cdp, 'button[aria-label="Add to message"]');
+          const menu = await cdp.evaluate(`document.querySelector('[role="menu"][aria-label="Add to message"]')?.innerText ?? ''`);
+          for (const label of ["Files and folders", "Audio file", "Documents only", "Voice input", "Voice Mode"]) {
+            if (!menu.includes(label)) throw new Error(`The chat add menu omitted ${label}: ${JSON.stringify(menu)}`);
+          }
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-chat-omnimodal-menu-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await clickInRenderer(cdp, 'button[aria-label="Add to message"]');
+          if (await cdp.evaluate(`Boolean(document.querySelector('[role="menu"][aria-label="Add to message"]'))`)) throw new Error("The chat add menu did not close after the second toggle.");
+          console.log(`[chat-omnimodal] ${JSON.stringify({ menuItems: ["Files and folders", "Audio file", "Documents only", "Voice input", "Voice Mode"] })}`);
+        }
+        if (route === "usage" && process.env.UI_MATRIX_EXERCISE_SETTINGS_OVERLAY === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          await clickInRenderer(cdp, '.global-rail button[aria-label="Settings"]');
+          const settingsOverlayReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.usage-page') && document.querySelector('.settings-overlay [role="dialog"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!settingsOverlayReady) throw new Error("Settings did not open as a modal over the Usage page.");
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-settings-over-usage-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
+          await clickInRenderer(cdp, '.settings-overlay button[aria-label="Close settings"]');
+          const usageRestored = await cdp.evaluate(`Boolean(document.querySelector('.usage-page') && !document.querySelector('.settings-overlay'))`);
+          if (!usageRestored) throw new Error("Closing Settings did not return to the Usage page.");
+          console.log(`[usage-settings-overlay] ${JSON.stringify({ modalOverUsage: true, returnToUsage: true })}`);
+        }
         const states = route === "settings" ? settingsCategories : [null];
         for (const category of states) {
           if (category) {
@@ -824,6 +1258,9 @@ async function main() {
           }
           if (route === "coding" && width < 640) {
             await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-coding', '.coding-session-grid', '.project-thread-panel .message-list']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return 1; })()`);
+          }
+          if (((route === "marketplace" && exerciseMcpReview) || (route === "chat" && process.env.UI_MATRIX_EXERCISE_OMNIMODAL === "1")) && width === 1440 && height === 900) {
+            await cdp.evaluate(`(() => { window.scrollTo(0, 0); document.querySelectorAll('*').forEach((element) => { if (element.scrollTop) element.scrollTop = 0; if (element.scrollLeft) element.scrollLeft = 0; }); return true; })()`);
           }
           const issues = await cdp.evaluate(PROBE);
           if (process.env.UI_MATRIX_LAYOUT_DEBUG === "1" && width < 640) {
@@ -893,6 +1330,14 @@ main().catch((error) => { console.error(error.message); process.exitCode = 1; })
   if (taskProgressServer) {
     taskProgressServer.closeAllConnections();
     await new Promise((resolve) => taskProgressServer.close(() => resolve()));
+  }
+  if (sideChatServer) {
+    sideChatServer.closeAllConnections();
+    await new Promise((resolve) => sideChatServer.close(() => resolve()));
+  }
+  if (mcpReviewServer) {
+    mcpReviewServer.closeAllConnections();
+    await new Promise((resolve) => mcpReviewServer.close(() => resolve()));
   }
   if (process.platform === "win32" && child.pid) {
     const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });

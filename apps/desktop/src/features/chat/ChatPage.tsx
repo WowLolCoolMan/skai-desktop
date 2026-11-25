@@ -5,42 +5,16 @@ import { Button, Card } from "../../components/ui/Primitives";
 import { ModalDialog } from "../../components/ui/ModalDialog";
 import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { ModelPicker } from "../../components/ui/ModelPicker";
-import { ChatMessage } from "./ChatMessage";
+import { ChatMessageList } from "./ChatMessageList";
+import { ChatThreadActivity } from "./ChatThreadActivity";
 import { ChatComposer } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";
 import { ChatSchedulesPanel } from "./ChatSchedulesPanel";
 import type { ChatResponseMode, ConversationImportPreview } from "./useChatWorkspace";
-import { loadChatDraft, saveChatDraft } from "./chatDraftStore";
+import { useChatDraft } from "./useChatDraft";
 import { ChatCapacityPopover } from "./ChatCapacityPopover";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
-const CHAT_SCROLL_KEY_PREFIX = "skai.chat.scroll.";
-const CHAT_DRAFT_KEY_PREFIX = "skai.chat.draft.";
-const LEGACY_CHAT_DRAFT_KEY = "skai.chat.draft";
-
-function chatScrollKey(conversationId: string | null) {
-  return `${CHAT_SCROLL_KEY_PREFIX}${conversationId ?? "new"}`;
-}
-
-function chatDraftKey(tabId: string) {
-  return `${CHAT_DRAFT_KEY_PREFIX}tab.${tabId}`;
-}
-
-function readChatDraft(tabId: string, conversationId: string | null) {
-  const scopedKey = chatDraftKey(tabId);
-  const scoped = localStorage.getItem(scopedKey);
-  if (scoped !== null) return scoped;
-  const legacyKey = `${CHAT_DRAFT_KEY_PREFIX}${conversationId ?? "new"}`;
-  const legacy = localStorage.getItem(legacyKey) ?? localStorage.getItem(LEGACY_CHAT_DRAFT_KEY);
-  if (legacy !== null) {
-    localStorage.setItem(scopedKey, legacy);
-    if (legacyKey !== scopedKey) localStorage.removeItem(legacyKey);
-    localStorage.removeItem(LEGACY_CHAT_DRAFT_KEY);
-    return legacy;
-  }
-  return "";
-}
-
 type ChatPageProps = {
   workspaceTabId: string;
   capacity: LocalCapacitySnapshot | null;
@@ -94,10 +68,7 @@ type ChatPageProps = {
 
 export function ChatPage({ workspaceTabId, capacity, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onQueue, onRemoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onTaskAction, onOpenFile, onExport, onPreviewImport, onApplyImport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onTransitionScheduledTask, workspaceMode = "conversation", onNewWorkspaceTab }: ChatPageProps) {
   const selectedModel = models.find((item) => item.model === model);
-  const [draft, setDraft] = useState(() => readChatDraft(workspaceTabId, conversationId));
-  const latestDraftRef = useRef(draft);
-  const updateDraft = (value: string) => { latestDraftRef.current = value; setDraft(value); };
-  const [draftPersistenceWarning, setDraftPersistenceWarning] = useState<string | null>(null);
+  const { draft, updateDraft, persistenceWarning: draftPersistenceWarning } = useChatDraft(workspaceTabId, conversationId, attachments, onSetAttachments);
   const [documentsOnly, setDocumentsOnly] = useState(false);
   const [temporaryChat, setTemporaryChat] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState<number | null>(null);
@@ -112,101 +83,10 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const [showCodingWorkflowTools, setShowCodingWorkflowTools] = useState(false);
   const [showConversationDetails, setShowConversationDetails] = useState(false);
   const [showProjectTaskPlanner, setShowProjectTaskPlanner] = useState(false);
-  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const messageListRef = useRef<HTMLDivElement>(null);
-  const previousConversationIdRef = useRef(conversationId);
-  const restoreScrollPendingRef = useRef(false);
-  const stickToLatestRef = useRef(true);
-  const draftTabRef = useRef(workspaceTabId);
-  const draftHydrationRef = useRef("");
-  const latestAttachmentsRef = useRef(attachments);
-  latestAttachmentsRef.current = attachments;
   const threadTasks = tasks.filter((task) => task.conversationId === conversationId);
-  useEffect(() => {
-    if (draftTabRef.current !== workspaceTabId) {
-      draftTabRef.current = workspaceTabId;
-      draftHydrationRef.current = "";
-      const tabDraft = readChatDraft(workspaceTabId, conversationId);
-      latestDraftRef.current = tabDraft;
-      setDraft(tabDraft);
-      onSetAttachments([]);
-    }
-    let active = true;
-    const startingDraft = readChatDraft(workspaceTabId, conversationId);
-    void loadChatDraft(workspaceTabId).then((record) => {
-      if (!active || draftTabRef.current !== workspaceTabId) return;
-      const restoredDraft = localStorage.getItem(chatDraftKey(workspaceTabId)) ?? record?.draft ?? latestDraftRef.current;
-      if (latestDraftRef.current === startingDraft) updateDraft(restoredDraft);
-      if (record) onSetAttachments(record.attachments);
-      draftHydrationRef.current = workspaceTabId;
-      localStorage.setItem(chatDraftKey(workspaceTabId), restoredDraft);
-      void saveChatDraft({ tabId: workspaceTabId, draft: restoredDraft, attachments: record?.attachments ?? latestAttachmentsRef.current, updatedAt: Date.now() }).then((saved) => {
-        if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
-      });
-    });
-    return () => { active = false; };
-  // Hydrate only when the workspace tab changes. Draft/attachment edits are persisted below.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceTabId]);
-  useEffect(() => {
-    localStorage.setItem(chatDraftKey(workspaceTabId), draft);
-    if (draftHydrationRef.current !== workspaceTabId) return;
-    const timer = window.setTimeout(() => {
-      void saveChatDraft({ tabId: workspaceTabId, draft: latestDraftRef.current, attachments: latestAttachmentsRef.current, updatedAt: Date.now() }).then((saved) => {
-        if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
-      });
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [draft, workspaceTabId]);
-  useEffect(() => {
-    if (draftHydrationRef.current !== workspaceTabId) return;
-    void saveChatDraft({ tabId: workspaceTabId, draft: latestDraftRef.current, attachments, updatedAt: Date.now() }).then((saved) => {
-      if (draftTabRef.current === workspaceTabId) setDraftPersistenceWarning(saved ? null : "This draft could not be saved locally. It may be too large or local storage may be unavailable.");
-    });
-  }, [attachments, workspaceTabId]);
   useEffect(() => { if (!renameOpen) setRenameDraft(conversationTitle); }, [conversationTitle, renameOpen]);
   useEffect(() => { setDocumentsOnly(false); }, [conversationId]);
-  useEffect(() => {
-    const key = chatScrollKey(conversationId);
-    return () => { localStorage.setItem(key, String(Math.max(0, Math.round(messageListRef.current?.scrollTop ?? 0)))); };
-  }, [conversationId]);
-  useEffect(() => {
-    const node = messageListRef.current;
-    if (!node) return;
-    const updateScrollState = () => {
-      const distanceFromLatest = node.scrollHeight - node.scrollTop - node.clientHeight;
-      const atLatest = distanceFromLatest < 56;
-      stickToLatestRef.current = atLatest;
-      setShowJumpToLatest(!atLatest && node.scrollHeight > node.clientHeight + 12);
-    };
-    node.addEventListener("scroll", updateScrollState, { passive: true });
-    updateScrollState();
-    return () => node.removeEventListener("scroll", updateScrollState);
-  }, [messages.length > 0]);
-  useEffect(() => {
-    const conversationChanged = previousConversationIdRef.current !== conversationId;
-    if (conversationChanged) {
-      previousConversationIdRef.current = conversationId;
-      restoreScrollPendingRef.current = true;
-    }
-    if (conversationChanged || restoreScrollPendingRef.current) {
-      restoreScrollPendingRef.current = false;
-      const saved = Number(localStorage.getItem(chatScrollKey(conversationId)) ?? "0");
-      const top = Number.isFinite(saved) ? Math.max(0, saved) : 0;
-      window.requestAnimationFrame(() => { if (messageListRef.current) messageListRef.current.scrollTop = top; });
-      return;
-    }
-    if (!stickToLatestRef.current) return;
-    window.requestAnimationFrame(() => { if (messageListRef.current) messageListRef.current.scrollTo({ top: messageListRef.current.scrollHeight, behavior: "smooth" }); });
-  }, [conversationId, messages.length, busy]);
-
-  const jumpToLatest = () => {
-    stickToLatestRef.current = true;
-    setShowJumpToLatest(false);
-    messageListRef.current?.scrollTo({ top: messageListRef.current.scrollHeight, behavior: "smooth" });
-  };
-
   const sendDraft = (text: string) => {
     onSend(text, attachments, documentsOnly, false, temporaryChat);
     updateDraft("");
@@ -281,12 +161,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const isCodingAgent = workspaceMode === "project" || responseMode === "coding";
   const activeTaskCount = threadTasks.filter((task) => task.status === "running" || task.status === "verifying").length;
   const queuedTaskCount = threadTasks.filter((task) => task.status === "queued").length;
-  const attentionTaskCount = threadTasks.filter((task) => task.status === "failed" || task.status === "blocked").length;
-  const approvalTaskCount = threadTasks.filter((task) => task.status === "awaiting_approval").length;
   const changedFileCount = new Set(threadTasks.flatMap((task) => task.changedFiles ?? [])).size;
-  const currentThreadTasks = threadTasks.filter((task) => ["queued", "running", "verifying", "awaiting_approval", "failed", "blocked"].includes(task.status));
-  const earlierThreadTasks = threadTasks.filter((task) => !currentThreadTasks.includes(task));
-  const renderThreadTask = (task: typeof threadTasks[number]) => <article className={`thread-run-card thread-run-${task.status}`} key={task.id}><div className="thread-run-heading"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>{task.resultSummary && <p>{task.resultSummary}</p>}{(task.changedFiles?.length || task.artifactLabels?.length) ? <div className="thread-run-files">{(task.changedFiles?.length ? task.changedFiles : task.artifactLabels ?? []).map((file) => <code key={file}>{file}</code>)}</div> : null}<div className="thread-run-actions">{["queued", "running", "verifying"].includes(task.status) && <Button variant="ghost" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "cancel")}>Stop</Button>}{["failed", "blocked"].includes(task.status) && <Button variant="secondary" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "retry")}>Retry</Button>}{task.status === "completed" && <Button variant="secondary" type="button" onClick={() => { const file = task.changedFiles?.[0]; if (file && workspaceMode === "project") onOpenFile(file); onNavigate("coding"); }}>{task.changedFiles?.length ? "Review first file" : "Review changes"}</Button>}</div></article>;
   return <div className={`feature-page chat-page ${workspaceMode === "project" ? "project-task-chat" : ""} ${isCodingAgent ? "is-coding-agent" : ""}`}>
     <div className="chat-context-bar">
       <div className="chat-heading-copy"><p className="section-kicker">{temporaryChat ? "TEMPORARY CHAT" : isCodingAgent ? "CODING AGENT" : "CHAT"}</p><strong>{conversationId ? conversationTitle : isCodingAgent ? "New coding thread" : "New chat"}</strong>{temporaryChat && <small className="chat-temporary-indicator">Temporary</small>}<span>{temporaryChat ? "This conversation won’t appear in Recents." : `Saved on this device · ${provider}`}</span></div>
@@ -301,18 +176,15 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
     <div className={`chat-layout${messages.length === 0 ? " is-start-screen" : ""}${showCodingWorkflowTools ? " has-chat-tools" : ""}${showConversationDetails ? " has-chat-details" : ""}`}>
       <main className="chat-column">
         <section className="conversation-surface" aria-label="Conversation">
-          {currentThreadTasks.length > 0 && <details className="thread-run-current" open={currentThreadTasks.length === 1 || activeTaskCount > 0}>
-            <summary><strong>Task activity</strong><span>{[activeTaskCount ? `${activeTaskCount} active` : "", queuedTaskCount ? `${queuedTaskCount} queued` : "", approvalTaskCount ? `${approvalTaskCount} awaiting approval` : "", attentionTaskCount ? `${attentionTaskCount} need attention` : ""].filter(Boolean).join(" · ") || `${currentThreadTasks.length} open`}</span></summary>
-            <div className="thread-run-current-list">{currentThreadTasks.map(renderThreadTask)}</div>
-          </details>}
-          {earlierThreadTasks.length > 0 && <details className="thread-run-history"><summary><strong>Earlier tasks · {earlierThreadTasks.length}</strong><span>Plans and past runs</span></summary><div>{earlierThreadTasks.map(renderThreadTask)}</div></details>}
+          <ChatThreadActivity tasks={threadTasks} taskBusy={taskBusy} workspaceMode={workspaceMode} onTaskAction={onTaskAction} onOpenFile={onOpenFile} onNavigate={onNavigate} />
           {messages.length === 0 ? (
             <div className="chat-empty-surface"><section className="chat-start-screen">
               <img src={SKAI_WOLF_ICON} alt="" /><p className="section-kicker">{isCodingAgent ? "CODING AGENT" : "SKAI DESKTOP"}</p>
               <h2>{isCodingAgent ? "What should the coding agent work on?" : "What would you like to work on?"}</h2><p>{isCodingAgent ? "Describe a change or ask the agent to inspect this project." : "Describe a task or ask a question to get started."}</p>
+              {!isCodingAgent && <div className="chat-start-actions"><button type="button" onClick={() => onNavigate("projects")}><strong>Open a project</strong><span>Choose a folder and work with its files.</span></button><button type="button" onClick={() => onNavigate("models")}><strong>Choose a model</strong><span>Review models available on this computer.</span></button></div>}
             </section></div>
           ) : (
-            <><div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={index} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>{showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>Jump to latest ↓</Button></div>}</>
+            <ChatMessageList conversationId={conversationId} messages={messages} busy={busy} model={model} copiedMessage={copiedMessage} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />
           )}
         </section>
         {workspaceMode === "project" ? <div className="project-task-planner-slot" hidden={!showProjectTaskPlanner}><ChatTaskComposer expanded={showProjectTaskPlanner} onExpand={() => setShowProjectTaskPlanner(true)} showToggle={false} busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment, requiresApproval) => onPlanTask(title, instruction, environment, conversationId, requiresApproval)} /></div> : showCodingWorkflowTools && <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment, requiresApproval) => onPlanTask(title, instruction, environment, conversationId, requiresApproval)} />}

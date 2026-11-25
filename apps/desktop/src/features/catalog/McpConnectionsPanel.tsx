@@ -115,10 +115,6 @@ export function McpConnectionsPanel({
                 <span><b>Tools</b>{tools.length} discovered</span>
                 <span><b>Access</b>Explicit approval per call</span>
               </div>
-              {tools.length === 0 ? <p className="plugins-tool-empty">No live tool manifest. Refresh health while the server is connected to inspect its current tools.</p> : <div className="plugins-tool-groups">
-                <ToolReviewGroup title="Read-only tools" tools={readTools} access="Read approval" onRun={(tool) => reviewCall(connection, tool)} />
-                <ToolReviewGroup title="Mutating tools" tools={writeTools} access="Write approval" mutating onRun={(tool) => reviewCall(connection, tool)} />
-              </div>}
               {draft?.connection.connectionId === connection.connectionId && <section className="plugins-tool-call" aria-label="Review MCP tool call">
                 <div className="plugins-tool-call-heading">
                   <div><p className="section-kicker">REVIEW TOOL CALL</p><h4>{draft.tool.toolName}</h4></div>
@@ -135,6 +131,10 @@ export function McpConnectionsPanel({
                   {callBusy ? "Running…" : draft.tool.isMutating ? "Approve write and run" : "Approve read and run"}
                 </Button>
               </section>}
+              {tools.length === 0 ? <p className="plugins-tool-empty">No live tool manifest. Refresh health while the server is connected to inspect its current tools.</p> : <div className="plugins-tool-groups">
+                <ToolReviewGroup title="Read-only tools" tools={readTools} access="Read approval" onRun={(tool) => reviewCall(connection, tool)} />
+                <ToolReviewGroup title="Mutating tools" tools={writeTools} access="Write approval" mutating onRun={(tool) => reviewCall(connection, tool)} />
+              </div>}
               <p className="plugins-approval-boundary">Listing a tool only shows untrusted server metadata. Skai still requires an explicit approval grant when a tool is called.</p>
             </div>}
           </div>;

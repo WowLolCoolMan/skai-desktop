@@ -5,7 +5,93 @@ handoffs and temporary screenshot paths. The live Electron artifact and the
 automated acceptance scripts are authoritative; this document only summarizes
 what they cover.
 
+## Revision 4 focused continuation — 2026-11-25
+
+- References #27–28 now have fresh packaged captures and workflow checks. The
+  Voice Workbench comparison exposed that its clip list was visually buried
+  beside setup cards; the selected profile, clip search, and Add audio clips
+  control now lead a compact eight-row list. The isolated smoke filters clips,
+  keeps duplicate file names distinct, previews each local WAV, reloads from
+  IndexedDB, and removes one duplicate. Memory now uses the reference's
+  saved-list-left/editor-right order. The packaged UI flow saves three notes,
+  selects and restores one for editing, adds a document to its separate corpus,
+  and removes it. That flow caught disconnected corpus actions; save/search/
+  remove now use the local native protocol. Captures:
+  `evidence-voice-workbench-clips-1440.png`,
+  `evidence-memory-note-1440.png`, and
+  `evidence-memory-corpus-1440.png`. Chat and Coding panels also passed a
+  fresh 390×844 packaged pass with zero runtime/layout findings; mobile captures
+  confirm the main thread stays above the optional side panel and Monaco.
+  Desktop typecheck, production build, and Electron packaging passed. The build
+  still reports its existing large-JavaScript-chunk warning.
+- References #1–3 now have packaged 1440×900 shared-shell, active-thread, and
+  new-chat captures. The empty Chat start screen has compact Open a project and
+  Choose a model actions; packaged interaction checks verified Projects and
+  Model Library navigation. The smoke also confirms an active recent
+  conversation, persistent navigation rail, four recent chats, and a reachable
+  composer. The visible actions exposed a stale CSS rule hiding their container;
+  the final shell cascade now keeps the actions visible.
+- Reference #18 now passes with the actual installed `qwen3:14b` runtime. The
+  packaged Model Library smoke inspects its Ollama/local availability, captures
+  the settled selection state, and applies it to Chat. The separate
+  `npm run smoke:documents-only` run passed real local inference, cited both
+  attachments, and matched all three expected outcomes. Voice acceptance also
+  passed Windows speech plus local Piper synthesis. #22's isolated packaged
+  Marketplace profile did not settle its local inventory refresh in the
+  focused packaged capture. The page now shows a matching checking state
+  instead of an empty inventory while it refreshes. Installed Piper/Kokoro
+  voice details remain unverified in that package profile, although host
+  synthesis works. The focused model matrix passed at all five window sizes;
+  screenshot: `evidence-model-installed-1440.png`.
+- `npm run smoke:electron:ui-matrix` completed for Models with no runtime
+  errors. The broad Revision 4 visual comparison remains in progress. #17 has
+  core GitHub service code but no desktop Agent Host/renderer bridge for device
+  authorization, repository listing, or clone/open; an isolated repository and
+  scoped test authorization will also be needed after that workflow is wired.
+
 ## Targeted Revision 4 continuity pass — 2026-11-24
+
+- Continued workflow acceptance through references #23 and #26–28. The
+  packaged MCP review UI connected a disposable loopback server, displayed a
+  read-only tool, accepted reviewed JSON, required explicit approval, and
+  returned the fixture result. That pass found a narrow inspector; the
+  connection summary and inspector now stack, with the pending review above
+  the tool list. The composer menu smoke verifies file/folder, audio, document
+  only, dictation, and Voice Mode actions; the packaged fake-microphone session
+  reaches local listening and ends cleanly. PDF validation, Voice Workbench
+  clip persistence/removal, and Memory lifecycle smokes passed. Evidence and
+  the #22 isolated-voice-inventory limitation are in the Revision 4 README.
+  Desktop typecheck, production build, Electron package, and the focused #23
+  and #26 packaged matrices passed. The build retains its existing large-JS
+  chunk warning. The #22 installed-profile preview remains blocked by the
+  isolated test profile's empty Piper/Kokoro inventory; real host synthesis
+  was independently verified. References #27–28 passed their clip and Memory
+  lifecycle smokes; #29 Usage and all 13 Settings categories passed desktop
+  layout review. The Settings route passed all five viewport sizes and four
+  theme/sidebar variants. A packaged workflow check opens Settings over Usage,
+  captures the centered dialog, closes it, and asserts the Usage page returns. #30 Pets
+  passed companion/visibility/customization/return interactions, and #31
+  remains correctly marked planned. The scoped GitHub credentials/repository
+  (#17) and installed-voice inventory (#22) remain open. Reference #18's actual
+  local model selection/inference now passes; see the current continuation note
+  above and Revision 4 evidence.
+
+- Reference #5 now has direct composer coverage in addition to the existing
+  result-state and model-backed inference checks. The packaged UI smoke drops
+  a local text attachment, enters a grounded prompt, selects Documents-only,
+  verifies the checked state and enabled Send action, captures the prepared
+  composer, then cleans up its draft. Visual inspection found file contents
+  squeezed into the 42px attachment thumbnail; the preview now uses a compact
+  file-type mark and leaves the filename/type readable. Typecheck, production
+  build, Electron packaging, and the Chat matrix (five viewport sizes × four
+  theme/sidebar variants) passed. References #9 and #10 also passed focused
+  390×844 workflows: task progress and Stop from the Activity drawer, and
+  opening the mobile sidebar to select a conversation and save a weekly schedule
+  from Details. Both mobile flows passed the layout probe without clipping or
+  horizontal overflow. Reference #12's Create project dialog and listed-project
+  open flow also pass at 390×844; direct mobile native folder-picker coverage
+  remains open, and the persistent project shell is recorded as a visual
+  variation from that standalone-page reference.
 
 - References #13–15 now have paired packaged desktop evidence. #13 captures
   the project Coding Agent thread beside Monaco. #14 captures a side-by-side
@@ -18,8 +104,11 @@ what they cover.
   index without disturbing unrelated staged changes. Typecheck, production
   build, Electron packaging, native core checks, and focused 1440×900 Coding
   and Git smokes passed with no renderer errors. The #14 flow also passed at
-  390×844 with no page overflow; mobile Git review and references #16–30
-  remain open.
+  390×844 with no page overflow. After the compact shell fix, the 390×844
+  Coding thread/editor flow also passed with the full project sidebar in its
+  drawer and the split panes stacked in a scrollable workspace; Monaco, file
+  search, Save, Undo, and the main thread stayed reachable. Mobile Git review
+  and references #16–30 remain open.
 
 - Refined Images against references #24–25. Generate and Edit are the two
   primary modes, secondary ComfyUI tools are under More tools, and the local
@@ -174,6 +263,10 @@ what they cover.
 - Packaged Chat and Coding checks passed at 390×844. The active Coding
   project flow was checked at that size after the editor workspace was scrolled
   internally; there was no page-level horizontal overflow or clipped control.
+  A later mobile matrix exposed an older desktop sidebar selector winning over
+  the compact Chat hide rule; the sidebar now stays out of the content grid
+  until the user opens navigation. Chat and the Coding split panels pass the
+  390×844 packaged rerun.
 - Chat's seeded history search, task-tools visibility toggle, and import-menu
   availability passed. Coding's edit → compare → save → undo flow passed at
   desktop and mobile sizes. Persona selection/start-conversation and Pet
@@ -193,6 +286,20 @@ what they cover.
   Voice Workbench, Memory/corpus, and Usage/Settings.
 - Confirm local model-backed generation against a responsive local runtime;
   UI rendering alone does not verify inference. Keep Video future-only.
+- Revision 4 #16 now has its own packaged 1440×900 Terminal workspace capture.
+  A selected-project run showed Setup preflight and Files & Diffs beside the
+  command runner; read-only preflight did not execute the fixture script, and
+  the explicit bounded command returned exit 0. #19's Ollama download review
+  was opened for `qwen3:8b` and cancelled without starting a download.
+- #17 GitHub live-account acceptance remains blocked on an isolated test
+  repository and scoped test credential/device authorization. #18's selected
+  model state remains unverified because the local Ollama inventory is empty.
+- #20's packaged Persona smoke selected Release Engineer and started its own
+  conversation; #21's Discover smoke searched/selects Qwen3.6-27B and checked
+  its availability, license, publisher, and local adapter details. Marketplace
+  host acceptance returned 63 model results across six providers without a
+  package download. Captures and limitations are recorded in the Revision 4
+  README. Persona and Pet pages remain separate.
 - Finish keyboard/focus, screen-reader, theme, and user-perceived visual
   review. The automated package checks do not establish spoken assistive
   technology behavior.
@@ -457,9 +564,8 @@ and cross-platform acceptance.
 - Replaced the Coding `Side chat +` global-tab switch with a persistent project
   workspace that keeps the main Coding Agent thread visible and provides a
   second, independently managed right-side page group. The current right pages
-  are Editor, Side chat, and Changes; the project-file tree is inside Editor.
-  Revision 4 shows Files as a separate page, so that exact layout still needs
-  review before this workflow can be marked as reference-matched.
+  are Editor, Files, Side chat, and Changes. Files is a peer page; selecting a
+  file opens it in Monaco while the main chat remains mounted.
 - Side chat submits a project-scoped Coding task to the existing local task
   queue/executor, displays its status/result, supports stopping active work,
   and links changed files back into Monaco. Changes without a Git repository
@@ -468,11 +574,45 @@ and cross-platform acceptance.
 - Added `UI_MATRIX_EXERCISE_CODING_PANELS=1` to the packaged Electron matrix.
   The focused 1440×900 flow switched the right-side pages, asserted the main
   chat remained visible, accepted a Side chat draft, opened `README.md` in
-  Monaco, and exercised save/undo and Changes. Captures show the two top-level
+  Monaco, and exercised save/undo, Files, and Changes. Captures show the two top-level
   tab groups aligned in one row. `npm run desktop:typecheck`, `npm run build`,
   `npm run package:electron`, and the packaged UI matrix passed; the matrix
   covered 20 routes × five window sizes × four theme/sidebar variants.
-- Remaining acceptance: implement Files as a peer page per the user-provided
-  Revision 4 examples, exercise a Side chat task with an isolated model fixture,
-  run the right-page states at mobile widths, and compare captures against the
-  supplied references. See the Revision 4 README for images and scope.
+- Extracted Chat thread activity/history, message timeline/scroll behavior, and
+  per-tab draft hydration/persistence from `ChatPage.tsx` into two focused
+  components and a hook. Packaged Chat/Coding smoke, typecheck, production
+  build, and Electron packaging passed after the refactor. The Chat task-history
+  disclosure now has clear spacing, and the Monaco editor receives more of the
+  right pane while clipping long code lines to its viewport.
+- Moved Coding file-tab restoration/persistence, active-file recovery, keyboard
+  navigation, reorder, and close behavior from `CodingSessionView` into
+  `useCodingFileTabs`. The packaged project-editor and project-browser bridge
+  smokes passed, as did focused desktop/mobile Coding panel smokes and the full
+  packaged matrix (20 routes × 5 sizes × 4 theme/sidebar variants).
+- A subsequent full layout run passed 20 routes × five window sizes × four
+  theme/sidebar variants. The dedicated overflow smoke then exposed that the
+  Recent Projects header button had inherited the 24px width intended for its
+  neighboring plus button. After separating those CSS selectors, overflow
+  acceptance passed 11 routes × five viewport widths. Accessibility smoke
+  covered 16 routes with zero WCAG violations; symbol-only decorative contrast
+  checks remain incomplete in axe. The desktop/mobile secondary-page smoke now
+  passes. The next packaged Coding workflow test exercised Side chat end to end
+  against an isolated Local API fixture: submit from the Side chat composer,
+  read the seeded `README.md`, complete with a model summary, and show that
+  result while the main Coding Agent thread remains mounted. This exposed a
+  task-start error when unknown model size/context metadata was sent as JSON
+  `null`; the composer now omits those optional numeric fields unless a model
+  provides a number. Desktop typecheck, production build, Electron packaging,
+  and the focused packaged workflow passed. The refreshed capture is linked in
+  the Revision 4 README. Visual continuity review for references #16–30 remains
+  open.
+- Reference #16 workflow testing passed: `smoke:project-terminal`,
+  `smoke:task-journal`, and the focused packaged Coding flow detected the
+  fixture manifest/runtime, confirmed suggested checks remained unrun, and
+  returned a successful explicitly entered command with bounded output and
+  Windows isolation status. The first parallel run of the two host builds hit a
+  transient shared compiler-output lock; both tests passed when run without
+  concurrent builds. Screenshot comparison found a remaining visual mismatch:
+  the app uses a narrow Terminal drawer and separate preflight card, while
+  reference #16 shows a dedicated terminal workspace with Preflight and Files
+  & Diffs together. Keep #16 open for layout continuity; next reference is #17.

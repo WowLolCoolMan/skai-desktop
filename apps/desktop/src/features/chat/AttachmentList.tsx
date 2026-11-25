@@ -17,10 +17,6 @@ function attachmentKind(attachment: ChatAttachment) {
 
 function attachmentPreview(attachment: ChatAttachment) {
   if (isImage(attachment) && attachment.content) return <img src={`data:${attachment.mediaType};base64,${attachment.content}`} alt="" />;
-  if (attachment.content && !attachment.fileName.toLowerCase().endsWith(".pdf")) {
-    const snippet = attachment.content.replace(/\s+/g, " ").trim().slice(0, 96);
-    if (snippet) return <span className="attachment-snippet">{snippet}{attachment.content.length > 96 ? "…" : ""}</span>;
-  }
   return <span className="attachment-file-mark">{attachment.fileName.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE"}</span>;
 }
 

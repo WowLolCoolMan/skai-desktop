@@ -110,6 +110,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   const [installedModels, setInstalledModels] = useState<Array<{ model: string; vision: string; capabilities: string[]; provider?: string; endpoint?: string | null }>>([]);
   const [installedConnections, setInstalledConnections] = useState<Array<{ connectionId: string; serverId: string; transport: string; state: string }>>([]);
   const [selectedInstalledId, setSelectedInstalledId] = useState<string | null>(null);
+  const [installedCategory, setInstalledCategory] = useState("All");
   const [pinnedItems, setPinnedItems] = useState<string[]>(() => marketplacePreference("installed.pinned", []));
   const [installedPersonas, setInstalledPersonas] = useState<DesktopPersona[]>([]);
   const [installedInventoryError, setInstalledInventoryError] = useState<string | null>(null);
@@ -117,6 +118,7 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   const [installedError, setInstalledError] = useState<string | null>(null);
   const [installedActionBusy, setInstalledActionBusy] = useState(false);
   const [installedActionStatus, setInstalledActionStatus] = useState<string | null>(null);
+  const [installedVoicePreviewStatus, setInstalledVoicePreviewStatus] = useState<string | null>(null);
   const [mcpMarketplaceBusy, setMcpMarketplaceBusy] = useState(false);
   const [mcpMarketplaceStatus, setMcpMarketplaceStatus] = useState<string | null>(null);
   const [imageAssets, setImageAssets] = useState<Array<{ repository: string; downloads: number; files: Array<{ path: string; sizeBytes: number }> }>>([]);
@@ -347,6 +349,20 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     ...installedImageAssets.map((item) => ({ id: `asset:${item.id}`, name: item.id, detail: `${item.repository} · ${formatSize(item.sizeBytes)}`, state: "installed", icon: "image" as NavIconName, source: item.repository, requirements: formatSize(item.sizeBytes), nextStep: "Remove this local image asset or restart image generation to use it.", remove: () => void removeImageAsset(item.id) })),
   ];
   const selectedInstalled = installedRecords.find((item) => item.id === selectedInstalledId) ?? installedRecords[0] ?? null;
+  const selectedInstalledVoiceId = selectedInstalled?.id.startsWith("voice:") ? selectedInstalled.id.slice("voice:".length) : null;
+  const selectedInstalledVoice = selectedInstalledVoiceId ? installedVoiceModels.find((voice) => voice.id === selectedInstalledVoiceId) ?? null : null;
+  const previewInstalledVoice = async () => {
+    if (!selectedInstalledVoice) return;
+    const previousSettings = selectedVoiceSettings();
+    saveVoiceSetting("primaryModelId", selectedInstalledVoice.id);
+    setInstalledVoicePreviewStatus(`Playing ${selectedInstalledVoice.name}…`);
+    try {
+      const played = await speakNativeResponse(`Skai voice preview. ${selectedInstalledVoice.name} is ready for local playback.`, true);
+      setInstalledVoicePreviewStatus(played ? `${selectedInstalledVoice.name} preview finished.` : `${selectedInstalledVoice.name} could not be previewed on this device.`);
+    } finally {
+      saveVoiceSetting("primaryModelId", previousSettings.primaryModelId);
+    }
+  };
 
   const sectionCategory: Partial<Record<Section, Filter>> = { Models: "Local models", Voices: "Voices", "Image workflows": "Image workflows", Skills: "Skills", Tools: "Tools" };
   const visible = useMemo(() => marketplaceItems.filter((item) => {
@@ -641,12 +657,13 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
           <div className="marketplace-installed-layout">
           <div className="marketplace-installed-pane">
             <div className="panel-heading"><div><p className="section-kicker">LOCAL INVENTORY</p><h3>Installed marketplace items</h3><p className="panel-subtitle">Review marketplace downloads, update compatible items, or remove local installs. To update Skai Desktop, open Settings → Updates.</p></div><div className="marketplace-model-actions"><StatusBadge tone={installedError || installedInventoryError ? "warning" : installedLoading ? "neutral" : "success"}>{installedLoading ? "Refreshing" : `${installedModels.length + (catalog?.skills.filter((item) => item.installed).length ?? 0) + (catalog?.voices.filter((item) => item.installed).length ?? 0) + (catalog?.tools.filter((item) => item.builtIn).length ?? 0) + installedImageAssets.length + installedConnections.length + installedPersonas.length} items`}</StatusBadge><Button variant="secondary" disabled={installedLoading} onClick={() => void loadInstalledModels()}>{installedLoading ? "Refreshing…" : "Refresh inventory"}</Button>{onNavigate && <Button variant="ghost" onClick={() => onNavigate("settings")}>Skai app updates · Settings</Button>}</div></div>
-            <label className="marketplace-installed-search"><span className="sr-only">Search installed items</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search installed tools and local items…" aria-label="Search installed items" /></label>
+            <div className="marketplace-installed-filters"><label><span className="sr-only">Filter installed items by category</span><select value={installedCategory} onChange={(event) => setInstalledCategory(event.target.value)} aria-label="Filter installed items by category">{["All", "Models", "Voice profiles", "Skills", "MCP servers", "Skai built-ins", "Personas", "Image assets"].map((category) => <option key={category} value={category}>{category === "All" ? "All installed items" : category}</option>)}</select></label><label className="marketplace-installed-search"><span className="sr-only">Search installed items</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search installed items…" aria-label="Search installed items" /></label></div>
             {(installedError || installedInventoryError) && <div className="marketplace-honesty" role="status">{[installedError, installedInventoryError].filter(Boolean).join(" ")}</div>}
-            {(() => {
+            {installedLoading ? <EmptyState title="Checking installed items" description="Reading models and local marketplace inventory from this computer…" /> : (() => {
               const term = query.trim().toLowerCase();
               const matches = (...values: Array<string | undefined>) => values.join(" ").toLowerCase().includes(term);
               const group = (title: string, rows: Array<{ id: string; name: string; detail: string; state: string; icon: NavIconName; remove?: () => void; health?: () => void }>) => {
+                if (installedCategory !== "All" && installedCategory !== title) return null;
                 const filtered = rows.filter((row) => matches(row.name, row.detail, row.state));
                 if (!filtered.length) return null;
                 return <section className="marketplace-installed-group" key={title}><h4>{title} <span>{filtered.length}</span></h4>{filtered.map((row) => <article className={`marketplace-installed-model${selectedInstalled?.id === row.id ? " is-selected" : ""}`} key={row.id} role="button" tabIndex={0} aria-pressed={selectedInstalled?.id === row.id} onClick={() => setSelectedInstalledId(row.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedInstalledId(row.id); } }}><span className="marketplace-installed-model-icon"><NavIcon name={row.icon} /></span><div className="marketplace-installed-model-copy"><strong>{row.name}</strong><small>{row.detail}</small></div><StatusBadge tone={row.state === "limited" ? "warning" : "success"}>{row.state}</StatusBadge></article>)}</section>;
@@ -667,9 +684,10 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
             <div className="marketplace-detail-heading"><div><p className="section-kicker">INSTALLED ITEM</p><h3>{selectedInstalled.name}</h3></div><StatusBadge tone={selectedInstalled.state === "limited" ? "warning" : "success"}>{selectedInstalled.state}</StatusBadge></div>
             <p>{selectedInstalled.detail}</p>
             <dl className="marketplace-detail-list"><div><dt>Source</dt><dd>{selectedInstalled.source}</dd></div><div><dt>Requirements</dt><dd>{selectedInstalled.requirements}</dd></div><div><dt>Next step</dt><dd>{selectedInstalled.nextStep}</dd></div></dl>
+            {selectedInstalled.id.startsWith("voice:") && <div className="marketplace-installed-voice-status" aria-label={`${selectedInstalled.name} availability`}><div><strong>Local runtime</strong><span>{selectedInstalledVoice ? "Available" : "Unavailable"}</span></div><div><strong>Local voice/model data</strong><span>{selectedInstalledVoice?.installed ? "Available" : "Unavailable"}</span></div><div><strong>Local playback</strong><span>{selectedInstalledVoice ? "Available" : "Unavailable"}</span></div><div className="marketplace-voice-actions"><Button variant="primary" disabled={!selectedInstalledVoice} onClick={() => void previewInstalledVoice()} aria-label={`Preview ${selectedInstalled.name} voice`}>Preview voice</Button><Button variant="ghost" onClick={stopNativeSpeech}>Stop</Button></div>{installedVoicePreviewStatus && <p role="status">{installedVoicePreviewStatus}</p>}</div>}
             {installedActionStatus && selectedInstalled.id.startsWith("model:") && <p className="marketplace-honesty" role="status">{installedActionStatus}</p>}
             <div className="marketplace-model-actions">{selectedInstalled.health && <Button variant="secondary" onClick={selectedInstalled.health}>Check health</Button>}{selectedInstalled.update && <Button variant="secondary" disabled={installedActionBusy} onClick={selectedInstalled.update}>{installedActionBusy ? "Updating…" : "Update"}</Button>}{selectedInstalled.remove && <Button variant="danger" disabled={installedActionBusy} onClick={selectedInstalled.remove}>{installedActionBusy ? "Working…" : "Remove"}</Button>}<Button variant="ghost" aria-pressed={pinnedItems.includes(selectedInstalled.id)} onClick={() => setPinnedItems((current) => current.includes(selectedInstalled.id) ? current.filter((id) => id !== selectedInstalled.id) : [...current, selectedInstalled.id])}>{pinnedItems.includes(selectedInstalled.id) ? "Unpin" : "Pin"}</Button></div>
-          </aside> : <aside className="marketplace-detail marketplace-installed-inspector"><EmptyState title="No installed items" description="Installed inventory will appear here when a local runtime or catalog item is available." /></aside>}
+          </aside> : <aside className="marketplace-detail marketplace-installed-inspector"><EmptyState title={installedLoading ? "Checking installed items" : "No installed items"} description={installedLoading ? "The inventory is still being read from this computer." : installedRecords.length ? "Select an installed item to review its local details and available actions." : "Installed inventory details will appear here when a local runtime or catalog item is available."} /></aside>}
           </div>
         ) : (
           <>

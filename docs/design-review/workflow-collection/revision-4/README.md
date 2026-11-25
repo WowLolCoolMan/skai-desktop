@@ -25,17 +25,36 @@ The designs apply those familiar navigation and review patterns to Skai's docume
 - Video is a future page concept only. Generate and Edit are marked as planned; no video editing or generation controls are shown as working features.
 - No old sample brand, unsupported A/B comparison page, fake model capabilities, past scheduled dates, or contradictory runtime states are part of the final set.
 
+### Shared workspace shell and start — references #1–3
+
+The packaged 1440×900 captures pair the persistent shell with a selected
+conversation in [shared-shell evidence](evidence-shared-workspace-shell-1440.png)
+and [everyday Chat evidence](evidence-everyday-chat-thread-1440.png). The
+[new-chat start capture](evidence-new-chat-and-workspace-start-1440.png) keeps
+the familiar composer in place and adds compact **Open a project** and
+**Choose a model** shortcuts below the welcome copy. The packaged smoke opens a
+saved recent conversation, starts a fresh chat, verifies both shortcuts are
+visible, opens Projects, returns to the empty chat, and opens Model Library.
+Both navigation paths passed. New conversations and Model Library are covered
+by their dedicated workflow sections below; the basic empty Chat state stays
+simple, with the extra entry points limited to the start screen.
+
 ## Implementation review status — 2026-11-24
 
 The current packaged app has been checked at 1440×900 across 20 routes in dark
-and light themes with the workspace sidebar expanded and collapsed. The matrix
-reported no renderer errors or layout failures. A 390×844 pass covered Chat
-and Coding with no page-level horizontal overflow or clipped controls. Chat
-search/task-tools/import-menu checks and the Coding Agent edit → compare → save
-→ undo flow passed; the latter also passed at 390×844 after the workspace was
-made to scroll internally. Persona Workshop and Pet Workshop remain separate
-routes and their selection/customization flows have separate smoke coverage.
-The Video page remains a planned concept.
+and light themes with the workspace sidebar expanded and collapsed. The full
+matrix passed at five window sizes and four theme/sidebar variants, with no
+renderer errors or layout failures. The dedicated overflow check passed 11
+routes at five widths, and accessibility smoke passed 16 routes with zero WCAG
+violations. At 390×844, Chat and the Coding Agent thread/editor workflow pass
+without horizontal overflow or unreachable controls. Coding's optional split
+stacks into a scrollable mobile workspace; the editor, file tree, Save, and Undo
+remain reachable. Desktop and mobile panel switching, file editing, Git review,
+and split close/reopen are exercised. Coding file-tab restore and interaction
+state are separated from the pane renderer and pass the packaged editor and
+browser acceptance smokes. A model-backed Side chat task and the
+#16–30 visual continuity review remain open. Persona Workshop and Pet Workshop
+remain separate routes. The Video page remains a planned concept.
 
 ### Image workflow continuity evidence
 
@@ -70,6 +89,9 @@ inline edit, and verifies assistant Copy, Retry, and Fork actions. Copy now
 falls back to a bounded, main-window-only Electron clipboard bridge when the
 renderer clipboard write is unavailable. The packaged smoke confirms the
 action and Copy confirmation at both sizes, with no matrix layout findings.
+The everyday Chat shell at [390×844](evidence-chat-shell-390.png) and the
+Coding Agent's [single-pane mobile thread](evidence-coding-panel-chat-390.png)
+are captured after correcting the mobile sidebar/content overlap.
 
 The reference labels assistant actions Copy / Retry / Edit. Skai keeps Edit on
 the user's own prompt and offers Fork from here on assistant replies; this
@@ -82,15 +104,17 @@ missing queue or message workflow.
 The packaged result state is captured in
 [document-grounded Chat evidence](evidence-chat-documents-1440.png). The seeded
 thread keeps both attachment names with the user question and shows the answer
-citing `Plan.pdf` and `Results.xlsx`. Separately,
+citing `Plan.pdf` and `Results.xlsx`. The direct composer preparation is
+captured in [composer evidence](evidence-chat-documents-composer-1440.png):
+the smoke drops a local text file, enters a grounded question, enables
+Documents-only, verifies its checked state and Docs only chip, and confirms
+Send is enabled. The thumbnail uses a file-type mark instead of squeezing
+document text into a 42px preview. Separately,
 `npm run smoke:documents-only` passed real local inference with Qwen3 14B using
 two isolated synthetic attachments; it checked the three objective outcomes
-and both source filenames. This is protocol/inference evidence, not proof of
-the composer attachment and Documents-only toggle interaction. The composer
-clears attachments and turns the per-message mode off after send, so the
-result-state capture shows the source documents on the sent turn while the
-composer is ready for the next turn. The direct UI attach → Documents-only →
-send flow remains open for acceptance.
+and both source filenames. Sending clears the attachments and per-message mode
+for the next turn. The packaged UI and local-inference checks cover the
+composer interaction and grounded result separately.
 
 ### Local Voice Mode — reference #6
 
@@ -157,15 +181,18 @@ The packaged interaction smoke checks the live file list, Git status, button
 feedback, and task cancellation. Changed paths persist as each write completes
 instead of appearing only after the task ends. The held-model fixture now
 reaches Cancelled and closes its pending request; both the Agent Host smoke and
-task-progress UI smoke pass. Mobile task-progress behavior remains open.
+task-progress UI smoke pass. The focused 390×844 task-progress flow also
+passes: changed files remain visible in the Activity drawer, Stop cancels the
+fixture, and the mobile overflow probe reports no clipping or horizontal
+scroll.
 This page keeps task review in the
 project's Activity drawer beside the Coding Agent thread rather than navigating
 to a separate task page.
 
-The per-reference pass remains open for mobile task-progress behavior and
-references #16–30. References #13–15 now have packaged desktop captures and
-focused Coding workspace flows; the remaining reference-specific states still
-need comparison and interaction evidence.
+The per-reference visual pass remains open for references #16–30. References
+#13–15 now have packaged desktop captures and focused Coding workspace flows;
+the remaining reference-specific states still need comparison and interaction
+evidence.
 
 ### Schedule from a conversation — reference #10
 
@@ -179,10 +206,11 @@ conversation's schedule list. The schedule stays attached to the conversation
 while its thread and composer remain visible. Revision 4 places the form in the
 main conversation surface; Skai keeps it in the Details rail to preserve thread
 space. The rail was previously hidden by a stale Chat style rule; it now opens
-on desktop and stacks below the conversation on narrow screens. The 390×844
-Chat layout smoke passed after that correction. Mobile schedule interaction
-still needs a direct flow check because the narrow sidebar collapses the seeded
-thread list in the current fixture.
+on desktop and stacks below the conversation on narrow screens. The focused
+390×844 flow opens the mobile navigation drawer, selects the saved conversation,
+opens Details, creates a weekly schedule, and confirms it appears in that
+thread. Selecting the conversation dismisses the drawer, and the matrix reports
+no clipping or horizontal overflow.
 
 ### Standalone scheduled tasks — reference #11
 
@@ -201,7 +229,7 @@ reference. The 1440×900 matrix found no layout or runtime issues.
 
 Packaged 1440×900 captures show the [Create project dialog](evidence-project-create-1440.png) and the [opened project workspace](evidence-project-open-1440.png). The Projects page now puts **Open folder** beside **New project**, searches recent projects by name or path, and lists each project with its folder path. Creating a project asks for a name and one local folder; project settings retain the existing instructions and multi-folder editing controls. The packaged flow checks both entry points, the compact name/folder dialog, and opening a listed project into Coding. On Windows, the real native folder picker was exercised with a temporary fixture, and the project was created and opened. The already-running app showed stale dialog copy; the packaged screenshots and smoke are from the freshly built source.
 
-Reference #12 is still a visual approximation: the persistent workspace sidebar and tabs remain visible around Projects, while the reference shows a standalone full-page surface. Review that shared-shell difference during the remaining continuity pass. Mobile project creation and direct Open folder flow still need focused acceptance.
+Reference #12 is still a visual approximation: the persistent workspace sidebar and tabs remain visible around Projects, while the reference shows a standalone full-page surface. This preserves Skai's common project navigation and workspace tabs, but remains a visible shell difference to check during continuity review. At 390×844, the focused smoke opens and closes the compact Create project dialog, then opens the listed project into Coding. The native Open folder picker was exercised on desktop; its mobile picker flow remains untested.
 
 ### Coding project session — reference #13
 
@@ -238,6 +266,167 @@ panel uses the existing Files workspace in Coding, keeping repository actions
 with the project. At 1440×900 the file list and commit controls stay in a left
 rail beside a large diff pane. Mobile Git review remains open.
 
+### Project terminal and preflight — reference #16
+
+The focused Agent Host smokes passed bounded command execution and read-only
+project preflight. The packaged Coding workflow detected `package.json` and
+Node.js, listed the build command as **Suggested checks (not run)**, and verified
+that preflight did not execute the fixture script. The project terminal then ran
+an explicitly entered command in the selected project and returned exit code 0,
+captured output, and the Windows process-isolation summary. The task-journal
+smoke also passed selected-check result persistence and failure evidence.
+
+Packaged captures: [read-only preflight](evidence-project-preflight-1440.png),
+[command result in the Coding inspector](evidence-project-terminal-1440.png),
+and [the dedicated Terminal workspace](evidence-project-terminal-workspace-1440.png).
+The #16 flow now selects a project, keeps the main command runner beside Setup
+and Files & Diffs, refreshes the project file list, runs read-only preflight,
+and executes one explicit command with exit code 0. The packaged geometry check
+confirmed both columns align with no overlap at 1440×900. The seeded build
+script was not run during preflight. This closes the #16 composition mismatch;
+the command and isolation evidence remain local to a disposable project.
+
+### GitHub repositories — reference #17
+
+The reference calls for a live account repository list, selection, and opening
+the chosen repository as a project. The current desktop-to-Agent Host protocol
+does not expose GitHub device authorization, repository listing, or cloning.
+The core project has device-flow, credential-store, API-client, and workspace
+service code with unit coverage, but these services are not wired to the
+desktop workflow. The visible GitHub controls cover local project changes and
+pull-request creation through the existing CLI session; they do not provide
+the referenced repo picker. Therefore no packaged UI journey exists yet for
+consent denial, repo selection, clone conflict, cancellation, or retry. This
+is a feature/bridge gap in addition to needing an isolated repository fixture;
+see the next step in [the active queue](../../../planning/TO_DO_NEXT.md).
+
+### Local model library and download review — references #18–19
+
+The packaged model page reports the real local inventory. The installed
+`qwen3:14b` model was selected in the inspector, its Ollama runtime and local
+availability were confirmed, and **Use in chat** opened Chat with that model
+selected. The refreshed [selected-model capture](evidence-model-installed-1440.png)
+shows the settled Registry ready state. `npm run smoke:documents-only` also
+passed real local inference with Qwen3 14B, citing both attached files and
+matching all three recorded outcomes. The #19 free-form pull path was tested
+without starting a download: enter `qwen3:8b`, review the local-runtime
+destination and verification limits, then cancel. See [download review
+evidence](evidence-model-download-review-1440.png).
+
+### Persona Workshop — reference #20
+
+The packaged smoke loaded the seeded persona library, selected Release Engineer,
+confirmed its profile details, and started a persona-specific conversation.
+The selected profile is captured in [Persona Workshop evidence](evidence-persona-workshop-1440.png).
+Persona Workshop stays a separate page from Pet Workshop; their data and
+controls are not merged.
+
+### Marketplace discovery — reference #21
+
+The packaged Discover flow searched the local catalog for Qwen3.6-27B,
+selected the listing, and verified that availability, license, publisher,
+capabilities, and the local model adapter guidance appear in the inspector.
+The [selected listing capture](evidence-marketplace-discover-1440.png) shows
+the filtered result and its details. The independent Marketplace host smoke
+returned 63 model results across six providers without downloading model files.
+
+### Installed voices — reference #22
+
+The packaged Installed & updates view opens, but its isolated profile's local
+inventory request was still refreshing when the focused UI smoke captured the
+state. The inventory pane now shows an explicit checking state instead of a
+contradictory empty result; see [Installed voice inventory](evidence-marketplace-installed-voices-1440.png).
+The host's separate voice acceptance test confirms native Windows speech plus
+installed Piper and Kokoro synthesis. The packaged profile has not returned
+those voice profiles for inspection, so #22's selected installed-voice UI
+state remains blocked on the local inventory bridge settling and surfacing
+those runtimes.
+
+### MCP tool review — reference #23
+
+The packaged review flow connected an isolated loopback Streamable HTTP server,
+inspected its read-only `read_garden_plan` tool, reviewed editable JSON
+arguments, explicitly approved the read, and confirmed the result. The host
+protocol smoke separately rejects a write call without a write grant and
+verifies revocation and clean reconnection. The first UI pass exposed a narrow
+inspector caused by a flex row; the server summary and inspector now stack, and
+the pending call review appears before the tool inventory. The focused
+[MCP review capture](evidence-mcp-tool-review-1440.png) and packaged run pass
+without renderer errors. The current connected-state surface is taller than
+the reference and uses an inline review card rather than a standalone pending
+approval queue; the essential review-before-execute boundary matches.
+
+### Local image workflows — references #24–25
+
+The packaged Generate and Edit layouts have [desktop Generate](evidence-image-generate-1440.png),
+[mobile Generate](evidence-image-generate-390.png), and
+[Edit/history](evidence-image-edit-1440.png) evidence. Focused runs cover
+cancellation, local generation, history selection, reopening a result in Edit,
+and a second edit. A real local runtime is required for inference acceptance.
+
+### Omnimodal composer — reference #26
+
+At 1440×900, the packaged Chat smoke opens the add menu and verifies the
+Files and folders, Audio file, Documents only, Voice input, and Voice Mode
+paths; the [menu capture](evidence-chat-omnimodal-menu-1440.png) shows these
+choices in context. The packaged fake-microphone Voice Mode smoke reaches
+“Listening on this device,” checks the visible End control, and closes the
+session; see [Voice Mode evidence](evidence-voice-mode-1440.png). The PDF
+attachment validation smoke rejects malformed content and protected names.
+These checks establish menu and local voice workflow availability; they do not
+exercise a physical microphone turn or every file-picker attachment type.
+
+### Voice Workbench clips — reference #27
+
+The refreshed [Voice Workbench capture](evidence-voice-workbench-clips-1440.png)
+shows the selected profile, clip search, Add audio clips control, and all eight
+fixture rows together. `npm run smoke:voice:workbench` verified profile
+selection, name filtering, two same-named files from different folders,
+decodable local previews, IndexedDB reload, and removing one same-named clip
+without removing its sibling. The smoke uses synthetic audio; it does not rate
+speech quality or claim that a voice-cloning adapter is available.
+
+### Memory and document corpus — reference #28
+
+The saved-note list now sits to the left of the selected note editor, as in the
+reference. The [selected note capture](evidence-memory-note-1440.png) shows
+three explicit notes and the selected note ready to edit. The
+[document-corpus capture](evidence-memory-corpus-1440.png) shows the separate
+corpus view. The packaged UI flow saves three notes, selects and restores one
+in the editor, adds and searches a local document, then removes it. That flow
+exposed that the visible corpus controls had no connected action handlers;
+Save, Search, and Remove now call the existing local corpus protocol.
+`npm run smoke:memory`
+also covers note search, disable, export, and removal. Memory and document
+corpus remain separate from each other and from project context.
+
+### Usage and settings — reference #29
+
+The packaged Usage page shows local activity, runtime capacity, saved model
+mix, and inventory in [Usage evidence](evidence-usage-1440.png). The packaged
+layout matrix visited all 13 Settings categories at 1440×900; the Appearance
+category is shown in [Settings evidence](evidence-settings-appearance-1440.png).
+The focused Usage → Settings flow now verifies that Settings opens as a modal
+over Usage, then returns to Usage when closed. The screenshot is in
+[Settings-over-Usage evidence](evidence-settings-over-usage-1440.png). This
+matches the reference's composition and close/return behavior while keeping
+the app's fuller Settings categories. The Settings route also passes all 13
+categories at five viewport sizes and four theme/sidebar variants.
+
+### Pets Workshop — reference #30
+
+The isolated packaged flow selects a companion, toggles visibility off and
+back on, opens appearance customization, and returns to work. The selected
+profile and separate workshop are shown in [Pets evidence](evidence-pet-workshop-1440.png).
+Persona Workshop remains a different page with its own records and controls.
+
+### Planned Video page — reference #31
+
+The packaged page is explicitly marked **Planned** and says its preview is not
+available; Generate a clip, Edit a timeline, and Export are also marked planned.
+The [Video capture](evidence-video-planned-1440.png) verifies the future-state
+page without presenting video generation or editing as working functionality.
+
 ### Coding workspace panel continuity — user-provided Codex examples
 
 The Coding Agent thread stays mounted on the left while the right workspace
@@ -248,56 +437,62 @@ local Git review state. Side chat starts a Coding task through the existing
 local task queue/executor, and file links in its result return to Monaco.
 
 The current Revision 4 examples also show **Files** as a separate right-side
-page. Skai currently keeps the file tree inside Editor, so that particular
-page-for-page workflow is still an acceptance gap in this audit.
+page. Skai now exposes Files as a peer page beside Editor, Side chat, and
+Changes; selecting a file there opens it in Monaco and keeps the main thread
+mounted.
 
-The packaged panel smoke at 1440×900 verified the three right-side pages,
+The packaged panel smoke at 1440×900 verified all four right-side pages,
 confirmed the main thread remained visible after each switch, typed and enabled
 a Side chat task draft, opened `README.md` in Monaco, and checked the Changes
 surface. Current captures are:
 
 - [Side chat beside the main thread](evidence-coding-panel-side-chat-1440.png)
 - [Editor/Monaco with the project-file tree beside the main thread](evidence-coding-panel-monaco-1440.png)
+- [Files as a separate right-side page](evidence-coding-panel-files-1440.png)
 - [Changes beside the main thread](evidence-coding-panel-changes-1440.png)
+
+The packaged mobile panel pass also has [single-pane Chat](evidence-coding-panel-chat-390.png),
+[Side chat](evidence-coding-panel-side-chat-390.png),
+[Monaco with Files](evidence-coding-panel-monaco-390.png), and
+[Changes](evidence-coding-panel-changes-390.png) captures. The main thread and
+right-side panel stack vertically at 390×844; there is no horizontal overflow.
 
 The full packaged matrix passed 20 routes at five window sizes across dark and
 light themes with expanded and collapsed sidebars, with no runtime errors or
-layout findings. The panel-specific interaction pass is
-desktop-only; mobile panel switching remains open. Side chat’s task composer
-and task-runner connection are implemented, but an isolated model-backed
-subagent execution has not yet been exercised by this panel smoke. Changes
-without a Git repository show an inline status message and can be refreshed
-through Project actions.
+layout findings. After the matrix exposed a clipped Recent Projects section
+label, the sidebar control sizing was corrected and the dedicated overflow
+acceptance passed 11 routes at five viewport widths. The packaged accessibility
+smoke covered 16 routes with zero WCAG violations; four contrast checks for
+symbol-only decorative content remain incomplete because axe cannot determine
+their text contrast. Desktop and 390×844 panel switching preserve the main
+thread. An isolated Local API fixture now verifies the Side chat composer,
+project task execution, README inspection, completed summary, and result card
+beside the main thread; this workflow exposed and fixed omission handling for
+unknown model size/context metadata. Changes without a Git repository show an
+inline status message and can be refreshed through Project actions.
 
 After the Image changes, the packaged layout matrix captured all 20 routes at
 1440×900 in the dark expanded-sidebar state with no renderer or layout findings.
 Focused interaction smokes passed for queueing, search/import, task handoff and
 journal/schedules, project file/terminal flows, Memory, MCP, Marketplace, and
-Voice Workbench. These results do not close the reference-by-reference review:
-the document-grounded composer interaction, Voice Mode, GitHub,
-model download review, and remaining route-specific states still need paired
-screenshots and interaction evidence. See the active acceptance queue for the
-specific model-cache and persona quality limitations.
+Voice Workbench. Additional Revision 4 work now has packaged evidence for
+references #23 and #26–31, including MCP approval, omnmodal attachment choices,
+Voice Mode, Memory, Usage, Pets, and the planned Video destination. The current
+open gaps are #17 GitHub repository browsing/cloning (desktop bridge not wired)
+and #22 voice inventory in the isolated package profile. Reference #18's installed-model
+selection and real local inference now pass. These results
+advance the review but do not close it.
 
 This is route and representative-flow evidence, not proof that every numbered
 image has been matched. Several references describe distinct states within one
-route. Reference #4 now has paired screenshots and interaction evidence.
-Reference #5 has a result screenshot and local-inference evidence, while its
-composer interaction still needs direct packaged UI coverage. References #7
-and #8 now have packaged screenshots and their search/import and local-plan
-flows exercised. The
-remaining
-acceptance work is to capture and compare the other states individually,
-especially Voice
-Mode, task scheduling, schedules, project creation, GitHub, model
-inspection/download review, Marketplace install and voice details, MCP
-approval, image generation/edit history, multimodal attachments, Voice
-Workbench, Memory/document corpus, and Settings/Usage. Do not mark the
-Revision 4 continuity pass complete until those supported journeys have
-specific screenshot and interaction evidence. Local model-backed inference
-must be verified against an available local runtime; a rendered page is not
-inference evidence. See [UI evidence](../../../planning/SKAI_PREMIUM_UI_PROGRESS.md)
-and [the active queue](../../../planning/TO_DO_NEXT.md).
+route. References #4–8, #16, #19–21, #23, and #26–31 now have targeted workflow
+evidence; see the individual notes above and the progress log. Do not mark the
+Revision 4 continuity pass complete until remaining supported journeys have
+paired screenshots and interaction evidence, and the listed environmental
+blockers are resolved. Local model-backed inference must be verified against
+an available local runtime; a rendered page is not inference evidence. See
+[UI evidence](../../../planning/SKAI_PREMIUM_UI_PROGRESS.md) and [the active
+queue](../../../planning/TO_DO_NEXT.md).
 
 ## Image index
 
