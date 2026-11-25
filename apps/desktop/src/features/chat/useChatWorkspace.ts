@@ -41,6 +41,29 @@ function readPreferredModel(slot: "coding" | "rewrite" | "vision", fallback: str
   } catch { return fallback; }
 }
 
+const REWRITE_STOP_WORDS = new Set([
+  "about", "after", "again", "against", "also", "and", "are", "but", "can", "could", "from", "have", "into",
+  "just", "more", "please", "that", "the", "their", "there", "this", "what", "when", "where", "which", "with", "would",
+]);
+
+function rewriteTokens(value: string) {
+  return [...new Set((value.toLocaleLowerCase().match(/[a-z0-9][a-z0-9'_-]*/g) ?? [])
+    .filter((token) => token.length >= 3 && !REWRITE_STOP_WORDS.has(token)))];
+}
+
+function isSubstantiveRewriteCandidate(original: string) {
+  const wordCount = original.split(/\s+/).filter(Boolean).length;
+  return wordCount >= 5 && original.length >= 32;
+}
+
+function rewritePreservesIntent(original: string, candidate: string) {
+  const originalTokens = rewriteTokens(original);
+  if (originalTokens.length === 0) return candidate === original;
+  const candidateText = candidate.toLocaleLowerCase();
+  const overlap = originalTokens.filter((token) => candidateText.includes(token));
+  return overlap.length >= Math.max(2, Math.ceil(originalTokens.length * 0.35));
+}
+
 function readFileAsBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -265,6 +288,12 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       onError("Enter a prompt under 120,000 characters before rewriting it.");
       return null;
     }
+    // Very short drafts are usually questions or references that need the user's
+    // context. Sending them through a local model invites invented intent.
+    if (!isSubstantiveRewriteCandidate(original)) {
+      onError(null);
+      return original;
+    }
     if (!isLocalEndpoint(endpoint)) {
       onError(LOCAL_ENDPOINT_ERROR);
       return null;
@@ -279,7 +308,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const rewriteMessages = [
       {
         role: "system" as const,
-        content: "Rewrite the user's latest draft as a clear, specific, actionable prompt for the selected AI. Preserve the full intent, requested operation, names, paths, examples, constraints, tone, uncertainty, and technical details. Do not add requirements, facts, safety rules, refusals, or claims that work was done. Do not omit content because it is technical or risky. Keep the original language and return only the rewritten prompt. If the draft is already clear, return it unchanged.",
+        content: "Rewrite the user's latest draft as a clear, specific, actionable prompt for the selected AI. Preserve the full intent, requested operation, names, paths, examples, constraints, tone, uncertainty, and technical details. Do not add requirements, facts, safety rules, refusals, or claims that work was done. Do not omit content because it is technical or risky. Keep the original language and return only the rewritten prompt. Never answer the draft, greet the user, or describe yourself as an assistant. If the draft is short, ambiguous, or already clear, return it unchanged.",
       },
       ...context,
       { role: "user" as const, content: original },
@@ -293,7 +322,12 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       if (typeof candidate !== "string" || candidate.trim().length < 2 || candidate.trim().length > 24_000) {
         throw new Error("The model returned an empty or oversized rewrite. Your original draft is unchanged.");
       }
-      return candidate.trim();
+      const normalizedCandidate = candidate.trim();
+      if (!rewritePreservesIntent(original, normalizedCandidate)) {
+        onError(null);
+        return original;
+      }
+      return normalizedCandidate;
     } catch (error) {
       onError(error instanceof Error ? `Prompt rewrite failed. Your original draft is unchanged. ${error.message}` : "Prompt rewrite failed. Your original draft is unchanged.");
       return null;

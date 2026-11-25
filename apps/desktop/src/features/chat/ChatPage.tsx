@@ -101,7 +101,12 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
     else if (smartPromptRewritingEnabled && text) {
       setRewriteBusy(true);
       void onRewritePrompt(text).then((candidate) => {
-        if (candidate) setRewritePreview({ original: text, candidate });
+        if (!candidate) return;
+        // A guarded rewrite returns the original draft for low-context prompts
+        // and unsafe model suggestions. Send it directly instead of opening a
+        // misleading review dialog.
+        if (candidate.trim() === text) sendDraft(text);
+        else setRewritePreview({ original: text, candidate });
       }).finally(() => setRewriteBusy(false));
       return;
     } else { sendDraft(text); return; }
