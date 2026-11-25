@@ -2986,6 +2986,32 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-chat .chat-layout.is-start-screen.has-chat-tools .chat-rail { display: grid; }
 .app-content-chat .chat-layout.has-chat-details { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
 .app-content-chat .chat-layout.has-chat-details .chat-rail { display: grid; }
+.app-content-chat .chat-layout.has-thread-activity .chat-rail { min-width: 0; }
+.app-content-chat .chat-activity-rail { display: grid; align-content: start; gap: 10px; min-width: 0; max-height: calc(100vh - 190px); overflow-y: auto; scrollbar-gutter: stable; padding: 12px; border: 1px solid color-mix(in srgb, var(--skai-color-border-strong) 72%, var(--skai-color-border)); border-radius: var(--skai-radius-xl); background: color-mix(in srgb, var(--skai-color-surface) 86%, transparent); }
+.app-content-chat .chat-activity-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 2px 1px 9px; border-bottom: 1px solid var(--skai-color-border); }
+.app-content-chat .chat-activity-heading > div { display: grid; gap: 3px; min-width: 0; }
+.app-content-chat .chat-activity-heading .section-kicker { margin: 0; font-size: var(--skai-text-3xs); }
+.app-content-chat .chat-activity-heading strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); font-weight: 620; }
+.app-content-chat .chat-activity-heading > span { flex: 0 0 auto; color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-2xs); }
+.app-content-chat .chat-activity-rail .thread-run-current, .app-content-chat .chat-activity-rail .thread-run-history { width: 100%; margin: 0; }
+.app-content-chat .chat-activity-rail .thread-run-current { background: color-mix(in srgb, var(--skai-color-accent) 6%, var(--skai-color-surface-soft)); }
+.app-content-chat .chat-activity-rail .thread-run-current > summary, .app-content-chat .chat-activity-rail .thread-run-history > summary { align-items: flex-start; flex-direction: column; gap: 3px; min-height: 0; padding: 8px 9px; }
+.app-content-chat .chat-activity-rail .thread-run-current > summary strong, .app-content-chat .chat-activity-rail .thread-run-history > summary strong { font-size: var(--skai-text-xs); }
+.app-content-chat .chat-activity-rail .thread-run-current > summary span, .app-content-chat .chat-activity-rail .thread-run-history > summary span { font-size: var(--skai-text-2xs); white-space: normal; }
+.app-content-chat .chat-activity-rail .thread-run-current[open] { max-height: min(48vh, 380px); overflow-y: auto; }
+.app-content-chat .chat-activity-rail .thread-run-history { max-height: min(42vh, 320px); }
+.app-content-chat .chat-activity-rail .thread-run-card { margin: 0; padding: 10px; border-radius: var(--skai-radius-md); }
+.app-content-chat .chat-activity-rail .thread-run-heading { align-items: flex-start; font-size: var(--skai-text-sm); }
+.app-content-chat .chat-activity-rail .thread-run-heading > span { font-size: var(--skai-text-2xs); }
+.app-content-chat .chat-activity-rail .thread-run-card > p { margin-top: 6px; font-size: var(--skai-text-xs); line-height: 1.45; }
+.app-content-chat .chat-activity-rail .thread-run-files { gap: 4px; margin-top: 7px; }
+.app-content-chat .chat-activity-rail .thread-run-files code { max-width: 100%; overflow-wrap: anywhere; font-size: var(--skai-text-3xs); }
+.app-content-chat .chat-activity-rail .thread-run-actions { margin-top: 7px; }
+.app-content-chat .chat-activity-rail .thread-run-actions .ui-button { padding: 5px 7px; font-size: var(--skai-text-2xs); }
+/* Keep the main reading measure comfortable while preserving the user's type settings. */
+.app-content-chat .conversation-surface .message-list { width: min(100%, 780px); }
+.app-content-chat .conversation-surface .chat-message .message-content { max-width: 740px; line-height: 1.62; }
+.app-content-chat .conversation-surface .chat-message.user { max-width: min(700px, 88%); }
 @media (max-width: 1100px) {
   .app-shell { grid-template-columns: 54px minmax(248px, var(--skai-sidebar-width, 288px)) minmax(0, 1fr); }
   .app-shell.thread-sidebar-hidden { grid-template-columns: 54px minmax(0, 1fr); }
@@ -4308,4 +4334,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .memory-layout { grid-template-columns: minmax(0, 1fr); }
   .memory-layout > .memory-results { grid-column: 1; grid-row: 1; }
   .memory-layout > .memory-editor { grid-column: 1; grid-row: 2; }
+}
+
+/* Chat reading rail: task context belongs beside the transcript, not above it. */
+.app-content-chat .chat-layout.has-thread-activity:not(.has-chat-details):not(.has-chat-tools) { grid-template-columns: minmax(0, 1fr) minmax(244px, 292px); }
+.app-content-chat .chat-layout.has-thread-activity .chat-rail { display: grid; }
+@media (max-width: 900px) {
+  .app-content-chat .chat-layout.has-thread-activity { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .app-content-chat .chat-layout.has-thread-activity .chat-rail { display: grid; order: 2; max-height: 34vh; overflow: auto; }
+}
+
+/* Replace the ambiguous tab strip with a compact, labeled response setting. */
+.app-content-chat .chat-response-mode { display: grid; min-width: 168px; gap: 2px; padding: 4px 9px 5px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }
+.app-content-chat .chat-response-mode > span { color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); letter-spacing: .09em; text-transform: uppercase; }
+.app-content-chat .chat-response-mode select { width: 100%; min-width: 0; padding: 0 16px 0 0; border: 0; outline: 0; color: var(--skai-color-text); background: transparent; font: inherit; font-size: var(--skai-text-xs); cursor: pointer; }
+.app-content-chat .chat-response-mode:focus-within { border-color: var(--skai-color-accent); }
+@media (max-width: 480px) {
+  .app-content-chat .chat-header-actions > .chat-response-mode { grid-column: 1 / -1; justify-self: stretch; }
 }
