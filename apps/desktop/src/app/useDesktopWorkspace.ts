@@ -5,7 +5,7 @@ import type { AppRouteActions, AppRouteState } from "./AppRouteView";
 import { initializeNavigation, navigate, navigatePersonaWorkshop, readNavigationState, routeFromLocation, type NavigationState } from "./navigation";
 import type { ConnectionState, CorpusDocument, MemoryEntry, Model, Route, ThemeMode } from "./types";
 import type { DesktopWorkspace } from "./desktopWorkspaceTypes";
-import { defaultEndpoint, defaultModel, defaultProvider, readAgentMode, readPetInteractionDemoPreference, readSidebarWidth, readStoredBoolean, readThemeMode } from "./workspacePreferences";
+import { defaultEndpoint, defaultModel, defaultProvider, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, readAgentMode, readPetInteractionDemoPreference, readSidebarWidth, readStoredBoolean, readThemeMode, SIDEBAR_WIDTH_KEY } from "./workspacePreferences";
 import { createAgentClient } from "../services/agentClient";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR, localEndpointOrFallback, localProviderOrFallback } from "../services/localOnly";
 import { useChatWorkspace } from "../features/chat/useChatWorkspace";

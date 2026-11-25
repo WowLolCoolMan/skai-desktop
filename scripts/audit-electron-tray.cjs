@@ -9,6 +9,7 @@ const trayController = read("apps/desktop/electron/tray-controller.cjs");
 const preload = read("apps/desktop/electron/preload.cjs");
 const contracts = read("apps/desktop/shared/contracts.ts");
 const workspace = read("apps/desktop/src/app/useDesktopWorkspace.ts");
+const workspaceSessionTabs = read("apps/desktop/src/app/useWorkspaceSessionTabs.ts");
 const packageScript = read("scripts/package-electron.cjs");
 const releaseWorkflow = read(".github/workflows/release.yml");
 
@@ -28,7 +29,7 @@ expect(releaseWorkflow.includes("rid: linux-x64") && releaseWorkflow.includes("r
 expect(releaseWorkflow.includes("Skai-Desktop-electron-linux-x64.tar.gz") && releaseWorkflow.includes("SHA256SUMS-electron-linux-x64.txt"), "Linux Electron releases must be archived and checksummed");
 expect(preload.includes("onTrayOpenConversation") && preload.includes("onTrayNewChat"), "preload must expose tray navigation events");
 expect(contracts.includes("onTrayOpenConversation?") && contracts.includes("onTrayNewChat?"), "tray events must remain typed in the renderer contract");
-expect(workspace.includes("onTrayOpenConversation") && workspace.includes("onTrayNewChat"), "renderer must handle tray recent-chat and new-chat actions");
+expect((workspace + workspaceSessionTabs).includes("onTrayOpenConversation") && (workspace + workspaceSessionTabs).includes("onTrayNewChat"), "renderer must handle tray recent-chat and new-chat actions");
 expect(packageScript.includes('process.platform === "linux" ? "linux-x64"') && packageScript.includes('const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai Desktop"'), "Electron packaging must publish a Linux x64 artifact with the native executable name");
 
 // Linux desktop integration: the launcher entry must match the window class so docks

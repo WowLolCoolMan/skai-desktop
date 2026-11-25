@@ -23,10 +23,10 @@ const preferredChatModel = readPreferredChatModel();
 export const defaultEndpoint = localEndpointOrFallback(preferredChatModel?.endpoint ?? localStorage.getItem("skai.endpoint"), "http://localhost:11434/v1");
 export const defaultModel = preferredChatModel?.model ?? localStorage.getItem("skai.model") ?? "llama3.2";
 export const defaultProvider = localProviderOrFallback(preferredChatModel?.provider ?? localStorage.getItem("skai.provider"));
-const SIDEBAR_WIDTH_KEY = "skai.sidebar.width";
+export const SIDEBAR_WIDTH_KEY = "skai.sidebar.width";
 const DEFAULT_SIDEBAR_WIDTH = 276;
-const MIN_SIDEBAR_WIDTH = 248;
-const MAX_SIDEBAR_WIDTH = 360;
+export const MIN_SIDEBAR_WIDTH = 248;
+export const MAX_SIDEBAR_WIDTH = 360;
 export function readAgentMode(): "ChatBot" | "Coding Agent" {
   return localStorage.getItem("skai.agentMode") === "Coding Agent" ? "Coding Agent" : "ChatBot";
 }

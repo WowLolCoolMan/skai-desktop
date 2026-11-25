@@ -18,6 +18,8 @@ const modelPicker = fs.readFileSync(path.join(root, "apps", "desktop", "src", "c
 const overflowMenu = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "ui", "OverflowMenu.tsx"), "utf8");
 const sidebar = fs.readFileSync(path.join(root, "apps", "desktop", "src", "components", "layout", "Sidebar.tsx"), "utf8");
 const chatComposer = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "ChatComposer.tsx"), "utf8");
+const chatComposerVoice = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "useChatComposerVoice.ts"), "utf8");
+const chatThreadActivity = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "ChatThreadActivity.tsx"), "utf8");
 const localAudioTranscription = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "localAudioTranscription.ts"), "utf8");
 const chatWorkspace = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "useChatWorkspace.ts"), "utf8");
 const navigation = fs.readFileSync(path.join(root, "apps", "desktop", "src", "app", "navigation.ts"), "utf8");
@@ -26,6 +28,7 @@ const smokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-a
 const themeSmokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-themes.cjs"), "utf8");
 const overflowSmokeScript = fs.readFileSync(path.join(root, "scripts", "smoke-electron-overflow.cjs"), "utf8");
 const workspace = fs.readFileSync(path.join(root, "apps", "desktop", "src", "app", "useDesktopWorkspace.ts"), "utf8");
+const chatComposerWithVoice = chatComposer + chatComposerVoice;
 
 function findAlternateDesktopFiles(directory, results = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -65,10 +68,10 @@ expect(main.includes('"tasks.plan"'), "Electron bridge must expose the review-fi
 expect(main.includes('"project.git.status"'), "Electron bridge must expose the read-only local Git status method");
 expect(workspaceIpc.includes('"workspace.importDroppedFiles"') && workspaceIpc.includes("decodeDroppedAttachment"), "Electron bridge must validate dropped chat files at the local boundary");
 expect(chatComposer.includes("onDrop={handleDrop}") && chatComposer.includes("Drop files to attach"), "Chat composer must expose a visible drag-and-drop attachment state");
-expect(chatComposer.includes("SpeechRecognition") && chatComposer.includes("aria-pressed={voiceListening}"), "Chat composer must expose explicit system voice input with a visible listening state");
-expect(chatComposer.includes("transcribeLocalAudioFile") && (chatComposer.includes("Transcribe MP3, M4A, OGG, or WAV locally") || chatComposer.includes("Transcribe MP3, M4A, OGG, WAV, or WebM locally")), "Chat composer must provide local audio transcription with an explicit user action");
+expect(chatComposerWithVoice.includes("SpeechRecognition") && chatComposerWithVoice.includes("aria-pressed={voiceListening}"), "Chat composer must expose explicit system voice input with a visible listening state");
+expect(chatComposerWithVoice.includes("transcribeLocalAudioFile") && chatComposer.includes("transcribeAudioFile(file)") && chatComposer.includes("Transcribe audio on this device"), "Chat composer must provide local audio transcription with an explicit user action");
 expect(localAudioTranscription.includes("processLocally = true") && localAudioTranscription.includes("recognition.start(track)") && localAudioTranscription.includes("Audio was not sent to a remote service"), "Audio file transcription must consume only a local media track with on-device recognition");
-expect(chatComposer.includes("stopNativeSpeech();") && chatComposer.includes("setHandsFreeActive(false);"), "Disabling hands-free mode must interrupt local speech output");
+expect(chatComposerWithVoice.includes("stopNativeSpeech();") && chatComposerWithVoice.includes("setHandsFreeActive(false);"), "Disabling hands-free mode must interrupt local speech output");
 expect(chatComposer.includes("aria-activedescendant={commandQuery !== null ? activeCommandId : undefined}") && chatComposer.includes("(index + 1) % commandMatches.length"), "Chat composer commands must expose the active option and wrap keyboard navigation");
 expect(modelPicker.includes("const onPopoverKeyDown") && modelPicker.includes("aria-activedescendant={filtered[activeIndex]"), "Model picker must keep keyboard focus inside the popover and expose the active option");
 expect(overflowMenu.includes('event.key === "Tab"') && sidebar.includes('event.key === "Tab"'), "Overflow and recent-chat menus must close when keyboard focus leaves with Tab");
@@ -106,8 +109,7 @@ expect(packageJson.scripts["smoke:electron:themes"] === "node scripts/smoke-elec
 expect(packageJson.scripts["smoke:electron:overflow"] === "node scripts/smoke-electron-overflow.cjs" && overflowSmokeScript.includes("1920") && overflowSmokeScript.includes("routes") && overflowSmokeScript.includes("getBoundingClientRect"), "Packaged Electron overflow acceptance must exercise every route across supported viewport widths");
 expect(workspace.includes('request("tasks.list")') && workspace.includes("window.setInterval(refresh, 2000)"), "Workbench must refresh task state while local execution is active");
 // Task cards in the conversation thread replaced the Agent Workbench (a944933): Stop must stay available there.
-const threadTaskCards = fs.readFileSync(path.join(root, "apps", "desktop", "src", "features", "chat", "ChatPage.tsx"), "utf8");
-expect(threadTaskCards.includes('["queued", "running", "verifying"].includes(task.status)') && threadTaskCards.includes('onTaskAction(task.id, "cancel")') && threadTaskCards.includes(">Stop</Button>"), "Conversation task cards must expose cancellation for active local task execution");
+expect(chatThreadActivity.includes('["queued", "running", "verifying"].includes(task.status)') && chatThreadActivity.includes('onTaskAction(task.id, "cancel")') && chatThreadActivity.includes(">Stop</Button>"), "Conversation task cards must expose cancellation for active local task execution");
 const alternateDesktopFiles = findAlternateDesktopFiles(root);
 expect(alternateDesktopFiles.length === 0, `alternate desktop UI files must not return to the project: ${alternateDesktopFiles.join(", ")}`);
 

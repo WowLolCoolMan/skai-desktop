@@ -16,7 +16,7 @@ type WorkspaceSessionTabOptions = {
   agentMode: "ChatBot" | "Coding Agent";
   setAgentModeState: (mode: "ChatBot" | "Coding Agent") => void;
   setModel: (model: string) => void;
-  setProvider: (provider: string) => void;
+  setProvider: (provider: ReturnType<typeof localProviderOrFallback>) => void;
   setEndpoint: (endpoint: string) => void;
   setError: (error: string | null) => void;
 };

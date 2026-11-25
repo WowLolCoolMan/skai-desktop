@@ -7,6 +7,7 @@ import { ModalDialog } from "../../components/ui/ModalDialog";
 import { ComposerCommandMenu } from "../../components/ui/ComposerCommandMenu";
 import { AttachmentList } from "./AttachmentList";
 import { composerCommands, type ComposerCommand } from "./composerCommands";
+import { saveVoiceSetting, stopNativeSpeech } from "../../services/nativeTts";
 import { isLocalEndpoint } from "../../services/localOnly";
 import { useChatComposerVoice } from "./useChatComposerVoice";
 
