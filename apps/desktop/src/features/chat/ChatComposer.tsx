@@ -428,7 +428,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
           </section>}
         </div>
         {documentsOnly && <span className="composer-docs-chip"><NavIcon name="document" /> Docs only</span>}
-        <span className={`composer-context-meter${contextBudgetPercent >= 85 ? " is-near-limit" : ""}`} title="Approximate context estimate based on this draft and attached content" aria-label={`${contextBudgetLabel}. This is an estimate; the model may use additional conversation context.`}><span className="composer-context-meter-label">{contextBudgetLabel}</span><span className="composer-context-meter-track" aria-hidden="true"><span style={{ width: `${contextBudgetPercent}%` }} /></span></span>
+        <span className={`composer-context-meter${contextBudgetPercent >= 85 ? " is-near-limit" : ""}`} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={contextBudgetPercent} aria-valuetext={`${contextBudgetLabel}; approximate estimate based on this draft and attached content`} title="Approximate context estimate based on this draft and attached content"><span className="composer-context-meter-label">{contextBudgetLabel}</span><span className="composer-context-meter-track" aria-hidden="true"><span style={{ width: `${contextBudgetPercent}%` }} /></span></span>
         <span id="attachment-help" className="sr-only">{attachments.length} of 5 attachments. {workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"} to {busy ? "queue" : "send"}; {workflowPreferences.sendBehavior === "enter-sends" ? "Shift+Enter" : "Enter"} starts a new line.</span>
       </div>
       <div className="composer-action-right">
