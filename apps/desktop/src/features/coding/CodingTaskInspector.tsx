@@ -53,7 +53,7 @@ function statusLabel(status: string) {
 function taskNextStep(task: DesktopTask) {
   switch (task.status) {
     case "proposed": return "Review and queue this plan when it is ready.";
-    case "queued": return "Waiting for a local execution slot.";
+    case "queued": return task.capacityWaitReason || "Waiting for a local execution slot.";
     case "awaiting_approval": return "Your approval is needed before this task can continue.";
     case "running": return "Working through the task plan.";
     case "verifying": return "Checking the result before completing the task.";

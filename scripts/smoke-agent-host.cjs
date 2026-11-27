@@ -449,12 +449,12 @@ async function run() {
   pendingSmokeServers.add(queueModelServer);
   await new Promise(resolve => queueModelServer.listen(0, "127.0.0.1", resolve));
   const queueModelPort = queueModelServer.address().port;
-  // Keep this fixture's capacity decision stable even if host CPU/RAM telemetry
-  // changes while the two queued tasks are waiting for their execution slot.
-  const queueSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "queue-smoke-model", provider: "Local API", localRamBudgetBytes: 1024 * 1024 * 1024 });
+  // Give the mock task a bounded small-model estimate so this execution smoke
+  // tests FIFO dispatch without relying on the physical model installed here.
+  const queueSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "queue-smoke-model", provider: "Local API" });
   if (!queueSettings.ok) throw new Error("settings.save could not prepare the queued task smoke endpoint.");
-  const firstQueued = await request("tasks.plan", { title: "First queued task", instruction: "Complete the first queued smoke task.", environment: "local" });
-  const secondQueued = await request("tasks.plan", { title: "Second queued task", instruction: "Complete the second queued smoke task.", environment: "local" });
+  const firstQueued = await request("tasks.plan", { title: "First queued task", instruction: "Complete the first queued smoke task.", environment: "local", modelSizeBytes: 512 * 1024 * 1024, modelContextLength: 4096 });
+  const secondQueued = await request("tasks.plan", { title: "Second queued task", instruction: "Complete the second queued smoke task.", environment: "local", modelSizeBytes: 512 * 1024 * 1024, modelContextLength: 4096 });
   if (!firstQueued.ok || !secondQueued.ok) throw new Error("tasks.plan could not create the queued task pair.");
   for (const task of [firstQueued, secondQueued]) {
     const queuedTask = await request("tasks.queue", { id: task.result.id });
@@ -469,12 +469,13 @@ async function run() {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 100));
     const snapshot = await request("tasks.list");
-    if (!snapshot.ok) throw new Error("tasks.list failed while observing queued task dispatch.");
+    if (!snapshot.ok) throw new Error(`tasks.list failed while observing queued task dispatch: ${JSON.stringify(snapshot)}`);
     firstTerminal = snapshot.result.find(item => item.id === firstQueued.result.id) ?? null;
     secondTerminal = snapshot.result.find(item => item.id === secondQueued.result.id) ?? null;
     if ([firstTerminal, secondTerminal].every(task => task && ["completed", "failed", "cancelled", "blocked"].includes(task.status))) break;
   }
-  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || !fencedActionServed || maxActiveQueueRequests < 1 || maxActiveQueueRequests > reportedSlotLimit)
+  const requestOrderIsFifo = queueRequestBodies[0]?.includes("first queued smoke task") && queueRequestBodies[1]?.includes("second queued smoke task");
+  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || !requestOrderIsFifo || !fencedActionServed || maxActiveQueueRequests < 1 || maxActiveQueueRequests > reportedSlotLimit)
     throw new Error(`Queued task dispatch or fenced-action recovery failed: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, fencedActionServed, maxActiveQueueRequests, reportedSlotLimit, queueRequestBodies })}`);
   const ollamaSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "native-tools-smoke-model", provider: "Ollama" });
   if (!ollamaSettings.ok) throw new Error("settings.save could not prepare the native Ollama tool smoke endpoint.");
@@ -588,11 +589,10 @@ async function run() {
     if (capacitySnapshot.ok && capacitySnapshot.result?.scheduler?.activeTaskCount === 0 && capacitySnapshot.result?.scheduler?.queuedTaskCount === 0) break;
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  // Use an intentionally large model estimate so this pair exercises the
-  // single-slot cancellation path even on hosts with room for multiple small
-  // local runs.
+  // Keep the leader runnable while giving the waiter an intentionally
+  // impossible estimate, so cancellation is exercised behind active work.
   const cancellationModelSizeBytes = 60 * 1024 * 1024 * 1024;
-  const cancellationLeader = await request("tasks.plan", { title: "Cancellation leader", instruction: "Keep the local slot occupied briefly.", environment: "local", modelSizeBytes: cancellationModelSizeBytes });
+  const cancellationLeader = await request("tasks.plan", { title: "Cancellation leader", instruction: "Keep the local slot occupied briefly.", environment: "local", modelSizeBytes: 512 * 1024 * 1024, modelContextLength: 4096 });
   const cancellationWaiter = await request("tasks.plan", { title: "Cancellation waiter", instruction: "Cancel while waiting for the local slot.", environment: "local", modelSizeBytes: cancellationModelSizeBytes });
   for (const task of [cancellationLeader, cancellationWaiter]) {
     const queuedTask = await request("tasks.queue", { id: task.result.id });
@@ -603,6 +603,15 @@ async function run() {
   for (let attempt = 0; attempt < 30 && queueRequests < requestsBeforeCancellation + 1; attempt += 1) await new Promise(resolve => setTimeout(resolve, 100));
   const waiterExecution = await request("tasks.execute", { id: cancellationWaiter.result.id });
   if (!leaderExecution.ok || !waiterExecution.ok || waiterExecution.result?.status !== "queued") throw new Error("The cancellation waiter did not enter the local queue.");
+  let capacityWaitingTask = null;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error(`tasks.list failed while checking capacity wait guidance: ${JSON.stringify(snapshot)}`);
+    capacityWaitingTask = snapshot.result.find(item => item.id === cancellationWaiter.result.id) ?? null;
+    if (capacityWaitingTask?.capacityWaitReason) break;
+  }
+  if (!capacityWaitingTask?.capacityWaitReason?.includes("headroom")) throw new Error(`The queued task did not expose a capacity wait explanation: ${JSON.stringify(capacityWaitingTask)}`);
   const waiterCancelled = await request("tasks.cancel", { id: cancellationWaiter.result.id });
   if (!waiterCancelled.ok || waiterCancelled.result?.status !== "queued" || waiterCancelled.result?.cancellationRequested !== true) throw new Error(`Queued task cancellation was not acknowledged: ${JSON.stringify(waiterCancelled)}`);
   let cancelledTask = null;

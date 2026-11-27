@@ -34,6 +34,7 @@ public sealed class AgentTaskArtifact
     public bool AirLlmCompatible { get; set; }
     public string Role { get; set; } = "specialist";
     public string Status { get; set; } = AgentTaskStatuses.Proposed;
+    public string? CapacityWaitReason { get; set; }
     public bool RequiresApproval { get; set; }
     public List<string> DependsOn { get; set; } = [];
     public string? ResultSummary { get; set; }

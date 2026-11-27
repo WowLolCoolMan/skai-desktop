@@ -19,6 +19,7 @@ public static partial class AgentHostLoop
     private static readonly object ActiveTaskExecutionsGate = new();
     private static readonly object LocalExecutionGate = new();
     private static int LocalAdmittedTaskCount;
+    private static readonly List<string> LocalExecutionWaitQueue = [];
     private static readonly object RuntimeCapacityGate = new();
     private static RuntimeCapacitySnapshot? CachedRuntimeCapacity;
     private static readonly Dictionary<string, WorkspaceTerminalSession> TerminalSessions = new(StringComparer.Ordinal);

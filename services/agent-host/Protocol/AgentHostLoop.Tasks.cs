@@ -40,6 +40,7 @@ public static partial class AgentHostLoop
                 changedFiles = task.ChangedFiles,
                 role = task.Role,
                 status = task.Status,
+                capacityWaitReason = task.CapacityWaitReason,
                 resultSummary = task.ResultSummary,
                 artifactLabels = task.ArtifactLabels,
                 verificationEvidence = task.VerificationEvidence,
@@ -252,24 +253,16 @@ public static partial class AgentHostLoop
                 throw new InvalidOperationException("The task is already executing.");
 
             var execution = new ActiveTaskExecution(new CancellationTokenSource());
+            lock (LocalExecutionGate)
+                if (!LocalExecutionWaitQueue.Contains(taskId, StringComparer.Ordinal)) LocalExecutionWaitQueue.Add(taskId);
             execution.Task = Task.Run(() => ExecuteQueuedLocalModelTaskAsync(taskId, execution));
             ActiveTaskExecutions[taskId] = execution;
         }
 
-        var snapshot = new LocalCapacityProbe().GetSnapshotAsync().GetAwaiter().GetResult();
-        var settings = CreateSettingsStore().Load();
-        var usesCodingModel = string.IsNullOrWhiteSpace(task.Model) && !string.IsNullOrWhiteSpace(settings.CodingModel);
-        var effectiveProvider = !string.IsNullOrWhiteSpace(task.ModelProvider) ? task.ModelProvider
-            : usesCodingModel && !string.IsNullOrWhiteSpace(settings.CodingModelProvider) ? settings.CodingModelProvider : settings.ModelProvider;
-        var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(effectiveProvider));
-        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes,
-            task.ModelSizeBytes ?? (usesCodingModel ? settings.CodingModelSizeBytes : null),
-            task.ModelContextLength ?? (usesCodingModel ? settings.CodingModelContextLength : null),
-            task.AirLlmCompatible || usesCodingModel && effectiveProvider.Equals("AirLLM", StringComparison.OrdinalIgnoreCase), runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
-        int activeTaskCount;
-        lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
-        var status = activeTaskCount < decision.SlotLimit ? AgentTaskStatuses.Running : AgentTaskStatuses.Queued;
-        return new(ProtocolVersion, request.Id, true, new { id = taskId, status, execution = "local-queue" });
+        // Admission and the durable status transition happen asynchronously. Report
+        // the state that is true when this request is accepted, avoiding a race where
+        // a fast worker removes itself from the FIFO queue before this response.
+        return new(ProtocolVersion, request.Id, true, new { id = taskId, status = AgentTaskStatuses.Queued, execution = "local-queue", queuePolicy = "fifo" });
     }
 
     private static async Task ExecuteQueuedLocalModelTaskAsync(string taskId, ActiveTaskExecution execution)
@@ -301,6 +294,7 @@ public static partial class AgentHostLoop
                     lock (LocalExecutionGate)
                     {
                         LocalAdmittedTaskCount = Math.Max(0, LocalAdmittedTaskCount - 1);
+                        LocalExecutionWaitQueue.Remove(taskId);
                         acquired = false;
                         Monitor.PulseAll(LocalExecutionGate);
                     }
@@ -332,8 +326,13 @@ public static partial class AgentHostLoop
                 lock (LocalExecutionGate)
                 {
                     LocalAdmittedTaskCount = Math.Max(0, LocalAdmittedTaskCount - 1);
+                    LocalExecutionWaitQueue.Remove(taskId);
                     Monitor.PulseAll(LocalExecutionGate);
                 }
+            }
+            else
+            {
+                lock (LocalExecutionGate) LocalExecutionWaitQueue.Remove(taskId);
             }
             lock (ActiveTaskExecutionsGate)
             {
@@ -344,6 +343,9 @@ public static partial class AgentHostLoop
 
     private static async Task WaitForLocalExecutionCapacityAsync(AgentTaskArtifact task, CancellationToken cancellationToken)
     {
+        lock (LocalExecutionGate)
+            if (!LocalExecutionWaitQueue.Contains(task.Id, StringComparer.Ordinal)) LocalExecutionWaitQueue.Add(task.Id);
+
         while (true)
         {
             var snapshot = await new LocalCapacityProbe().GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
@@ -355,18 +357,45 @@ public static partial class AgentHostLoop
             var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes,
                 task.ModelSizeBytes ?? (usesCodingModel ? settings.CodingModelSizeBytes : null),
                 task.ModelContextLength ?? (usesCodingModel ? settings.CodingModelContextLength : null),
-                task.AirLlmCompatible || usesCodingModel && effectiveProvider.Equals("AirLLM", StringComparison.OrdinalIgnoreCase), runtime.AirLlmReady == true, runtime.LoadedRamBytes, runtime.LoadedGpuBytes);
+                task.AirLlmCompatible || usesCodingModel && effectiveProvider.Equals("AirLLM", StringComparison.OrdinalIgnoreCase), runtime.AirLlmReady == true);
+            var acquired = false;
+            int queuePosition;
             lock (LocalExecutionGate)
             {
-                if (LocalAdmittedTaskCount < decision.SlotLimit)
+                queuePosition = LocalExecutionWaitQueue.IndexOf(task.Id) + 1;
+                if (queuePosition == 1 && LocalAdmittedTaskCount < decision.SlotLimit)
                 {
                     LocalAdmittedTaskCount++;
-                    return;
+                    LocalExecutionWaitQueue.RemoveAt(0);
+                    acquired = true;
                 }
             }
+            if (acquired)
+            {
+                CreateTaskStore().SetCapacityWaitReason(task.Id, null);
+                return;
+            }
+
+            var reason = decision.SlotLimit == 0
+                ? BuildCapacityWaitReason(decision.LimitingResource)
+                : queuePosition > 1
+                    ? $"FIFO position {queuePosition}; waiting for earlier local work to use the next available slot."
+                    : $"All {decision.SlotLimit} local slots are in use. {CapacityUnblockHint(decision.LimitingResource)}";
+            CreateTaskStore().SetCapacityWaitReason(task.Id, reason);
             await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken).ConfigureAwait(false);
         }
     }
+
+    private static string BuildCapacityWaitReason(string resource) =>
+        $"Waiting for {resource.ToLowerInvariant()} headroom. {CapacityUnblockHint(resource)}";
+
+    private static string CapacityUnblockHint(string resource) => resource switch
+    {
+        "RAM budget" or "RAM headroom" => "Close memory-heavy apps or lower the selected model context, then retry.",
+        "GPU memory" => "Close GPU-heavy apps or wait for GPU memory to become available.",
+        "CPU pressure" => "Wait for CPU-heavy work to finish before this task starts.",
+        _ => "Wait for local capacity telemetry or free system resources, then retry.",
+    };
 
     private static RuntimeCapacitySnapshot ReadRuntimeCapacity(AppSettings settings, bool checkAirLlm, CancellationToken cancellationToken = default)
     {

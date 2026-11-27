@@ -237,6 +237,22 @@ public sealed class AgentTaskArtifactStore
             .FirstOrDefault();
     }
 
+    /// <summary>Persists the current local-capacity wait explanation without changing task state.</summary>
+    public void SetCapacityWaitReason(string id, string? reason)
+    {
+        lock (StoreGate)
+        {
+            var tasks = Load().ToList();
+            var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+            if (task.Status != AgentTaskStatuses.Queued) return;
+            var normalized = NormalizeOptional(reason, 320, "capacity wait reason");
+            if (string.Equals(task.CapacityWaitReason, normalized, StringComparison.Ordinal)) return;
+            task.CapacityWaitReason = normalized;
+            task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            Save(tasks);
+        }
+    }
+
     /// <summary>
     /// Reconciles tasks that were running when the process stopped. This is a
     /// local metadata transition only: it does not retry handlers, release
@@ -290,6 +306,7 @@ public sealed class AgentTaskArtifactStore
     private AgentTaskArtifact Claim(List<AgentTaskArtifact> tasks, AgentTaskArtifact task, DateTimeOffset now)
     {
         task.Status = AgentTaskStatuses.Running;
+        task.CapacityWaitReason = null;
         task.UpdatedAtUtc = now;
         Save(tasks);
         return Copy(task);
@@ -550,6 +567,7 @@ public sealed class AgentTaskArtifactStore
         AirLlmCompatible = source.AirLlmCompatible,
         Role = source.Role,
         Status = source.Status,
+        CapacityWaitReason = source.CapacityWaitReason,
         RequiresApproval = source.RequiresApproval,
         DependsOn = source.DependsOn.ToList(),
         ResultSummary = source.ResultSummary,

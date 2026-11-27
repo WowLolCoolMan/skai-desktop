@@ -1339,6 +1339,10 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .usage-loaded-models strong { overflow-wrap: anywhere; color: var(--skai-color-text); font-size: var(--skai-text-xs); }
 .usage-loaded-models span, .usage-note, .usage-scheduler, .usage-provider-summary, .usage-privacy-note { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.5; }
 .usage-scheduler, .usage-provider-summary, .usage-privacy-note { margin: 0; padding-top: 10px; border-top: 1px solid var(--skai-color-border); }
+.usage-capacity-details { padding-top: 10px; border-top: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.5; }
+.usage-capacity-details summary { color: var(--skai-color-text); cursor: pointer; font-size: var(--skai-text-xs); }
+.usage-capacity-details > div { display: grid; gap: 7px; padding-top: 8px; }
+.usage-capacity-details p { margin: 0; }
 .usage-models, .usage-inventory { min-height: 100%; }
 .usage-current-model { display: grid; gap: 4px; min-width: 0; margin-bottom: 14px; padding: 11px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
 .usage-current-model strong { overflow-wrap: anywhere; color: var(--skai-color-text); font-size: var(--skai-text-sm); }

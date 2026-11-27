@@ -42,7 +42,9 @@ public static partial class AgentHostLoop
         var tasks = CreateTaskStore().Load();
         var settings = CreateSettingsStore().Load();
         var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(settings.ModelProvider));
-        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes, airLlmAvailable: runtime.AirLlmReady == true, loadedRamBytes: runtime.LoadedRamBytes, loadedGpuBytes: runtime.LoadedGpuBytes);
+        var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes,
+            settings.CodingModelSizeBytes, settings.CodingModelContextLength,
+            string.Equals(settings.CodingModelProvider ?? settings.ModelProvider, "AirLLM", StringComparison.OrdinalIgnoreCase), runtime.AirLlmReady == true);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;
         var queuedTaskCount = tasks.Count(task => task.Status == AgentTaskStatuses.Queued);
@@ -54,7 +56,7 @@ public static partial class AgentHostLoop
             snapshot.CpuUtilizationPercent,
             snapshot.Gpu,
             snapshot.MeasurementNote,
-            scheduler = new { activeTaskCount, queuedTaskCount, executionSlotLimit = decision.SlotLimit, limitingResource = decision.LimitingResource },
+            scheduler = new { activeTaskCount, queuedTaskCount, executionSlotLimit = decision.SlotLimit, limitingResource = decision.LimitingResource, estimatedRamPerTaskBytes = decision.EstimatedRamPerTaskBytes, effectiveAvailableRamBytes = decision.EffectiveAvailableRamBytes, effectiveAvailableGpuBytes = decision.EffectiveAvailableGpuBytes, estimateBasis = decision.EstimateBasis, queuePolicy = "fifo" },
             runtime = new { loadedModelsKnown = runtime.LoadedModelsKnown, loadedModels = runtime.LoadedModels, loadedRamBytes = runtime.LoadedRamBytes, loadedGpuBytes = runtime.LoadedGpuBytes, loadedModelNote = runtime.LoadedModelNote, airLlmReady = runtime.AirLlmReady },
         });
     }

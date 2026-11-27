@@ -157,6 +157,13 @@ internal static class AgentTaskArtifactTests
             store.RemoveTerminalTasksBefore(DateTimeOffset.MaxValue);
             var retainedIds = store.Load().Select(task => task.Id).ToHashSet(StringComparer.Ordinal);
             Check(retainedIds.Contains(retainedWorktree.Id) && retainedIds.Contains(retainedDependency.Id) && retainedIds.Contains(liveDependent.Id), "task retention preserves reviewed worktrees and terminal prerequisites of retained tasks");
+
+            var capacityWait = store.Create("Capacity wait fixture", "Wait until local resources are available.");
+            store.Queue(capacityWait.Id);
+            store.SetCapacityWaitReason(capacityWait.Id, "Waiting for RAM headroom.");
+            var waitingTask = store.Get(capacityWait.Id);
+            store.TryClaim(capacityWait.Id);
+            Check(waitingTask.CapacityWaitReason == "Waiting for RAM headroom." && store.Get(capacityWait.Id).CapacityWaitReason is null, "capacity wait explanations persist while queued and clear when execution starts");
         }
         finally { DeleteDirectoryTree(root); }
     }

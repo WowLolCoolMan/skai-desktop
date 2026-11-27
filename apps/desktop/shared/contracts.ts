@@ -47,7 +47,17 @@ export type LocalCapacitySnapshot = {
   cpuUtilizationPercent: number | null;
   gpu: { name: string; totalBytes: number | null; availableBytes: number | null; utilizationPercent: number | null } | null;
   measurementNote: string | null;
-  scheduler?: { activeTaskCount: number; queuedTaskCount: number; executionSlotLimit: number; limitingResource?: string };
+  scheduler?: {
+    activeTaskCount: number;
+    queuedTaskCount: number;
+    executionSlotLimit: number;
+    limitingResource?: string;
+    estimatedRamPerTaskBytes?: number | null;
+    effectiveAvailableRamBytes?: number | null;
+    effectiveAvailableGpuBytes?: number | null;
+    estimateBasis?: string;
+    queuePolicy?: string;
+  };
   runtime?: {
     loadedModelsKnown: boolean;
     loadedModels: Array<{ runtime: string; model: string; ramBytes: number | null; gpuBytes: number | null }>;
@@ -226,6 +236,7 @@ export type DesktopTask = {
   changedFiles?: string[];
   role: string;
   status: string;
+  capacityWaitReason?: string | null;
   resultSummary?: string | null;
   artifactLabels?: string[];
   requiresApproval?: boolean;

@@ -120,7 +120,18 @@ export function UsagePage({ conversations, projects, tasks, scheduledTasks, memo
           {capacity.gpu && <UsageMeter label={capacity.gpu.name || "GPU memory"} detail={`${formatBytes(gpuUsed)} / ${formatBytes(capacity.gpu.totalBytes)}`} value={usagePercent(gpuUsed, capacity.gpu.totalBytes)} />}
           <UsageMeter label="CPU" detail={cpuValue == null ? "Usage unavailable" : `${Math.round(cpuValue)}% in use`} value={cpuValue} />
           {capacity.runtime?.loadedModels?.length ? <div className="usage-loaded-models"><h4>Loaded models</h4>{capacity.runtime.loadedModels.map((loaded, index) => <div key={`${loaded.runtime}-${loaded.model}-${index}`}><strong>{loaded.model}</strong><span>{loaded.runtime} · RAM {formatBytes(loaded.ramBytes)} · GPU {formatBytes(loaded.gpuBytes)}</span></div>)}</div> : <p className="usage-note">{capacity.runtime?.loadedModelNote ?? "No loaded model details reported by the runtime."}</p>}
-          {capacity.scheduler && <p className="usage-scheduler">{capacity.scheduler.activeTaskCount} active · {capacity.scheduler.queuedTaskCount} queued · {capacity.scheduler.executionSlotLimit} execution slots{capacity.scheduler.limitingResource ? ` · limited by ${capacity.scheduler.limitingResource}` : ""}</p>}
+          {capacity.scheduler && <>
+            <p className="usage-scheduler">{capacity.scheduler.activeTaskCount} active · {capacity.scheduler.queuedTaskCount} queued · {capacity.scheduler.executionSlotLimit} execution slots{capacity.scheduler.limitingResource ? ` · limited by ${capacity.scheduler.limitingResource}` : ""}</p>
+            <details className="usage-capacity-details">
+              <summary>Capacity estimates and queue behavior</summary>
+              <div>
+                <p>RAM and CPU are measured locally by the operating system. GPU memory is sampled with NVIDIA telemetry when present. Loaded model sizes are separately reported by the runtime.</p>
+                <p>Effective available RAM: {formatBytes(capacity.scheduler.effectiveAvailableRamBytes ?? null)} · GPU: {formatBytes(capacity.scheduler.effectiveAvailableGpuBytes ?? null)}</p>
+                <p>{capacity.scheduler.estimatedRamPerTaskBytes ? `Estimated RAM per task: ${formatBytes(capacity.scheduler.estimatedRamPerTaskBytes)}. ` : "Per-task RAM estimate unavailable. "}{capacity.scheduler.estimateBasis}</p>
+                <p>Queue policy: {capacity.scheduler.queuePolicy === "fifo" ? "first in, first out" : "local FIFO"}. Work begins only after you explicitly start a task; Skai does not unload models automatically.</p>
+              </div>
+            </details>
+          </>}
         </> : <EmptyState title="Runtime measurements unavailable" description="Reconnect to the local agent host to see memory, CPU, and loaded-model readings." />}
       </Card>
 

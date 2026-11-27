@@ -17,7 +17,9 @@ export function estimateModelCapacity(model: Model | undefined, capacity: LocalC
   const startupRamBytes = modelBytes === null ? null : Math.ceil(modelBytes * 1.25);
   const measuredRamBytes = Number.isFinite(capacity?.ramAvailableBytes) ? capacity!.ramAvailableBytes : null;
   const loadedRamBytes = capacity?.runtime?.loadedModelsKnown ? capacity.runtime.loadedRamBytes : 0;
-  const availableRamBytes = measuredRamBytes === null ? null : Math.max(0, measuredRamBytes! - loadedRamBytes);
+  // The OS free-memory reading already reflects resident loaded models. Keep
+  // runtime-reported sizes visible, but do not subtract the same allocation twice.
+  const availableRamBytes = measuredRamBytes;
   const state = startupRamBytes === null || availableRamBytes === null
     ? "unknown"
     : availableRamBytes >= startupRamBytes ? "room" : "tight";
@@ -30,8 +32,8 @@ export function estimateModelCapacity(model: Model | undefined, capacity: LocalC
     contextLength: Number.isFinite(model?.contextLength) && (model?.contextLength ?? 0) > 0 ? model!.contextLength! : null,
     gpuAvailableBytes: Number.isFinite(capacity?.gpu?.availableBytes) ? capacity!.gpu!.availableBytes : null,
     note: capacity?.runtime?.loadedModelsKnown
-      ? `Rough startup RAM floor uses model size plus 25% headroom and subtracts ${formatBytes(loadedRamBytes)} reported by the local runtime for loaded models. Context cache and other allocations remain approximate.`
-      : "Rough startup RAM floor uses model size plus 25% headroom. Loaded-model allocation is unavailable from this runtime, so context cache and other allocations remain approximate.",
+      ? `Available RAM is measured by the OS; the runtime separately reports ${formatBytes(loadedRamBytes)} for loaded models, already reflected in that measurement. Startup RAM and context cache remain rough estimates.`
+      : "Available RAM is measured by the OS. Loaded-model sizes are unavailable from this runtime; startup RAM and context cache remain rough estimates.",
   };
 }
 
