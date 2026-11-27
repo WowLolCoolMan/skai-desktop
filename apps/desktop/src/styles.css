@@ -5078,4 +5078,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .composer-context-meter-track > span { display: block; height: 100%; border-radius: inherit; background: var(--skai-color-accent); transition: width 120ms ease; }
 .composer-context-meter.is-near-limit { color: var(--skai-color-warning); }
 .composer-context-meter.is-near-limit .composer-context-meter-track > span { background: var(--skai-color-warning); }
+.file-editor-heading > .file-editor-heading-copy { display: grid; min-width: 0; flex: 1 1 auto; justify-content: initial; gap: 2px; }
+.file-editor-heading-copy small { overflow: hidden; color: var(--skai-color-text-muted); font-family: var(--skai-font-sans); font-size: var(--skai-text-3xs); text-overflow: ellipsis; white-space: nowrap; }
+.file-editor-heading-copy span { overflow: hidden; color: var(--skai-color-text); text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .chat-working-context { max-width: 100%; } .chat-working-context small { display: none; } .composer-mode-chip { max-width: 84px; overflow: hidden; text-overflow: ellipsis; } }
+@media (max-width: 1100px) { .coding-project-browser .file-editor-heading > .file-editor-heading-copy { width: 100%; } }
