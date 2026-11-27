@@ -2927,6 +2927,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-coding .coding-project-heading-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
 .app-content-coding .coding-project-heading-actions select { width: min(220px, 26vw); min-width: 110px; min-height: 31px; padding: 4px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font-size: var(--skai-text-xs); }
 .app-content-coding .coding-project-heading-actions .ui-button { min-height: 31px; padding: 5px 9px; font-size: var(--skai-text-xs); }
+.coding-context-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; min-width: 0; padding: 8px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
+.coding-context-strip > span { display: grid; min-width: 0; gap: 3px; padding: 2px 8px; border-right: 1px solid var(--skai-color-border); }
+.coding-context-strip > span:last-child { border-right: 0; }
+.coding-context-strip small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); text-transform: uppercase; letter-spacing: .06em; }
+.coding-context-strip strong { overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-xs); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { .coding-context-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }.coding-context-strip > span { border-right: 0; }.coding-context-strip > span:last-child { grid-column: 1 / -1; } }
 .app-content-coding .coding-page-active .coding-project-context { min-height: 36px; gap: 10px; padding-block: 3px; }
 .app-content-coding .coding-page-active .coding-project-context-actions { gap: 4px; }
 .app-content-coding .coding-page-active .coding-project-context-actions .ui-button { min-height: 29px; padding: 4px 8px; font-size: var(--skai-text-xs); }
