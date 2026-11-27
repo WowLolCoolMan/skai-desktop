@@ -9,7 +9,7 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
   { route: "projects", icon: "project", label: "Projects" },
   { route: "scheduled", icon: "clock", label: "Scheduled" },
   { route: "coding", icon: "code", label: "Coding" },
-  { route: "images", icon: "image", label: "Images" },
+  { route: "images", icon: "image", label: "Visuals" },
 ];
 
 const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];

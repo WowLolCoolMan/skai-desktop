@@ -3433,7 +3433,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-images { padding: 8px 10px 10px; overflow: hidden; }
 .app-content-images .visuals-workshop-page { width: 100%; max-width: none; height: 100%; min-height: 0; margin: 0; padding: 0; gap: 8px; overflow: hidden; }
 .visuals-toolstrip { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-start; gap: 3px; min-width: 0; min-height: 42px; padding: 2px 4px 7px; overflow-x: auto; border-bottom: 1px solid var(--skai-color-border); scrollbar-width: thin; }
-.visuals-page-title { flex: 0 0 auto; margin: 0 0 0 4px; color: var(--skai-color-text); font-size: clamp(24px, 2vw, 30px); font-weight: 650; line-height: 1.2; }
+.visuals-page-heading { display: flex; flex: 0 0 auto; align-items: end; justify-content: space-between; gap: 16px; min-width: 0; padding: 2px 4px 0; }
+.visuals-page-heading > div { min-width: 0; }
+.visuals-page-heading .section-kicker { margin: 0 0 3px; color: var(--skai-color-accent); font-size: var(--skai-text-2xs); letter-spacing: .1em; }
+.visuals-page-title { margin: 0; color: var(--skai-color-text); font-size: clamp(24px, 2vw, 30px); font-weight: 650; line-height: 1.2; }
+.visuals-page-subtitle { margin: 4px 0 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.visuals-page-scope { flex: 0 0 auto; margin-bottom: 3px; padding: 5px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); white-space: nowrap; }
 .visuals-tool-tab { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; min-height: 32px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: transparent; font: inherit; font-size: var(--skai-text-xs); white-space: nowrap; cursor: pointer; }
 .visuals-tool-tab .nav-icon { width: 15px; height: 15px; }
 .visuals-tool-tab:hover:not(:disabled) { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
@@ -3456,7 +3461,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .visuals-workshop-page.is-generate-empty .visuals-composer-options { flex-wrap: wrap; }
 .visuals-workshop-page.is-generate-empty .visuals-composer-action .ui-button { justify-content: center; min-height: 44px; }
 .visuals-workshop-page.is-editing { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); grid-template-rows: auto auto minmax(0, 1fr) 116px; }
-.visuals-workshop-page.is-editing > .visuals-page-title { grid-column: 1 / -1; grid-row: 1; }
+.visuals-workshop-page.is-editing > .visuals-page-heading { grid-column: 1 / -1; grid-row: 1; }
 .visuals-workshop-page.is-editing > .visuals-toolstrip { grid-column: 1 / -1; grid-row: 2; }
 .visuals-workshop-page.is-editing .visuals-main { display: contents; }
 .visuals-workshop-page.is-editing .visuals-stage { grid-column: 1; grid-row: 3; }

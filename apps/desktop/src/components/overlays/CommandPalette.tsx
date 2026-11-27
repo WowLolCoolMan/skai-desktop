@@ -18,7 +18,7 @@ const commands: Command[] = [
   { id: "coding", label: "Open Coding Workspace", detail: "Projects, files, terminal, and edits", route: "coding", shortcutId: "coding", context: ["coding", "projects"] },
   { id: "terminal", label: "Open Terminal", detail: "Run a bounded command in a selected project", route: "terminal", shortcutId: "terminal", context: ["coding", "terminal"] },
   { id: "models", label: "Open Models", detail: "Discover and select a provider model", route: "models", context: ["chat", "models"] },
-  { id: "images", label: "Open Image Studio", detail: "Create with a local workflow", route: "images", context: ["images", "chat"] },
+  { id: "images", label: "Open Visuals Workshop", detail: "Create and edit local images, animation, and media", route: "images", context: ["images", "chat"] },
   { id: "marketplace", label: "Open Marketplace", detail: "Find models, voices, tools, and skills", route: "marketplace", context: ["marketplace", "plugins"] },
   { id: "voice-workbench", label: "Open Voice Workbench", detail: "Customize installed and local voice profiles", route: "voice-workbench", context: ["voice-workbench", "marketplace"] },
   { id: "memory", label: "Open Memory", detail: "Review approved local memory", route: "memory", context: ["memory", "chat"] },
