@@ -225,6 +225,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const runtime = installedVoiceModels.find((voice) => voice.id === runtimeId);
   const safeText = removeUnsupportedSpeechCues(text, runtime);
   if (!safeText) return false;
+  window.dispatchEvent(new CustomEvent("skai:voice-caption", { detail: { text: safeText } }));
   const expressiveness = settings.expressiveness;
   // Skai profiles control pacing on every engine. Pitch is applied only by the
   // browser's native fallback; local model runtimes do not expose pitch control.
@@ -240,10 +241,21 @@ export async function speakNativeResponse(text: string, force = false, profileId
         activeCloudAudio?.pause();
         activeCloudAudio = new Audio(audioDataUrl);
         const audio = activeCloudAudio;
+        const outputDeviceId = localStorage.getItem("skai.voice.outputDevice") ?? "default";
+        const routableAudio = audio as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void> };
+        if (outputDeviceId !== "default" && routableAudio.setSinkId) {
+          try { await routableAudio.setSinkId(outputDeviceId); }
+          catch { window.dispatchEvent(new CustomEvent("skai:voice-output-routing", { detail: { available: false } })); }
+        }
         let finishPlayback!: () => void;
         const playbackFinished = new Promise<void>((resolve) => { finishPlayback = resolve; });
+        let outputContext: AudioContext | null = null;
+        let outputMeterTimer = 0;
         const playbackEnded = () => {
           if (activeCloudAudio === audio) activeCloudAudio = null;
+          if (outputMeterTimer) window.clearInterval(outputMeterTimer);
+          window.dispatchEvent(new CustomEvent("skai:voice-output-level", { detail: 0 }));
+          if (outputContext && outputContext.state !== "closed") void outputContext.close().catch(() => {});
           setVoicePlaybackActive(false);
           finishPlayback();
         };
@@ -251,6 +263,25 @@ export async function speakNativeResponse(text: string, force = false, profileId
         audio.addEventListener("ended", playbackEnded, { once: true });
         audio.addEventListener("pause", playbackEnded, { once: true });
         audio.addEventListener("error", playbackEnded, { once: true });
+        if (typeof AudioContext !== "undefined") {
+          try {
+            outputContext = new AudioContext();
+            const source = outputContext.createMediaElementSource(audio);
+            const analyser = outputContext.createAnalyser();
+            analyser.fftSize = 512;
+            source.connect(analyser);
+            analyser.connect(outputContext.destination);
+            const samples = new Float32Array(analyser.fftSize);
+            outputMeterTimer = window.setInterval(() => {
+              analyser.getFloatTimeDomainData(samples);
+              let square = 0;
+              for (const sample of samples) square += sample * sample;
+              const rms = Math.sqrt(square / samples.length);
+              window.dispatchEvent(new CustomEvent("skai:voice-output-level", { detail: Math.min(1, rms * 5) }));
+            }, 80);
+            void outputContext.resume();
+          } catch { outputContext = null; }
+        }
         if (["chatterbox-nano-local", "pocket-tts-local", "qwen3-tts-local"].includes((speech.result as { engine?: unknown }).engine as string)) {
           audio.preservesPitch = true;
           audio.playbackRate = profile.rate;

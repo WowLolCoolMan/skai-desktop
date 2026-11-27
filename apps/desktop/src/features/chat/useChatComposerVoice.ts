@@ -21,6 +21,9 @@ type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
   install?: (options: { langs: string[]; processLocally: boolean; quality?: "dictation" }) => Promise<boolean>;
 };
 type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
+type VoiceDevice = { deviceId: string; label: string };
+type VoiceTranscriptLine = { id: number; speaker: "you" | "skai"; text: string };
+type HandsFreeCapture = { stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; recentMonitorChunk: Blob | null; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number; monitorDuringPlayback: boolean; bargeInTriggered: boolean; finish?: () => void };
 
 type UseChatComposerVoiceOptions = {
   draft: string;
@@ -44,15 +47,29 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const [audioTranscribing, setAudioTranscribing] = useState(false);
   const [voiceTurnTranscribing, setVoiceTurnTranscribing] = useState(false);
   const [voicePlaybackActive, setVoicePlaybackActive] = useState(false);
+  const [voiceOutputLevel, setVoiceOutputLevel] = useState(0);
+  const [voiceInputDevices, setVoiceInputDevices] = useState<VoiceDevice[]>([]);
+  const [voiceOutputDevices, setVoiceOutputDevices] = useState<VoiceDevice[]>([]);
+  const [voiceInputDeviceId, setVoiceInputDeviceId] = useState(() => localStorage.getItem("skai.voice.inputDevice") ?? "default");
+  const [voiceOutputDeviceId, setVoiceOutputDeviceId] = useState(() => localStorage.getItem("skai.voice.outputDevice") ?? "default");
+  const [voiceInteractionMode, setVoiceInteractionMode] = useState<"hands-free" | "push-to-talk">(() => localStorage.getItem("skai.voice.interactionMode") === "push-to-talk" ? "push-to-talk" : "hands-free");
+  const [pushToTalkHeld, setPushToTalkHeld] = useState(false);
+  const [voiceCalibration, setVoiceCalibration] = useState(() => localStorage.getItem("skai.voice.calibrated.v1") ?? "not-calibrated");
+  const [voiceTranscriptPreview, setVoiceTranscriptPreview] = useState("");
+  const [voiceReviewBeforeSend, setVoiceReviewBeforeSend] = useState(() => localStorage.getItem("skai.voice.reviewBeforeSend") === "true");
+  const [pendingVoiceTranscript, setPendingVoiceTranscript] = useState<string | null>(null);
+  const [voicePaused, setVoicePaused] = useState(false);
+  const [voiceSessionTranscript, setVoiceSessionTranscript] = useState<VoiceTranscriptLine[]>([]);
   const [audioTranscriptReady, setAudioTranscriptReady] = useState(false);
   const audioPickerRef = useRef<HTMLInputElement>(null);
   const audioAbortRef = useRef<AbortController | null>(null);
   const whisperRecorderRef = useRef<{ recorder: MediaRecorder; stream: MediaStream; chunks: Blob[] } | null>(null);
   const whisperRecorderTimerRef = useRef<number | null>(null);
-  const handsFreeCaptureRef = useRef<{ stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; recentMonitorChunk: Blob | null; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number; monitorDuringPlayback: boolean; bargeInTriggered: boolean } | null>(null);
+  const handsFreeCaptureRef = useRef<HandsFreeCapture | null>(null);
   const handsFreeAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const handsFreeRef = useRef(false);
+  const pushToTalkRef = useRef(false);
   const awaitingResponseRef = useRef(false);
   const pendingBargeInTranscriptRef = useRef<string | null>(null);
   const voicePlaybackActiveRef = useRef(false);
@@ -85,6 +102,112 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     return () => window.removeEventListener("skai:voice-settings-updated", refreshVoiceSettings);
   }, []);
 
+  const refreshVoiceDevices = async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setVoiceInputDevices(devices.filter((device) => device.kind === "audioinput").map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Microphone ${index + 1}` })));
+      setVoiceOutputDevices(devices.filter((device) => device.kind === "audiooutput").map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Speaker ${index + 1}` })));
+    } catch { /* Device labels may be unavailable until microphone permission is granted. */ }
+  };
+
+  useEffect(() => {
+    void refreshVoiceDevices();
+    const onDeviceChange = () => void refreshVoiceDevices();
+    navigator.mediaDevices?.addEventListener?.("devicechange", onDeviceChange);
+    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", onDeviceChange);
+  }, []);
+
+  const setVoiceInputDevice = (deviceId: string) => {
+    setVoiceInputDeviceId(deviceId);
+    localStorage.setItem("skai.voice.inputDevice", deviceId);
+  };
+  const setVoiceOutputDevice = (deviceId: string) => {
+    setVoiceOutputDeviceId(deviceId);
+    localStorage.setItem("skai.voice.outputDevice", deviceId);
+    window.dispatchEvent(new CustomEvent("skai:voice-output-device", { detail: deviceId }));
+  };
+  const setVoiceMode = (mode: "hands-free" | "push-to-talk") => {
+    setVoiceInteractionMode(mode);
+    localStorage.setItem("skai.voice.interactionMode", mode);
+    pushToTalkRef.current = false;
+    setPushToTalkHeld(false);
+    if (mode === "push-to-talk") {
+      stopHandsFreeCapture(false);
+      setVoiceListening(false);
+    } else if (handsFreeRef.current && !busyRef.current) void startHandsFreeListeningRef.current();
+  };
+  const setVoiceReview = (enabled: boolean) => {
+    setVoiceReviewBeforeSend(enabled);
+    localStorage.setItem("skai.voice.reviewBeforeSend", String(enabled));
+  };
+  const pauseVoiceMode = () => {
+    const next = !voicePaused;
+    setVoicePaused(next);
+    if (next) {
+      pushToTalkRef.current = false;
+      setPushToTalkHeld(false);
+      stopHandsFreeCapture(false);
+      setVoiceListening(false);
+    } else if (handsFreeRef.current && voiceInteractionMode === "hands-free" && !busyRef.current) void startHandsFreeListeningRef.current();
+  };
+  const submitReviewedVoiceTranscript = () => {
+    if (!pendingVoiceTranscript) return;
+    const transcript = pendingVoiceTranscript;
+    setPendingVoiceTranscript(null);
+    if (!onVoiceTranscript(transcript)) {
+      awaitingResponseRef.current = false;
+      setVoiceError("Add a document before sending a Documents-only request.");
+      if (voiceInteractionMode === "hands-free") void startHandsFreeListeningRef.current();
+    }
+  };
+  const discardReviewedVoiceTranscript = () => {
+    setPendingVoiceTranscript(null);
+    awaitingResponseRef.current = false;
+    setVoiceTranscriptPreview("");
+    if (voiceInteractionMode === "hands-free" && handsFreeRef.current && !voicePaused) void startHandsFreeListeningRef.current();
+  };
+
+  const calibrateVoice = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof AudioContext === "undefined") {
+      setVoiceError("Microphone calibration is not available in this desktop runtime.");
+      return;
+    }
+    let stream: MediaStream | null = null;
+    let context: AudioContext | null = null;
+    try {
+      const audio: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      if (voiceInputDeviceId !== "default") audio.deviceId = { exact: voiceInputDeviceId };
+      stream = await navigator.mediaDevices.getUserMedia({ audio });
+      context = new AudioContext();
+      await context.resume();
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      context.createMediaStreamSource(stream).connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      const readings: number[] = [];
+      setVoiceError(null);
+      for (let index = 0; index < 20; index++) {
+        analyser.getFloatTimeDomainData(samples);
+        readings.push(audioRms(samples));
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+      }
+      const average = readings.reduce((sum, value) => sum + value, 0) / readings.length;
+      const peak = Math.max(...readings);
+      const result = peak < 0.003 ? "quiet" : average > 0.08 ? "noisy" : "ready";
+      setVoiceCalibration(result);
+      localStorage.setItem("skai.voice.calibrated.v1", result);
+      setVoiceError(result === "quiet" ? "Very little microphone audio was detected. Check the selected input and try speaking during the next turn." : result === "noisy" ? "Background noise is high. Lower the microphone gain or choose a quieter room." : null);
+      await refreshVoiceDevices();
+    } catch (error) {
+      setVoiceCalibration(error instanceof Error && error.name === "NotAllowedError" ? "permission-denied" : "error");
+      setVoiceError(error instanceof Error && error.name === "NotAllowedError" ? "Microphone access was denied. Allow it in desktop app permissions, then calibrate again." : error instanceof Error ? error.message : "Microphone calibration failed.");
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop());
+      if (context && context.state !== "closed") await context.close().catch(() => {});
+    }
+  };
+
   useEffect(() => {
     const interruptSpeech = (event: KeyboardEvent) => {
       if (!handsFreeRef.current || !voicePlaybackActiveRef.current || !event.ctrlKey || !event.shiftKey || event.code !== "Space") return;
@@ -113,6 +236,18 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   }, []);
 
   useEffect(() => {
+    const onCaption = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text?.trim();
+      if (!text) return;
+      setVoiceSessionTranscript((current) => [...current, { id: Date.now(), speaker: "skai" as const, text }].slice(-30));
+    };
+    window.addEventListener("skai:voice-caption", onCaption);
+    const onOutputLevel = (event: Event) => setVoiceOutputLevel(Number((event as CustomEvent<number>).detail) || 0);
+    window.addEventListener("skai:voice-output-level", onOutputLevel);
+    return () => { window.removeEventListener("skai:voice-caption", onCaption); window.removeEventListener("skai:voice-output-level", onOutputLevel); };
+  }, []);
+
+  useEffect(() => {
     if (!busy && pendingBargeInTranscriptRef.current && handsFreeRef.current) {
       const transcript = pendingBargeInTranscriptRef.current;
       pendingBargeInTranscriptRef.current = null;
@@ -122,6 +257,13 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         setVoiceError("The interrupted voice turn could not be submitted. Try again.");
         void startHandsFreeListening();
       }
+      return;
+    }
+    if (voiceInteractionMode === "push-to-talk") {
+      if (busy && handsFreeRef.current) {
+        awaitingResponseRef.current = true;
+        if (!handsFreeCaptureRef.current?.monitorDuringPlayback) stopHandsFreeCapture(false);
+      } else if (!busy) awaitingResponseRef.current = false;
       return;
     }
     if (busy && handsFreeRef.current && !awaitingResponseRef.current) {
@@ -144,7 +286,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       void startHandsFreeListening();
     });
     return () => { cancelled = true; };
-  }, [busy]);
+  }, [busy, voiceInteractionMode]);
 
   useEffect(() => {
     const handleFallback = (event: Event) => setVoiceFallbackNotice((event as CustomEvent<{ message?: string }>).detail?.message ?? "The selected voice model failed to load. Using the native fallback voice.");
@@ -312,11 +454,27 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     handsFreeRef.current = true;
     awaitingResponseRef.current = false;
     setHandsFreeActive(true);
+    if (voiceInteractionMode === "hands-free") void startHandsFreeListening();
+  };
+
+  const startPushToTalk = () => {
+    if (voiceInteractionMode !== "push-to-talk" || !handsFreeRef.current || busyRef.current || voiceTurnTranscribing || pushToTalkRef.current) return;
+    pushToTalkRef.current = true;
+    setPushToTalkHeld(true);
+    awaitingResponseRef.current = false;
+    setVoiceTranscriptPreview("");
     void startHandsFreeListening();
+  };
+  const stopPushToTalk = () => {
+    if (!pushToTalkRef.current) return;
+    pushToTalkRef.current = false;
+    setPushToTalkHeld(false);
+    handsFreeCaptureRef.current?.finish?.();
   };
 
   const endVoiceMode = () => {
     handsFreeRef.current = false;
+    pushToTalkRef.current = false;
     awaitingResponseRef.current = false;
     sawBusyRef.current = false;
     pendingBargeInTranscriptRef.current = null;
@@ -344,7 +502,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   };
 
   const startHandsFreeListening = async (monitorDuringPlayback = false) => {
-    if (!handsFreeRef.current || (!monitorDuringPlayback && (busyRef.current || awaitingResponseRef.current)) || (monitorDuringPlayback && !voicePlaybackActiveRef.current) || handsFreeCaptureRef.current || handsFreeAbortRef.current) return;
+    if (!handsFreeRef.current || voicePaused || (!monitorDuringPlayback && (busyRef.current || awaitingResponseRef.current)) || (monitorDuringPlayback && !voicePlaybackActiveRef.current) || handsFreeCaptureRef.current || handsFreeAbortRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined" || typeof AudioContext === "undefined") {
       setVoiceError("This desktop runtime cannot capture local Voice Mode audio.");
       endVoiceMode();
@@ -360,7 +518,9 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         endVoiceMode();
         return;
       }
-      const stream = pendingStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      const audio: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      if (voiceInputDeviceId !== "default") audio.deviceId = { exact: voiceInputDeviceId };
+      const stream = pendingStream = await navigator.mediaDevices.getUserMedia({ audio });
       if (!handsFreeRef.current || (monitorDuringPlayback && !voicePlaybackActiveRef.current)) { stream.getTracks().forEach((track) => track.stop()); return; }
       const context = pendingContext = new AudioContext();
       await context.resume();
@@ -382,7 +542,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       const samples = new Float32Array(analyser.fftSize);
       const mimeType = ["audio/webm;codecs=opus", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type));
       if (!mimeType) throw new Error("This desktop runtime cannot record a supported local audio format.");
-      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], recentMonitorChunk: null as Blob | null, abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false, lastLevelPublish: 0 };
+      const capture: HandsFreeCapture & { speechDetected: boolean; calibrationStartedAt: number; lastLevelPublish: number } = { stream, context, frame: 0, recorder: null, chunks: [], recentMonitorChunk: null, abort: null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false, lastLevelPublish: 0 };
       handsFreeCaptureRef.current = capture;
       capture.recorder = new MediaRecorder(stream, { mimeType });
       capture.recorder.ondataavailable = (event) => {
@@ -406,7 +566,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
           if (!blob.size || blob.size > 20 * 1024 * 1024) {
             if (blob.size > 20 * 1024 * 1024) setVoiceError("That voice turn exceeded the 20 MB local transcription limit. Try a shorter turn.");
             setVoiceListening(false);
-            window.setTimeout(() => void startHandsFreeListening(), 400);
+            if (voiceInteractionMode === "hands-free") window.setTimeout(() => void startHandsFreeListening(), 400);
             return;
           }
           setVoiceListening(false);
@@ -417,6 +577,12 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
           handsFreeAbortRef.current = controller;
           void transcribeLocalAudioFile(new File([blob], `voice-turn-${Date.now()}.webm`, { type: "audio/webm" }), controller.signal).then((transcript) => {
             if (!handsFreeRef.current || controller.signal.aborted) return;
+            setVoiceTranscriptPreview(transcript);
+            setVoiceSessionTranscript((current) => [...current, { id: Date.now(), speaker: "you" as const, text: transcript }].slice(-30));
+            if (voiceReviewBeforeSend) {
+              setPendingVoiceTranscript(transcript);
+              return;
+            }
             if (busyRef.current) {
               pendingBargeInTranscriptRef.current = transcript;
               return;
@@ -424,14 +590,14 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
             if (!onVoiceTranscript(transcript)) {
               awaitingResponseRef.current = false;
               setVoiceError("Add a document before speaking a Documents-only request.");
-              window.setTimeout(() => void startHandsFreeListening(), 400);
+              if (voiceInteractionMode === "hands-free") window.setTimeout(() => void startHandsFreeListening(), 400);
             }
           }).catch((error) => {
             if (!handsFreeRef.current || controller.signal.aborted) return;
             const message = error instanceof Error ? error.message : "Local Whisper could not transcribe that voice turn.";
             if (!message.includes("did not recognize speech")) setVoiceError(message);
             awaitingResponseRef.current = false;
-            window.setTimeout(() => void startHandsFreeListening(), 500);
+            if (voiceInteractionMode === "hands-free") window.setTimeout(() => void startHandsFreeListening(), 500);
           }).finally(() => {
             if (handsFreeAbortRef.current === controller) handsFreeAbortRef.current = null;
             setVoiceTurnTranscribing(false);
@@ -439,6 +605,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         };
         recorder.stop();
       };
+      capture.finish = finalize;
       const inspect = () => {
         if (!handsFreeRef.current || handsFreeCaptureRef.current !== capture) return;
         analyser.getFloatTimeDomainData(samples);
@@ -476,7 +643,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         } else if (capture.monitorDuringPlayback && !capture.bargeInTriggered) {
           capture.speechStartedAt = 0;
         }
-        if ((!capture.monitorDuringPlayback && now - capture.startedAt > 30_000) || (capture.speechDetected && now - capture.lastSpeechAt > 900 && now - capture.speechStartedAt > 300)) { finalize(); return; }
+        if ((!capture.monitorDuringPlayback && ((voiceInteractionMode === "hands-free" && now - capture.startedAt > 30_000) || (voiceInteractionMode === "push-to-talk" && now - capture.startedAt > 120_000))) || (voiceInteractionMode === "hands-free" && capture.speechDetected && now - capture.lastSpeechAt > 900 && now - capture.speechStartedAt > 300)) { finalize(); return; }
         if (capture.context.state !== "running") void capture.context.resume();
       };
       capture.frame = window.setInterval(inspect, 40);
@@ -543,5 +710,5 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       setVoicePackInstalling(false);
     }
   };
-  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack };
+  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode };
 }

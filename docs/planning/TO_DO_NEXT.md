@@ -46,6 +46,20 @@ Mark an item done only when the linked workflow has evidence.
   1440×900 reference size, including project open, Monaco/editor, Files,
   Changes, and local Side chat split coverage.
 
+### Marketplace and Models presentation — completed in this pass
+
+- **Status / owner:** Done · Codex
+- **Result:** Marketplace model cards now keep their content column at the
+  available width, so repository names and source metadata wrap naturally
+  instead of collapsing into one-character columns. The dedicated Models
+  page now surfaces local readiness counts (available, loaded, vision-capable,
+  and runtime coverage), exposes loaded-now state in the inventory, and keeps
+  search clearing and model inspection actions close to the list.
+- **Evidence:** `npm run desktop:typecheck`, `npm run build`,
+  `npm run package:electron`, `npm run audit:theme-tokens`, and the packaged
+  UI matrix for `#/models` and `#/marketplace` at 1440×900 passed without
+  runtime or layout failures.
+
 1. **UI and accessibility acceptance — In progress · Codex.** The freshly
    packaged audit passes all 16 routes with zero WCAG violations; axe reports
    one incomplete contrast check for decorative symbol-only icons on Pet
