@@ -16,9 +16,22 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
 ];
 
 const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];
+const railOrderKey = "skai.global-rail.order.v1";
+
+function readRailOrder(): Route[] {
+  const fallback = destinations.map((item) => item.route);
+  try {
+    const value = JSON.parse(localStorage.getItem(railOrderKey) ?? "[]") as unknown;
+    if (!Array.isArray(value)) return fallback;
+    const stored = value.filter((item): item is Route => fallback.includes(item as Route));
+    return [...stored, ...fallback.filter((route) => !stored.includes(route))];
+  } catch { return fallback; }
+}
 
 export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: DesktopTask[]; onNavigate: (route: Route) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [customizeRail, setCustomizeRail] = useState(false);
+  const [railOrder, setRailOrder] = useState<Route[]>(readRailOrder);
   const [showPetWorkshop, setShowPetWorkshop] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
   const [query, setQuery] = useState("");
   const [lastActivityVisit, setLastActivityVisit] = useState(() => Number(localStorage.getItem("skai.workspace-activity.last-visit.v1") ?? 0));
@@ -27,6 +40,7 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
     catch { return []; }
   });
   const menuRef = useRef<HTMLDivElement>(null);
+  const draggedRailRouteRef = useRef<Route | null>(null);
   useEffect(() => {
     const refresh = () => setShowPetWorkshop(localStorage.getItem("skai.pet.workshop.enabled") === "true");
     window.addEventListener("storage", refresh);
@@ -42,6 +56,7 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
   useEffect(() => {
     localStorage.setItem("skai.extras.recent", JSON.stringify(recentRoutes));
   }, [recentRoutes]);
+  useEffect(() => { localStorage.setItem(railOrderKey, JSON.stringify(railOrder)); }, [railOrder]);
   useEffect(() => {
     if (!menuOpen) return;
     const closeOutside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
@@ -65,6 +80,18 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
     ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pets", icon: "sparkle" as NavIconName, description: "Customize your desktop companion", unavailable: false }] : []),
   ], [lastActivityVisit, showPetWorkshop, tasks]);
   const filteredItems = menuItems.filter((item) => !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const orderedDestinations = railOrder.map((itemRoute) => destinations.find((item) => item.route === itemRoute)).filter((item): item is (typeof destinations)[number] => Boolean(item));
+  const moveRailRoute = (targetRoute: Route) => {
+    const sourceRoute = draggedRailRouteRef.current;
+    draggedRailRouteRef.current = null;
+    if (!sourceRoute || sourceRoute === targetRoute) return;
+    setRailOrder((current) => {
+      const next = current.filter((item) => item !== sourceRoute);
+      const targetIndex = Math.max(0, next.indexOf(targetRoute));
+      next.splice(targetIndex, 0, sourceRoute);
+      return next;
+    });
+  };
   const openExtra = (itemRoute: Route) => {
     const next = recentExtraRoutes.includes(itemRoute)
       ? [itemRoute, ...recentRoutes.filter((route) => route !== itemRoute)].slice(0, 3)
@@ -77,11 +104,12 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
   };
   return <aside className="global-rail" aria-label="Global navigation">
     <nav className="global-rail-destinations" aria-label="Primary navigation">
-      {destinations.map((item) => <button key={item.route} className={route === item.route ? "is-active" : ""} type="button" aria-current={route === item.route ? "page" : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item.route)}><NavIcon name={item.icon} /></button>)}
+      {orderedDestinations.map((item) => <button key={item.route} className={`${route === item.route ? "is-active" : ""}${customizeRail ? " is-customizing" : ""}`} draggable={customizeRail} type="button" aria-current={route === item.route ? "page" : undefined} aria-label={item.label} title={customizeRail ? `Drag to reorder ${item.label}` : item.label} onDragStart={() => { draggedRailRouteRef.current = item.route; }} onDragOver={(event) => { if (customizeRail) event.preventDefault(); }} onDrop={() => { if (customizeRail) moveRailRoute(item.route); }} onClick={() => { if (!customizeRail) onNavigate(item.route); }}><NavIcon name={item.icon} /></button>)}
       <div className="global-rail-app-menu" ref={menuRef}>
         <button className={menuOpen ? "is-active" : ""} type="button" aria-label="Extras" title="Extras" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><NavIcon name="more" />{menuItems.some((item) => item.unavailable) && <span className="global-rail-attention-dot" aria-label="Setup needs attention" />}</button>
         {menuOpen && <section className="global-rail-extras-panel" aria-label="Extras">
-          <header><div><p className="section-kicker">YOUR WORKSPACE</p><strong>Extras</strong><span>More ways to work with Skai</span></div><button type="button" aria-label="Close Extras" onClick={() => setMenuOpen(false)}>×</button></header>
+          <header><div><p className="section-kicker">YOUR WORKSPACE</p><strong>Extras</strong><span>More ways to work with Skai</span></div><div className="global-rail-extras-header-actions"><button type="button" className="global-rail-customize-toggle" onClick={() => setCustomizeRail((open) => !open)} aria-pressed={customizeRail}>{customizeRail ? "Done" : "Customize rail"}</button><button type="button" aria-label="Close Extras" onClick={() => setMenuOpen(false)}>×</button></div></header>
+          {customizeRail && <p className="global-rail-customize-hint" role="status">Drag the primary destinations to choose your order. Your arrangement stays on this device.</p>}
           {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search extras" aria-label="Search extras" /></label>}
           {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PICK UP WHERE YOU LEFT OFF</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
           <div className="global-rail-extras-group"><p className="global-rail-extras-label">FEATURES</p>
