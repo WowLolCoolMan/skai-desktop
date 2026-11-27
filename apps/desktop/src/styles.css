@@ -5224,11 +5224,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .chat-message:target { outline: 2px solid var(--skai-color-accent); outline-offset: 4px; }
 .new-activity-divider { grid-column: 1 / -1; justify-self: center; padding: 4px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-accent-text); background: var(--skai-color-surface); font-size: var(--skai-text-xs); font-weight: 600; }
 .message-actions .ui-button { min-height: 28px; }
+.chat-message .message-actions .ui-button { color: var(--skai-color-text); }
 .chat-message:not(:hover):not(:focus-within) .message-actions { opacity: .7; }
 .chat-message:focus-within .message-actions, .chat-message:hover .message-actions { opacity: 1; }
 .message-meta > span, .sidebar-label, .sidebar-project-thread-count, .workspace-tab-status, .conversation-count, .panel-count, .model-picker-label { font-variant-numeric: tabular-nums; }
 .sidebar-muted, .sidebar-project-no-threads, .sidebar-project-thread-count, .form-helper, .composer-hint, .settings-save-status { font-size: max(var(--skai-text-xs), 12px); }
 .sidebar-project-tree-open span, .sidebar-project-thread > span, .sidebar-history-item, .workspace-tab-select > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-history-item { display: flex; align-items: center; gap: 8px; }
+.sidebar-history-item > span { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-history-item > time { flex: 0 0 auto; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); font-variant-numeric: tabular-nums; }
 .message-content, .message-content p, .message-content li, .message-content th, .message-content td { overflow-wrap: anywhere; }
 .app-content-coding .project-thread-panel .message-content { width: min(100%, 68ch); }
 .ui-dialog { max-height: calc(100dvh - 32px); }
