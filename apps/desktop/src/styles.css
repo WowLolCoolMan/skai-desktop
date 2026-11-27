@@ -5071,4 +5071,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .chat-working-context small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer-mode-chip { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 8px; border: 1px solid var(--skai-color-border); border-radius: 999px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 700; white-space: nowrap; }
 .composer-mode-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--skai-color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--skai-color-accent) 12%, transparent); }
+.composer-context-meter { display: inline-flex; min-width: 0; flex-direction: column; gap: 3px; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); white-space: nowrap; }
+.composer-context-meter-label { overflow: hidden; text-overflow: ellipsis; }
+.composer-context-meter-track { width: 74px; height: 3px; overflow: hidden; border-radius: 999px; background: var(--skai-color-border); }
+.composer-context-meter-track > span { display: block; height: 100%; border-radius: inherit; background: var(--skai-color-accent); transition: width 120ms ease; }
+.composer-context-meter.is-near-limit { color: var(--skai-color-warning); }
+.composer-context-meter.is-near-limit .composer-context-meter-track > span { background: var(--skai-color-warning); }
 @media (max-width: 640px) { .chat-working-context { max-width: 100%; } .chat-working-context small { display: none; } .composer-mode-chip { max-width: 84px; overflow: hidden; text-overflow: ellipsis; } }

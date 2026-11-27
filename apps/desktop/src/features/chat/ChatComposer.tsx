@@ -312,6 +312,11 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   };
 
   const hasMessageContent = draft.trim().length > 0 || attachments.length > 0;
+  const selectedModel = models.find((item) => item.model === model && (item.provider ?? provider) === provider);
+  const contextBudget = selectedModel?.contextLength && selectedModel.contextLength > 0 ? selectedModel.contextLength : 8_192;
+  const estimatedContextTokens = Math.max(0, Math.ceil((draft.length + attachments.reduce((total, attachment) => total + attachment.content.length, 0)) / 4));
+  const contextBudgetPercent = Math.min(100, Math.round((estimatedContextTokens / contextBudget) * 100));
+  const contextBudgetLabel = estimatedContextTokens > 0 ? `Context · ~${estimatedContextTokens.toLocaleString()} / ${contextBudget.toLocaleString()}` : `Context · ${contextBudget.toLocaleString()} available`;
   const saveQueuedEdit = async (index: number) => {
     setQueueUpdateBusy(true);
     try {
@@ -368,6 +373,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
           </section>}
         </div>
         {documentsOnly && <span className="composer-docs-chip"><NavIcon name="document" /> Docs only</span>}
+        <span className={`composer-context-meter${contextBudgetPercent >= 85 ? " is-near-limit" : ""}`} title="Approximate context estimate based on this draft and attached content" aria-label={`${contextBudgetLabel}. This is an estimate; the model may use additional conversation context.`}><span className="composer-context-meter-label">{contextBudgetLabel}</span><span className="composer-context-meter-track" aria-hidden="true"><span style={{ width: `${contextBudgetPercent}%` }} /></span></span>
         <span id="attachment-help" className="sr-only">{attachments.length} of 5 attachments. {workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"} to {busy ? "queue" : "send"}; {workflowPreferences.sendBehavior === "enter-sends" ? "Shift+Enter" : "Enter"} starts a new line.</span>
       </div>
       <div className="composer-action-right">
