@@ -5,8 +5,10 @@ import { Button } from "../../components/ui/Primitives";
 const preferenceKey = "skai.taskNotifications.preferences.v1";
 const historyKey = "skai.taskNotifications.history.v1";
 const statusKey = "skai.taskNotifications.statuses.v1";
+const observationKey = "skai.taskNotifications.observation.v1";
 const preferenceEvent = "skai-task-notification-preferences-changed";
 const historyEvent = "skai-task-notification-history-changed";
+const observationEvent = "skai-task-notification-observation-changed";
 const maxHistory = 50;
 
 type NotificationPreferences = {
@@ -22,6 +24,7 @@ type NotificationPreferences = {
 };
 type Delivery = "shown" | "disabled" | "category-disabled" | "quiet-hours" | "project-muted" | "permission-required" | "unsupported" | "error";
 type HistoryEntry = { id: string; taskId: string; taskTitle: string; projectId: string | null; status: string; createdAt: string; delivery: Delivery };
+type Observation = { observedAt: string; taskCount: number };
 
 const defaultPreferences: NotificationPreferences = { enabled: false, completed: true, failed: true, decisions: true, quietHours: false, quietStart: "22:00", quietEnd: "08:00", mutedProjectIds: [], showTaskTitles: false };
 const statuses = new Set(["completed", "failed", "blocked", "awaiting_approval", "needs_decision"]);
@@ -49,6 +52,14 @@ function readHistory(): HistoryEntry[] {
     const value = JSON.parse(localStorage.getItem(historyKey) ?? "[]") as unknown;
     return Array.isArray(value) ? value.filter((entry): entry is HistoryEntry => Boolean(entry && typeof entry === "object" && typeof (entry as HistoryEntry).id === "string" && typeof (entry as HistoryEntry).taskId === "string" && typeof (entry as HistoryEntry).taskTitle === "string" && typeof (entry as HistoryEntry).status === "string" && typeof (entry as HistoryEntry).createdAt === "string" && typeof (entry as HistoryEntry).delivery === "string")).slice(0, maxHistory) : [];
   } catch { return []; }
+}
+
+function readObservation(): Observation | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(observationKey) ?? "null") as Partial<Observation> | null;
+    if (!value || typeof value.observedAt !== "string" || !Number.isFinite(Date.parse(value.observedAt)) || typeof value.taskCount !== "number" || !Number.isFinite(value.taskCount)) return null;
+    return { observedAt: value.observedAt, taskCount: Math.max(0, Math.floor(value.taskCount)) };
+  } catch { return null; }
 }
 
 function inQuietHours(start: string, end: string, now = new Date()) {
@@ -85,6 +96,10 @@ export function TaskNotificationMonitor({ tasks, scheduledTasks = [], loading, o
     if (!hasBaseline && tasks.length === 0) return;
     const scheduleTasks = scheduledTasks.filter((task) => ["completed", "failed", "needs_decision"].includes(task.status)).map((task): DesktopTask => ({ id: `scheduled:${task.id}`, title: task.prompt, instruction: task.prompt, role: "scheduled automation", status: task.status, dependsOn: [], updatedAt: task.runs?.at(-1)?.completedAtUtc ?? task.dueAt }));
     const allTasks = [...tasks, ...scheduleTasks];
+    try {
+      localStorage.setItem(observationKey, JSON.stringify({ observedAt: new Date().toISOString(), taskCount: allTasks.length } satisfies Observation));
+      window.dispatchEvent(new Event(observationEvent));
+    } catch { /* task refresh must not depend on notification storage */ }
     const next = Object.fromEntries(allTasks.slice(0, 1200).map((task) => [task.id, task.status]));
     try { localStorage.setItem(statusKey, JSON.stringify(next)); } catch { /* task loading must not depend on notification storage */ }
     if (!hasBaseline) return;
@@ -130,11 +145,17 @@ export function TaskNotificationMonitor({ tasks, scheduledTasks = [], loading, o
 export function TaskNotificationSettings({ projects }: { projects: DesktopProject[] }) {
   const [preferences, setPreferences] = useState(readPreferences);
   const [history, setHistory] = useState(readHistory);
+  const [observation, setObservation] = useState(readObservation);
   const [permission, setPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   useEffect(() => {
     const refresh = () => setHistory(readHistory());
     window.addEventListener(historyEvent, refresh);
     return () => window.removeEventListener(historyEvent, refresh);
+  }, []);
+  useEffect(() => {
+    const refresh = () => setObservation(readObservation());
+    window.addEventListener(observationEvent, refresh);
+    return () => window.removeEventListener(observationEvent, refresh);
   }, []);
   const update = (patch: Partial<NotificationPreferences>) => {
     const next = { ...preferences, ...patch };
@@ -150,6 +171,7 @@ export function TaskNotificationSettings({ projects }: { projects: DesktopProjec
     <div className="settings-section-heading"><div><p className="section-kicker">TASK UPDATES</p><h2 id="task-notifications-title">Desktop notifications</h2><p>Local task updates only. Notification previews hide task names unless you opt in below.</p></div></div>
     <label className="settings-notification-toggle"><input type="checkbox" checked={preferences.enabled} onChange={(event) => update({ enabled: event.target.checked })} /><span><strong>Notify me about agent tasks</strong><small>Completion, failure, blocked tasks, and tasks waiting for approval.</small></span></label>
     <div className="settings-notification-permission"><span>System permission: <strong>{permission === "granted" ? "Allowed" : permission === "denied" ? "Blocked in system settings" : permission === "unsupported" ? "Unavailable" : "Not requested"}</strong></span>{permission !== "granted" && permission !== "denied" && permission !== "unsupported" && <Button variant="secondary" type="button" onClick={() => void requestPermission()}>Allow notifications</Button>}</div>
+    <div className="settings-notification-observation" role="status" aria-live="polite"><strong>Local host status: {observation ? (Date.now() - Date.parse(observation.observedAt) < 5 * 60_000 ? "Live in this desktop session" : "Stale — refresh Skai to verify task state") : "Not observed yet"}</strong><span>{observation ? `Last checked ${new Date(observation.observedAt).toLocaleString()} · ${observation.taskCount} task${observation.taskCount === 1 ? "" : "s"} tracked` : "No local task refresh has been recorded yet."}</span><small>This status is local-only. It is not a remote/mobile connection, and cached task state should not be treated as live when marked stale.</small></div>
     <div className="settings-notification-grid">
       <label><input type="checkbox" checked={preferences.completed} onChange={(event) => update({ completed: event.target.checked })} /><span>Completed</span></label>
       <label><input type="checkbox" checked={preferences.failed} onChange={(event) => update({ failed: event.target.checked })} /><span>Failed or blocked</span></label>

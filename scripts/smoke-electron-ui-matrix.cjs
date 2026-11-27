@@ -1756,7 +1756,8 @@ async function main() {
               const times = panel?.querySelectorAll('.settings-notification-quiet input[type="time"]');
               const safePreview = [...(panel?.querySelectorAll('input[type="checkbox"]') ?? [])].find((input) => input.closest('label')?.innerText.includes('Show task titles'));
               const clear = () => { if (previous === null) localStorage.removeItem(key); else localStorage.setItem(key, previous); window.dispatchEvent(new Event('skai-task-notification-preferences-changed')); };
-              if (!panel || !enabled || !quiet || times?.length !== 2 || !safePreview) return { ok: false, reason: 'notification controls are missing', panel: panel?.innerText.slice(0, 500) };
+              const observation = panel?.querySelector('.settings-notification-observation');
+              if (!panel || !enabled || !quiet || times?.length !== 2 || !safePreview || !observation?.innerText.includes('Local host status') || !observation.innerText.includes('local-only')) return { ok: false, reason: 'notification controls or local freshness disclosure are missing', panel: panel?.innerText.slice(0, 700) };
               const safeByDefault = !enabled.checked && !safePreview.checked;
               enabled.click(); quiet.click(); safePreview.click();
               const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;

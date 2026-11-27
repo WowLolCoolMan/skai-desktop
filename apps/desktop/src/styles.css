@@ -4922,6 +4922,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .settings-notification-toggle > span { display:grid; gap:3px; }
 .settings-notification-toggle small, .settings-notification-permission, .settings-notification-quiet small, .settings-notification-projects small, .settings-notification-history li small { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
 .settings-notification-permission, .settings-notification-history-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.settings-notification-observation { display:grid; gap:4px; padding:12px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-lg); background:var(--skai-color-surface-soft); }
+.settings-notification-observation strong { font-size:var(--skai-text-sm); }
+.settings-notification-observation span, .settings-notification-observation small { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); line-height:1.5; }
 .settings-notification-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 18px; }
 .settings-notification-grid label { color:var(--skai-color-text); font-size:var(--skai-text-sm); }
 .settings-notification-quiet { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:10px; padding:12px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-lg); }

@@ -439,6 +439,33 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Unverified: native LAN transport, QR key rotation, relay encryption review,
   companion-device UX, and remote action approval are intentionally open.
 
+### Slice 30 — notifications and mobile follow-up
+
+- Outcome: keep local task notifications useful without implying a remote
+  control plane. Existing delivery groups repeated transitions, defaults to
+  private previews, supports quiet hours and project muting, deep-links back to
+  the local task inbox, and retains bounded delivery history. Settings now shows
+  the last local task observation, marks it stale after five minutes, and
+  explicitly says the status is not a remote/mobile connection.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run package:electron`; packaged Settings-route smoke with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=settings
+  UI_MATRIX_EXERCISE_TASK_NOTIFICATION_SETTINGS=1` verifies privacy-safe
+  defaults, quiet-hour persistence, and the local freshness disclosure. Native
+  `npm test` also passes.
+- Failure check: the settings panel must not present cached task state as live,
+  notification titles must remain hidden by default, and the local history must
+  continue recording delivery failures and quiet-hour decisions.
+- Disposable profile / cleanup: the packaged matrix uses a throwaway Electron
+  profile and restores notification preferences; no OS notification permission
+  is requested and no remote host is started.
+- Network and privacy boundary: desktop notifications are local browser/OS
+  delivery only. Mobile approvals, lock-screen pause/cancel actions, and local
+  network status links remain disabled until a trusted host and task-scoped
+  approval protocol are implemented.
+- Unverified: native OS notification action buttons, lock-screen privacy across
+  platforms, companion-device transport, and offline mobile reconciliation.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record
