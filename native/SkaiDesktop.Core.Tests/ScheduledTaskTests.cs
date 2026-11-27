@@ -18,6 +18,7 @@ internal static class ScheduledTaskTests
         store.Complete(claimed!.Id, succeeded: true, "queued for reviewed chat execution", now.AddMinutes(6));
         var completed = store.Load().Single(item => item.Id == claimed.Id);
         Check(completed.Status == ScheduledTaskStatuses.Completed && completed.Outcome!.Contains("reviewed", StringComparison.Ordinal), "scheduled task records its outcome");
+        Check(completed.RunCount == 1 && completed.Runs.Count == 1 && completed.Runs[0].Input == task.Prompt && completed.Runs[0].Result!.Contains("reviewed", StringComparison.Ordinal) && completed.Runs[0].Status == "succeeded", "scheduled task preserves bounded run input and result history");
 
         var recurring = store.Schedule("Review recurring health", now.AddMinutes(10), WorkspaceModes.Chat, now, repeatEveryMinutes: 120);
         var recurringClaim = store.TryClaimDue(now.AddMinutes(11));
@@ -42,7 +43,25 @@ internal static class ScheduledTaskTests
         var cancelledState = store.Load().Single(item => item.Id == cancelled.Id);
         Check(cancelledState.Status == ScheduledTaskStatuses.Cancelled && cancelledState.Outcome == "Cancelled before execution.", "scheduled task cancellation is durable");
         Check(store.TryClaimDue(now.AddDays(2))?.Id != cancelled.Id, "cancelled scheduled task is never claimed");
-        Console.WriteLine("PASS scheduled task persistence, recurrence, claim, no-replay, outcome, run-now, pause, resume, and cancellation");
+
+        var missedSkip = store.Schedule("Skip stale work", now.AddMinutes(1), WorkspaceModes.Chat, now, missedRunPolicy: ScheduledMissedRunPolicies.Skip);
+        Check(store.TryClaimDue(now.AddMinutes(10)) is null, "missed run skip policy does not execute stale work");
+        var skipped = store.Load().Single(item => item.Id == missedSkip.Id);
+        Check(skipped.Status == ScheduledTaskStatuses.Completed && skipped.Runs.Single().Status == "skipped", "missed one-shot run is recorded as skipped");
+
+        var missedAsk = store.Schedule("Ask before stale work", now.AddMinutes(1), WorkspaceModes.Chat, now, missedRunPolicy: ScheduledMissedRunPolicies.AskFirst);
+        Check(store.TryClaimDue(now.AddMinutes(10)) is null, "ask-first policy does not execute a missed run unattended");
+        var awaiting = store.Load().Single(item => item.Id == missedAsk.Id);
+        Check(awaiting.Status == ScheduledTaskStatuses.NeedsDecision, "missed ask-first task waits for a user decision");
+        var runOnce = store.ResolveMissedRun(missedAsk.Id, "run_once", now.AddMinutes(10));
+        Check(runOnce.Status == ScheduledTaskStatuses.Scheduled && runOnce.DueAtUtc == now.AddMinutes(10) && store.TryClaimDue(now.AddMinutes(10))?.Id == missedAsk.Id, "missed run can be explicitly run once");
+
+        var missedRecurring = store.Schedule("Skip a missed recurrence", now.AddMinutes(1), WorkspaceModes.Chat, now, repeatEveryMinutes: 60, missedRunPolicy: ScheduledMissedRunPolicies.Skip);
+        Check(store.TryClaimDue(now.AddHours(3)) is null, "missed recurring skip policy avoids replaying every missed interval");
+        var recurringAfterSkip = store.Load().Single(item => item.Id == missedRecurring.Id);
+        Check(recurringAfterSkip.Status == ScheduledTaskStatuses.Scheduled && recurringAfterSkip.DueAtUtc > now.AddHours(3) && recurringAfterSkip.Runs.Single().Status == "skipped", "missed recurring task advances to the next future interval and records the skip");
+
+        Console.WriteLine("PASS scheduled task persistence, recurrence, claim, no-replay, run history, missed-run decisions, outcome, run-now, pause, resume, and cancellation");
     }
 
     private static void Check(bool condition, string message)

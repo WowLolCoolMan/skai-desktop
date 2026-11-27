@@ -262,8 +262,11 @@ export type DesktopScheduledTask = {
   workspaceMode: string;
   dueAt: string;
   repeatEveryMinutes?: number | null;
+  missedRunPolicy?: "run_once" | "skip" | "ask_first";
   status: string;
   outcome?: string | null;
+  selectedModel?: string | null;
+  runs?: Array<{ id: string; input: string; status: "running" | "succeeded" | "failed" | "skipped"; startedAtUtc: string; completedAtUtc?: string | null; result?: string | null; failure?: string | null; artifactPaths?: string[] }>;
 };
 
 export type ScheduledTaskDraft = {
@@ -271,6 +274,7 @@ export type ScheduledTaskDraft = {
   conversationId?: string | null;
   dueAt: string;
   repeatEveryMinutes?: number | null;
+  missedRunPolicy?: "run_once" | "skip" | "ask_first";
   workspaceMode?: "ChatBot" | "Coding Agent";
 };
 

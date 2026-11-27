@@ -10,6 +10,8 @@ public sealed class ScheduledTaskStore
     public const int MaxTasks = 256;
     public const int MaxPromptCharacters = 50_000;
     public const int MaxOutcomeCharacters = 2_000;
+    public const int MaxRunsPerTask = 20;
+    private static readonly TimeSpan MissedRunGrace = TimeSpan.FromMinutes(5);
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { WriteIndented = true, MaxDepth = 16 };
     private readonly string _path;
 
@@ -33,18 +35,19 @@ public sealed class ScheduledTaskStore
         }
     }
 
-    public ScheduledTask Schedule(string prompt, DateTimeOffset dueAtUtc, string workspaceMode = WorkspaceModes.Chat, DateTimeOffset? now = null, int? repeatEveryMinutes = null, string? conversationId = null)
+    public ScheduledTask Schedule(string prompt, DateTimeOffset dueAtUtc, string workspaceMode = WorkspaceModes.Chat, DateTimeOffset? now = null, int? repeatEveryMinutes = null, string? conversationId = null, string missedRunPolicy = ScheduledMissedRunPolicies.RunOnce)
     {
         ValidatePrompt(prompt);
         if (workspaceMode is not (WorkspaceModes.Chat or WorkspaceModes.CodingAgent)) throw new ArgumentException("The scheduled workspace mode is invalid.", nameof(workspaceMode));
         var current = now ?? DateTimeOffset.UtcNow;
         ValidateRepeat(repeatEveryMinutes);
+        ValidateMissedRunPolicy(missedRunPolicy);
         if (dueAtUtc < current.AddSeconds(-5)) throw new ArgumentException("A scheduled task must be in the future.", nameof(dueAtUtc));
         if (dueAtUtc > current.AddYears(1)) throw new ArgumentException("A scheduled task cannot be more than one year away.", nameof(dueAtUtc));
         var tasks = Load().ToList();
         if (tasks.Count >= MaxTasks) throw new InvalidOperationException($"At most {MaxTasks} scheduled tasks can be saved.");
         if (conversationId is { Length: > 128 }) throw new ArgumentException("The conversation ID is invalid.", nameof(conversationId));
-        var task = new ScheduledTask { Prompt = prompt.Trim(), ConversationId = string.IsNullOrWhiteSpace(conversationId) ? null : conversationId.Trim(), WorkspaceMode = workspaceMode, DueAtUtc = dueAtUtc, RepeatEveryMinutes = repeatEveryMinutes, CreatedAtUtc = current };
+        var task = new ScheduledTask { Prompt = prompt.Trim(), ConversationId = string.IsNullOrWhiteSpace(conversationId) ? null : conversationId.Trim(), WorkspaceMode = workspaceMode, DueAtUtc = dueAtUtc, RepeatEveryMinutes = repeatEveryMinutes, MissedRunPolicy = missedRunPolicy, CreatedAtUtc = current };
         tasks.Add(task);
         Save(tasks);
         return task;
@@ -57,8 +60,24 @@ public sealed class ScheduledTaskStore
         var task = tasks.Where(item => item.Status == ScheduledTaskStatuses.Scheduled && item.DueAtUtc <= current)
             .OrderBy(item => item.DueAtUtc).ThenBy(item => item.CreatedAtUtc).FirstOrDefault();
         if (task is null) return null;
+        if (current - task.DueAtUtc > MissedRunGrace && task.MissedRunPolicy == ScheduledMissedRunPolicies.AskFirst)
+        {
+            task.Status = ScheduledTaskStatuses.NeedsDecision;
+            task.Outcome = "This run was missed while Skai was unavailable. Choose whether to run it once or skip it.";
+            Save(tasks);
+            return null;
+        }
+        if (current - task.DueAtUtc > MissedRunGrace && task.MissedRunPolicy == ScheduledMissedRunPolicies.Skip)
+        {
+            RecordSkippedRun(task, current);
+            Save(tasks);
+            return null;
+        }
         task.Status = ScheduledTaskStatuses.Running;
         task.StartedAtUtc = current;
+        task.Runs ??= [];
+        task.Runs.Add(new ScheduledTaskRun { Input = task.Prompt, StartedAtUtc = current });
+        TrimRunHistory(task);
         Save(tasks);
         return task;
     }
@@ -74,9 +93,14 @@ public sealed class ScheduledTaskStore
         task.Status = succeeded && task.RepeatEveryMinutes is not null ? ScheduledTaskStatuses.Scheduled : succeeded ? ScheduledTaskStatuses.Completed : ScheduledTaskStatuses.Failed;
         task.CompletedAtUtc = completedAt;
         task.Outcome = outcome.Trim();
+        task.Runs ??= [];
+        var run = task.Runs.LastOrDefault(item => item.Status == "running") ?? throw new InvalidOperationException("The claimed scheduled run is missing from its history.");
+        run.Status = succeeded ? "succeeded" : "failed";
+        run.CompletedAtUtc = completedAt;
+        if (succeeded) run.Result = task.Outcome; else run.Failure = task.Outcome;
+        task.RunCount++;
         if (task.Status == ScheduledTaskStatuses.Scheduled)
         {
-            task.RunCount++;
             task.StartedAtUtc = null;
             task.DueAtUtc = completedAt.AddMinutes(task.RepeatEveryMinutes!.Value);
         }
@@ -91,6 +115,27 @@ public sealed class ScheduledTaskStore
     public void Resume(string id)
     {
         UpdateStatus(id, ScheduledTaskStatuses.Paused, ScheduledTaskStatuses.Scheduled);
+    }
+
+    public ScheduledTask ResolveMissedRun(string id, string choice, DateTimeOffset? now = null)
+    {
+        if (choice is not ("run_once" or "skip")) throw new ArgumentException("Choose whether to run the missed task once or skip it.", nameof(choice));
+        var tasks = Load().ToList();
+        var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new InvalidOperationException("The scheduled task no longer exists.");
+        if (task.Status != ScheduledTaskStatuses.NeedsDecision) throw new InvalidOperationException("This task is not waiting for a missed-run decision.");
+        var current = now ?? DateTimeOffset.UtcNow;
+        if (choice == "run_once")
+        {
+            task.Status = ScheduledTaskStatuses.Scheduled;
+            task.DueAtUtc = current;
+            task.Outcome = "Missed run will execute once now.";
+        }
+        else
+        {
+            RecordSkippedRun(task, current);
+        }
+        Save(tasks);
+        return task;
     }
 
     public void Cancel(string id)
@@ -144,6 +189,33 @@ public sealed class ScheduledTaskStore
             throw new ArgumentException($"A recurrence must be between {ScheduledTask.MinRepeatEveryMinutes} minutes and one week.", nameof(repeatEveryMinutes));
     }
 
+    private static void ValidateMissedRunPolicy(string? policy)
+    {
+        if (policy is not (ScheduledMissedRunPolicies.RunOnce or ScheduledMissedRunPolicies.Skip or ScheduledMissedRunPolicies.AskFirst))
+            throw new ArgumentException("The missed-run policy must be run_once, skip, or ask_first.", nameof(policy));
+    }
+
+    private static void RecordSkippedRun(ScheduledTask task, DateTimeOffset current)
+    {
+        task.Runs ??= [];
+        task.Runs.Add(new ScheduledTaskRun { Input = task.Prompt, Status = "skipped", StartedAtUtc = task.DueAtUtc, CompletedAtUtc = current, Failure = "Skipped because the device was unavailable when this run was due." });
+        TrimRunHistory(task);
+        task.CompletedAtUtc = current;
+        task.Outcome = "Missed run skipped.";
+        if (task.RepeatEveryMinutes is int repeat)
+        {
+            var intervals = Math.Max(1, (long)Math.Floor((current - task.DueAtUtc).TotalMinutes / repeat) + 1);
+            task.DueAtUtc = task.DueAtUtc.AddMinutes(intervals * repeat);
+            task.Status = ScheduledTaskStatuses.Scheduled;
+        }
+        else task.Status = ScheduledTaskStatuses.Completed;
+    }
+
+    private static void TrimRunHistory(ScheduledTask task)
+    {
+        if (task.Runs.Count > MaxRunsPerTask) task.Runs.RemoveRange(0, task.Runs.Count - MaxRunsPerTask);
+    }
+
     private static void Validate(IEnumerable<ScheduledTask> tasks)
     {
         var list = tasks.ToList();
@@ -157,8 +229,16 @@ public sealed class ScheduledTaskStore
             ValidateRepeat(task.RepeatEveryMinutes);
             if (task.RunCount < 0) throw new InvalidDataException("The scheduled task store contains an invalid run count.");
             if (task.WorkspaceMode is not (WorkspaceModes.Chat or WorkspaceModes.CodingAgent)) throw new InvalidDataException("The scheduled task store contains an invalid workspace mode.");
-            if (task.Status is not (ScheduledTaskStatuses.Scheduled or ScheduledTaskStatuses.Running or ScheduledTaskStatuses.Completed or ScheduledTaskStatuses.Failed or ScheduledTaskStatuses.Paused or ScheduledTaskStatuses.Cancelled)) throw new InvalidDataException("The scheduled task store contains an invalid status.");
+            if (task.Status is not (ScheduledTaskStatuses.Scheduled or ScheduledTaskStatuses.Running or ScheduledTaskStatuses.Completed or ScheduledTaskStatuses.Failed or ScheduledTaskStatuses.Paused or ScheduledTaskStatuses.Cancelled or ScheduledTaskStatuses.NeedsDecision)) throw new InvalidDataException("The scheduled task store contains an invalid status.");
             if (task.Outcome is { Length: > MaxOutcomeCharacters } || task.Outcome?.Any(char.IsControl) == true) throw new InvalidDataException("The scheduled task store contains an invalid outcome.");
+            ValidateMissedRunPolicy(task.MissedRunPolicy);
+            task.Runs ??= [];
+            if (task.Runs.Count > MaxRunsPerTask) throw new InvalidDataException("Scheduled task run history exceeds the retention bound.");
+            foreach (var run in task.Runs)
+            {
+                if (string.IsNullOrWhiteSpace(run.Id) || run.Id.Length > 128 || run.Input.Length > MaxPromptCharacters || run.Input.Any(char.IsControl) || run.Result is { Length: > MaxOutcomeCharacters } || run.Failure is { Length: > MaxOutcomeCharacters } || run.ArtifactPaths.Count > 100 || run.ArtifactPaths.Any(path => string.IsNullOrWhiteSpace(path) || path.Length > 1024 || path.Any(char.IsControl)) || run.Status is not ("running" or "succeeded" or "failed" or "skipped"))
+                    throw new InvalidDataException("Scheduled task run history contains an invalid entry.");
+            }
         }
     }
 }

@@ -3883,8 +3883,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   overflow: hidden;
   padding: 12px;
 }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser > .git-change-summary,
-.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser > .git-review-actions,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser:not(.is-changes-panel) > .git-change-summary,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser:not(.is-changes-panel) > .git-review-actions,
 .app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser > .file-summary { display: none; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .project-file-layout {
   grid-template-columns: minmax(125px, 30%) minmax(0, 1fr);
@@ -4293,6 +4293,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-side-chat-panel .project-file-layout,
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-changes-panel .project-file-layout { display: none; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-side-chat-panel .git-change-summary { display: none; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-changes-panel > .git-change-summary { display: grid; min-height: 0; max-height: none; overflow: auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-changes-panel > .git-change-summary > .git-change-list { min-height: 46px; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .project-file-explorer { display: grid; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .project-file-layout { grid-template-columns: minmax(180px, .34fr) minmax(0, 1fr); }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .file-editor-panel { display: flex; flex-direction: column; }
@@ -4682,3 +4684,65 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .workspace-activity-empty { margin: 0; padding: 16px 2px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 @media (max-width: 860px) { .workspace-search-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } .workspace-activity-board { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 620px) { .workspace-search-toolbar { align-items: stretch; flex-direction: column; } .workspace-search-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .workspace-search-result { grid-template-columns: 1fr auto; gap: 7px; } .workspace-search-result-type { grid-column: 1 / -1; } .workspace-search-result-copy { grid-column: 1 / -1; } .workspace-search-result-date { grid-column: 2; grid-row: 1; } .workspace-search-results-heading { align-items: flex-start; flex-direction: column; gap: 3px; } .workspace-activity-toolbar { align-items: flex-start; flex-direction: column; } }
+.git-review-workbench { display:grid; gap:12px; min-width:0; margin-top:14px; }
+.git-review-workbench-heading { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:12px 14px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-lg); background:var(--skai-color-surface); }
+.git-review-workbench-heading > div { display:grid; gap:4px; min-width:0; }
+.git-review-workbench-heading strong { color:var(--skai-color-text); }
+.git-review-workbench-heading span { color:var(--skai-color-text-muted); font-size:var(--skai-text-sm); line-height:1.4; }
+.git-review-toolbar-options { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:7px 12px; }
+.git-review-toolbar-options label { display:inline-flex; align-items:center; gap:6px; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); white-space:nowrap; }
+.git-review-toolbar-options input { accent-color:var(--skai-color-accent); }
+.git-review-large-diff { border-bottom:1px solid var(--skai-color-border); }
+.git-review-large-diff > summary { padding:10px 13px; color:var(--skai-color-accent-text); background:var(--skai-color-surface-soft); cursor:pointer; font-size:var(--skai-text-sm); }
+.git-review-hunk.is-whitespace-only { outline:1px solid color-mix(in srgb,var(--skai-color-warning) 40%,transparent); outline-offset:-1px; }
+.git-review-file-list { display:grid; gap:10px; min-width:0; }
+.git-review-file { min-width:0; padding:0; overflow:hidden; }
+.git-review-file-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 13px; border-bottom:1px solid var(--skai-color-border); }
+.git-review-file-heading > label { display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; }
+.git-review-file-heading > label > span { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:3px 9px; min-width:0; }
+.git-review-file-heading strong { padding:2px 6px; border-radius:var(--skai-radius-sm); color:var(--skai-color-accent-text); background:color-mix(in srgb,var(--skai-color-accent) 10%,transparent); font-size:var(--skai-text-xs); font-weight:600; }
+.git-review-file-heading b { min-width:0; overflow-wrap:anywhere; color:var(--skai-color-text); font-size:var(--skai-text-sm); }
+.git-review-file-heading small,.git-review-file-heading > small { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
+.git-review-file-heading > label small { grid-column:2; }
+.git-review-hunk { border-bottom:1px solid var(--skai-color-border); }
+.git-review-hunk:last-child { border-bottom:0; }
+.git-review-hunk-toggle { display:flex; align-items:center; gap:8px; padding:8px 12px; color:var(--skai-color-text-muted); background:var(--skai-color-surface-soft); font-size:var(--skai-text-xs); }
+.git-review-hunk-toggle code { min-width:0; color:var(--skai-color-text-muted); font-family:var(--skai-font-mono); overflow-wrap:anywhere; }
+.git-review-hunk-toggle span { margin-left:auto; white-space:nowrap; }
+.git-review-hunk-lines { overflow:auto; }
+.git-review-line { display:grid; grid-template-columns:42px 42px minmax(0,1fr) auto auto; align-items:start; gap:7px; min-width:550px; padding:2px 10px; border-top:1px solid color-mix(in srgb,var(--skai-color-border) 42%,transparent); font-family:var(--skai-font-mono); font-size:var(--skai-text-xs); line-height:1.55; }
+.git-review-line > span { color:var(--skai-color-text-muted); text-align:right; user-select:none; }
+.git-review-line code { min-width:0; overflow-wrap:anywhere; white-space:pre-wrap; }
+.git-review-line.is-added { background:color-mix(in srgb,var(--skai-color-success) 10%,transparent); }
+.git-review-line.is-removed { background:color-mix(in srgb,var(--skai-color-danger) 9%,transparent); }
+.git-review-line > .ui-button { min-height:23px; padding:1px 7px; font-family:var(--skai-font-sans); font-size:var(--skai-text-xs); }
+.git-review-line-note-count { padding:2px 6px; border-radius:var(--skai-radius-sm); color:var(--skai-color-accent-text)!important; background:color-mix(in srgb,var(--skai-color-accent) 10%,transparent); white-space:nowrap; }
+.git-review-comment-form { display:grid; gap:9px; padding:12px; border-top:1px solid var(--skai-color-border); background:var(--skai-color-surface-soft); }
+.git-review-comment-form label { display:grid; gap:6px; color:var(--skai-color-text); font-size:var(--skai-text-sm); }
+.git-review-comment-form textarea { width:100%; resize:vertical; }
+.git-review-comment-form > div { display:flex; justify-content:flex-end; gap:8px; }
+.git-review-note { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 12px; align-items:center; padding:10px 12px; border-top:1px solid var(--skai-color-border); }
+.git-review-note > span { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
+.git-review-note p { grid-column:1; margin:0; color:var(--skai-color-text); font-size:var(--skai-text-sm); white-space:pre-wrap; overflow-wrap:anywhere; }
+.git-review-note > .ui-button { grid-column:2; grid-row:1 / span 2; }
+.git-review-note.is-stale { background:color-mix(in srgb,var(--skai-color-warning) 8%,transparent); }
+.git-review-note.is-stale > span,.git-review-stale-note { color:var(--skai-color-warning-text); }
+.git-review-stale-note { margin:0; font-size:var(--skai-text-sm); }
+@media(max-width:640px) { .git-review-workbench-heading,.git-review-file-heading { align-items:flex-start; flex-direction:column; }.git-review-workbench-heading > .ui-button { width:100%; }.git-review-hunk-toggle { align-items:flex-start; }.git-review-hunk-toggle span { white-space:normal; }.git-review-line { grid-template-columns:34px 34px minmax(0,1fr) auto; min-width:450px; }.git-review-line-note-count { grid-column:4; }.git-review-note { grid-template-columns:minmax(0,1fr); }.git-review-note > .ui-button { grid-column:1; grid-row:auto; justify-self:start; } }
+.scheduled-form-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr)); }
+.scheduled-permission-preview { display:grid; gap:5px; margin-top:12px; padding:12px 14px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-md); background:var(--skai-color-surface-soft); }
+.scheduled-permission-preview strong { color:var(--skai-color-text); font-size:var(--skai-text-sm); }
+.scheduled-permission-preview span,.scheduled-permission-preview small { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); line-height:1.45; }
+.scheduled-dry-run-result { max-height:280px; overflow:auto; margin-top:12px; padding:13px 15px; border:1px solid color-mix(in srgb,var(--skai-color-success) 48%,var(--skai-color-border)); border-radius:var(--skai-radius-md); background:color-mix(in srgb,var(--skai-color-success) 7%,var(--skai-color-surface)); }
+.scheduled-dry-run-result strong { color:var(--skai-color-success-text); font-size:var(--skai-text-sm); }
+.scheduled-dry-run-result p { margin:8px 0 0; color:var(--skai-color-text); white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--skai-text-sm); line-height:1.55; }
+.scheduled-run-history { display:grid; gap:9px; margin-top:24px; }
+.scheduled-run-history h3 { display:flex; align-items:baseline; gap:8px; margin:0; color:var(--skai-color-text); font-size:var(--skai-text-md); }
+.scheduled-run-history h3 small { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); font-weight:400; }
+.scheduled-run-entry { display:grid; gap:8px; padding:11px 12px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-md); background:var(--skai-color-surface-soft); }
+.scheduled-run-entry > div { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.scheduled-run-entry time { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
+.scheduled-run-entry details summary { color:var(--skai-color-text); cursor:pointer; font-size:var(--skai-text-sm); }
+.scheduled-run-entry details p { display:grid; gap:4px; margin:10px 0 0; color:var(--skai-color-text-muted); font-size:var(--skai-text-sm); white-space:pre-wrap; overflow-wrap:anywhere; }
+.scheduled-run-entry details p strong { color:var(--skai-color-text); font-size:var(--skai-text-xs); }
+.scheduled-run-entry details code { display:block; }

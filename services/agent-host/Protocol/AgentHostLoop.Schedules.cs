@@ -75,6 +75,8 @@ public static partial class AgentHostLoop
 
     private static AgentResponse ListScheduledTasks(AgentRequest request)
     {
+        var settings = CreateSettingsStore().Load();
+        var selectedModel = $"{settings.ModelProvider} · {settings.Model}";
         var tasks = CreateScheduledTaskStore().Load()
             .OrderBy(task => task.DueAtUtc)
             .Select(task => new
@@ -85,8 +87,11 @@ public static partial class AgentHostLoop
                 workspaceMode = task.WorkspaceMode,
                 dueAt = task.DueAtUtc,
                 repeatEveryMinutes = task.RepeatEveryMinutes,
+                missedRunPolicy = task.MissedRunPolicy,
                 status = task.Status,
                 outcome = task.Outcome,
+                runs = task.Runs,
+                selectedModel,
             })
             .ToArray();
         return new(ProtocolVersion, request.Id, true, tasks);
@@ -104,7 +109,8 @@ public static partial class AgentHostLoop
             dueAt.ToUniversalTime(),
             OptionalString(request, "workspaceMode") ?? WorkspaceModes.Chat,
             repeatEveryMinutes: repeat,
-            conversationId: conversationId);
+            conversationId: conversationId,
+            missedRunPolicy: OptionalString(request, "missedRunPolicy") ?? ScheduledMissedRunPolicies.RunOnce);
         return ScheduledTaskResponse(request, task);
     }
 
@@ -118,6 +124,7 @@ public static partial class AgentHostLoop
             case "resume": store.Resume(id); break;
             case "cancel": store.Cancel(id); break;
             case "runNow": store.RunNow(id); break;
+            case "resolveMissed": store.ResolveMissedRun(id, RequiredBoundedString(request, "choice", 32)); break;
             default: throw new InvalidOperationException("Unknown scheduled-task operation.");
         }
         var task = store.Load().Single(item => item.Id == id);
@@ -133,9 +140,18 @@ public static partial class AgentHostLoop
             workspaceMode = task.WorkspaceMode,
             dueAt = task.DueAtUtc,
             repeatEveryMinutes = task.RepeatEveryMinutes,
+            missedRunPolicy = task.MissedRunPolicy,
             status = task.Status,
             outcome = task.Outcome,
+            runs = task.Runs,
+            selectedModel = SelectedScheduleModel(),
         });
+
+    private static string SelectedScheduleModel()
+    {
+        var settings = CreateSettingsStore().Load();
+        return $"{settings.ModelProvider} · {settings.Model}";
+    }
 
 
 }

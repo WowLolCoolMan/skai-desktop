@@ -87,7 +87,7 @@ public sealed partial class GitHubWorkspaceService
         var unsafePaths = FindUnsafeChangePaths(currentSelection);
         if (unsafePaths.Count > 0)
             throw new InvalidOperationException($"Refusing to stage secret-like files: {string.Join(", ", unsafePaths.Take(8))}{(unsafePaths.Count > 8 ? "…" : "")}");
-        return await CommitSelectedCoreAsync(repositoryPath, currentSelection, message, accessToken, cancellationToken).ConfigureAwait(false);
+        return await CommitSelectedCoreAsync(repositoryPath, currentSelection, message, accessToken, null, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<GitWorkspaceDiffPreview> GetDiffPreviewAsync(string repositoryPath, IEnumerable<GitWorkspaceFileChange> selectedChanges,
@@ -116,18 +116,19 @@ public sealed partial class GitHubWorkspaceService
             }
 
             var root = await GetRepositoryRootAsync(repositoryPath, cancellationToken).ConfigureAwait(false);
+            var hasHead = await HasGitHeadAsync(root, cancellationToken).ConfigureAwait(false);
             var paths = new[] { current.Path, current.OriginalPath }
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.Ordinal)
                 .Cast<string>()
                 .ToArray();
-            var staged = await RunGitAsync(root, ["diff", "--cached", "--no-ext-diff", "--no-color", "--find-renames", "--unified=3", "--", .. paths], null,
+            string[] diffArguments = hasHead
+                ? ["diff", "HEAD", "--no-ext-diff", "--no-color", "--find-renames", "--unified=3", "--", .. paths]
+                : ["diff", "--cached", "--no-ext-diff", "--no-color", "--find-renames", "--unified=3", "--", .. paths];
+            var working = await RunGitAsync(root, diffArguments, null,
                 TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
-            EnsureSuccess(staged, "Git could not read the staged diff.");
-            var unstaged = await RunGitAsync(root, ["diff", "--no-ext-diff", "--no-color", "--find-renames", "--unified=3", "--", .. paths], null,
-                TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
-            EnsureSuccess(unstaged, "Git could not read the workspace diff.");
-            var diff = (staged.StandardOutput + unstaged.StandardOutput).Trim();
+            EnsureSuccess(working, "Git could not read the workspace diff.");
+            var diff = working.StandardOutput.Trim();
             if (diff.Length == 0 && current.Status == "??") diff = BuildUntrackedDiff(root, current.Path);
             if (diff.Length == 0) diff = $"# {current.Status} {DisplayPath(current)}\n# No text diff is available (the file may be binary or unchanged in the selected index).\n";
             included++;
@@ -149,7 +150,27 @@ public sealed partial class GitHubWorkspaceService
         var currentSelection = selected.Select(requested => currentByIdentity.TryGetValue(ChangeIdentity(requested), out var current)
             ? current
             : throw new InvalidOperationException($"The workspace changed since review. Reopen the Git review before committing {DisplayPath(requested)}.")).ToArray();
-        return await CommitSelectedCoreAsync(repositoryPath, currentSelection, message, null, cancellationToken).ConfigureAwait(false);
+        return await CommitSelectedCoreAsync(repositoryPath, currentSelection, message, null, null, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Commits selected diff hunks through a temporary index, leaving unrelated staged paths untouched.</summary>
+    public async Task<string> CommitSelectedHunksLocallyAsync(string repositoryPath, IEnumerable<GitWorkspaceFileChange> selectedChanges,
+        IReadOnlyDictionary<string, IReadOnlyCollection<int>> selectedHunks, string message, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(selectedChanges);
+        ArgumentNullException.ThrowIfNull(selectedHunks);
+        var selected = selectedChanges.Distinct().ToArray();
+        if (selected.Length == 0 || selected.Length > MaxDiffFiles) throw new InvalidOperationException($"Select between 1 and {MaxDiffFiles} changed files to commit.");
+        if (selectedHunks.Count == 0 || selectedHunks.Count > selected.Length) throw new InvalidOperationException("Select at least one changed hunk to commit.");
+        var status = await GetLocalStatusAsync(repositoryPath, cancellationToken).ConfigureAwait(false);
+        var currentByIdentity = status.Changes.ToDictionary(ChangeIdentity, StringComparer.Ordinal);
+        var currentSelection = selected.Select(requested => currentByIdentity.TryGetValue(ChangeIdentity(requested), out var current)
+            ? current
+            : throw new InvalidOperationException($"The workspace changed since review. Reopen the Git review before committing {DisplayPath(requested)}.")).ToArray();
+        var selectedPaths = currentSelection.Select(change => change.Path).ToHashSet(StringComparer.Ordinal);
+        if (selectedHunks.Keys.Any(path => !selectedPaths.Contains(path))) throw new InvalidOperationException("A selected hunk no longer belongs to the reviewed file set.");
+        if (FindUnsafeChangePaths(currentSelection).Count > 0) throw new InvalidOperationException("Refusing to stage secret-like files from a partial review.");
+        return await CommitSelectedCoreAsync(repositoryPath, currentSelection, message, null, selectedHunks, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Pushes clean local commits through the user's configured Git credential helper.</summary>
@@ -196,7 +217,7 @@ public sealed partial class GitHubWorkspaceService
 
 
     private async Task<string> CommitSelectedCoreAsync(string repositoryPath, IReadOnlyCollection<GitWorkspaceFileChange> selectedChanges, string message,
-        string? accessToken, CancellationToken cancellationToken)
+        string? accessToken, IReadOnlyDictionary<string, IReadOnlyCollection<int>>? selectedHunks, CancellationToken cancellationToken)
     {
         if (accessToken is not null) ValidateAccessToken(accessToken);
         message = (message ?? "").Trim();
@@ -205,6 +226,7 @@ public sealed partial class GitHubWorkspaceService
 
         if (selectedChanges.Count == 0) throw new InvalidOperationException("There are no file changes to commit.");
         var root = await GetRepositoryRootAsync(repositoryPath, cancellationToken).ConfigureAwait(false);
+        var hasHead = await HasGitHeadAsync(root, cancellationToken).ConfigureAwait(false);
         var paths = selectedChanges
             .SelectMany(change => change.OriginalPath is not null && !change.Status.StartsWith("R", StringComparison.Ordinal)
                 ? new[] { change.Path, change.OriginalPath }
@@ -216,10 +238,33 @@ public sealed partial class GitHubWorkspaceService
         var temporaryIndex = Path.Combine(Path.GetTempPath(), $"skai-index-{Guid.NewGuid():N}");
         try
         {
-            var resetIndex = await RunGitAsync(root, ["read-tree", "HEAD"], null, TimeSpan.FromMinutes(2), cancellationToken, temporaryIndex).ConfigureAwait(false);
+            var resetIndex = await RunGitAsync(root, hasHead ? ["read-tree", "HEAD"] : ["read-tree", "--empty"], null, TimeSpan.FromMinutes(2), cancellationToken, temporaryIndex).ConfigureAwait(false);
             EnsureSuccess(resetIndex, "Git could not prepare an isolated commit index.");
+            var appliedHunks = 0;
             foreach (var path in paths)
             {
+                if (selectedHunks is not null && selectedChanges.Any(change => selectedHunks.ContainsKey(change.Path) && change.OriginalPath == path)) continue;
+                if (selectedHunks is not null && selectedHunks.TryGetValue(path, out var hunkSelection))
+                {
+                    var change = selectedChanges.Single(item => item.Path == path);
+                    var patch = await GetChangePatchAsync(root, change, cancellationToken).ConfigureAwait(false);
+                    var selectedPatch = SelectDiffHunks(patch, hunkSelection);
+                    var patchFile = Path.Combine(Path.GetTempPath(), $"skai-patch-{Guid.NewGuid():N}.diff");
+                    try
+                    {
+                        await File.WriteAllTextAsync(patchFile, selectedPatch, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
+                        var apply = await RunGitAsync(root, ["apply", "--cached", "--", patchFile], null, TimeSpan.FromMinutes(2), cancellationToken, temporaryIndex).ConfigureAwait(false);
+                        EnsureSuccess(apply, $"Git could not stage the selected hunks in {DisplayPath(change)}. Refresh the diff and review again.");
+                        appliedHunks += hunkSelection.Count;
+                    }
+                    finally
+                    {
+                        try { if (File.Exists(patchFile)) File.Delete(patchFile); }
+                        catch (IOException) { }
+                        catch (UnauthorizedAccessException) { }
+                    }
+                    continue;
+                }
                 var target = Path.GetFullPath(Path.Combine(root, path));
                 var arguments = File.Exists(target) || Directory.Exists(target)
                     ? new[] { "add", "--", path }
@@ -227,6 +272,7 @@ public sealed partial class GitHubWorkspaceService
                 var stage = await RunGitAsync(root, arguments, null, TimeSpan.FromMinutes(2), cancellationToken, temporaryIndex).ConfigureAwait(false);
                 EnsureSuccess(stage, "Git could not stage the workspace changes.");
             }
+            if (selectedHunks is not null && appliedHunks == 0) throw new InvalidOperationException("The selected review contains no applicable text hunks. Select a hunk or commit the whole file.");
             var commit = await RunGitAsync(root, ["commit", "-m", message], null, TimeSpan.FromMinutes(2), cancellationToken, temporaryIndex).ConfigureAwait(false);
             EnsureSuccess(commit, "Git could not create the commit. Check your Git author name and email in Git settings.");
             var refreshIndex = await RunGitAsync(root, ["reset", "--quiet", "HEAD", "--", .. paths], null, TimeSpan.FromMinutes(2), cancellationToken).ConfigureAwait(false);
@@ -239,6 +285,54 @@ public sealed partial class GitHubWorkspaceService
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
+    }
+
+    private async Task<string> GetChangePatchAsync(string root, GitWorkspaceFileChange change, CancellationToken cancellationToken)
+    {
+        if (change.Status == "??") return BuildUntrackedDiff(root, change.Path);
+        var paths = new[] { change.Path, change.OriginalPath }.Where(path => !string.IsNullOrWhiteSpace(path)).Cast<string>().Distinct(StringComparer.Ordinal).ToArray();
+        var hasHead = await HasGitHeadAsync(root, cancellationToken).ConfigureAwait(false);
+        string[] arguments = hasHead
+            ? ["diff", "HEAD", "--no-ext-diff", "--no-color", "--find-renames", "--unified=3", "--", .. paths]
+            : ["diff", "--cached", "--no-ext-diff", "--no-color", "--find-renames", "--unified=3", "--", .. paths];
+        var result = await RunGitAsync(root, arguments, null, TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
+        EnsureSuccess(result, "Git could not refresh the selected file patch.");
+        return result.StandardOutput;
+    }
+
+    private async Task<bool> HasGitHeadAsync(string root, CancellationToken cancellationToken)
+    {
+        var result = await RunGitAsync(root, ["rev-parse", "--verify", "HEAD"], null, TimeSpan.FromSeconds(15), cancellationToken).ConfigureAwait(false);
+        return result.ExitCode == 0;
+    }
+
+    private static string SelectDiffHunks(string patch, IReadOnlyCollection<int> selectedHunks)
+    {
+        if (selectedHunks.Count == 0 || selectedHunks.Count > 10_000 || selectedHunks.Any(index => index < 0)) throw new InvalidOperationException("Select at least one valid text hunk.");
+        if (patch.Length > MaxDiffFileCharacters * 4 || patch.Contains("diff preview truncated", StringComparison.OrdinalIgnoreCase) || patch.Contains("file diff truncated", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("This file diff is truncated. Refresh the review and select a smaller file before committing hunks.");
+        var lines = patch.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var headers = new List<string>();
+        var hunks = new List<List<string>>();
+        List<string>? current = null;
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("@@ ", StringComparison.Ordinal))
+            {
+                current = [];
+                hunks.Add(current);
+                current.Add(line);
+            }
+            else if (current is not null) current.Add(line);
+            else headers.Add(line);
+        }
+        if (hunks.Count == 0 || selectedHunks.Any(index => index >= hunks.Count)) throw new InvalidOperationException("The diff changed since review. Refresh it and select current hunks again.");
+        if (headers.All(line => !line.StartsWith("diff --git ", StringComparison.Ordinal)) || headers.Any(line => line.StartsWith("GIT binary patch", StringComparison.Ordinal) || line.StartsWith("Binary files ", StringComparison.Ordinal)))
+            throw new InvalidOperationException("This change has no safely selectable text hunks. Commit the whole file instead.");
+        var builder = new StringBuilder();
+        foreach (var line in headers) builder.Append(line).Append('\n');
+        foreach (var index in selectedHunks.Distinct().Order()) foreach (var line in hunks[index]) builder.Append(line).Append('\n');
+        return builder.ToString();
     }
 
     private static string ChangeIdentity(GitWorkspaceFileChange change) =>

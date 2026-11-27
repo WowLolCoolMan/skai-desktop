@@ -284,8 +284,29 @@ public static partial class AgentHostLoop
     {
         var (project, root, changes) = await ResolveProjectGitSelectionAsync(request).ConfigureAwait(false);
         var message = RequiredBoundedString(request, "message", 256);
-        var commit = await new GitHubWorkspaceService().CommitSelectedLocallyAsync(root, changes, message, CancellationToken.None).ConfigureAwait(false);
+        var hunkSelection = ReadGitHunkSelection(request);
+        var service = new GitHubWorkspaceService();
+        var commit = hunkSelection is null
+            ? await service.CommitSelectedLocallyAsync(root, changes, message, CancellationToken.None).ConfigureAwait(false)
+            : await service.CommitSelectedHunksLocallyAsync(root, changes, hunkSelection, message, CancellationToken.None).ConfigureAwait(false);
         return new(ProtocolVersion, request.Id, true, new { repository = project.Name, committed = true, output = commit });
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyCollection<int>>? ReadGitHunkSelection(AgentRequest request)
+    {
+        if (request.Params is not { } parameters || !parameters.TryGetProperty("hunks", out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return null;
+        if (value.ValueKind != JsonValueKind.Object || value.EnumerateObject().Count() is < 1 or > 24) throw new InvalidOperationException("The partial commit selection is invalid. Refresh the diff and try again.");
+        var result = new Dictionary<string, IReadOnlyCollection<int>>(StringComparer.Ordinal);
+        foreach (var property in value.EnumerateObject())
+        {
+            if (string.IsNullOrWhiteSpace(property.Name) || property.Name.Length > 4_000 || property.Name.Any(char.IsControl) || property.Value.ValueKind != JsonValueKind.Array)
+                throw new InvalidOperationException("The partial commit selection is invalid. Refresh the diff and try again.");
+            var indices = property.Value.EnumerateArray().Select(item => item.TryGetInt32(out var index) ? index : -1).ToArray();
+            if (indices.Length is < 1 or > 10_000 || indices.Any(index => index < 0) || indices.Distinct().Count() != indices.Length)
+                throw new InvalidOperationException("Select one or more current hunks in each partially committed file.");
+            result.Add(property.Name, indices);
+        }
+        return result;
     }
 
     private static async Task<AgentResponse> PushProjectGitAsync(AgentRequest request)

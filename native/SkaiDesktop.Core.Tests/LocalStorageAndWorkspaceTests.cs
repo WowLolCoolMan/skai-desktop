@@ -342,6 +342,50 @@ internal static class LocalStorageAndWorkspaceTests
             Check(afterReviewStatus.Changes.Any(change => change.Path == "secrets.json") && afterReviewStatus.Changes.Any(change => change.Path == "pre-staged-user-work.md"), "GitHub review selectively stages safe normal, rename, and workflow changes");
             Check(!afterReviewStatus.Changes.Any(change => change.Path == "README.md" || change.Path == renamedNotesName || change.Path == ".github/workflows/ci.yml"), "GitHub selected commit refreshes committed paths in the normal Git index");
 
+            var hunkReviewPath = Path.Combine(settingsDirectory, "git-hunk-review");
+            Directory.CreateDirectory(hunkReviewPath);
+            RunGit(hunkReviewPath, "init", "-b", "main");
+            RunGit(hunkReviewPath, "config", "user.email", "skai-tests@example.invalid");
+            RunGit(hunkReviewPath, "config", "user.name", "Skai Desktop Tests");
+            var hunkLines = Enumerable.Range(1, 24).Select(number => $"line-{number}").ToArray();
+            File.WriteAllLines(Path.Combine(hunkReviewPath, "review.txt"), hunkLines);
+            RunGit(hunkReviewPath, "add", "--all");
+            RunGit(hunkReviewPath, "commit", "-m", "initial hunk fixture");
+            var editedHunkLines = hunkLines.ToArray();
+            editedHunkLines[1] = "first hunk selected";
+            editedHunkLines[21] = "second hunk left in workspace";
+            File.WriteAllLines(Path.Combine(hunkReviewPath, "review.txt"), editedHunkLines);
+            var unrelatedStaged = Path.Combine(hunkReviewPath, "unrelated-staged.txt");
+            File.WriteAllText(unrelatedStaged, "keep unrelated staged work\n");
+            RunGit(hunkReviewPath, "add", "--", "unrelated-staged.txt");
+            var hunkService = new GitHubWorkspaceService();
+            var hunkStatus = await hunkService.GetLocalStatusAsync(hunkReviewPath);
+            var hunkChanges = hunkStatus.Changes.Where(change => change.Path == "review.txt").ToArray();
+            var hunkPreview = await hunkService.GetDiffPreviewAsync(hunkReviewPath, hunkChanges);
+            Check(CountDiffHunks(hunkPreview.Text) == 2, "Git review exposes separate hunks for independent edits");
+            _ = await hunkService.CommitSelectedHunksLocallyAsync(hunkReviewPath, hunkChanges,
+                new Dictionary<string, IReadOnlyCollection<int>> { ["review.txt"] = [0] }, "Commit first reviewed hunk");
+            var committedHunkContent = RunGitOutput(hunkReviewPath, "show", "HEAD:review.txt");
+            var remainingHunkDiff = RunGitOutput(hunkReviewPath, "diff", "--", "review.txt");
+            var preservedHunkIndex = RunGitOutput(hunkReviewPath, "diff", "--cached", "--name-only");
+            Check(committedHunkContent.Contains("first hunk selected", StringComparison.Ordinal) && !committedHunkContent.Contains("second hunk left in workspace", StringComparison.Ordinal), "Git hunk commit includes only the selected hunk");
+            Check(remainingHunkDiff.Contains("second hunk left in workspace", StringComparison.Ordinal) && !remainingHunkDiff.Contains("first hunk selected", StringComparison.Ordinal), "Git hunk commit leaves excluded hunks unstaged in the working copy");
+            Check(preservedHunkIndex.Contains("unrelated-staged.txt", StringComparison.Ordinal), "Git hunk commit preserves unrelated staged work");
+
+            var unbornReviewPath = Path.Combine(settingsDirectory, "git-unborn-review");
+            Directory.CreateDirectory(unbornReviewPath);
+            RunGit(unbornReviewPath, "init", "-b", "main");
+            RunGit(unbornReviewPath, "config", "user.email", "skai-tests@example.invalid");
+            RunGit(unbornReviewPath, "config", "user.name", "Skai Desktop Tests");
+            File.WriteAllText(Path.Combine(unbornReviewPath, "first.txt"), "initial file\n");
+            var unbornService = new GitHubWorkspaceService();
+            var unbornStatus = await unbornService.GetLocalStatusAsync(unbornReviewPath);
+            var unbornDiff = await unbornService.GetDiffPreviewAsync(unbornReviewPath, unbornStatus.Changes);
+            Check(unbornDiff.Text.Contains("initial file", StringComparison.Ordinal), "Git review supports the first commit in an unborn repository");
+            _ = await unbornService.CommitSelectedHunksLocallyAsync(unbornReviewPath, unbornStatus.Changes,
+                new Dictionary<string, IReadOnlyCollection<int>> { ["first.txt"] = [0] }, "Commit initial reviewed file");
+            Check(RunGitOutput(unbornReviewPath, "show", "HEAD:first.txt").Contains("initial file", StringComparison.Ordinal), "Git hunk commit can create an initial commit in an unborn repository");
+
             var commandRunner = new WorkspaceCommandRunner();
             var commandResponse = "Check the result first.\n<workspace-command cwd=\"src\" timeout-seconds=\"999\">  printf 'one\\ntwo'  </workspace-command>\n<workspace-command>echo next</workspace-command>";
             var proposedCommands = WorkspaceCommandProposalParser.Parse(commandResponse);
@@ -825,4 +869,6 @@ internal static class LocalStorageAndWorkspaceTests
             && !WorkspacePath.AreSame(comparedRoot, comparedRoot + "-other"),
             "workspace path comparison ignores a trailing separator and tells folders apart");
     }
+
+    private static int CountDiffHunks(string diff) => diff.Split('\n').Count(line => line.StartsWith("@@ ", StringComparison.Ordinal));
 }
