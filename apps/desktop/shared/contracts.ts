@@ -22,6 +22,20 @@ export type RuntimeHealth = {
   capabilities: string[];
 };
 
+export type DesktopHarnessAdapter = {
+  id: string;
+  name: string;
+  description: string;
+  status: "ready" | "detected-not-connected" | "not-installed";
+  available: boolean;
+  executionSupported: boolean;
+  executablePath?: string | null;
+  capabilities: string[];
+  prerequisites: string[];
+  ownsSessionFormat: boolean;
+  taskJournal: string;
+};
+
 export type LocalCapacitySnapshot = {
   capturedAtUtc: string;
   ramTotalBytes: number | null;

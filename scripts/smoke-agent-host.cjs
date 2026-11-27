@@ -138,6 +138,15 @@ async function run() {
   const health = await request("runtime.health");
   if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call") || !health.result?.capabilities?.includes("persona.discover"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
+  const harnesses = await request("harness.adapters.list");
+  const harnessEntries = harnesses.result?.adapters;
+  const nativeHarness = harnessEntries?.find(adapter => adapter.id === "skai-local");
+  if (!harnesses.ok || harnesses.result?.contractVersion !== 1 || !Array.isArray(harnessEntries) || !nativeHarness?.available || !nativeHarness.executionSupported || !nativeHarness.capabilities.includes("task-journal"))
+    throw new Error(`The versioned harness adapter contract did not advertise the native Skai executor: ${JSON.stringify(harnesses)}`);
+  for (const adapter of harnessEntries.filter(entry => entry.id !== "skai-local")) {
+    if (adapter.executionSupported || adapter.available || !["not-installed", "detected-not-connected"].includes(adapter.status) || !adapter.prerequisites?.length || !adapter.taskJournal?.includes("not enabled"))
+      throw new Error(`The harness catalog overstated an unintegrated external adapter: ${JSON.stringify(adapter)}`);
+  }
   const queuedFirst = await request("chat.queue.enqueue", { text: "Review the first draft", attachments: [{ fileName: "brief.txt", content: "Keep this attachment with the queued turn." }] });
   const queuedSecond = await request("chat.queue.enqueue", { text: "Check the follow-up" });
   const queuedEdit = await request("chat.queue.update", { index: 0, text: "Review the revised draft" });

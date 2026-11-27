@@ -1416,6 +1416,13 @@ async function main() {
           }
           if (route === "coding") {
             await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-coding', '.coding-session-grid', '.project-thread-panel .message-list']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return 1; })()`);
+            const harnessCatalog = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { const panel = document.querySelector('.coding-harness-adapters'); if (panel?.querySelector('summary')?.innerText.includes('1 ready')) { if (!panel.open) panel.querySelector('summary').click(); await new Promise((r) => setTimeout(r, 50)); return { available: panel.innerText.includes('Skai Local Agent'), summary: panel.querySelector('summary')?.innerText, externalNotClaimedReady: ![...panel.querySelectorAll('li')].some((item) => item.innerText.includes('Detected · not connected') && item.innerText.includes('Ready')) }; } await new Promise((r) => setTimeout(r, 50)); } const panel = document.querySelector('.coding-harness-adapters'); return { available: false, panel: panel?.innerText, page: document.querySelector('.feature-page')?.className, title: document.title, body: document.body.innerText.slice(0, 400) }; })()`);
+            if (!harnessCatalog.available || !harnessCatalog.externalNotClaimedReady) throw new Error(`The Coding workspace did not show the honest local/external harness availability catalog: ${JSON.stringify(harnessCatalog)}`);
+            if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(captureDirectory, "coding-harness-adapters-1440.png"), Buffer.from(screenshot.data, "base64"));
+            }
           }
           if (((route === "marketplace" && exerciseMcpReview) || (route === "chat" && process.env.UI_MATRIX_EXERCISE_OMNIMODAL === "1")) && width === 1440 && height === 900) {
             await cdp.evaluate(`(() => { window.scrollTo(0, 0); document.querySelectorAll('*').forEach((element) => { if (element.scrollTop) element.scrollTop = 0; if (element.scrollLeft) element.scrollLeft = 0; }); return true; })()`);

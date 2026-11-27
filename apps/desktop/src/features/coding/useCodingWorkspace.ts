@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { DesktopGitDiff, DesktopGitStatus, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
+import type { DesktopGitDiff, DesktopGitStatus, DesktopHarnessAdapter, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
 import type { Route } from "../../app/types";
 import type { AgentRequest } from "../../services/agentClient";
 import { loadProjectEditorDraft, removeProjectEditorDraft, saveProjectEditorDraft } from "./projectEditorDraftStore";
@@ -13,6 +13,7 @@ type CodingWorkspaceOptions = {
 
 export function useCodingWorkspace({ request, connection, onError, onNavigate }: CodingWorkspaceOptions) {
   const [projects, setProjects] = useState<DesktopProject[]>([]);
+  const [harnessAdapters, setHarnessAdapters] = useState<DesktopHarnessAdapter[]>([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [selectedProject, setSelectedProject] = useState<DesktopProject | null>(null);
   const [projectFiles, setProjectFiles] = useState<DesktopProjectFile[]>([]);
@@ -86,6 +87,16 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
       setProjectsLoaded(true);
     }).catch(() => onError("Projects could not be loaded."));
   }, [connection, onError, request]);
+
+  useEffect(() => {
+    if (connection !== "ready") return;
+    void request("harness.adapters.list").then((response) => {
+      if (response.ok) {
+        const result = response.result as { adapters?: DesktopHarnessAdapter[] } | undefined;
+        setHarnessAdapters(result?.adapters ?? []);
+      }
+    }).catch(() => setHarnessAdapters([]));
+  }, [connection, request]);
 
   const pickProjectFolder = async () => {
     const response = await request("workspace.pickFolder");
@@ -309,5 +320,5 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setTerminalSessionId(null); setTerminalScreen(null); setTerminalExitCode(null); return true;
   };
 
-  return { projects, projectsLoaded, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest, loadProjectChecks, runProjectCheck };
+  return { projects, projectsLoaded, harnessAdapters, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest, loadProjectChecks, runProjectCheck };
 }
