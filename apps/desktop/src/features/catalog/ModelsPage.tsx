@@ -20,10 +20,10 @@ function modelCapabilityLabels(model: Model) {
 const modelKey = (model: Model) => `${model.provider ?? ""}|${model.endpoint ?? ""}|${model.model}`;
 
 function recommendation(model: Model, capacity: LocalCapacitySnapshot | null) {
-  if (model.isLoaded) return "Loaded now";
+  if (model.isLoaded) return "Recommended · loaded";
   if (!capacity?.ramAvailableBytes || !model.sizeBytes) return null;
   const headroom = capacity.ramAvailableBytes * 0.7;
-  if (model.sizeBytes <= headroom) return "Fits current headroom";
+  if (model.sizeBytes <= headroom) return "Recommended · fits headroom";
   return null;
 }
 
