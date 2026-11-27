@@ -13,6 +13,7 @@ import { ChatSchedulesPanel } from "./ChatSchedulesPanel";
 import type { ChatResponseMode, ConversationImportPreview } from "./useChatWorkspace";
 import { useChatDraft } from "./useChatDraft";
 import { ChatCapacityPopover } from "./ChatCapacityPopover";
+import { ChatCollaboration } from "./ChatCollaboration";
 
 const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png", import.meta.url).href;
 type ChatPageProps = {
@@ -181,6 +182,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
         {isCodingAgent && workspaceMode !== "project" && <span className="coding-mode-badge">CODING AGENT</span>}
         {workspaceMode === "project" && <Button className="project-task-plan-trigger" variant={showProjectTaskPlanner ? "secondary" : "ghost"} type="button" aria-expanded={showProjectTaskPlanner} onClick={() => setShowProjectTaskPlanner((open) => !open)}>{showProjectTaskPlanner ? "Close planner" : "Plan task"}</Button>}
         {workspaceMode !== "project" && <Button variant={showConversationDetails ? "secondary" : "ghost"} type="button" aria-expanded={showConversationDetails} onClick={() => setShowConversationDetails((visible) => !visible)}>Details</Button>}
+        <ChatCollaboration conversationId={conversationId} title={conversationTitle} messages={messages} onAddToDraft={(text) => updateDraft(`${draft.trimEnd()}${draft.trim() ? "\n\n" : ""}${text}`)} />
         <OverflowMenu label="Chat options" items={[{ label: temporaryChat ? "End temporary chat" : "Make temporary chat", onSelect: () => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); } }, { label: "Rename chat…", disabled: temporaryChat || !conversationId, onSelect: () => setRenameOpen(true) }, { label: "Import conversations…", onSelect: () => void beginConversationImport() }, { label: "Export conversations", onSelect: onExport }, { label: showCodingWorkflowTools ? "Hide task tools" : "Show task tools", onSelect: () => setShowCodingWorkflowTools((value) => !value) }, { label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} />
       </div>
     </div>
