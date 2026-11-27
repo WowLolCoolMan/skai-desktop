@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import type { DesktopScheduledTask, ScheduledTaskDraft } from "../../../shared/contracts";
+import type { DesktopScheduledTask, DesktopTask, ScheduledTaskDraft } from "../../../shared/contracts";
 import { Button, EmptyState, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 
 type ScheduleFilter = "active" | "paused" | "completed";
 type ScheduledWorkspace = "ChatBot" | "Coding Agent";
+type TriggerType = "schedule" | "manual" | "project_event" | "webhook";
+type OverlapPolicy = "skip" | "queue" | "replace";
 type ScheduleTemplate = { icon: NavIconName; title: string; description: string; prompt: string; workspaceMode: ScheduledWorkspace };
 
 const templates: ScheduleTemplate[] = [
@@ -55,8 +57,9 @@ function repeatLabel(minutes?: number | null) {
   return `Every ${minutes} minutes`;
 }
 
-export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, provider, model, onRetry, onSchedule, onPreview, onTransition }: {
+export function ScheduledPage({ scheduledTasks, successfulTasks, busyTask, loading, loadError, provider, model, onRetry, onSchedule, onPreview, onTransition }: {
   scheduledTasks: DesktopScheduledTask[];
+  successfulTasks: DesktopTask[];
   busyTask: string | null;
   loading: boolean;
   loadError: string | null;
@@ -76,6 +79,11 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, pr
   const [repeat, setRepeat] = useState("");
   const [missedRunPolicy, setMissedRunPolicy] = useState<"run_once" | "skip" | "ask_first">("run_once");
   const [workspaceMode, setWorkspaceMode] = useState<ScheduledWorkspace>("ChatBot");
+  const [triggerType, setTriggerType] = useState<TriggerType>("schedule");
+  const [triggerValue, setTriggerValue] = useState("");
+  const [overlapPolicy, setOverlapPolicy] = useState<OverlapPolicy>("skip");
+  const [sourceTaskId, setSourceTaskId] = useState("");
+  const [sourceWorkflowName, setSourceWorkflowName] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -99,6 +107,7 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, pr
     setDueAt(localDateTimeValue(new Date(Date.now() + 60 * 60 * 1000)));
     setRepeat("");
     setMissedRunPolicy("run_once");
+    setTriggerType("schedule"); setTriggerValue(""); setOverlapPolicy("skip"); setSourceTaskId(""); setSourceWorkflowName("");
     setPreview(null);
     setFormError(null);
     setCreating(true);
@@ -110,6 +119,7 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, pr
     setDueAt(localDateTimeValue(new Date(Date.now() + 60 * 60 * 1000)));
     setRepeat("");
     setMissedRunPolicy("run_once");
+    setTriggerType("schedule"); setTriggerValue(""); setOverlapPolicy("skip"); setSourceTaskId(""); setSourceWorkflowName("");
     setPreview(null);
     setFormError(null);
     setCreating(true);
@@ -121,6 +131,7 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, pr
     setDueAt(localDateTimeValue(new Date(Date.now() + 60 * 60 * 1000)));
     setRepeat(task.repeatEveryMinutes?.toString() ?? "");
     setMissedRunPolicy(task.missedRunPolicy ?? "run_once");
+    setTriggerType(task.triggerType ?? "schedule"); setTriggerValue(task.triggerValue ?? ""); setOverlapPolicy(task.overlapPolicy ?? "skip"); setSourceTaskId(task.sourceTaskId ?? ""); setSourceWorkflowName(task.sourceWorkflowName ?? "");
     setPreview(null);
     setFormError(null);
     setTransitionError(null);
@@ -133,8 +144,10 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, pr
     if (prompt.trim().length > 6000) { setFormError("Keep the prompt under 6,000 characters."); return; }
     if (Number.isNaN(due.getTime()) || due.getTime() <= Date.now()) { setFormError("Choose a future local time."); return; }
     if (due.getTime() > Date.now() + 365 * 24 * 60 * 60 * 1000) { setFormError("Choose a time within the next year."); return; }
+    if ((triggerType === "project_event" || triggerType === "webhook") && !triggerValue.trim()) { setFormError("Add the local event or webhook identifier for this trigger."); return; }
+    if (!preview) { setFormError("Run the one-time preview before enabling this automation."); return; }
     setFormError(null);
-    const saved = await onSchedule({ prompt: prompt.trim(), dueAt: due.toISOString(), repeatEveryMinutes: repeat ? Number(repeat) : null, missedRunPolicy, workspaceMode });
+    const saved = await onSchedule({ prompt: prompt.trim(), dueAt: due.toISOString(), repeatEveryMinutes: repeat ? Number(repeat) : null, missedRunPolicy, workspaceMode, triggerType, triggerValue: triggerValue.trim() || null, overlapPolicy, dryRunCompleted: true, sourceTaskId: sourceTaskId || null, sourceWorkflowName: sourceWorkflowName.trim() || null });
     if (saved) { setCreating(false); setSelectedId(null); setQuery(""); }
     else setFormError("The schedule could not be saved. Check the status message and try again.");
   };
@@ -173,13 +186,15 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, pr
     <main className="scheduled-content" aria-label="Scheduled task details">
       {creating ? <section className="scheduled-form-panel"><div className="scheduled-form-heading"><div><p className="section-kicker">NEW AUTOMATION</p><h2>Schedule a task</h2><p>Skai will run this prompt with your configured local model.</p></div><Button variant="ghost" type="button" onClick={() => setCreating(false)}>Close</Button></div>
         <label className="scheduled-prompt-field">Prompt<textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} maxLength={6000} rows={7} placeholder="What should the local model do when this runs?" autoFocus /></label>
-        <div className="scheduled-form-grid"><label>Run at<input type="datetime-local" value={dueAt} min={localDateTimeValue(new Date())} onChange={(event) => setDueAt(event.target.value)} /></label><label>Repeat<select value={repeat} onChange={(event) => setRepeat(event.target.value)}><option value="">Once</option><option value="60">Hourly</option><option value="1440">Daily</option><option value="10080">Weekly</option>{repeat && !["60", "1440", "10080"].includes(repeat) && <option value={repeat}>{repeatLabel(Number(repeat))}</option>}</select></label><label>Workspace mode<select value={workspaceMode} onChange={(event) => setWorkspaceMode(event.target.value as ScheduledWorkspace)}><option value="ChatBot">Chat</option><option value="Coding Agent">Coding agent</option></select></label><label>When Skai missed a run<select value={missedRunPolicy} onChange={(event) => setMissedRunPolicy(event.target.value as typeof missedRunPolicy)}><option value="run_once">Run once when Skai returns</option><option value="skip">Skip missed runs</option><option value="ask_first">Ask me before running</option></select></label></div>
+        <div className="scheduled-form-grid"><label>Trigger<select value={triggerType} onChange={(event) => { setTriggerType(event.target.value as TriggerType); setPreview(null); }}><option value="schedule">Schedule</option><option value="manual">Manual run</option><option value="project_event">Project event (local)</option><option value="webhook">Webhook (local)</option></select></label><label>Run at<input type="datetime-local" value={dueAt} min={localDateTimeValue(new Date())} onChange={(event) => setDueAt(event.target.value)} /></label><label>Repeat<select value={repeat} onChange={(event) => setRepeat(event.target.value)}><option value="">Once</option><option value="60">Hourly</option><option value="1440">Daily</option><option value="10080">Weekly</option>{repeat && !["60", "1440", "10080"].includes(repeat) && <option value={repeat}>{repeatLabel(Number(repeat))}</option>}</select></label><label>Workspace mode<select value={workspaceMode} onChange={(event) => setWorkspaceMode(event.target.value as ScheduledWorkspace)}><option value="ChatBot">Chat</option><option value="Coding Agent">Coding agent</option></select></label><label>When Skai missed a run<select value={missedRunPolicy} onChange={(event) => setMissedRunPolicy(event.target.value as typeof missedRunPolicy)}><option value="run_once">Run once when Skai returns</option><option value="skip">Skip missed runs</option><option value="ask_first">Ask me before running</option></select></label><label>Overlap policy<select value={overlapPolicy} onChange={(event) => setOverlapPolicy(event.target.value as OverlapPolicy)}><option value="skip">Skip while already running</option><option value="queue">Queue the next run</option><option value="replace">Replace the running request</option></select></label></div>
+        {triggerType !== "schedule" && <label className="scheduled-prompt-field">Trigger identifier<input value={triggerValue} onChange={(event) => { setTriggerValue(event.target.value); setPreview(null); }} placeholder={triggerType === "webhook" ? "local webhook name" : triggerType === "project_event" ? "project id:event" : "Optional manual label"} /><small>Only local events are accepted. Skai does not expose this automation to the public network.</small></label>}
+        <div className="scheduled-source-row"><label>Start from a successful task<select value={sourceTaskId} onChange={(event) => { const id = event.target.value; setSourceTaskId(id); const task = successfulTasks.find((item) => item.id === id); if (task) { setPrompt(task.instruction || task.title); setWorkspaceMode(task.responseMode === "coding" ? "Coding Agent" : "ChatBot"); setPreview(null); } }}><option value="">Write a new prompt…</option>{successfulTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select>{successfulTasks.length === 0 && <small>No successful tasks yet; saved workflows can still be named below.</small>}</label><label>Saved workflow name<input value={sourceWorkflowName} onChange={(event) => setSourceWorkflowName(event.target.value)} placeholder="Optional local workflow" maxLength={200} /></label></div>
         <p className="scheduled-form-note"><NavIcon name="activity" /> Runs on this device in {localTimeZoneLabel()} while Skai is open and the device is awake. Execution uses the configured {provider} provider and {model || "selected model"}; prompts may leave this device depending on that provider. The scheduled prompt has no tools or project-file access.</p>
         <section className="scheduled-permission-preview" aria-label="Automation access preview"><strong>Execution access</strong><span>One prompt to the configured model · no tools · no automatic project writes</span><small>Project events and webhooks are unavailable until a local trigger provider is configured.</small></section>
         {preview && <section className="scheduled-dry-run-result" aria-live="polite"><strong>One-time preview · not saved</strong><p>{preview}</p></section>}
         {formError && <p className="form-error" role="alert">{formError}</p>}
-        <div className="scheduled-form-actions"><Button variant="ghost" type="button" onClick={() => setCreating(false)}>Cancel</Button><Button variant="secondary" type="button" disabled={previewBusy || !prompt.trim()} onClick={() => void previewPrompt()}>{previewBusy ? "Running preview…" : "Run one-time preview"}</Button><Button variant="primary" type="button" disabled={busyTask === "schedule" || !prompt.trim()} onClick={() => void submitSchedule()}>{busyTask === "schedule" ? "Saving…" : "Save schedule"}</Button></div>
-      </section> : selectedTask ? <section className="scheduled-detail-panel"><div className="scheduled-detail-topline"><p className="section-kicker">SCHEDULE DETAILS</p><StatusBadge tone={statusTone(selectedTask.status)}>{selectedTask.status === "needs_decision" ? "needs decision" : selectedTask.status}</StatusBadge></div><h2>{selectedTask.prompt}</h2><dl className="scheduled-detail-grid"><div><dt>Next run</dt><dd>{selectedTask.status === "needs_decision" ? "Waiting for your decision" : selectedTask.status === "completed" || selectedTask.status === "cancelled" || selectedTask.status === "failed" ? "No upcoming run" : dueLabel(selectedTask.dueAt)}</dd></div><div><dt>Time zone</dt><dd>{localTimeZoneLabel()}</dd></div><div><dt>Device requirement</dt><dd>Skai open · device awake</dd></div><div><dt>Repeat</dt><dd>{repeatLabel(selectedTask.repeatEveryMinutes)}</dd></div><div><dt>Workspace mode</dt><dd>{selectedTask.workspaceMode === "Coding Agent" ? "Coding agent" : "Chat"}</dd></div><div><dt>Configured model</dt><dd>{selectedTask.selectedModel || `${provider} · ${model || "selected model"}`}</dd></div><div><dt>Missed run</dt><dd>{selectedTask.missedRunPolicy === "ask_first" ? "Ask first" : selectedTask.missedRunPolicy === "skip" ? "Skip" : "Run once when Skai returns"}</dd></div><div><dt>Latest result</dt><dd>{selectedTask.outcome || "No result yet"}</dd></div></dl>
+        <div className="scheduled-form-actions"><Button variant="ghost" type="button" onClick={() => setCreating(false)}>Cancel</Button><Button variant="secondary" type="button" disabled={previewBusy || !prompt.trim()} onClick={() => void previewPrompt()}>{previewBusy ? "Running preview…" : "Run one-time preview"}</Button><Button variant="primary" type="button" disabled={busyTask === "schedule" || !prompt.trim() || !preview} onClick={() => void submitSchedule()}>{busyTask === "schedule" ? "Saving…" : preview ? "Enable automation" : "Preview before enabling"}</Button></div>
+      </section> : selectedTask ? <section className="scheduled-detail-panel"><div className="scheduled-detail-topline"><p className="section-kicker">SCHEDULE DETAILS</p><StatusBadge tone={statusTone(selectedTask.status)}>{selectedTask.status === "needs_decision" ? "needs decision" : selectedTask.status}</StatusBadge></div><h2>{selectedTask.prompt}</h2><dl className="scheduled-detail-grid"><div><dt>Next run</dt><dd>{selectedTask.status === "needs_decision" ? "Waiting for your decision" : selectedTask.status === "completed" || selectedTask.status === "cancelled" || selectedTask.status === "failed" ? "No upcoming run" : dueLabel(selectedTask.dueAt)}</dd></div><div><dt>Trigger</dt><dd>{selectedTask.triggerType === "project_event" ? `Project event · ${selectedTask.triggerValue}` : selectedTask.triggerType === "webhook" ? `Local webhook · ${selectedTask.triggerValue}` : selectedTask.triggerType === "manual" ? "Manual run" : "Schedule"}</dd></div><div><dt>Time zone</dt><dd>{localTimeZoneLabel()}</dd></div><div><dt>Device requirement</dt><dd>Skai open · device awake</dd></div><div><dt>Repeat</dt><dd>{repeatLabel(selectedTask.repeatEveryMinutes)}</dd></div><div><dt>Overlap</dt><dd>{selectedTask.overlapPolicy === "queue" ? "Queue next run" : selectedTask.overlapPolicy === "replace" ? "Replace running request" : "Skip overlapping run"}</dd></div><div><dt>Workspace mode</dt><dd>{selectedTask.workspaceMode === "Coding Agent" ? "Coding agent" : "Chat"}</dd></div><div><dt>Configured model</dt><dd>{selectedTask.selectedModel || `${provider} · ${model || "selected model"}`}</dd></div><div><dt>Dry run</dt><dd>{selectedTask.dryRunCompletedAt ? `Passed ${dueLabel(selectedTask.dryRunCompletedAt)}` : "Not recorded"}</dd></div><div><dt>Source</dt><dd>{selectedTask.sourceTaskId ? "Successful task" : selectedTask.sourceWorkflowName ? `Workflow · ${selectedTask.sourceWorkflowName}` : "New prompt"}</dd></div><div><dt>Missed run</dt><dd>{selectedTask.missedRunPolicy === "ask_first" ? "Ask first" : selectedTask.missedRunPolicy === "skip" ? "Skip" : "Run once when Skai returns"}</dd></div><div><dt>Latest result</dt><dd>{selectedTask.outcome || "No result yet"}</dd></div></dl>
         {!!selectedTask.runs?.length && <section className="scheduled-run-history" aria-label="Run history"><h3>Run history <small>{selectedTask.runs.length} most recent</small></h3>{[...selectedTask.runs].reverse().map((run) => <article key={run.id} className={`scheduled-run-entry is-${run.status}`}><div><StatusBadge tone={run.status === "succeeded" ? "success" : run.status === "running" ? "warning" : "neutral"}>{run.status}</StatusBadge><time dateTime={run.startedAtUtc}>{dueLabel(run.startedAtUtc)}</time></div><details><summary>Input and {run.status === "failed" || run.status === "skipped" ? "failure" : "result"}</summary><p><strong>Input</strong>{run.input}</p>{run.result && <p><strong>Result</strong>{run.result}</p>}{run.failure && <p><strong>{run.status === "skipped" ? "Outcome" : "Failure"}</strong>{run.failure}</p>}{run.artifactPaths?.length ? <p><strong>Artifacts</strong>{run.artifactPaths.map((path) => <code key={path}>{path}</code>)}</p> : null}</details></article>)}</section>}
         {transitionError && <p className="form-error" role="alert">{transitionError}</p>}
         <div className="scheduled-detail-actions"><Button variant="secondary" type="button" onClick={() => duplicateTask(selectedTask)}>Duplicate</Button>{selectedTask.status === "needs_decision" && <><Button variant="primary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "resolveMissed", "run_once")}>Run missed task once</Button><Button variant="secondary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "resolveMissed", "skip")}>Skip missed task</Button></>}{selectedTask.status === "scheduled" && <><Button variant="secondary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "runNow")}>Run now</Button><Button variant="ghost" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "pause")}>Pause</Button></>}{selectedTask.status === "paused" && <Button variant="secondary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "resume")}>Resume</Button>}{(selectedTask.status === "scheduled" || selectedTask.status === "paused") && <Button variant="ghost" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "cancel")}>Cancel schedule</Button>}</div>

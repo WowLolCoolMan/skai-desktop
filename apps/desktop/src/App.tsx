@@ -92,7 +92,7 @@ export default function App() {
   }, [applyLayoutPreset]);
   const isSidebarOpen = compactViewport ? mobileSidebarOpen : desktopSidebarOpen;
   return <ErrorBoundary><div className={`app-shell ${workspaceTabsVisible && workspace.workspaceTabs.length ? "has-workspace-tabs" : ""} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""} ${desktopSidebarOpen ? "" : "workspace-sidebar-collapsed"}`} style={shellStyle}>
-    <TaskNotificationMonitor tasks={workspace.routeState.tasks} loading={workspace.routeState.tasksLoading} onOpenTask={openTaskFromNotification} />
+    <TaskNotificationMonitor tasks={workspace.routeState.tasks} scheduledTasks={workspace.routeState.scheduledTasks} loading={workspace.routeState.tasksLoading} onOpenTask={openTaskFromNotification} />
     <a className="skip-link" href="#main-content">Skip to content</a>
     <Toolbar connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onOpenCommandPalette={workspace.openCommandPalette} onApplyLayoutPreset={applyLayoutPreset} onToggleSidebar={() => { if (compactViewport) setMobileSidebarOpen((open) => !open); else setDesktopSidebarOpen((open) => !open); }} sidebarOpen={isSidebarOpen} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
     <GlobalRail route={workspace.route} tasks={workspace.routeState.tasks} onNavigate={workspace.onNavigate} />

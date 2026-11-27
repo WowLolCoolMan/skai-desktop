@@ -713,7 +713,7 @@ async function run() {
   const scheduledPort = scheduledModelServer.address().port;
   const scheduledSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${scheduledPort}/v1`, model: "scheduled-smoke-model", provider: "Ollama" });
   if (!scheduledSettings.ok) throw new Error("settings.save could not prepare the unattended scheduler endpoint.");
-  const scheduled = await request("scheduled.create", { prompt: "Run the local review", dueAt: new Date(Date.now() + 60_000).toISOString(), repeatEveryMinutes: 1 });
+  const scheduled = await request("scheduled.create", { prompt: "Run the local review", dueAt: new Date(Date.now() + 60_000).toISOString(), repeatEveryMinutes: 1, dryRunCompleted: true, triggerType: "schedule", overlapPolicy: "skip" });
   if (!scheduled.ok || scheduled.result?.status !== "scheduled") throw new Error("scheduled.create did not persist a scheduled run.");
   const runNow = await request("scheduled.runNow", { id: scheduled.result.id });
   if (!runNow.ok || runNow.result?.id !== scheduled.result.id) throw new Error("scheduled.runNow did not update the scheduled run.");

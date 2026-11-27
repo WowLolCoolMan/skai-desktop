@@ -18,6 +18,21 @@ public static class ScheduledMissedRunPolicies
     public const string AskFirst = "ask_first";
 }
 
+public static class ScheduledTriggerTypes
+{
+    public const string Schedule = "schedule";
+    public const string Manual = "manual";
+    public const string ProjectEvent = "project_event";
+    public const string Webhook = "webhook";
+}
+
+public static class ScheduledOverlapPolicies
+{
+    public const string Skip = "skip";
+    public const string Queue = "queue";
+    public const string Replace = "replace";
+}
+
 public sealed class ScheduledTaskRun
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -42,6 +57,12 @@ public sealed class ScheduledTask
     public DateTimeOffset DueAtUtc { get; set; }
     public int? RepeatEveryMinutes { get; set; }
     public string MissedRunPolicy { get; set; } = ScheduledMissedRunPolicies.RunOnce;
+    public string TriggerType { get; set; } = ScheduledTriggerTypes.Schedule;
+    public string? TriggerValue { get; set; }
+    public string OverlapPolicy { get; set; } = ScheduledOverlapPolicies.Skip;
+    public DateTimeOffset? DryRunCompletedAtUtc { get; set; }
+    public string? SourceTaskId { get; set; }
+    public string? SourceWorkflowName { get; set; }
     public int RunCount { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? StartedAtUtc { get; set; }

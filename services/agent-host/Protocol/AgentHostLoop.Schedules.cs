@@ -88,6 +88,12 @@ public static partial class AgentHostLoop
                 dueAt = task.DueAtUtc,
                 repeatEveryMinutes = task.RepeatEveryMinutes,
                 missedRunPolicy = task.MissedRunPolicy,
+                triggerType = task.TriggerType,
+                triggerValue = task.TriggerValue,
+                overlapPolicy = task.OverlapPolicy,
+                dryRunCompletedAt = task.DryRunCompletedAtUtc,
+                sourceTaskId = task.SourceTaskId,
+                sourceWorkflowName = task.SourceWorkflowName,
                 status = task.Status,
                 outcome = task.Outcome,
                 runs = task.Runs,
@@ -104,13 +110,20 @@ public static partial class AgentHostLoop
             throw new InvalidOperationException("dueAt must be a valid date and time.");
         var repeat = OptionalInt(request, "repeatEveryMinutes");
         var conversationId = OptionalString(request, "conversationId");
+        if (!OptionalBoolean(request, "dryRunCompleted")) throw new InvalidOperationException("Run the one-time dry run before enabling this automation.");
         var task = CreateScheduledTaskStore().Schedule(
             RequiredBoundedString(request, "prompt", ScheduledTaskStore.MaxPromptCharacters),
             dueAt.ToUniversalTime(),
             OptionalString(request, "workspaceMode") ?? WorkspaceModes.Chat,
             repeatEveryMinutes: repeat,
             conversationId: conversationId,
-            missedRunPolicy: OptionalString(request, "missedRunPolicy") ?? ScheduledMissedRunPolicies.RunOnce);
+            missedRunPolicy: OptionalString(request, "missedRunPolicy") ?? ScheduledMissedRunPolicies.RunOnce,
+            triggerType: OptionalString(request, "triggerType") ?? ScheduledTriggerTypes.Schedule,
+            triggerValue: OptionalString(request, "triggerValue"),
+            overlapPolicy: OptionalString(request, "overlapPolicy") ?? ScheduledOverlapPolicies.Skip,
+            dryRunCompleted: true,
+            sourceTaskId: OptionalString(request, "sourceTaskId"),
+            sourceWorkflowName: OptionalString(request, "sourceWorkflowName"));
         return ScheduledTaskResponse(request, task);
     }
 
@@ -141,6 +154,12 @@ public static partial class AgentHostLoop
             dueAt = task.DueAtUtc,
             repeatEveryMinutes = task.RepeatEveryMinutes,
             missedRunPolicy = task.MissedRunPolicy,
+            triggerType = task.TriggerType,
+            triggerValue = task.TriggerValue,
+            overlapPolicy = task.OverlapPolicy,
+            dryRunCompletedAt = task.DryRunCompletedAtUtc,
+            sourceTaskId = task.SourceTaskId,
+            sourceWorkflowName = task.SourceWorkflowName,
             status = task.Status,
             outcome = task.Outcome,
             runs = task.Runs,

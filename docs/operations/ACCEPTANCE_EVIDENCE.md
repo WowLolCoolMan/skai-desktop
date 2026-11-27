@@ -101,6 +101,36 @@ platform or theme that was not recorded.
 - After screenshot: review surface includes advisory check coverage, explicit
   before/working-copy cards, reviewer-agent handoff, and note status/history
   controls. The existing UI matrix capture remains the interaction evidence.
+
+### Slice 18 completion — safer local automations
+
+- Outcome: schedules now require a successful one-time dry run before
+  activation, retain trigger/overlap/source provenance, disclose model/access,
+  and surface bounded local notification history for completed, failed, or
+  decision-waiting runs.
+- Reference / workflow: Scheduled task page and the conversation scheduling
+  panel, with schedule/manual/project-event/local-webhook trigger choices.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`; `npm test`.
+- Failure check: activation is blocked until preview succeeds; project-event and
+  webhook identifiers remain local metadata and no public listener is implied;
+  legacy schedules are migrated with their creation time as the historical
+  dry-run marker.
+- Disposable profile / cleanup: native scheduled-store tests use a temporary
+  directory; packaged UI profiles remain throwaway and no user schedule is
+  mutated.
+- Platform / OS: Windows x64 development host and local Agent Host.
+- Viewport / theme / sidebar: renderer build/type checks cover the responsive
+  schedule form; focused packaged visual capture remains follow-up evidence.
+- Runtime / app revision: Agent Host scheduler with prompt-only execution and
+  the existing local notification preference/history surface.
+- Network and privacy boundary: no public webhook server or remote tool access;
+  the scheduled prompt uses the configured provider under the existing local
+  transport policy.
+- Before screenshot: schedule form offered save after a non-persisting preview
+  but did not retain trigger/source/overlap metadata.
+- After screenshot: form offers trigger, overlap, successful-task/workflow
+  provenance, and an explicit “Enable automation” dry-run gate; details show
+  the stored activation evidence and notification boundary.
 - Comparison: changed-file selection and hunk staging remain unchanged; new
   controls add review context without implying unavailable binary or CI data.
 - Unverified platforms, integrations, or hardware: native Linux/macOS visual

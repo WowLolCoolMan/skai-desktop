@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DesktopProject, DesktopTask } from "../../../shared/contracts";
+import type { DesktopProject, DesktopScheduledTask, DesktopTask } from "../../../shared/contracts";
 import { Button } from "../../components/ui/Primitives";
 
 const preferenceKey = "skai.taskNotifications.preferences.v1";
@@ -24,7 +24,7 @@ type Delivery = "shown" | "disabled" | "category-disabled" | "quiet-hours" | "pr
 type HistoryEntry = { id: string; taskId: string; taskTitle: string; projectId: string | null; status: string; createdAt: string; delivery: Delivery };
 
 const defaultPreferences: NotificationPreferences = { enabled: false, completed: true, failed: true, decisions: true, quietHours: false, quietStart: "22:00", quietEnd: "08:00", mutedProjectIds: [], showTaskTitles: false };
-const statuses = new Set(["completed", "failed", "blocked", "awaiting_approval"]);
+const statuses = new Set(["completed", "failed", "blocked", "awaiting_approval", "needs_decision"]);
 
 function readPreferences(): NotificationPreferences {
   try {
@@ -62,12 +62,12 @@ function inQuietHours(start: string, end: string, now = new Date()) {
 function statusEnabled(status: string, preferences: NotificationPreferences) {
   if (status === "completed") return preferences.completed;
   if (status === "failed" || status === "blocked") return preferences.failed;
-  if (status === "awaiting_approval") return preferences.decisions;
+  if (status === "awaiting_approval" || status === "needs_decision") return preferences.decisions;
   return false;
 }
 
 /** Watches task status transitions while recording even undelivered events for recovery. */
-export function TaskNotificationMonitor({ tasks, loading, onOpenTask }: { tasks: DesktopTask[]; loading: boolean; onOpenTask: (task: DesktopTask) => void }) {
+export function TaskNotificationMonitor({ tasks, scheduledTasks = [], loading, onOpenTask }: { tasks: DesktopTask[]; scheduledTasks?: DesktopScheduledTask[]; loading: boolean; onOpenTask: (task: DesktopTask) => void }) {
   const [preferences, setPreferences] = useState(readPreferences);
   useEffect(() => {
     const refresh = () => setPreferences(readPreferences());
@@ -83,10 +83,12 @@ export function TaskNotificationMonitor({ tasks, loading, onOpenTask }: { tasks:
       if (raw) { const parsed = JSON.parse(raw) as unknown; if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) { previous = parsed as Record<string, string>; hasBaseline = true; } }
     } catch { /* malformed local history starts from a clean baseline */ }
     if (!hasBaseline && tasks.length === 0) return;
-    const next = Object.fromEntries(tasks.slice(0, 1000).map((task) => [task.id, task.status]));
+    const scheduleTasks = scheduledTasks.filter((task) => ["completed", "failed", "needs_decision"].includes(task.status)).map((task): DesktopTask => ({ id: `scheduled:${task.id}`, title: task.prompt, instruction: task.prompt, role: "scheduled automation", status: task.status, dependsOn: [], updatedAt: task.runs?.at(-1)?.completedAtUtc ?? task.dueAt }));
+    const allTasks = [...tasks, ...scheduleTasks];
+    const next = Object.fromEntries(allTasks.slice(0, 1200).map((task) => [task.id, task.status]));
     try { localStorage.setItem(statusKey, JSON.stringify(next)); } catch { /* task loading must not depend on notification storage */ }
     if (!hasBaseline) return;
-    const changed = tasks.filter((task) => statuses.has(task.status) && previous[task.id] !== task.status);
+    const changed = allTasks.filter((task) => statuses.has(task.status) && previous[task.id] !== task.status);
     if (!changed.length) return;
 
     const delivered = changed.map((task): HistoryEntry => {
@@ -121,7 +123,7 @@ export function TaskNotificationMonitor({ tasks, loading, onOpenTask }: { tasks:
       }
       notification.onclick = () => { window.focus(); const target = tasks.find((task) => task.id === visible[0].taskId) ?? changed[0]; onOpenTask(target); notification.close(); };
     } catch { /* notification storage or native delivery can fail without affecting tasks */ }
-  }, [tasks, loading, preferences, onOpenTask]);
+  }, [tasks, scheduledTasks, loading, preferences, onOpenTask]);
   return null;
 }
 

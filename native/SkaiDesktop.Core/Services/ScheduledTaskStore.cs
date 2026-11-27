@@ -35,19 +35,22 @@ public sealed class ScheduledTaskStore
         }
     }
 
-    public ScheduledTask Schedule(string prompt, DateTimeOffset dueAtUtc, string workspaceMode = WorkspaceModes.Chat, DateTimeOffset? now = null, int? repeatEveryMinutes = null, string? conversationId = null, string missedRunPolicy = ScheduledMissedRunPolicies.RunOnce)
+    public ScheduledTask Schedule(string prompt, DateTimeOffset dueAtUtc, string workspaceMode = WorkspaceModes.Chat, DateTimeOffset? now = null, int? repeatEveryMinutes = null, string? conversationId = null, string missedRunPolicy = ScheduledMissedRunPolicies.RunOnce, string triggerType = ScheduledTriggerTypes.Schedule, string? triggerValue = null, string overlapPolicy = ScheduledOverlapPolicies.Skip, bool dryRunCompleted = true, string? sourceTaskId = null, string? sourceWorkflowName = null)
     {
         ValidatePrompt(prompt);
         if (workspaceMode is not (WorkspaceModes.Chat or WorkspaceModes.CodingAgent)) throw new ArgumentException("The scheduled workspace mode is invalid.", nameof(workspaceMode));
         var current = now ?? DateTimeOffset.UtcNow;
         ValidateRepeat(repeatEveryMinutes);
         ValidateMissedRunPolicy(missedRunPolicy);
+        ValidateTrigger(triggerType, triggerValue);
+        ValidateOverlapPolicy(overlapPolicy);
+        if (!dryRunCompleted) throw new InvalidOperationException("Run the one-time dry run before enabling this automation.");
         if (dueAtUtc < current.AddSeconds(-5)) throw new ArgumentException("A scheduled task must be in the future.", nameof(dueAtUtc));
         if (dueAtUtc > current.AddYears(1)) throw new ArgumentException("A scheduled task cannot be more than one year away.", nameof(dueAtUtc));
         var tasks = Load().ToList();
         if (tasks.Count >= MaxTasks) throw new InvalidOperationException($"At most {MaxTasks} scheduled tasks can be saved.");
         if (conversationId is { Length: > 128 }) throw new ArgumentException("The conversation ID is invalid.", nameof(conversationId));
-        var task = new ScheduledTask { Prompt = prompt.Trim(), ConversationId = string.IsNullOrWhiteSpace(conversationId) ? null : conversationId.Trim(), WorkspaceMode = workspaceMode, DueAtUtc = dueAtUtc, RepeatEveryMinutes = repeatEveryMinutes, MissedRunPolicy = missedRunPolicy, CreatedAtUtc = current };
+        var task = new ScheduledTask { Prompt = prompt.Trim(), ConversationId = string.IsNullOrWhiteSpace(conversationId) ? null : conversationId.Trim(), WorkspaceMode = workspaceMode, DueAtUtc = dueAtUtc, RepeatEveryMinutes = repeatEveryMinutes, MissedRunPolicy = missedRunPolicy, TriggerType = triggerType, TriggerValue = string.IsNullOrWhiteSpace(triggerValue) ? null : triggerValue.Trim(), OverlapPolicy = overlapPolicy, DryRunCompletedAtUtc = current, SourceTaskId = string.IsNullOrWhiteSpace(sourceTaskId) ? null : sourceTaskId.Trim(), SourceWorkflowName = string.IsNullOrWhiteSpace(sourceWorkflowName) ? null : sourceWorkflowName.Trim(), CreatedAtUtc = current };
         tasks.Add(task);
         Save(tasks);
         return task;
@@ -195,6 +198,18 @@ public sealed class ScheduledTaskStore
             throw new ArgumentException("The missed-run policy must be run_once, skip, or ask_first.", nameof(policy));
     }
 
+    private static void ValidateTrigger(string? triggerType, string? triggerValue)
+    {
+        if (triggerType is not (ScheduledTriggerTypes.Schedule or ScheduledTriggerTypes.Manual or ScheduledTriggerTypes.ProjectEvent or ScheduledTriggerTypes.Webhook)) throw new ArgumentException("The trigger type is invalid.", nameof(triggerType));
+        if (triggerValue is { Length: > 512 } || triggerValue?.Any(char.IsControl) == true) throw new ArgumentException("The trigger value is invalid.", nameof(triggerValue));
+        if (triggerType is ScheduledTriggerTypes.ProjectEvent or ScheduledTriggerTypes.Webhook && string.IsNullOrWhiteSpace(triggerValue)) throw new ArgumentException("This trigger needs a local event or webhook identifier.", nameof(triggerValue));
+    }
+
+    private static void ValidateOverlapPolicy(string? policy)
+    {
+        if (policy is not (ScheduledOverlapPolicies.Skip or ScheduledOverlapPolicies.Queue or ScheduledOverlapPolicies.Replace)) throw new ArgumentException("The overlap policy is invalid.", nameof(policy));
+    }
+
     private static void RecordSkippedRun(ScheduledTask task, DateTimeOffset current)
     {
         task.Runs ??= [];
@@ -232,6 +247,14 @@ public sealed class ScheduledTaskStore
             if (task.Status is not (ScheduledTaskStatuses.Scheduled or ScheduledTaskStatuses.Running or ScheduledTaskStatuses.Completed or ScheduledTaskStatuses.Failed or ScheduledTaskStatuses.Paused or ScheduledTaskStatuses.Cancelled or ScheduledTaskStatuses.NeedsDecision)) throw new InvalidDataException("The scheduled task store contains an invalid status.");
             if (task.Outcome is { Length: > MaxOutcomeCharacters } || task.Outcome?.Any(char.IsControl) == true) throw new InvalidDataException("The scheduled task store contains an invalid outcome.");
             ValidateMissedRunPolicy(task.MissedRunPolicy);
+            task.TriggerType ??= ScheduledTriggerTypes.Schedule;
+            ValidateTrigger(task.TriggerType, task.TriggerValue);
+            task.OverlapPolicy ??= ScheduledOverlapPolicies.Skip;
+            ValidateOverlapPolicy(task.OverlapPolicy);
+            // Existing schedules predate the activation gate. Preserve them as already-enabled
+            // local automations; new schedules always receive a dry-run timestamp in Schedule().
+            task.DryRunCompletedAtUtc ??= task.CreatedAtUtc;
+            if (task.SourceTaskId is { Length: > 128 } || task.SourceTaskId?.Any(char.IsControl) == true || task.SourceWorkflowName is { Length: > 200 } || task.SourceWorkflowName?.Any(char.IsControl) == true) throw new InvalidDataException("The scheduled task source metadata is invalid.");
             task.Runs ??= [];
             if (task.Runs.Count > MaxRunsPerTask) throw new InvalidDataException("Scheduled task run history exceeds the retention bound.");
             foreach (var run in task.Runs)

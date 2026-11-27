@@ -289,6 +289,12 @@ export type DesktopScheduledTask = {
   dueAt: string;
   repeatEveryMinutes?: number | null;
   missedRunPolicy?: "run_once" | "skip" | "ask_first";
+  triggerType?: "schedule" | "manual" | "project_event" | "webhook";
+  triggerValue?: string | null;
+  overlapPolicy?: "skip" | "queue" | "replace";
+  dryRunCompletedAt?: string | null;
+  sourceTaskId?: string | null;
+  sourceWorkflowName?: string | null;
   status: string;
   outcome?: string | null;
   selectedModel?: string | null;
@@ -301,6 +307,12 @@ export type ScheduledTaskDraft = {
   dueAt: string;
   repeatEveryMinutes?: number | null;
   missedRunPolicy?: "run_once" | "skip" | "ask_first";
+  triggerType?: "schedule" | "manual" | "project_event" | "webhook";
+  triggerValue?: string | null;
+  overlapPolicy?: "skip" | "queue" | "replace";
+  dryRunCompleted?: boolean;
+  sourceTaskId?: string | null;
+  sourceWorkflowName?: string | null;
   workspaceMode?: "ChatBot" | "Coding Agent";
 };
 

@@ -9,8 +9,9 @@ internal static class ScheduledTaskTests
         Directory.CreateDirectory(directory);
         var store = new ScheduledTaskStore(Path.Combine(directory, "scheduled.json"));
         var now = DateTimeOffset.UtcNow;
-        var task = store.Schedule("Review the release checklist", now.AddMinutes(5), WorkspaceModes.Chat, now);
+        var task = store.Schedule("Review the release checklist", now.AddMinutes(5), WorkspaceModes.Chat, now, triggerType: ScheduledTriggerTypes.ProjectEvent, triggerValue: "project-1:push", overlapPolicy: ScheduledOverlapPolicies.Queue, sourceTaskId: "task-1", sourceWorkflowName: "Release review");
         Check(store.Load().Count == 1 && store.Load()[0].Status == ScheduledTaskStatuses.Scheduled, "scheduled task persists as pending");
+        Check(store.Load()[0].TriggerType == ScheduledTriggerTypes.ProjectEvent && store.Load()[0].TriggerValue == "project-1:push" && store.Load()[0].OverlapPolicy == ScheduledOverlapPolicies.Queue && store.Load()[0].DryRunCompletedAtUtc is not null && store.Load()[0].SourceTaskId == "task-1" && store.Load()[0].SourceWorkflowName == "Release review", "automation trigger, overlap, dry-run, and source metadata persist");
         Check(store.TryClaimDue(now) is null, "future scheduled task is not claimed early");
         var claimed = store.TryClaimDue(now.AddMinutes(6));
         Check(claimed is not null && claimed.Status == ScheduledTaskStatuses.Running, "due scheduled task is claimed durably");
@@ -60,6 +61,11 @@ internal static class ScheduledTaskTests
         Check(store.TryClaimDue(now.AddHours(3)) is null, "missed recurring skip policy avoids replaying every missed interval");
         var recurringAfterSkip = store.Load().Single(item => item.Id == missedRecurring.Id);
         Check(recurringAfterSkip.Status == ScheduledTaskStatuses.Scheduled && recurringAfterSkip.DueAtUtc > now.AddHours(3) && recurringAfterSkip.Runs.Single().Status == "skipped", "missed recurring task advances to the next future interval and records the skip");
+
+        var rejected = false;
+        try { store.Schedule("Missing dry run", now.AddHours(4), WorkspaceModes.Chat, now, dryRunCompleted: false); }
+        catch (InvalidOperationException) { rejected = true; }
+        Check(rejected, "automation activation requires a completed dry run");
 
         Console.WriteLine("PASS scheduled task persistence, recurrence, claim, no-replay, run history, missed-run decisions, outcome, run-now, pause, resume, and cancellation");
     }
