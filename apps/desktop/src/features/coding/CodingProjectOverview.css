@@ -18,6 +18,12 @@
 .coding-project-recent-activity strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .coding-project-recent-activity time { margin-left:auto; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
 .coding-project-recent-activity p { margin:8px 0 0; color:var(--skai-color-text-muted); font-size:var(--skai-text-sm); }
+.coding-project-tool-policy { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-top:14px; border-top:1px solid var(--skai-color-border); }
+.coding-project-tool-policy p { margin:5px 0 0; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
+.coding-project-tool-policy > div:last-child { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; }
+.coding-project-tool-chip { padding:7px 10px; border:1px solid var(--skai-color-border); border-radius:999px; color:var(--skai-color-text-muted); background:transparent; cursor:pointer; font:inherit; font-size:var(--skai-text-xs); }
+.coding-project-tool-chip:hover,.coding-project-tool-chip:focus-visible { border-color:var(--skai-color-accent); color:var(--skai-color-text); }
+.coding-project-tool-chip.is-enabled { border-color:color-mix(in srgb, var(--skai-color-success) 60%, var(--skai-color-border)); color:var(--skai-color-success); background:color-mix(in srgb, var(--skai-color-success) 10%, transparent); }
 .coding-project-quick-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
-@media (max-width:900px) { .coding-project-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }.coding-project-overview-footer { grid-template-columns:1fr; }.coding-project-quick-actions { justify-content:flex-start; } }
+@media (max-width:900px) { .coding-project-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }.coding-project-tool-policy { align-items:flex-start; flex-direction:column; }.coding-project-tool-policy > div:last-child { justify-content:flex-start; }.coding-project-overview-footer { grid-template-columns:1fr; }.coding-project-quick-actions { justify-content:flex-start; } }
 @media (max-width:520px) { .coding-project-overview { padding:15px; }.coding-project-overview-heading { flex-direction:column; gap:10px; }.coding-project-metrics { grid-template-columns:1fr 1fr; }.coding-project-quick-actions > button { flex:1 1 auto; } }
