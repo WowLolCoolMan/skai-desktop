@@ -17,7 +17,7 @@ jobs:
     name: Verify release source
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
@@ -61,7 +61,7 @@ jobs:
       RELEASE_SIGNING_READY: ${{ vars.RELEASE_SIGNING_READY }}
       RELEASE_UNSIGNED_TEST: ${{ vars.RELEASE_UNSIGNED_TEST }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -177,7 +177,7 @@ jobs:
           "file=$([IO.Path]::GetFileName($installer))`nstatus=$($signature.Status)`nsubject=$($signature.SignerCertificate.Subject)`nsha256=$hash`n" | Add-Content -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'SIGNATURES-electron-win-x64.txt')
       - name: Check out the previous release for upgrade testing
         if: runner.os == 'Windows'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: v0.1.3
           path: .tmp/release-v0.1.3
