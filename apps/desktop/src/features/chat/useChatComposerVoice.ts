@@ -35,6 +35,8 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const [voiceListening, setVoiceListening] = useState(false);
   const [handsFreeActive, setHandsFreeActive] = useState(false);
   const [voiceExpressiveness, setVoiceExpressiveness] = useState(() => selectedVoiceSettings().expressiveness);
+  const [voiceActivitySensitivity, setVoiceActivitySensitivity] = useState(() => selectedVoiceSettings().voiceActivitySensitivity);
+  const [voiceInputLevel, setVoiceInputLevel] = useState(0);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voiceFallbackNotice, setVoiceFallbackNotice] = useState<string | null>(null);
   const [voicePackNeeded, setVoicePackNeeded] = useState(false);
@@ -78,9 +80,19 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   }, []);
 
   useEffect(() => {
-    const refreshVoiceSettings = () => setVoiceExpressiveness(selectedVoiceSettings().expressiveness);
+    const refreshVoiceSettings = () => { const settings = selectedVoiceSettings(); setVoiceExpressiveness(settings.expressiveness); setVoiceActivitySensitivity(settings.voiceActivitySensitivity); };
     window.addEventListener("skai:voice-settings-updated", refreshVoiceSettings);
     return () => window.removeEventListener("skai:voice-settings-updated", refreshVoiceSettings);
+  }, []);
+
+  useEffect(() => {
+    const interruptSpeech = (event: KeyboardEvent) => {
+      if (!handsFreeRef.current || !voicePlaybackActiveRef.current || !event.ctrlKey || !event.shiftKey || event.code !== "Space") return;
+      event.preventDefault();
+      stopNativeSpeech();
+    };
+    window.addEventListener("keydown", interruptSpeech);
+    return () => window.removeEventListener("keydown", interruptSpeech);
   }, []);
 
   useEffect(() => {
@@ -315,6 +327,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     handsFreeAbortRef.current?.abort();
     stopHandsFreeCapture(false);
     setVoiceTurnTranscribing(false);
+    setVoiceInputLevel(0);
   };
 
   const stopHandsFreeCapture = (finishUtterance: boolean) => {
@@ -369,7 +382,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       const samples = new Float32Array(analyser.fftSize);
       const mimeType = ["audio/webm;codecs=opus", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type));
       if (!mimeType) throw new Error("This desktop runtime cannot record a supported local audio format.");
-      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], recentMonitorChunk: null as Blob | null, abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false };
+      const capture = { stream, context, frame: 0, recorder: null as MediaRecorder | null, chunks: [] as Blob[], recentMonitorChunk: null as Blob | null, abort: null as AbortController | null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false, lastLevelPublish: 0 };
       handsFreeCaptureRef.current = capture;
       capture.recorder = new MediaRecorder(stream, { mimeType });
       capture.recorder.ondataavailable = (event) => {
@@ -432,7 +445,8 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         const level = audioRms(samples);
         document.querySelector(".voice-mode-session")?.setAttribute("data-input-level", level.toFixed(6));
         const now = performance.now();
-        const threshold = voiceActivityThreshold(capture.noiseFloor, capture.monitorDuringPlayback);
+        if (now - capture.lastLevelPublish >= 100) { capture.lastLevelPublish = now; setVoiceInputLevel(Math.max(0, Math.min(1, level * 12))); }
+        const threshold = voiceActivityThreshold(capture.noiseFloor, capture.monitorDuringPlayback, voiceActivitySensitivity);
         if (!capture.monitorDuringPlayback && !capture.speechDetected && now - capture.calibrationStartedAt < 350) capture.noiseFloor = Math.min(0.02, capture.noiseFloor * 0.9 + level * 0.1);
         if (level > threshold) {
           capture.lastSpeechAt = now;
@@ -529,5 +543,5 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       setVoicePackInstalling(false);
     }
   };
-  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack };
+  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack };
 }

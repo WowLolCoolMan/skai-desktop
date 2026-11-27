@@ -11,6 +11,8 @@ export function isSustainedVoiceActivity(level: number, threshold: number, start
   return level > threshold && startedAt > 0 && now - startedAt >= durationMs;
 }
 
-export function voiceActivityThreshold(noiseFloor: number, monitorDuringPlayback: boolean) {
-  return monitorDuringPlayback ? Math.max(0.005, noiseFloor * 2.8) : Math.max(0.0006, noiseFloor * 1.6);
+export function voiceActivityThreshold(noiseFloor: number, monitorDuringPlayback: boolean, sensitivity = 50) {
+  const level = Number.isFinite(sensitivity) ? Math.max(0, Math.min(100, sensitivity)) : 50;
+  const sensitivityScale = 1.5 - level / 100;
+  return monitorDuringPlayback ? Math.max(0.002, noiseFloor * 2.8 * sensitivityScale) : Math.max(0.0003, noiseFloor * 1.6 * sensitivityScale);
 }

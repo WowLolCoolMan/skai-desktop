@@ -106,6 +106,7 @@ const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
 const cloudModelIdKey = "skai.voice.cloudModelId";
 const qwenSpeakerKey = "skai.voice.qwenSpeaker";
 const expressivenessKey = "skai.voice.expressiveness";
+const voiceActivitySensitivityKey = "skai.voice.activitySensitivity";
 const savedVoicePresetsKey = "skai.voice.presets.v1";
 let activeCloudAudio: HTMLAudioElement | null = null;
 let speechGeneration = 0;
@@ -129,6 +130,7 @@ export function selectedVoiceSettings() {
     cloudVoiceId: localStorage.getItem(cloudVoiceIdKey) ?? selectedProvider.defaultVoiceId,
     qwenSpeaker: localStorage.getItem(qwenSpeakerKey) ?? "Ryan",
     expressiveness: normalizeExpressiveness(localStorage.getItem(expressivenessKey)),
+    voiceActivitySensitivity: normalizeExpressiveness(localStorage.getItem(voiceActivitySensitivityKey)),
   };
 }
 
@@ -137,9 +139,9 @@ function normalizeExpressiveness(value: string | number | null) {
   return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
 }
 
-export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness", value: string | boolean | number) {
-  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey, qwenSpeaker: qwenSpeakerKey, expressiveness: expressivenessKey }[key];
-  const safeValue = key === "primaryModelId" ? resolveInstalledVoiceModel(String(value)) : key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value), true) : key === "expressiveness" ? normalizeExpressiveness(Number(value)) : value;
+export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness" | "voiceActivitySensitivity", value: string | boolean | number) {
+  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey, qwenSpeaker: qwenSpeakerKey, expressiveness: expressivenessKey, voiceActivitySensitivity: voiceActivitySensitivityKey }[key];
+  const safeValue = key === "primaryModelId" ? resolveInstalledVoiceModel(String(value)) : key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value), true) : key === "expressiveness" || key === "voiceActivitySensitivity" ? normalizeExpressiveness(Number(value)) : value;
   localStorage.setItem(storageKey, String(safeValue));
   window.dispatchEvent(new CustomEvent("skai:voice-settings-updated"));
 }
@@ -178,7 +180,7 @@ export function removeSavedVoicePreset(id: string) {
 
 export function applyVoicePreset(preset: SavedVoicePreset) {
   const settings = preset.settings;
-  for (const key of ["profileId", "primaryModelId", "lowResourceModelId", "lowResourceMode", "voiceOutputEnabled", "source", "cloudProvider", "cloudModelId", "cloudVoiceId", "qwenSpeaker", "expressiveness"] as const) {
+  for (const key of ["profileId", "primaryModelId", "lowResourceModelId", "lowResourceMode", "voiceOutputEnabled", "source", "cloudProvider", "cloudModelId", "cloudVoiceId", "qwenSpeaker", "expressiveness", "voiceActivitySensitivity"] as const) {
     saveVoiceSetting(key, settings[key]);
   }
 }

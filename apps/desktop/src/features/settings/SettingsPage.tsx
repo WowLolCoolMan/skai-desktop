@@ -261,7 +261,7 @@ export function SettingsPage(props: SettingsProps) {
     const response = await window.skaiAgent?.request("airllm.install.cancel", { id: airLlmInstall.id });
     if (response?.ok) setAirLlmInstall(response.result as AirLlmInstallSession);
   };
-  const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness", value: string | boolean | number) => { if (key === "source" && value !== "cloud" || key === "cloudProvider") { setCloudApiKey(""); setCloudCredentialError(null); } saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
+  const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness" | "voiceActivitySensitivity", value: string | boolean | number) => { if (key === "source" && value !== "cloud" || key === "cloudProvider") { setCloudApiKey(""); setCloudCredentialError(null); } saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
   const activeVoiceRuntime = installedVoiceModels.find((voice) => voice.id === (voiceSettings.lowResourceMode ? voiceSettings.lowResourceModelId : voiceSettings.primaryModelId));
   const checkUpdates = async () => {
     if (checkingUpdates || !window.skaiAgent?.updates) return;

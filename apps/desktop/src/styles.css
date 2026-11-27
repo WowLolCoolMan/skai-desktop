@@ -678,16 +678,28 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .computer-use-agent { padding: 10px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 28%, var(--skai-color-border)); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 5%, var(--skai-color-surface)); }
 .computer-use-steps { max-height: 150px; margin: 12px 0 0; padding: 10px 10px 10px 30px; overflow: auto; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-sm); }
 @media (max-width: 680px) { .computer-use-dialog { padding: 14px; } .computer-use-controls > * { flex: 1 1 auto; } }
-.voice-mode-dialog { width: min(430px, calc(100vw - 32px)); }
+.voice-mode-dialog { width: min(430px, calc(100vw - 32px)); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
 .voice-mode-session { display: grid; justify-items: center; gap: 12px; padding: 24px 16px 16px; text-align: center; }
 .voice-mode-session h3 { margin: 0; color: var(--skai-color-text); font-size: var(--skai-text-2xl); }
 .voice-mode-session p { margin: 0; }
 .voice-mode-state { color: var(--skai-color-text); font-size: var(--skai-text-lg); font-weight: 700; }
+.voice-mode-input-meter { width: min(100%, 340px); height: 8px; overflow: hidden; border-radius: 999px; background: var(--skai-color-surface-soft); border: 1px solid var(--skai-color-border); }
+.voice-mode-input-meter span { display: block; width: 100%; height: 100%; transform-origin: left center; transition: transform 90ms linear; background: var(--skai-color-accent); border-radius: inherit; }
 .voice-mode-detail { max-width: 320px; color: var(--skai-color-text-muted); line-height: 1.5; }
 .voice-mode-session-actions { display: flex; justify-content: center; gap: 8px; }
 .voice-mode-expressiveness { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 16px; width: min(100%, 340px); padding: 12px 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); text-align: left; color: var(--skai-color-text); }
 .voice-mode-expressiveness span { color: var(--skai-color-text-muted); font-variant-numeric: tabular-nums; }
 .voice-mode-expressiveness input { grid-column: 1 / -1; width: 100%; accent-color: var(--skai-color-accent); }
+@media (max-height: 720px) {
+  .voice-mode-dialog { max-height: calc(100dvh - 112px); }
+  .voice-mode-session { gap: 6px; padding: 8px 14px; }
+  .voice-mode-orb { width: 48px; height: 48px; margin: 0; box-shadow: 0 0 0 6px color-mix(in srgb, var(--skai-color-accent) 10%, transparent), 0 0 24px color-mix(in srgb, var(--skai-color-accent) 35%, transparent); }
+  .voice-mode-session h3 { font-size: var(--skai-text-xl); }
+  .voice-mode-state { font-size: var(--skai-text-md); }
+  .voice-mode-detail { font-size: var(--skai-text-sm); line-height: 1.3; }
+  .voice-mode-expressiveness { gap: 4px 12px; padding: 7px 10px; }
+  .voice-mode-session-actions { position: sticky; bottom: 0; padding: 6px 0; background: var(--skai-color-surface); }
+}
 .voice-mode-orb { display: flex; align-items: center; justify-content: center; gap: 5px; width: 112px; height: 112px; margin-bottom: 4px; border-radius: var(--skai-radius-pill); background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--skai-color-accent) 88%, white), var(--skai-color-accent-strong)); box-shadow: 0 0 0 12px color-mix(in srgb, var(--skai-color-accent) 10%, transparent), 0 0 48px color-mix(in srgb, var(--skai-color-accent) 35%, transparent); }
 .voice-mode-orb span { display: block; width: 5px; height: 18px; border-radius: var(--skai-radius-pill); background: white; opacity: .8; }
 .voice-mode-orb.is-listening span { animation: skai-voice-wave 850ms ease-in-out infinite alternate; }
