@@ -109,6 +109,43 @@ platform or theme that was not recorded.
 - Unverified platforms, integrations, or hardware: native Linux/macOS UI,
   external MCP/GitHub tool execution from personas, and user-specific local
   model/voice combinations.
+
+### Slice 20 — live voice transcript and accessibility
+
+- Outcome: local Voice Mode exposes a live transcript region while a turn is
+  being captured. An optional on-device speech recognizer renders interim text
+  without taking ownership of submission; local Whisper remains the source of
+  truth for the final turn. Existing device selectors, meters, push-to-talk,
+  calibration, captions, stable controls, and assistive status remain covered.
+- Reference / workflow: Revision 4 local voice-mode workflow and the Chat
+  composer microphone affordance.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`; focused
+  packaged UI matrix with `UI_MATRIX_EXERCISE_VOICE=1`, `UI_MATRIX_QUICK=1`,
+  and `UI_MATRIX_ROUTE=chat`.
+- Failure check: interim recognition is unavailable or errors without ending
+  Voice Mode or sending a remote request; Whisper submission and transcript
+  review continue to work; the dialog keeps a polite live status and reachable
+  End control.
+- Disposable profile / cleanup: packaged UI matrix uses fake media devices and
+  a throwaway Electron profile. No microphone audio is saved by the preview
+  recognizer or calibration flow.
+- Platform / OS: Windows x64 packaged Electron; native Linux/macOS and real
+  hardware remain unverified.
+- Viewport / theme / sidebar: focused 1440×900 dark expanded-sidebar voice
+  exercise plus the shared five-size Chat matrix.
+- Runtime / app revision: packaged Electron production build for the Slice 20
+  commit.
+- Network and privacy boundary: `processLocally=true` is required when the
+  runtime exposes local speech recognition. Preview errors are non-fatal, and
+  no hosted speech endpoint is used.
+- Before screenshot: Voice Mode with session transcript placeholder while the
+  microphone is listening.
+- After screenshot: same dialog with the live-transcript region and accessible
+  status controls; no visual screenshot is treated as proof of speech quality.
+- Comparison: closes the prior interim-preview gap while preserving the
+  turn-based Whisper privacy boundary. True audio-frame streaming, native
+  output routing/levels, and representative voice/hardware quality fixtures
+  are still explicit release boundaries.
 | MCP denied access, revoke, reconnect, delayed response | [`smoke:marketplace-host`](../../package.json), [`MCP client tests`](../../native/SkaiDesktop.Core.Tests/McpStreamableHttpClientTests.cs) | Loopback lifecycle verifies denied writes, revocation, and fresh-session reconnect; core test injects a delayed handler and checks the request deadline. Packaged timeout UI recovery remains unverified. |
 | GitHub authentication expiry | [`GitHub integration guide`](../guides/GITHUB_INTEGRATION.md), [`GitHub core tests`](../../native/SkaiDesktop.Core.Tests/GitHubTests.cs) | Device-flow expiry/polling and an injected HTTP 401 are covered; end-to-end refresh failure in the packaged UI remains unverified. |
 | Disk full / storage exhaustion | [`Atomic file writer fault-injection test`](../../native/SkaiDesktop.Core.Tests/AtomicFileWriterTests.cs), [`Agent Host smoke`](../../scripts/smoke-agent-host.cjs) | A deterministic injected ENOSPC write failure verifies that the last complete file is preserved and the partial temp file is cleaned up. It does not fill a real disk or verify the packaged UI recovery message; disk-growth quota remains unenforced. |

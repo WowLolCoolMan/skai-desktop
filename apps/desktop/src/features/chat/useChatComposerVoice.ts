@@ -70,6 +70,8 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const handsFreeCaptureRef = useRef<HandsFreeCapture | null>(null);
   const handsFreeAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const interimRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const interimRecognitionRestartRef = useRef<number | null>(null);
   const handsFreeRef = useRef(false);
   const pushToTalkRef = useRef(false);
   const awaitingResponseRef = useRef(false);
@@ -96,6 +98,9 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
     recognitionRef.current?.stop();
     recognitionRef.current = null;
+    if (interimRecognitionRestartRef.current !== null) window.clearTimeout(interimRecognitionRestartRef.current);
+    interimRecognitionRef.current?.stop();
+    interimRecognitionRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -174,6 +179,62 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     awaitingResponseRef.current = false;
     setVoiceTranscriptPreview("");
     if (voiceInteractionMode === "hands-free" && handsFreeRef.current && !voicePaused) void startHandsFreeListeningRef.current();
+  };
+
+  const stopInterimTranscriptRecognition = () => {
+    if (interimRecognitionRestartRef.current !== null) window.clearTimeout(interimRecognitionRestartRef.current);
+    interimRecognitionRestartRef.current = null;
+    const recognition = interimRecognitionRef.current;
+    interimRecognitionRef.current = null;
+    if (recognition) {
+      recognition.onend = null;
+      try { recognition.stop(); } catch { /* The recognition may already have ended. */ }
+    }
+  };
+
+  const startInterimTranscriptRecognition = async () => {
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition || interimRecognitionRef.current || !handsFreeRef.current || voicePaused) return;
+    const recognition = new Recognition();
+    if (!("processLocally" in recognition)) return;
+    recognition.processLocally = true;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+    if (Recognition.available) {
+      try {
+        const availability = await Recognition.available({ langs: [recognition.lang], processLocally: true, quality: "dictation" });
+        if (availability !== "available" || !handsFreeRef.current || voicePaused) return;
+      } catch {
+        return;
+      }
+    }
+    recognition.onresult = (event) => {
+      if (!handsFreeRef.current || voicePaused) return;
+      const segments: string[] = [];
+      for (let index = 0; index < event.results.length; index++) {
+        const transcript = event.results[index]?.[0]?.transcript?.trim();
+        if (transcript) segments.push(transcript);
+      }
+      const preview = segments.join(" ").trim();
+      if (preview) setVoiceTranscriptPreview(preview);
+    };
+    recognition.onerror = () => {
+      // Whisper remains the source of truth for submission. Interim recognition is
+      // an optional local preview and must never take Voice Mode down with it.
+    };
+    recognition.onend = () => {
+      if (interimRecognitionRef.current === recognition) interimRecognitionRef.current = null;
+      if (!handsFreeRef.current || voicePaused || busyRef.current || handsFreeCaptureRef.current === null) return;
+      if (interimRecognitionRestartRef.current !== null) window.clearTimeout(interimRecognitionRestartRef.current);
+      interimRecognitionRestartRef.current = window.setTimeout(() => {
+        interimRecognitionRestartRef.current = null;
+        void startInterimTranscriptRecognition();
+      }, 250);
+    };
+    interimRecognitionRef.current = recognition;
+    try { recognition.start(); } catch { interimRecognitionRef.current = null; }
   };
 
   const calibrateVoice = async () => {
@@ -319,7 +380,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     }
     recognition.processLocally = true;
     recognition.continuous = handsFree;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
     if (Recognition.available) {
       try {
@@ -341,11 +402,15 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     if (!handsFree && handsFreeRef.current) return;
     recognition.onresult = (event) => {
       const finalSegments: string[] = [];
+      const previewSegments: string[] = [];
       for (let index = event.resultIndex; index < event.results.length; index++) {
         const result = event.results[index];
         const transcript = result?.[0]?.transcript?.trim();
+        if (transcript) previewSegments.push(transcript);
         if (result?.isFinal && transcript) finalSegments.push(transcript);
       }
+      const preview = previewSegments.join(" ").trim();
+      if (preview) setVoiceTranscriptPreview(preview);
       const transcript = finalSegments.join(" ").trim();
       if (!transcript) return;
       if (handsFree) {
@@ -353,6 +418,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         awaitingResponseRef.current = true;
         sawBusyRef.current = false;
         recognition.stop();
+        setVoiceTranscriptPreview(transcript);
         if (!onVoiceTranscript(transcript)) {
           awaitingResponseRef.current = false;
           setVoiceError("Add a document before speaking a Documents-only request.");
@@ -369,6 +435,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         const nextDraft = `${currentDraft}${currentDraft ? " " : ""}${transcript}`;
         draftRef.current = nextDraft;
         onDraftChange(nextDraft);
+        setVoiceTranscriptPreview("");
       }
     };
     recognition.onerror = (event) => {
@@ -453,6 +520,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       stopNativeSpeech();
       if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
       recognitionRef.current?.stop();
+      stopInterimTranscriptRecognition();
       handsFreeAbortRef.current?.abort();
       stopHandsFreeCapture(false);
       setVoiceTurnTranscribing(false);
@@ -493,6 +561,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     stopNativeSpeech();
     if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
     recognitionRef.current?.stop();
+    stopInterimTranscriptRecognition();
     handsFreeAbortRef.current?.abort();
     stopHandsFreeCapture(false);
     setVoiceTurnTranscribing(false);
@@ -555,6 +624,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       if (!mimeType) throw new Error("This desktop runtime cannot record a supported local audio format.");
       const capture: HandsFreeCapture & { speechDetected: boolean; calibrationStartedAt: number; lastLevelPublish: number } = { stream, context, frame: 0, recorder: null, chunks: [], recentMonitorChunk: null, abort: null, startedAt: performance.now(), lastSpeechAt: 0, speechStartedAt: 0, speechDetected: false, calibrationStartedAt: performance.now(), noiseFloor: 0.001, monitorDuringPlayback, bargeInTriggered: false, lastLevelPublish: 0 };
       handsFreeCaptureRef.current = capture;
+      void startInterimTranscriptRecognition();
       capture.recorder = new MediaRecorder(stream, { mimeType });
       capture.recorder.ondataavailable = (event) => {
         if (!event.data.size) return;
@@ -568,6 +638,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
         const recorder = capture.recorder;
         if (!recorder || recorder.state === "inactive") return;
         window.clearInterval(capture.frame);
+        stopInterimTranscriptRecognition();
         handsFreeCaptureRef.current = null;
         stream.getTracks().forEach((track) => track.stop());
         void context.close().catch(() => {});
