@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { Model, Route, ThemeMode } from "../../app/types";
-import type { AgentResponse, CloseBehavior, UpdateCheckResult } from "../../../shared/contracts";
+import type { AgentResponse, CloseBehavior, DesktopProject, UpdateCheckResult } from "../../../shared/contracts";
 import { cloudVoiceProviders, installedVoiceModels, refreshInstalledVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { isLocalProvider, localProviderOrFallback } from "../../services/localOnly";
 import { listPetSpriteProfiles, savePetSpriteProfile, validatePetStrip, type PetSpriteProfile } from "./petSprites";
@@ -12,6 +12,7 @@ import { enableRetroTheme, readAchievements, unlockAchievement, type SkaiAchieve
 import { VoicePresetManager } from "./VoicePresetManager";
 import { PermissionCenter } from "./PermissionCenter";
 import { WorkspaceBackupManager } from "./WorkspaceBackupManager";
+import { TaskNotificationSettings } from "../tasks/TaskNotifications";
 
 const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Achievements", "Updates", "Advanced"] as const;
 type Category = typeof categories[number];
@@ -67,6 +68,7 @@ const builtInPetPreviews: Record<string, string> = {
 };
 
 type SettingsProps = {
+  projects: DesktopProject[];
   provider: string;
   endpoint: string;
   model: string;
@@ -283,7 +285,7 @@ export function SettingsPage(props: SettingsProps) {
         <div className="settings-content-scroll" ref={settingsContentRef}>
         <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h1>{activeCategory}</h1><p>{categoryDescription(activeCategory)}</p></div></div>
 
-        {activeCategory === "General" && <><AboutYouSetting /><PreferredModelsSetting props={props} change={change} /><CloseBehaviorSetting /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
+        {activeCategory === "General" && <><AboutYouSetting /><PreferredModelsSetting props={props} change={change} /><CloseBehaviorSetting /><TaskNotificationSettings projects={props.projects} /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
 
         {activeCategory === "Appearance" && <><AppearancePreview /><div className="settings-field"><label>Color theme<select value={props.themeMode} onChange={(event) => change("themeMode", event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label>{/* Theme: the old Accent select (Cyan/Violet/Amber/Rose) was removed at the user's request: nothing read it. Appearance → Layout and motion → Accent sets the accent now. */}</div><ThemeSettings /><div className="settings-field"><label>Interface density<select value={props.density} onChange={(event) => change("density", event.target.value)}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label><label>Backdrop<select value={props.backdrop} onChange={(event) => change("backdrop", event.target.value)}><option value="none">None</option><option value="deep-sea">Deep sea</option><option value="deep-space">Deep space</option></select></label></div><Toggle label="Reduced motion" detail="Minimize interface animations and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /></>}
 

@@ -1409,6 +1409,54 @@ async function main() {
           if (!modelShortcut) throw new Error(`Choose a model did not navigate from the new-chat start screen to Model Library: ${JSON.stringify(await cdp.evaluate(`({ page: document.querySelector('.feature-page')?.className, title: document.title, actions: document.querySelector('.chat-start-actions')?.innerText })`))}`);
           await clickInRenderer(cdp, ".global-rail-destinations button[aria-label='Home']");
           console.log(`[chat-base] ${JSON.stringify({ shell: "active conversation and persistent navigation", newChat: "project and model shortcuts", projectShortcut, modelShortcut, ...shellState })}`);
+          if (process.env.UI_MATRIX_EXERCISE_TASK_NOTIFICATIONS === "1") {
+            const notificationFlow = await cdp.evaluate(`(async () => {
+              const keys = ['skai.taskNotifications.preferences.v1', 'skai.taskNotifications.history.v1', 'skai.taskNotifications.statuses.v1'];
+              const previous = Object.fromEntries(keys.map((key) => [key, localStorage.getItem(key)]));
+              let taskId = null;
+              let notification = null;
+              const originalNotification = Object.getOwnPropertyDescriptor(window, 'Notification');
+              try {
+                class MockNotification {
+                  static permission = 'granted';
+                  static calls = [];
+                  constructor(title, options) { this.title = title; this.body = options?.body ?? ''; MockNotification.calls.push(this); }
+                  close() {}
+                }
+                Object.defineProperty(window, 'Notification', { configurable: true, writable: true, value: MockNotification });
+                localStorage.setItem(keys[0], JSON.stringify({ enabled: true, completed: true, failed: true, decisions: true, quietHours: false, quietStart: '22:00', quietEnd: '08:00', mutedProjectIds: [], showTaskTitles: false }));
+                window.dispatchEvent(new Event('skai-task-notification-preferences-changed'));
+                const planned = await window.skaiAgent.request('tasks.plan', { title: 'Notification smoke task', instruction: 'This task exists only to exercise private desktop notification delivery.', environment: 'local', requiresApproval: true });
+                if (!planned.ok || !planned.result?.id) throw new Error(planned.error?.message ?? 'Could not create the notification fixture.');
+                taskId = planned.result.id;
+                let baseline = false;
+                for (let i = 0; i < 100; i++) {
+                  try { const state = JSON.parse(localStorage.getItem(keys[2]) ?? '{}'); if (state[taskId] === 'proposed') { baseline = true; break; } } catch {}
+                  await new Promise((resolve) => setTimeout(resolve, 100));
+                }
+                if (!baseline) throw new Error('The monitor did not record the initial task state before its transition.');
+                const queued = await window.skaiAgent.request('tasks.queue', { id: taskId });
+                if (!queued.ok || queued.result?.status !== 'awaiting_approval') throw new Error(queued.error?.message ?? 'The notification fixture did not enter the approval state.');
+                for (let i = 0; i < 120 && !MockNotification.calls.length; i++) await new Promise((resolve) => setTimeout(resolve, 100));
+                notification = MockNotification.calls[0] ?? null;
+                if (!notification || notification.title !== 'Skai task update' || !notification.body.includes('your attention') || notification.body.includes('Notification smoke task')) throw new Error('The grouped task alert was missing or exposed the task title by default: ' + JSON.stringify({ title: notification?.title, body: notification?.body, calls: MockNotification.calls.length, state: localStorage.getItem(keys[2]), preference: localStorage.getItem(keys[0]), taskId }));
+                const history = JSON.parse(localStorage.getItem(keys[1]) ?? '[]');
+                const item = history.find((entry) => entry.taskId === taskId);
+                if (!item || item.delivery !== 'shown' || item.status !== 'awaiting_approval') throw new Error('The local notification delivery history did not record the approval alert.');
+                notification.onclick?.();
+                for (let i = 0; i < 50 && !document.querySelector('.usage-page'); i++) await new Promise((resolve) => setTimeout(resolve, 50));
+                if (!document.querySelector('.usage-page')) throw new Error('Clicking the task alert did not return to the local task inbox.');
+                return { taskStatus: item.status, privacyDefault: !notification.body.includes('Notification smoke task'), returnedToInbox: true, history: item.delivery };
+              } finally {
+                if (taskId) await window.skaiAgent.request('tasks.deny', { id: taskId }).catch(() => undefined);
+                keys.forEach((key, index) => previous[key] === null ? localStorage.removeItem(key) : localStorage.setItem(key, previous[key]));
+                window.dispatchEvent(new Event('skai-task-notification-preferences-changed'));
+                if (originalNotification) Object.defineProperty(window, 'Notification', originalNotification);
+              }
+            })()`);
+            if (!notificationFlow?.returnedToInbox) throw new Error(`The local task notification workflow was incomplete: ${JSON.stringify(notificationFlow)}`);
+            console.log(`[task-notifications] ${JSON.stringify(notificationFlow)}`);
+          }
         }
         if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT === "1") {
           const activeChatClass = await cdp.evaluate(`document.querySelector('.chat-page')?.className ?? ''`);
@@ -1593,6 +1641,28 @@ async function main() {
             await cdp.evaluateWith(function (category) { [...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === category)?.click(); return 1; }, category);
             await sleep(90);
             phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
+          }
+          if (route === "settings" && category === "General" && process.env.UI_MATRIX_EXERCISE_TASK_NOTIFICATION_SETTINGS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            const preferences = await cdp.evaluate(`(() => {
+              const key = 'skai.taskNotifications.preferences.v1';
+              const previous = localStorage.getItem(key);
+              const panel = document.querySelector('.settings-notification-panel');
+              const enabled = panel?.querySelector('.settings-notification-toggle input');
+              const quiet = panel?.querySelector('.settings-notification-quiet input[type="checkbox"]');
+              const times = panel?.querySelectorAll('.settings-notification-quiet input[type="time"]');
+              const safePreview = [...(panel?.querySelectorAll('input[type="checkbox"]') ?? [])].find((input) => input.closest('label')?.innerText.includes('Show task titles'));
+              const clear = () => { if (previous === null) localStorage.removeItem(key); else localStorage.setItem(key, previous); window.dispatchEvent(new Event('skai-task-notification-preferences-changed')); };
+              if (!panel || !enabled || !quiet || times?.length !== 2 || !safePreview) return { ok: false, reason: 'notification controls are missing', panel: panel?.innerText.slice(0, 500) };
+              const safeByDefault = !enabled.checked && !safePreview.checked;
+              enabled.click(); quiet.click(); safePreview.click();
+              const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+              setValue.call(times[0], '23:15'); times[0].dispatchEvent(new Event('input', { bubbles: true })); times[0].dispatchEvent(new Event('change', { bubbles: true }));
+              const saved = JSON.parse(localStorage.getItem(key) ?? '{}');
+              clear();
+              return { ok: saved.enabled === true && saved.quietHours === true && saved.quietStart === '23:15' && saved.showTaskTitles === true, safeByDefault, quietWindow: saved.quietStart + '-' + saved.quietEnd };
+            })()`);
+            if (!preferences?.ok || !preferences.safeByDefault) throw new Error(`Task notification privacy and quiet-hour settings did not persist as expected: ${JSON.stringify(preferences)}`);
+            console.log(`[task-notification-settings] ${JSON.stringify(preferences)}`);
           }
           if (route === "settings" && category === "Storage" && exerciseRetention && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
             await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { const root = document.querySelector('.workspace-retention-card'); if (root?.querySelector('select[aria-label="Unpinned chats retention"]') && root.querySelector('select[aria-label="Generated media preview retention"]')) return true; await new Promise((resolve) => setTimeout(resolve, 50)); } return false; })()`);
