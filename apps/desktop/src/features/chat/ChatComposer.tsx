@@ -343,6 +343,16 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const estimatedContextTokens = Math.max(0, Math.ceil((draft.length + attachments.reduce((total, attachment) => total + attachment.content.length, 0)) / 4));
   const contextBudgetPercent = Math.min(100, Math.round((estimatedContextTokens / contextBudget) * 100));
   const contextBudgetLabel = estimatedContextTokens > 0 ? `Context · ~${estimatedContextTokens.toLocaleString()} / ${contextBudget.toLocaleString()}` : `Context · ${contextBudget.toLocaleString()} available`;
+  const duplicateAttachmentCount = attachments.length - new Set(attachments.map((attachment) => `${attachment.fileName}\u0000${attachment.mediaType}`)).size;
+  const removeDuplicateAttachments = () => {
+    const seen = new Set<string>();
+    onSetAttachments(attachments.filter((attachment) => {
+      const key = `${attachment.fileName}\u0000${attachment.mediaType}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }));
+  };
   const saveQueuedEdit = async (index: number) => {
     setQueueUpdateBusy(true);
     try {
@@ -395,6 +405,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
               <div><span>Connected tools</span><span>MCP tools require explicit review in Marketplace; they are not silently called from chat.</span></div>
               <div><span>Computer use</span><span>Starts only from Add to message and requires a local vision model.</span></div>
             </div>
+            {duplicateAttachmentCount > 0 && <div className="composer-context-dedup" role="status"><span>{duplicateAttachmentCount} duplicate attachment{duplicateAttachmentCount === 1 ? "" : "s"} will be sent more than once.</span><Button variant="ghost" type="button" onClick={removeDuplicateAttachments}>Remove duplicates</Button></div>}
             {projectId && <p className="composer-capability-footnote">Project context is limited to the connected folders shown above.</p>}
           </section>}
         </div>
