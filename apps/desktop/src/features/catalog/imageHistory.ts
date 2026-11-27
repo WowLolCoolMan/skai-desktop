@@ -5,6 +5,11 @@ export type ImageHistoryEntry = {
   provider: "comfyui" | "diffusers";
   prompt: string;
   mediaType?: "image" | "video" | "audio";
+  model?: string;
+  seed?: number;
+  width?: number;
+  height?: number;
+  workflow?: string;
 };
 
 const databaseName = "skai-image-history";
@@ -69,7 +74,7 @@ export async function saveImageHistory(entries: ImageHistoryEntry[]): Promise<vo
         request.onsuccess = () => {
           const unique = new Map<string, ImageHistoryEntry & { id: string }>();
           for (const entry of [...(request.result as Array<ImageHistoryEntry & { id: string }>), ...entries]) {
-            if (!entry.url || entry.url.length > maxImageCharacters || !entry.fileName || !entry.createdAt) continue;
+            if (!entry.url || entry.url.length > maxImageCharacters || !entry.fileName || !entry.createdAt || (entry.workflow?.length ?? 0) > 1_000_000) continue;
             const id = `${entry.createdAt}:${entry.fileName}`;
             unique.set(id, { ...entry, id });
           }
@@ -78,9 +83,10 @@ export async function saveImageHistory(entries: ImageHistoryEntry[]): Promise<vo
           const retained: Array<ImageHistoryEntry & { id: string }> = [];
           let storedCharacters = 0;
           for (const entry of newest) {
-            if (retained.length >= maxEntries || storedCharacters + entry.url.length > maxStoredCharacters) continue;
+            const metadataCharacters = JSON.stringify({ ...entry, url: "" }).length;
+            if (retained.length >= maxEntries || storedCharacters + entry.url.length + metadataCharacters > maxStoredCharacters) continue;
             retained.push(entry);
-            storedCharacters += entry.url.length;
+            storedCharacters += entry.url.length + metadataCharacters;
           }
 
           store.clear();

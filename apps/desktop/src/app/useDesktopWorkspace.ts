@@ -307,9 +307,30 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   };
   const saveSettings = async () => { const selectedProvider = localProviderOrFallback(provider); if (!isLocalEndpoint(endpoint) || !isLocalEndpoint(imageEndpoint)) { setError(LOCAL_ENDPOINT_ERROR); return false; } const response = await request("settings.save", { provider: selectedProvider, endpoint, model, comfyEndpoint: imageEndpoint, imageWorkflow, threeDWorkflow, subagentModel, subagentModelProvider, subagentModelSizeBytes, subagentModelContextLength, ollamaContextWindowTokens, localRamBudgetBytes, localGpuBudgetBytes, themeMode, accentColor, interfaceDensity: density, backdropPreset: backdrop, reduceMotion, developerMode, memoryInjectionEnabled, smartPromptRewritingEnabled }); if (!response.ok) { setError(response.error?.message ?? "Workspace settings could not be saved."); return false; } setProvider(selectedProvider); localStorage.setItem("skai.provider", selectedProvider); localStorage.setItem("skai.endpoint", endpoint); localStorage.setItem("skai.model", model); localStorage.setItem("skai.themeMode", themeMode); localStorage.setItem("skai.accentColor", accentColor); localStorage.setItem("skai.density", density); localStorage.setItem("skai.backdrop", backdrop); localStorage.setItem("skai.reduceMotion", String(reduceMotion)); localStorage.setItem("skai.smartPromptRewriting", String(smartPromptRewritingEnabled)); localStorage.setItem("skai.imageEndpoint", imageEndpoint); localStorage.setItem("skai.imageWorkflow", imageWorkflow); localStorage.setItem("skai.threeDWorkflow", threeDWorkflow); localStorage.setItem("skai.imageProvider", imageProvider); setError(null); return true; };
   const activeImageGenerationId = useRef<string | null>(null);
-  const generateImage = async (source?: import("../../shared/contracts").ChatAttachment, options?: { provider: "comfyui" | "diffusers"; prompt: string }) => {
+  const generateImage = async (source?: import("../../shared/contracts").ChatAttachment, options?: { provider: "comfyui" | "diffusers"; prompt: string; workflow?: string; model?: string; seed?: number; width?: number; height?: number }) => {
     const generationProvider = options?.provider ?? imageProvider;
     const generationPrompt = options?.prompt ?? imagePrompt;
+    const sourceWorkflow = options?.workflow ?? imageWorkflow;
+    const generationSeed = generationProvider === "comfyui" ? options?.seed : undefined;
+    const generationWorkflow = generationProvider === "comfyui" ? generationSeed === undefined ? sourceWorkflow : sourceWorkflow.replaceAll("{{seed}}", String(generationSeed)) : "";
+    let workflowModel: string | undefined;
+    let workflowWidth: number | undefined;
+    let workflowHeight: number | undefined;
+    if (generationProvider === "comfyui") {
+      try {
+        const graph = JSON.parse(sourceWorkflow) as Record<string, { inputs?: Record<string, unknown> }>;
+        for (const node of Object.values(graph)) {
+          const inputs = node?.inputs;
+          if (!inputs) continue;
+          if (!workflowModel && typeof inputs.ckpt_name === "string") workflowModel = inputs.ckpt_name;
+          if (!workflowWidth && typeof inputs.width === "number") workflowWidth = inputs.width;
+          if (!workflowHeight && typeof inputs.height === "number") workflowHeight = inputs.height;
+        }
+      } catch { /* Imported workflows are preserved as-authored; metadata stays partial when parsing fails. */ }
+    }
+    const generationModel = options?.model ?? (generationProvider === "diffusers" ? "Stable Diffusion Turbo" : workflowModel ?? "ComfyUI workflow");
+    const generationWidth = options?.width ?? workflowWidth ?? (generationProvider === "diffusers" ? 512 : undefined);
+    const generationHeight = options?.height ?? workflowHeight ?? (generationProvider === "diffusers" ? 512 : undefined);
     if (generationProvider === "comfyui" && !isLocalEndpoint(imageEndpoint)) { setError(LOCAL_ENDPOINT_ERROR); return; }
     setImageBusy(true);
     setImageCancelRequested(false);
@@ -317,9 +338,9 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     setError(null);
     localStorage.setItem("skai.imageEndpoint", imageEndpoint);
     localStorage.setItem("skai.imageProvider", generationProvider);
-    localStorage.setItem("skai.imageWorkflow", imageWorkflow);
+      localStorage.setItem("skai.imageWorkflow", sourceWorkflow);
     try {
-      const started = await request("image.generate.start", { provider: generationProvider, ...(generationProvider === "comfyui" ? { endpoint: imageEndpoint, workflow: imageWorkflow } : {}), ...(source ? { sourceImage: source.content, sourceImageMediaType: source.mediaType } : {}), prompt: generationPrompt });
+      const started = await request("image.generate.start", { provider: generationProvider, ...(generationProvider === "comfyui" ? { endpoint: imageEndpoint, workflow: generationWorkflow } : {}), ...(source ? { sourceImage: source.content, sourceImageMediaType: source.mediaType } : {}), prompt: generationPrompt });
       if (!started.ok) { setError(started.error?.message ?? "Image generation failed to start."); return; }
       const operationId = (started.result as { id?: string }).id;
       if (!operationId) { setError("Image generation did not return an operation ID."); return; }
@@ -337,7 +358,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       if (result.status !== "completed") { setError("Image generation ended without a completed result."); return; }
       const createdAt = new Date().toISOString();
       const imageSource = generationProvider === "comfyui" ? "comfyui" : "diffusers";
-      const images: ImageHistoryEntry[] = (result.images ?? []).map((image) => ({ ...image, mediaType: image.mediaType ?? "image", createdAt, provider: imageSource, prompt: generationPrompt.trim() }));
+      const images: ImageHistoryEntry[] = (result.images ?? []).map((image) => ({ ...image, mediaType: image.mediaType ?? "image", createdAt, provider: imageSource, prompt: generationPrompt.trim(), model: generationModel, seed: generationSeed, width: generationWidth, height: generationHeight, ...(generationWorkflow ? { workflow: generationWorkflow } : {}) }));
       setGeneratedImages((current) => [...images, ...current].slice(0, 24));
       void saveImageHistory(images);
     } catch (error) {
