@@ -4,6 +4,7 @@ import type { RuntimeHealth } from "../../../shared/contracts";
 import { Button, Card, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 
 type ChecklistId = "privacy" | "sample";
+type DemoWorkflow = "task" | "git" | "media";
 type OnboardingPageProps = {
   connection: "checking" | "ready" | "error";
   health: RuntimeHealth | null;
@@ -31,6 +32,7 @@ function readProgress(): Set<ChecklistId> {
 export function OnboardingPage({ connection, health, models, selectedModel, provider, projectCount, connectedFolderCount, ramTotalBytes, onNavigate, onSendSample }: OnboardingPageProps) {
   const [progress, setProgress] = useState(readProgress);
   const [showDemo, setShowDemo] = useState(false);
+  const [demoWorkflow, setDemoWorkflow] = useState<DemoWorkflow>("task");
   const [showNavigationGuide, setShowNavigationGuide] = useState(() => localStorage.getItem("skai.onboarding.navigation-guide-dismissed.v1") !== "true");
   const hasModel = models.length > 0;
   const runtimeReady = connection === "ready";
@@ -103,12 +105,18 @@ export function OnboardingPage({ connection, health, models, selectedModel, prov
       </div>
 
       <Card className="onboarding-demo-card">
-        <div className="onboarding-card-heading"><div><p className="section-kicker">NO-CHANGE PREVIEW</p><h2>See a sample workflow</h2><p>Preview example task, Git review, and media steps without writing demo content into your workspace.</p></div><Button variant="secondary" onClick={() => setShowDemo((value) => !value)}>{showDemo ? "Hide preview" : "Preview workflows"}</Button></div>
-        {showDemo && <div className="onboarding-demo-grid">{[
-          { title: "Project task", steps: ["Choose a folder", "Review a proposed plan", "Approve before edits run"] },
-          { title: "Git review", steps: ["Inspect changed files", "Run selected checks", "Commit or push when ready"] },
-          { title: "Visuals Workshop", steps: ["Describe the image", "Choose a local workflow", "Review and save the result"] },
-        ].map((demo) => <section key={demo.title}><h3>{demo.title}</h3><ol>{demo.steps.map((step) => <li key={step}>{step}</li>)}</ol></section>)}</div>}
+        <div className="onboarding-card-heading"><div><p className="section-kicker">ISOLATED DEMO PROFILE</p><h2>Explore a sample workspace</h2><p>These fictional task, Git, and media examples stay in this page. They do not create projects, call tools, contact providers, or change your workspace.</p></div><Button variant="secondary" onClick={() => setShowDemo((value) => !value)} aria-expanded={showDemo}>{showDemo ? "Close demo" : "Open demo workspace"}</Button></div>
+        {showDemo && <div className="onboarding-demo-workspace">
+          <div className="onboarding-demo-tabs" role="tablist" aria-label="Demo workflow">
+            {([ ["task", "Task"], ["git", "Git review"], ["media", "Visuals"] ] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={demoWorkflow === id} aria-controls="onboarding-demo-panel" className={demoWorkflow === id ? "is-active" : ""} onClick={() => setDemoWorkflow(id)}>{label}</button>)}
+          </div>
+          <section id="onboarding-demo-panel" role="tabpanel" className="onboarding-demo-panel">
+            {demoWorkflow === "task" && <><div className="onboarding-demo-panel-heading"><div><span className="onboarding-demo-label">SAMPLE PROJECT · FIELD NOTES</span><h3>Polish the README</h3></div><StatusBadge tone="neutral">Proposed</StatusBadge></div><p>A task begins with a plan you can review before any project files are touched.</p><ol><li>Read the existing README and package scripts</li><li>Suggest a clearer setup section</li><li>Wait for approval before editing</li></ol><div className="onboarding-demo-callout">Demo only · no agent task was created</div></>}
+            {demoWorkflow === "git" && <><div className="onboarding-demo-panel-heading"><div><span className="onboarding-demo-label">SAMPLE BRANCH · README-POLISH</span><h3>Review proposed changes</h3></div><StatusBadge tone="neutral">3 files</StatusBadge></div><p>Skai keeps review actions visible alongside the files and checks they affect.</p><ul className="onboarding-demo-files"><li><code>README.md</code><span>+8 −2</span></li><li><code>package.json</code><span>+1 −0</span></li><li><code>src/app.ts</code><span>+3 −1</span></li></ul><div className="onboarding-demo-callout">Demo only · no repository was opened and nothing was committed</div></>}
+            {demoWorkflow === "media" && <><div className="onboarding-demo-panel-heading"><div><span className="onboarding-demo-label">SAMPLE VISUALS WORKSHOP</span><h3>Misty forest at sunrise</h3></div><StatusBadge tone="neutral">Preview</StatusBadge></div><p>Choose a workflow, provide a prompt, then review the generated result before saving it.</p><div className="onboarding-demo-media"><span aria-hidden="true">✦</span><strong>Your generated image or video appears here</strong><small>This placeholder is fictional; no generation request was sent.</small></div></>}
+          </section>
+          <div className="onboarding-demo-profile-note"><span aria-hidden="true">◉</span> Ephemeral preview profile · closing this page discards the example state</div>
+        </div>}
       </Card>
     </div>
   </div>;

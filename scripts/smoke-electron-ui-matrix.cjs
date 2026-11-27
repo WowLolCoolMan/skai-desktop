@@ -226,6 +226,14 @@ async function clickButtonText(cdp, text, scope = "body") {
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x, y: point.y, button: "left", clickCount: 1 });
 }
 
+async function clickButtonContainingText(cdp, text, scope = "body") {
+  const point = await cdp.evaluateWith(function (text, scope) { const root = document.querySelector(scope); const element = [...(root?.querySelectorAll('button') ?? [])].find((button) => button.innerText.includes(text)); if (!element || element.disabled) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; }, text, scope);
+  if (!point) throw new Error(`UI button containing text was not found or is disabled: ${text}`);
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
+  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", clickCount: 1 });
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x, y: point.y, button: "left", clickCount: 1 });
+}
+
 // Collected in the page: layout problems for the current route and viewport.
 const PROBE = String.raw`(() => {
   const vw = window.innerWidth, vh = window.innerHeight;
@@ -437,9 +445,16 @@ async function main() {
             return [length(projects.result), length(tasks.result), length(conversations.result)];
           });
           const originalProgress = await cdp.evaluate(`document.querySelector('.onboarding-progress')?.getAttribute('aria-valuenow')`);
-          await clickButtonText(cdp, "Preview workflows", ".onboarding-demo-card");
-          const demoVisible = await cdp.evaluate(`document.querySelectorAll('.onboarding-demo-grid section').length === 3`);
-          if (!demoVisible) throw new Error("The Getting Started workflow preview did not display all three no-write examples.");
+          await clickButtonText(cdp, "Open demo workspace", ".onboarding-demo-card");
+          const taskDemo = await cdp.evaluate(`document.querySelector('[role="tabpanel"] h3')?.innerText === 'Polish the README' && document.querySelector('.onboarding-demo-profile-note')?.innerText.includes('Ephemeral preview profile')`);
+          if (!taskDemo) throw new Error("The isolated task demo did not open with its ephemeral-profile disclosure.");
+          await clickButtonText(cdp, "Git review", ".onboarding-demo-tabs");
+          const gitDemo = await cdp.evaluate(`document.querySelector('[role="tabpanel"] h3')?.innerText === 'Review proposed changes' && document.querySelectorAll('.onboarding-demo-files li').length === 3`);
+          if (!gitDemo) throw new Error("The isolated Git demo did not show its sample review changes.");
+          await clickButtonText(cdp, "Visuals", ".onboarding-demo-tabs");
+          const mediaDemo = await cdp.evaluate(`document.querySelector('[role="tabpanel"] h3')?.innerText === 'Misty forest at sunrise' && document.querySelector('.onboarding-demo-media small')?.innerText.includes('no generation request')`);
+          if (!mediaDemo) throw new Error("The isolated media demo did not disclose that it is a non-generating placeholder.");
+          await clickButtonText(cdp, "Task", ".onboarding-demo-tabs");
           const privacy = await cdp.evaluateWith(function () { const button = [...document.querySelectorAll('.onboarding-checklist button')].find((item) => item.innerText.trim() === 'Mark reviewed'); if (!button) return false; button.click(); return true; });
           if (!privacy) throw new Error("The onboarding privacy review action was not available.");
           await clickButtonText(cdp, "Dismiss", ".onboarding-navigation-guide");
@@ -460,10 +475,10 @@ async function main() {
           const skippedToChat = await cdp.evaluate(`document.title.endsWith(' · chat') && localStorage.getItem('skai.onboarding.completed.v1') === 'true'`);
           if (!skippedToChat) throw new Error("Skipping onboarding did not return to Chat and persist the optional skip.");
           await clickInRenderer(cdp, '[aria-label="Extras"]');
-          await clickInRenderer(cdp, ".global-rail-extras-panel .global-rail-extra");
+          await clickButtonContainingText(cdp, "Getting started", ".global-rail-extras-panel");
           const reopened = await cdp.evaluate(`document.title.endsWith(' · onboarding')`);
           if (!reopened) throw new Error("Getting Started could not be reopened from Extras after skipping.");
-          console.log(`[onboarding-workflow] ${JSON.stringify({ preview: demoVisible, resetPreservedWorkspace: true, skipAndReopen: reopened, checklistProgress: resetProgress })}`);
+          console.log(`[onboarding-workflow] ${JSON.stringify({ isolatedTaskGitMediaPreview: true, resetPreservedWorkspace: true, skipAndReopen: reopened, checklistProgress: resetProgress })}`);
         }
         if (route === "chat" && process.env.UI_MATRIX_CAPTURE === "1" && width === 390 && height === 844) {
           fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
