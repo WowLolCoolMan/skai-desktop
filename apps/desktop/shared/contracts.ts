@@ -258,6 +258,16 @@ export type DesktopProjectCheck = {
   source: string;
 };
 
+export type DesktopProjectActivityEvent = {
+  eventId: string;
+  runId: string;
+  sequence: number;
+  type: string;
+  actor: string;
+  timestamp: string;
+  payload: Record<string, string>;
+};
+
 export type TaskEnvironment = "local" | "worktree";
 
 export type DesktopScheduledTask = {

@@ -1,5 +1,7 @@
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace SkaiDesktop.AgentHost.Protocol;
 
@@ -36,6 +38,30 @@ public static partial class AgentHostLoop
                     actor: "system", modelProvider: string.IsNullOrWhiteSpace(task.ModelProvider) ? "unknown" : task.ModelProvider, model: string.IsNullOrWhiteSpace(task.Model) ? "unknown" : task.Model,
                     endpointPrivacy: "local", runId: task.Id);
             journal.AppendEvent(task.Id, type, actor: "agent-host", payload: payload, correlationId: task.Id);
+        }
+    }
+
+    private static void AppendProjectActivityEvent(string projectId, string projectName, string type, IReadOnlyDictionary<string, string>? payload = null)
+    {
+        lock (TaskJournalGate)
+        {
+            var journal = TaskJournal.Value;
+            var snapshot = journal.Load();
+            const string streamTitle = "Project activity stream";
+            var run = snapshot.Runs.FirstOrDefault(item => item.WorkspaceId == projectId && item.UserInstruction == streamTitle);
+            if (run is null)
+            {
+                var identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(projectId))).ToLowerInvariant()[..20];
+                run = journal.Create(projectId, streamTitle, actor: "system", modelProvider: "local", model: "project-activity", endpointPrivacy: "local", runId: $"project-activity-{identity}");
+            }
+            var safePayload = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["projectId"] = projectId,
+                ["projectName"] = projectName,
+            };
+            if (payload is not null)
+                foreach (var item in payload) safePayload[item.Key] = item.Value;
+            journal.AppendEvent(run.RunId, type, actor: "desktop-user-action", payload: safePayload, correlationId: projectId);
         }
     }
 
@@ -87,6 +113,25 @@ public static partial class AgentHostLoop
                 .TakeLast(40)
                 .Select(item => (object)new { sequence = item.Sequence, type = item.Type, actor = item.Actor, timestamp = item.TimestampUtc, payload = item.Payload })
                 .ToArray();
+        }
+    }
+
+    private static AgentResponse ListProjectActivity(AgentRequest request)
+    {
+        var projectId = RequiredBoundedString(request, "id", 128);
+        _ = CreateProjectStore().Load().SingleOrDefault(item => item.Id == projectId)
+            ?? throw new KeyNotFoundException("The project does not exist.");
+        lock (TaskJournalGate)
+        {
+            var snapshot = TaskJournal.Value.Load();
+            var runs = snapshot.Runs.Where(run => run.WorkspaceId == projectId).Select(run => run.RunId).ToHashSet(StringComparer.Ordinal);
+            var activity = snapshot.Events.Where(item => runs.Contains(item.RunId))
+                .OrderByDescending(item => item.TimestampUtc)
+                .ThenByDescending(item => item.Sequence)
+                .Take(60)
+                .Select(item => (object)new { eventId = item.EventId, runId = item.RunId, sequence = item.Sequence, type = item.Type, actor = item.Actor, timestamp = item.TimestampUtc, payload = item.Payload })
+                .ToArray();
+            return new(ProtocolVersion, request.Id, true, new { projectId, activity });
         }
     }
 

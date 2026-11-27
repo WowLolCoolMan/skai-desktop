@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DesktopGitDiff, DesktopGitStatus, DesktopHarnessAdapter, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
+import type { DesktopGitDiff, DesktopGitStatus, DesktopHarnessAdapter, DesktopProject, DesktopProjectActivityEvent, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
 import type { Route } from "../../app/types";
 import type { AgentRequest } from "../../services/agentClient";
 import { loadProjectEditorDraft, removeProjectEditorDraft, saveProjectEditorDraft } from "./projectEditorDraftStore";
@@ -41,6 +41,9 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   const [projectChecks, setProjectChecks] = useState<DesktopProjectCheck[]>([]);
   const [projectChecksBusy, setProjectChecksBusy] = useState(false);
   const [projectCheckBusy, setProjectCheckBusy] = useState(false);
+  const [projectActivity, setProjectActivity] = useState<DesktopProjectActivityEvent[]>([]);
+  const [projectActivityBusy, setProjectActivityBusy] = useState(false);
+  const projectActivityRequestId = useRef(0);
   const fileReadRequestId = useRef(0);
   const localFileDrafts = useRef(new Map<string, string>());
   const fileDraftSaveTimer = useRef<number | null>(null);
@@ -128,6 +131,9 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
 
   const selectProject = async (project: DesktopProject, navigateToProject = true) => {
     persistCurrentProjectDraft();
+    projectActivityRequestId.current += 1;
+    setProjectActivity([]);
+    setProjectActivityBusy(false);
     fileReadRequestId.current += 1;
     localStorage.setItem("skai.selectedProject", project.id);
     setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); setGitStatus(null); setGitDiff(null);
@@ -137,6 +143,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setProjectFiles(result.files ?? []);
     setSelectedProject(project);
     void loadProjectChecks(project.id);
+    void loadProjectActivity(project.id);
     setFileSummary(`${result.files.length} readable files · ${result.protectedFilesSkipped} protected names hidden${result.hitEntryLimit ? " · entry limit reached" : ""}`);
     await refreshGitStatus(project.id);
     if (navigateToProject) onNavigate("coding");
@@ -151,12 +158,33 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setProjectChecks((response.result as { checks?: DesktopProjectCheck[] }).checks ?? []);
   };
 
+  const loadProjectActivity = async (projectId = selectedProject?.id) => {
+    if (!projectId) return;
+    const requestId = ++projectActivityRequestId.current;
+    setProjectActivityBusy(true);
+    try {
+      const response = await request("project.activity.list", { id: projectId });
+      if (requestId !== projectActivityRequestId.current) return;
+      if (!response.ok) { setProjectActivity([]); onError(response.error?.message ?? "Project activity could not be loaded."); return; }
+      const result = response.result as { activity?: DesktopProjectActivityEvent[] };
+      setProjectActivity(result.activity ?? []);
+    } catch (error) {
+      if (requestId === projectActivityRequestId.current) {
+        setProjectActivity([]);
+        onError(error instanceof Error ? error.message : "Project activity could not be loaded.");
+      }
+    } finally {
+      if (requestId === projectActivityRequestId.current) setProjectActivityBusy(false);
+    }
+  };
+
   const runProjectCheck = async (projectId: string, taskId: string, checkId: string) => {
     if (projectCheckBusy) return;
     setProjectCheckBusy(true);
     const response = await request("project.check.run", { projectId, taskId, checkId });
     setProjectCheckBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "The selected project check failed to run."); return null; }
+    void loadProjectActivity(projectId);
     onError(null);
     return response.result;
   };
@@ -191,6 +219,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setGitCommitBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Local Git commit was rejected."); return false; }
     setGitDiff(null);
+    void loadProjectActivity(selectedProject.id);
     await refreshGitStatus(selectedProject.id);
     onError(null);
     return true;
@@ -202,6 +231,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     const response = await request("project.git.push", { id: selectedProject.id });
     setGitPushBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Git push was rejected."); return false; }
+    void loadProjectActivity(selectedProject.id);
     await refreshGitStatus(selectedProject.id);
     onError(null);
     return true;
@@ -213,6 +243,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     const response = await request("project.git.pullRequest", { id: selectedProject.id, title: title.trim(), body: body.trim(), draft });
     setGitPullRequestBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Pull request creation was unavailable."); return false; }
+    void loadProjectActivity(selectedProject.id);
     onError(null);
     return true;
   };
@@ -326,5 +357,5 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setTerminalSessionId(null); setTerminalScreen(null); setTerminalExitCode(null); return true;
   };
 
-  return { projects, projectsLoaded, harnessAdapters, refreshHarnessAdapters, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest, loadProjectChecks, runProjectCheck };
+  return { projects, projectsLoaded, harnessAdapters, refreshHarnessAdapters, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, projectActivity, projectActivityBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest, loadProjectChecks, loadProjectActivity, runProjectCheck };
 }

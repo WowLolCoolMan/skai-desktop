@@ -172,6 +172,15 @@ public static partial class AgentHostLoop
         var completed = DateTimeOffset.UtcNow;
         var evidence = new ProjectCheckEvidence(check.Id, check.Label, check.Command, check.RelativeWorkingDirectory, check.Source, result.ExitCode, result.Output, result.TimedOut, result.OutputTruncated, started, completed, result.IsolationStatus);
         var updated = CreateTaskStore().AttachVerificationEvidence(taskId, evidence);
+        AppendTaskJournalEvent(task, result.ExitCode == 0 && !result.TimedOut ? "project.check.passed" : "project.check.failed", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["projectId"] = projectId,
+            ["projectName"] = project.Name,
+            ["checkId"] = check.Id,
+            ["checkLabel"] = check.Label,
+            ["exitCode"] = result.ExitCode.ToString(CultureInfo.InvariantCulture),
+            ["timedOut"] = result.TimedOut.ToString().ToLowerInvariant(),
+        });
         return new(ProtocolVersion, request.Id, true, new { projectId, taskId, check, exitCode = result.ExitCode, output = result.Output, timedOut = result.TimedOut, outputTruncated = result.OutputTruncated, isolationStatus = result.IsolationStatus, startedAtUtc = started, completedAtUtc = completed, task = updated });
     }
 
@@ -289,6 +298,12 @@ public static partial class AgentHostLoop
         var commit = hunkSelection is null
             ? await service.CommitSelectedLocallyAsync(root, changes, message, CancellationToken.None).ConfigureAwait(false)
             : await service.CommitSelectedHunksLocallyAsync(root, changes, hunkSelection, message, CancellationToken.None).ConfigureAwait(false);
+        AppendProjectActivityEvent(project.Id, project.Name, "project.git.commit.completed", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["commitMessage"] = message,
+            ["fileCount"] = changes.Count.ToString(CultureInfo.InvariantCulture),
+            ["partialSelection"] = (hunkSelection is not null).ToString().ToLowerInvariant(),
+        });
         return new(ProtocolVersion, request.Id, true, new { repository = project.Name, committed = true, output = commit });
     }
 
@@ -315,6 +330,7 @@ public static partial class AgentHostLoop
         var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The project does not exist.");
         var root = project.FolderPaths.FirstOrDefault() ?? throw new InvalidOperationException("Select a project folder before pushing.");
         var output = await new GitHubWorkspaceService().PushLocalAsync(root, CancellationToken.None).ConfigureAwait(false);
+        AppendProjectActivityEvent(project.Id, project.Name, "project.git.push.completed");
         return new(ProtocolVersion, request.Id, true, new { repository = project.Name, pushed = true, output });
     }
 
@@ -329,6 +345,11 @@ public static partial class AgentHostLoop
         var body = OptionalString(request, "body") ?? string.Empty;
         var draft = OptionalBoolean(request, "draft");
         var output = await new GitHubWorkspaceService().CreatePullRequestAsync(root, title, body, draft, CancellationToken.None).ConfigureAwait(false);
+        AppendProjectActivityEvent(project.Id, project.Name, "project.git.pull_request.created", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["title"] = title,
+            ["draft"] = draft.ToString().ToLowerInvariant(),
+        });
         return new(ProtocolVersion, request.Id, true, new { repository = project.Name, created = true, output });
     }
 

@@ -214,6 +214,10 @@ async function run() {
   if (!diff.ok || typeof diff.result?.text !== "string" || diff.result.includedFiles !== 1) throw new Error("project.git.diff did not return the selected local diff.");
   const committed = await request("project.git.commit", { id: project.result.id, paths: [reviewPath], message: "Review local Git smoke" });
   if (!committed.ok || committed.result?.committed !== true) throw new Error("project.git.commit did not create the reviewed local commit.");
+  const activityAfterCommit = await request("project.activity.list", { id: project.result.id });
+  const firstCommitEvent = activityAfterCommit.result?.activity?.find(event => event.type === "project.git.commit.completed");
+  if (!activityAfterCommit.ok || firstCommitEvent?.payload?.commitMessage !== "Review local Git smoke" || firstCommitEvent.payload?.fileCount !== "1")
+    throw new Error(`project.activity.list did not persist the reviewed commit event: ${JSON.stringify(activityAfterCommit)}`);
   spawnSync("git", ["reset", "--hard", "--quiet", "HEAD"], { cwd: tempRoot, windowsHide: true });
   const remoteRoot = path.join(tempRoot, "..", `${path.basename(tempRoot)}-remote.git`);
   spawnSync("git", ["init", "--bare", "--quiet", remoteRoot], { cwd: tempRoot, windowsHide: true });
@@ -229,6 +233,10 @@ async function run() {
   const cleanPushStatus = await request("project.git.status", { id: project.result.id });
   const pushed = await request("project.git.push", { id: project.result.id });
   if (!pushed.ok || pushed.result?.pushed !== true) throw new Error(`project.git.push did not push to the disposable local remote: ${JSON.stringify({ pushed, cleanPushStatus })}`);
+  const activityAfterPush = await request("project.activity.list", { id: project.result.id });
+  const projectEventTypes = new Set(activityAfterPush.result?.activity?.map(event => event.type) ?? []);
+  if (!activityAfterPush.ok || !projectEventTypes.has("project.git.commit.completed") || !projectEventTypes.has("project.git.push.completed"))
+    throw new Error(`Project Git activity did not retain commit and push events together: ${JSON.stringify(activityAfterPush)}`);
   const corpusDocument = await request("corpus.upsert", { title: "Local retrieval smoke", source: "smoke://document", content: "Skai retrieves explicit local documents with bounded snippets.", tags: ["local", "retrieval"] });
   if (!corpusDocument.ok || typeof corpusDocument.result?.id !== "string") throw new Error("corpus.upsert did not persist a local document.");
   const corpusSearch = await request("corpus.search", { query: "bounded snippets" });
