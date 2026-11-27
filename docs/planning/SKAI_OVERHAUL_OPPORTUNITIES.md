@@ -392,6 +392,8 @@ The screenshot's exact DeepSeek Harness and CodeWhale names could not be verifie
 209. Keep video/music as honest placeholders until local workflows are verified.
 210. Add a local asset browser for generated images, audio, and supported media.
 
+**Implementation status (2026-11-27):** The canvas, source-image editing, named presets, before/after review, and result metadata were already in place. This slice adds a bounded sequential generation queue with per-job progress/status, cancel/remove, retry, and open-in-edit actions; batches are limited to four at a time and pending work is capped at eight so a local runtime is not flooded. The existing local gallery is the asset browser for generated image/audio/video outputs, and Video/Music remain clearly marked placeholders. The packaged Visuals Workshop smoke verified the persistent canvas, batch choices, preset save/restore/delete, five window sizes, and no runtime errors; screenshot review confirmed the reference-style canvas/gallery/composer balance. **Remaining:** show verified model/custom-node, disk, and license requirements before workflow activation; browse arbitrary local media files; add durable queue recovery and runtime-specific detailed failure causes.
+
 ## Slice 22 — Support more agent harnesses through an adapter boundary
 **Outcome:** Use installed coding agents without hardwiring the desktop to one runtime. OpenCode, Cline, Goose, OpenHands, Pi, Gemini CLI, Codex, and Omnigent document varied harnesses; Skai lists Codex/Claude Code integrations as planned.
 

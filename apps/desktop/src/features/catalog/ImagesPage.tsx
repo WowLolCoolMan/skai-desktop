@@ -6,6 +6,7 @@ import { NavIcon, type NavIconName } from "../../components/ui/NavIcon";
 type ImageResult = { url: string; fileName: string; mediaType?: "image" | "video" | "audio"; provider?: ImageProvider; prompt?: string; createdAt?: string; model?: string; seed?: number; width?: number; height?: number; workflow?: string };
 type Workflow = { name: string; workflow: string };
 type VisualPreset = { id: string; name: string; tool: VisualTool; prompt: string; provider: ImageProvider; workflow: string };
+type VisualJob = { id: string; prompt: string; source?: ChatAttachment; options: { provider: ImageProvider; prompt: string; workflow?: string; model?: string; seed?: number; width?: number; height?: number }; status: "queued" | "running" | "completed" | "failed" | "cancelled"; error?: string };
 type WorkflowMode = "generate" | "edit";
 type VisualTool = "image" | "edit" | "cutout" | "enhance" | "erase" | "video" | "animate" | "character" | "lipsync" | "music" | "extend" | "motion";
 const visualTools: Array<{ id: VisualTool; label: string; icon: NavIconName; prompt: string; note: string; comingSoon?: boolean }> = [
@@ -114,7 +115,7 @@ type ImageProvider = "comfyui" | "diffusers";
 type ImageRuntime = { workerAvailable: boolean; dependenciesAvailable: boolean; backgroundRemovalAvailable?: boolean; pythonCommand: string; status: string; message: string };
 type ImageRuntimeInstall = { id: string; status: string; progress: string[]; error?: string | null };
 
-export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelRequested, progress, images, onChange, onGenerate, onCancel, onImportWorkflow, onPickSourceImage }: { provider: string; endpoint: string; prompt: string; workflow: string; busy: boolean; cancelRequested: boolean; progress: string[]; images: ImageResult[]; onChange: (key: "endpoint" | "prompt" | "workflow" | "provider", value: string) => void; onGenerate: (source?: ChatAttachment, options?: { provider: ImageProvider; prompt: string; workflow?: string; model?: string; seed?: number; width?: number; height?: number }) => void; onCancel: () => Promise<boolean>; onImportWorkflow: () => Promise<Workflow | null>; onPickSourceImage: () => Promise<ChatAttachment | null> }) {
+export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelRequested, progress, images, onChange, onGenerate, onCancel, onImportWorkflow, onPickSourceImage }: { provider: string; endpoint: string; prompt: string; workflow: string; busy: boolean; cancelRequested: boolean; progress: string[]; images: ImageResult[]; onChange: (key: "endpoint" | "prompt" | "workflow" | "provider", value: string) => void; onGenerate: (source?: ChatAttachment, options?: { provider: ImageProvider; prompt: string; workflow?: string; model?: string; seed?: number; width?: number; height?: number }) => Promise<boolean>; onCancel: () => Promise<boolean>; onImportWorkflow: () => Promise<Workflow | null>; onPickSourceImage: () => Promise<ChatAttachment | null> }) {
   const selectedProvider: ImageProvider = provider === "diffusers" ? "diffusers" : "comfyui";
   const [activeTool, setActiveTool] = useState<VisualTool>(() => {
     const stored = localStorage.getItem("skai.visuals.tool");
@@ -147,6 +148,11 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const [reopeningImage, setReopeningImage] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [savedPresets, setSavedPresets] = useState<VisualPreset[]>(readVisualPresets);
+  const [batchSize, setBatchSize] = useState(1);
+  const [visualJobs, setVisualJobs] = useState<VisualJob[]>([]);
+  const visualJobsRef = useRef<VisualJob[]>([]);
+  const queueRunnerRef = useRef(false);
+  const [activeVisualJobId, setActiveVisualJobId] = useState<string | null>(null);
   const [presetName, setPresetName] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [imageRuntime, setImageRuntime] = useState<ImageRuntime | null>(null);
@@ -240,17 +246,74 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const sourceImageUrl = sourceImage?.mediaType && sourceImage.content
     ? `data:${sourceImage.mediaType};base64,${sourceImage.content}`
     : null;
-  const canGenerate = Boolean(prompt.trim() && !busy && (generationProvider === "diffusers"
+  const pendingVisualJobs = visualJobs.filter((job) => job.status === "queued" || job.status === "running").length;
+  const availableVisualJobSlots = Math.max(0, 8 - pendingVisualJobs);
+  const canGenerate = Boolean(prompt.trim() && (generationProvider === "diffusers"
     ? imageRuntime?.dependenciesAvailable
     : endpoint.trim() && workflow.includes("{{prompt}}") && (!workflow.includes("{{image}}") || sourceImage) && (!sourceImage || workflow.includes("{{image}}"))));
   useEffect(() => { if (!preserveImageSelectionRef.current) setSelectedImage(images[0] ?? null); }, [images]);
-  const generate = (source?: ChatAttachment, options?: { provider: ImageProvider; prompt: string }) => {
-    preserveImageSelectionRef.current = false;
-    const generationProvider = options?.provider ?? selectedProvider;
+  const updateVisualJobs = (update: (current: VisualJob[]) => VisualJob[]) => {
+    const next = update(visualJobsRef.current);
+    while (next.length > 12) {
+      const removable = next.findIndex((job) => job.status !== "queued" && job.status !== "running");
+      if (removable < 0) break;
+      next.splice(removable, 1);
+    }
+    visualJobsRef.current = next;
+    setVisualJobs(next);
+  };
+  const runVisualQueue = async () => {
+    if (queueRunnerRef.current) return;
+    queueRunnerRef.current = true;
+    try {
+      while (true) {
+        const next = visualJobsRef.current.find((job) => job.status === "queued");
+        if (!next) break;
+        setActiveVisualJobId(next.id);
+        updateVisualJobs((current) => current.map((job) => job.id === next.id ? { ...job, status: "running", error: undefined } : job));
+        preserveImageSelectionRef.current = false;
+        let succeeded = false;
+        try { succeeded = await onGenerate(next.source, next.options); }
+        catch (error) { updateVisualJobs((current) => current.map((job) => job.id === next.id ? { ...job, status: "failed", error: error instanceof Error ? error.message : "Generation failed." } : job)); }
+        if (succeeded) updateVisualJobs((current) => current.map((job) => job.id === next.id ? { ...job, status: "completed" } : job));
+        else if (visualJobsRef.current.find((job) => job.id === next.id)?.status === "running") updateVisualJobs((current) => current.map((job) => job.id === next.id ? { ...job, status: "failed", error: "The local generation did not complete. Review the runtime message, then retry." } : job));
+        setActiveVisualJobId(null);
+      }
+    } finally { queueRunnerRef.current = false; }
+  };
+  const queueGeneration = (count = 1, retry?: VisualJob) => {
+    if (retry) {
+      if (visualJobsRef.current.filter((job) => job.status === "queued" || job.status === "running").length >= 8) return;
+      const item = { ...retry, id: crypto.randomUUID(), status: "queued" as const, error: undefined };
+      updateVisualJobs((current) => [...current, item]);
+      void runVisualQueue();
+      return;
+    }
+    if (!canGenerate) return;
+    const pendingCount = visualJobsRef.current.filter((job) => job.status === "queued" || job.status === "running").length;
+    const allowedCount = Math.min(Math.max(1, count), 4, Math.max(0, 8 - pendingCount));
+    if (!allowedCount) return;
     const generationWorkflow = workflow;
     const metadata = workflowModelAndSize(generationWorkflow);
-    const generationSeed = generationProvider === "comfyui" ? generationWorkflow.includes("{{seed}}") ? Math.floor(Math.random() * 2_147_483_647) : metadata.seed : undefined;
-    onGenerate(source, { provider: generationProvider, prompt: options?.prompt ?? prompt, workflow: generationWorkflow, model: generationProvider === "diffusers" ? "Stable Diffusion Turbo" : metadata.model ?? "ComfyUI workflow", seed: generationSeed, width: metadata.width ?? (generationProvider === "diffusers" ? 512 : undefined), height: metadata.height ?? (generationProvider === "diffusers" ? 512 : undefined) });
+    const jobs = Array.from({ length: allowedCount }, (_, index): VisualJob => {
+      const generationSeed = generationProvider === "comfyui" && generationWorkflow.includes("{{seed}}")
+        ? Math.floor(Math.random() * 2_147_483_647)
+        : metadata.seed;
+      const jobPrompt = prompt.trim();
+      return {
+        id: crypto.randomUUID(), prompt: jobPrompt, source: sourceImage ?? undefined, status: "queued",
+        options: { provider: generationProvider, prompt: jobPrompt, workflow: generationWorkflow, model: generationProvider === "diffusers" ? "Stable Diffusion Turbo" : metadata.model ?? "ComfyUI workflow", seed: generationSeed, width: metadata.width ?? (generationProvider === "diffusers" ? 512 : undefined), height: metadata.height ?? (generationProvider === "diffusers" ? 512 : undefined) },
+      };
+    });
+    updateVisualJobs((current) => [...current, ...jobs]);
+    void runVisualQueue();
+  };
+  const cancelVisualJob = async (job: VisualJob) => {
+    if (job.status === "queued") {
+      updateVisualJobs((current) => current.map((item) => item.id === job.id ? { ...item, status: "cancelled" } : item));
+      return;
+    }
+    if (job.status === "running") await onCancel();
   };
   return <div className={`feature-page image-studio-page visuals-workshop-page${activeTool === "edit" ? " is-editing" : ""}${activeTool === "image" && images.length === 0 ? " is-generate-empty" : ""}`}>
     <h1 className="visuals-page-title">Images</h1>
@@ -271,8 +334,9 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
       <div className="visuals-control-summary"><span>{activeToolDetails.note}</span>{usesBuiltInImageEngine ? <><StatusBadge tone={imageRuntime?.dependenciesAvailable ? "success" : "warning"}>{imageRuntime?.dependenciesAvailable ? "Local runtime ready" : "Runtime setup needed"}</StatusBadge><label>Image engine<select value={selectedProvider} onChange={(event) => onChange("provider", event.target.value)}><option value="diffusers">Stable Diffusion Turbo</option><option value="comfyui">ComfyUI workflow</option></select></label></> : <StatusBadge tone="neutral">Local ComfyUI workflow</StatusBadge>}</div>
       {sourceImage && <div className="visuals-source-image">{sourceImageUrl && <img src={sourceImageUrl} alt="" />}<span>Source image: {sourceImage.fileName}</span><Button variant="ghost" type="button" disabled={busy} onClick={() => setSourceImage(null)}>Remove source</Button></div>}
       <label className="sr-only" htmlFor="visuals-prompt">{activeToolDetails.label} prompt</label><textarea id="visuals-prompt" value={prompt} onChange={(event) => onChange("prompt", event.target.value)} maxLength={8000} rows={2} placeholder={activeToolDetails.prompt} disabled={busy} />
-      <div className="visuals-composer-footer"><div className="visuals-composer-options"><Button variant="secondary" type="button" disabled={selectingImage || busy} onClick={() => { setSelectingImage(true); void onPickSourceImage().then((next) => { setSourceImage(next); setComparisonOpen(false); }).catch((error) => setWorkflowError(error instanceof Error ? error.message : "Image selection failed.")).finally(() => setSelectingImage(false)); }}>{selectingImage ? "Selecting…" : sourceImage ? "Replace source" : "Add source image"}</Button><details className="visuals-presets"><summary>Presets{savedPresets.length ? ` · ${savedPresets.length}` : ""}</summary><div className="visuals-presets-panel"><label>Saved generation<select aria-label="Saved generation presets" value={selectedPresetId} onChange={(event) => { const preset = savedPresets.find((item) => item.id === event.target.value); if (preset) applyVisualPreset(preset); }}><option value="">Choose a preset…</option>{savedPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label><label>Preset name<input value={presetName} onChange={(event) => setPresetName(event.target.value)} maxLength={80} placeholder="Name this setup" /></label><div><Button variant="secondary" type="button" disabled={!presetName.trim() || !prompt.trim() || workflow.length > 100_000 || busy} onClick={saveVisualPreset}>Save preset</Button>{selectedPresetId && <Button variant="ghost" type="button" disabled={busy} onClick={() => { setSavedPresets((current) => current.filter((item) => item.id !== selectedPresetId)); setSelectedPresetId(""); }}>Delete preset</Button>}</div>{workflow.length > 100_000 && <small>This workflow is too large to save as a preset.</small>}</div></details></div><div className="visuals-composer-action">{busy ? <Button variant="secondary" type="button" disabled={cancelRequested} onClick={() => void onCancel()}>{cancelRequested ? "Stopping…" : "Cancel"}</Button> : <Button variant="primary" type="button" disabled={!canGenerate} onClick={() => generate(sourceImage ?? undefined, { provider: generationProvider, prompt })}>{generationProvider === "diffusers" ? activeTool === "edit" ? "Edit image" : "Create image" : `Create ${activeToolDetails.label.toLowerCase()}`}<NavIcon name="sparkle" /></Button>}</div></div>
+      <div className="visuals-composer-footer"><div className="visuals-composer-options"><Button variant="secondary" type="button" disabled={selectingImage || busy} onClick={() => { setSelectingImage(true); void onPickSourceImage().then((next) => { setSourceImage(next); setComparisonOpen(false); }).catch((error) => setWorkflowError(error instanceof Error ? error.message : "Image selection failed.")).finally(() => setSelectingImage(false)); }}>{selectingImage ? "Selecting…" : sourceImage ? "Replace source" : "Add source image"}</Button><details className="visuals-presets"><summary>Presets{savedPresets.length ? ` · ${savedPresets.length}` : ""}</summary><div className="visuals-presets-panel"><label>Saved generation<select aria-label="Saved generation presets" value={selectedPresetId} onChange={(event) => { const preset = savedPresets.find((item) => item.id === event.target.value); if (preset) applyVisualPreset(preset); }}><option value="">Choose a preset…</option>{savedPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label><label>Preset name<input value={presetName} onChange={(event) => setPresetName(event.target.value)} maxLength={80} placeholder="Name this setup" /></label><div><Button variant="secondary" type="button" disabled={!presetName.trim() || !prompt.trim() || workflow.length > 100_000 || busy} onClick={saveVisualPreset}>Save preset</Button>{selectedPresetId && <Button variant="ghost" type="button" disabled={busy} onClick={() => { setSavedPresets((current) => current.filter((item) => item.id !== selectedPresetId)); setSelectedPresetId(""); }}>Delete preset</Button>}</div>{workflow.length > 100_000 && <small>This workflow is too large to save as a preset.</small>}</div></details></div><div className="visuals-composer-action"><label className="visuals-batch-select">Batch<select aria-label="Batch generation size" value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value))}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>{busy ? <Button variant="secondary" type="button" disabled={cancelRequested} onClick={() => void onCancel()}>{cancelRequested ? "Stopping…" : "Cancel"}</Button> : <Button variant="primary" type="button" disabled={!canGenerate || availableVisualJobSlots === 0} onClick={() => queueGeneration(batchSize)}>{batchSize > 1 ? `Queue ${Math.min(batchSize, availableVisualJobSlots)} images` : generationProvider === "diffusers" ? activeTool === "edit" ? "Edit image" : "Create image" : `Create ${activeToolDetails.label.toLowerCase()}`}<NavIcon name="sparkle" /></Button>}</div></div>
 
+      {visualJobs.length > 0 && <section className="visuals-job-queue" aria-label="Generation queue"><div className="visuals-job-queue-heading"><div><strong>Generation queue</strong><span>{pendingVisualJobs} pending; runs one at a time</span></div><Button variant="secondary" type="button" disabled={!canGenerate || availableVisualJobSlots === 0} onClick={() => queueGeneration(batchSize)}>Queue batch</Button></div><ol>{visualJobs.slice().reverse().map((job) => <li key={job.id} className={`visuals-job visuals-job-${job.status}`}><span className="visuals-job-status">{job.status === "running" ? cancelRequested ? "Stopping" : "Running" : job.status}</span><span className="visuals-job-prompt" title={job.prompt}>{job.prompt}</span>{job.status === "running" && <small>{progress.at(-1) ?? "Waiting for local runtime..."}</small>}{job.error && <small role="status">{job.error}</small>}<div>{job.status === "queued" && <Button variant="ghost" type="button" onClick={() => void cancelVisualJob(job)}>Remove</Button>}{job.status === "running" && <Button variant="ghost" type="button" disabled={cancelRequested} onClick={() => void cancelVisualJob(job)}>Cancel</Button>}{(job.status === "failed" || job.status === "cancelled") && <Button variant="secondary" type="button" disabled={!canGenerate || availableVisualJobSlots === 0} onClick={() => queueGeneration(1, job)}>Retry</Button>}{job.status === "completed" && images.some((image) => image.prompt === job.prompt && (image.createdAt ?? "") >= new Date(Date.now() - 10 * 60_000).toISOString()) && <Button variant="ghost" type="button" disabled={reopeningImage} onClick={() => { const result = images.find((image) => image.prompt === job.prompt); if (result) { setSelectedImage(result); preserveImageSelectionRef.current = true; void imageHistorySource(result).then(setSourceImage).then(() => chooseTool("edit")).catch((error) => setWorkflowError(error instanceof Error ? error.message : "The generated image could not be reopened.")); } }}>Open in edit</Button>}</div></li>)}</ol></section>}
       <details className="visuals-workflow-settings" open={workflowSettingsOpen} onToggle={(event) => setWorkflowSettingsOpen(event.currentTarget.open)}><summary>Workflow settings</summary><div className="visuals-workflow-panel">
         {generationProvider === "diffusers" ? <div className="visuals-runtime-settings"><p><strong>Stable Diffusion Turbo · local inference</strong></p><p>{imageRuntime?.message ?? "Checking the optional image runtime…"} The first generation downloads model weights (about 5.2 GB); CPU generation is supported but may be slow.</p><div className="settings-model-actions"><StatusBadge tone={imageRuntimeInstall?.status === "running" ? "warning" : imageRuntime?.dependenciesAvailable ? "success" : imageRuntime ? "warning" : "neutral"}>{imageRuntimeInstall?.status === "running" ? "Installing" : imageRuntime?.status ?? "Checking"}</StatusBadge><Button variant="secondary" type="button" disabled={imageRuntimeBusy} onClick={() => void refreshImageRuntime()}>Check runtime</Button>{!imageRuntime?.dependenciesAvailable && <Button variant="primary" type="button" disabled={imageRuntimeBusy || imageRuntimeInstall?.status === "running"} onClick={() => void installImageRuntime()}>{imageRuntimeBusy ? "Installing…" : "Install local image runtime"}</Button>}{imageRuntimeInstall?.status === "running" && <Button variant="ghost" type="button" onClick={() => void cancelImageRuntimeInstall()}>Cancel setup</Button>}</div></div> : <>
           <label>Local ComfyUI endpoint<input value={endpoint} onChange={(event) => { setCheckpoints([]); setCheckpoint(""); onChange("endpoint", event.target.value); }} placeholder="http://127.0.0.1:8188" /></label>
