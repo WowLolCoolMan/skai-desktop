@@ -3523,6 +3523,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .visuals-gallery-heading { display: grid; flex: 0 0 auto; justify-items: center; gap: 4px; width: 100%; padding: 11px 4px 9px; border-bottom: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); text-align: center; text-transform: uppercase; }
 .visuals-gallery-heading .nav-icon { width: 18px; height: 18px; }
 .visuals-gallery-heading span { color: var(--skai-color-text-muted); }
+.visuals-gallery-heading select { width: 100%; min-width: 0; padding: 4px 2px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font: inherit; font-size: var(--skai-text-3xs); }
 .visuals-gallery-items { display: grid; align-content: start; justify-items: center; gap: 7px; width: 100%; min-height: 0; padding: 7px 5px; overflow: auto; scrollbar-width: thin; }
 .visuals-gallery-item { display: grid; justify-items: center; width: 100%; gap: 3px; padding: 3px; border: 1px solid transparent; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: transparent; cursor: pointer; }
 .visuals-gallery-item:hover, .visuals-gallery-item.is-selected { border-color: var(--skai-color-border-strong); background: var(--skai-color-surface-soft); }
