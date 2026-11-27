@@ -77,6 +77,7 @@ await ReleaseManifestVerifierTests.RunAsync();
 ConversationContextPlannerTests.Run();
 await SemanticConversationCompactorTests.RunAsync();
 MemoryStoreTests.Run();
+DocumentCorpusStoreTests.Run();
 StatusMessageHistoryTests.Run();
 MemoryPromptContextTests.Run();
 await AgentTaskArtifactTests.RunAsync();

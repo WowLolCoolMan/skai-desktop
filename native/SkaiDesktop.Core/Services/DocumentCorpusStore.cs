@@ -22,9 +22,13 @@ public sealed class DocumentCorpusStore
         _vectorIndex = vectorIndex ?? new TokenVectorIndex();
     }
 
-    public IReadOnlyList<CorpusDocument> Load() => Read().OrderByDescending(document => document.UpdatedAtUtc).ToArray();
+    public IReadOnlyList<CorpusDocument> Load(string? scope = null)
+    {
+        var normalizedScope = NormalizeFilterScope(scope);
+        return Read().Where(document => normalizedScope == "all" || document.Scope == normalizedScope).OrderByDescending(document => document.UpdatedAtUtc).ToArray();
+    }
 
-    public CorpusDocument Upsert(string? id, string title, string source, string content, IEnumerable<string>? tags = null)
+    public CorpusDocument Upsert(string? id, string title, string source, string content, IEnumerable<string>? tags = null, string? scope = null)
     {
         var documents = Read().ToList();
         var normalizedId = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("n") : Normalize(id, 128, "document identity");
@@ -37,6 +41,7 @@ public sealed class DocumentCorpusStore
             Source = Normalize(source, MaxSourceCharacters, "document source"),
             Content = NormalizeContent(content),
             Tags = NormalizeTags(tags),
+            Scope = NormalizeScope(scope),
             CreatedAtUtc = existing?.CreatedAtUtc ?? now,
             UpdatedAtUtc = now
         };
@@ -46,13 +51,14 @@ public sealed class DocumentCorpusStore
         return document;
     }
 
-    public IReadOnlyList<CorpusSearchResult> Search(string? query, int limit = 12)
+    public IReadOnlyList<CorpusSearchResult> Search(string? query, int limit = 12, string? scope = null)
     {
         var normalized = query?.Trim() ?? "";
+        var normalizedScope = NormalizeFilterScope(scope);
         if (normalized.Length > MaxQueryCharacters || normalized.Any(char.IsControl)) throw new ArgumentException("The corpus query is invalid.", nameof(query));
         if (limit is < 1 or > 50) throw new ArgumentOutOfRangeException(nameof(limit));
         var terms = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return Load().Select(document =>
+        return Load(normalizedScope).Select(document =>
         {
             var haystack = $"{document.Title}\n{document.Source}\n{document.Content}\n{string.Join(' ', document.Tags)}";
             var score = terms.Length == 0 ? 1 : terms.Sum(term => haystack.Contains(term, StringComparison.OrdinalIgnoreCase) ? 1 : 0);
@@ -94,7 +100,7 @@ public sealed class DocumentCorpusStore
         if (documents.Count > MaxDocuments || documents.Select(document => document.Id).Distinct(StringComparer.Ordinal).Count() != documents.Count) throw new InvalidDataException("The local document corpus contains too many or duplicate documents.");
         foreach (var document in documents)
         {
-            Normalize(document.Id, 128, "document identity"); Normalize(document.Title, MaxTitleCharacters, "document title"); Normalize(document.Source, MaxSourceCharacters, "document source"); NormalizeContent(document.Content); NormalizeTags(document.Tags);
+            Normalize(document.Id, 128, "document identity"); Normalize(document.Title, MaxTitleCharacters, "document title"); Normalize(document.Source, MaxSourceCharacters, "document source"); NormalizeContent(document.Content); NormalizeTags(document.Tags); NormalizeScope(document.Scope);
         }
     }
 
@@ -114,6 +120,15 @@ public sealed class DocumentCorpusStore
         if (result.Count > 16) throw new ArgumentException("A document can have at most 16 tags.");
         return result;
     }
+    private static string NormalizeScope(string? scope, bool allowAll = false)
+    {
+        var value = string.IsNullOrWhiteSpace(scope) ? "workspace" : scope.Trim();
+        if (allowAll && value.Equals("all", StringComparison.OrdinalIgnoreCase)) return "all";
+        if (value.Equals("workspace", StringComparison.OrdinalIgnoreCase)) return "workspace";
+        if (value.StartsWith("project:", StringComparison.OrdinalIgnoreCase) && value.Length is > 8 and <= 136 && value[8..].All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_')) return $"project:{value[8..]}";
+        throw new ArgumentException("The document scope must be workspace or a valid project ID.", nameof(scope));
+    }
+    private static string NormalizeFilterScope(string? scope) => string.IsNullOrWhiteSpace(scope) ? "all" : NormalizeScope(scope, allowAll: true);
     private static string CreateSnippet(string content, IReadOnlyList<string> terms)
     {
         if (content.Length <= 240 || terms.Count == 0) return content[..Math.Min(240, content.Length)];
@@ -130,6 +145,7 @@ public sealed class CorpusDocument
     public string Source { get; set; } = "";
     public string Content { get; set; } = "";
     public List<string> Tags { get; set; } = [];
+    public string Scope { get; set; } = "workspace";
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }

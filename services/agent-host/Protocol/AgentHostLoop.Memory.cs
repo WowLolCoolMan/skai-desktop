@@ -45,15 +45,15 @@ public static partial class AgentHostLoop
         new(ProtocolVersion, request.Id, true, new { fileName = "skai-memory-backup.json", json = CreateMemoryStore().ExportJson() });
 
     private static AgentResponse ListCorpus(AgentRequest request) =>
-        new(ProtocolVersion, request.Id, true, CreateCorpusStore().Load());
+        new(ProtocolVersion, request.Id, true, CreateCorpusStore().Load(OptionalString(request, "scope")));
 
     private static AgentResponse SearchCorpus(AgentRequest request) =>
-        new(ProtocolVersion, request.Id, true, CreateCorpusStore().Search(OptionalString(request, "query"), OptionalInt(request, "limit") ?? 12));
+        new(ProtocolVersion, request.Id, true, CreateCorpusStore().Search(OptionalString(request, "query"), OptionalInt(request, "limit") ?? 12, OptionalString(request, "scope")));
 
     private static AgentResponse UpsertCorpus(AgentRequest request)
     {
         var store = CreateCorpusStore();
-        var document = store.Upsert(OptionalString(request, "id"), RequiredBoundedString(request, "title", DocumentCorpusStore.MaxTitleCharacters), RequiredBoundedString(request, "source", DocumentCorpusStore.MaxSourceCharacters), RequiredBoundedString(request, "content", DocumentCorpusStore.MaxContentCharacters), OptionalStringList(request, "tags", 16, 64));
+        var document = store.Upsert(OptionalString(request, "id"), RequiredBoundedString(request, "title", DocumentCorpusStore.MaxTitleCharacters), RequiredBoundedString(request, "source", DocumentCorpusStore.MaxSourceCharacters), RequiredBoundedString(request, "content", DocumentCorpusStore.MaxContentCharacters), OptionalStringList(request, "tags", 16, 64), OptionalString(request, "scope"));
         return new(ProtocolVersion, request.Id, true, document);
     }
 

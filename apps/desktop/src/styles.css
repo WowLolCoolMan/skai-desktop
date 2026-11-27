@@ -4419,6 +4419,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .corpus-panel textarea { min-height: 150px; resize: vertical; }
 .corpus-panel .memory-inputs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
 .corpus-panel .memory-toolbar input { max-width: 460px; }
+.corpus-panel .memory-toolbar { grid-template-columns: minmax(160px, auto) minmax(200px, 1fr); align-items: center; }
+.memory-scope-picker { display: flex; align-items: center; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.memory-scope-picker select { min-width: 150px; max-width: 260px; }
 .corpus-panel .memory-entry { align-items: center; }
 .voice-workbench-view { width: min(100%, 1240px); }
 .voice-workbench-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
