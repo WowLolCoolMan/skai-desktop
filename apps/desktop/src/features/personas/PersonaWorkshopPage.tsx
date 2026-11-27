@@ -11,6 +11,7 @@ type GroupResult = { turns?: Array<{ personaId: string; personaName: string; con
 export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model, provider }: { personas: DesktopPersona[]; endpoint: string; model: string; provider: string }) {
   const [personas, setPersonas] = useState(initialPersonas);
   const [personasLoading, setPersonasLoading] = useState(true);
+  const [duplicatingPersonaId, setDuplicatingPersonaId] = useState<string | null>(null);
   const [location, setLocation] = useState(personaWorkshopLocation);
   const [selectedLibraryPersonaId, setSelectedLibraryPersonaId] = useState<string | null>(null);
   const [threads, setThreads] = useState<DesktopConversation[]>([]);
@@ -215,6 +216,38 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     if (response.ok) { await refreshPersonas(); setMoreResearchSources((items) => items.filter((item) => item.url !== source.url)); }
     else setError(response.error?.message ?? "The source could not be saved.");
   };
+  const duplicatePersona = async (source: DesktopPersona) => {
+    if (duplicatingPersonaId) return;
+    setDuplicatingPersonaId(source.id);
+    setError(null);
+    const response = await request("persona.save", { persona: {
+      ...source,
+      id: "",
+      name: `${source.name} copy`,
+      personalContinuityEnabled: false,
+      interactionCount: 0,
+      researchPassCount: 0,
+      lastResearchAtUtc: null,
+      lastResearchSummary: "",
+      latestDistillation: null,
+      researchHistory: [],
+      updatedAtUtc: new Date().toISOString(),
+    } });
+    if (!response.ok) {
+      setError(response.error?.message ?? "The persona could not be duplicated.");
+      setDuplicatingPersonaId(null);
+      return;
+    }
+    const duplicate = (response.result as { persona?: DesktopPersona }).persona;
+    if (!duplicate?.id) {
+      setError("The persona was saved, but Skai did not return the new profile.");
+      setDuplicatingPersonaId(null);
+      return;
+    }
+    setPersonas((current) => [duplicate, ...current.filter((item) => item.id !== duplicate.id)]);
+    setSelectedLibraryPersonaId(duplicate.id);
+    setDuplicatingPersonaId(null);
+  };
   const removePersonaResearch = async (source: DesktopPersonaSource, removeExcerpt: boolean) => {
     if (!persona) return;
     const affectsProfile = !persona.profileEvidenceUrls?.length || persona.profileEvidenceUrls.includes(source.url);
@@ -255,7 +288,7 @@ export function PersonaWorkshopPage({ personas: initialPersonas, endpoint, model
     content = <PersonasPage endpoint={endpoint} model={model} provider={provider} editingPersona={location.page === "settings" ? persona : null} onChanged={() => { void refreshPersonas(); void loadThreads(); }} onCancel={() => open("library", null)} onSaved={(saved) => { void refreshPersonas(); open("settings", saved.id); }} />;
   } else if (location.page === "library") {
     content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Meet your personas" description="Build a cast of characters, then give each one its own conversations, voice, memories, and reference material." />
-      {personas.length && libraryPersona ? <div className="persona-library-detail-layout"><nav className="persona-library-picker" aria-label="Personas">{personas.map((item) => <button type="button" key={item.id} className={item.id === libraryPersona.id ? "is-selected" : ""} aria-pressed={item.id === libraryPersona.id} onClick={() => setSelectedLibraryPersonaId(item.id)}><span className="persona-avatar" aria-hidden="true">{item.name.trim().slice(0, 1).toUpperCase()}</span><span><strong>{item.name}</strong><small>{item.roles || item.personality || "A persona ready for a conversation."}</small></span></button>)}</nav><Card className="persona-library-detail"><div className="persona-library-detail-heading"><div className="persona-avatar" aria-hidden="true">{libraryPersona.name.trim().slice(0, 1).toUpperCase()}</div><div><h2>{libraryPersona.name}</h2><p>{libraryPersona.roles || libraryPersona.personality || "A persona ready for a conversation."}</p></div><Button variant="ghost" type="button" aria-label={`Edit ${libraryPersona.name}`} onClick={() => open("settings", libraryPersona.id)}>Edit profile</Button></div><dl className="persona-library-profile-fields"><div><dt>Name</dt><dd>{libraryPersona.name}</dd></div><div><dt>Description</dt><dd>{libraryPersona.roles || libraryPersona.personality || "A reusable assistant for your conversations."}</dd></div><div><dt>Instructions</dt><dd>{libraryPersona.instructions || libraryPersona.interactionStyle || "Use the saved profile and source material to guide this conversation."}</dd></div></dl><div className="persona-library-start"><Button type="button" onClick={() => { const existing = threads.find((thread) => thread.personaId === libraryPersona.id); existing ? open("chat", libraryPersona.id, existing.id) : void beginThread([libraryPersona.id], false); }}>Start conversation</Button><span>Starts a new conversation using this persona. The persona applies to this conversation only.</span></div></Card></div> : <Card><EmptyState title={personasLoading ? "Loading your personas" : "Your persona library is ready"} description={personasLoading ? "Checking your saved profiles on this device." : "Create a persona from your own material or add a carefully reviewed public research profile."} action={!personasLoading && <Button type="button" onClick={() => open("create")}>Create your first persona</Button>} /></Card>}</section>;
+      {personas.length && libraryPersona ? <div className="persona-library-detail-layout"><nav className="persona-library-picker" aria-label="Personas">{personas.map((item) => <button type="button" key={item.id} className={item.id === libraryPersona.id ? "is-selected" : ""} aria-pressed={item.id === libraryPersona.id} onClick={() => setSelectedLibraryPersonaId(item.id)}><span className="persona-avatar" aria-hidden="true">{item.name.trim().slice(0, 1).toUpperCase()}</span><span><strong>{item.name}</strong><small>{item.roles || item.personality || "A persona ready for a conversation."}</small></span></button>)}</nav><Card className="persona-library-detail"><div className="persona-library-detail-heading"><div className="persona-avatar" aria-hidden="true">{libraryPersona.name.trim().slice(0, 1).toUpperCase()}</div><div><h2>{libraryPersona.name}</h2><p>{libraryPersona.roles || libraryPersona.personality || "A persona ready for a conversation."}</p></div><div className="persona-library-profile-actions"><Button variant="ghost" type="button" disabled={duplicatingPersonaId !== null} onClick={() => void duplicatePersona(libraryPersona)}>{duplicatingPersonaId === libraryPersona.id ? "Duplicating…" : "Duplicate"}</Button><Button variant="ghost" type="button" aria-label={`Edit ${libraryPersona.name}`} onClick={() => open("settings", libraryPersona.id)}>Edit profile</Button></div></div><dl className="persona-library-profile-fields"><div><dt>Name</dt><dd>{libraryPersona.name}</dd></div><div><dt>Description</dt><dd>{libraryPersona.roles || libraryPersona.personality || "A reusable assistant for your conversations."}</dd></div><div><dt>Instructions</dt><dd>{libraryPersona.instructions || libraryPersona.interactionStyle || "Use the saved profile and source material to guide this conversation."}</dd></div></dl><div className="persona-library-effective-scope"><strong>Conversation scope</strong><span>Uses this profile, {libraryPersona.sources.length} saved source{libraryPersona.sources.length === 1 ? "" : "s"}, and the selected chat model. No project files or tools are attached.</span><small>{libraryPersona.personalContinuityEnabled ? "Personal continuity is enabled for this persona." : "Personal continuity is off."}</small></div><div className="persona-library-start"><Button type="button" onClick={() => { const existing = threads.find((thread) => thread.personaId === libraryPersona.id); existing ? open("chat", libraryPersona.id, existing.id) : void beginThread([libraryPersona.id], false); }}>Start conversation</Button><span>Starts a new conversation using this persona. The persona applies to this conversation only.</span></div></Card></div> : <Card><EmptyState title={personasLoading ? "Loading your personas" : "Your persona library is ready"} description={personasLoading ? "Checking your saved profiles on this device." : "Create a persona from your own material or add a carefully reviewed public research profile."} action={!personasLoading && <Button type="button" onClick={() => open("create")}>Create your first persona</Button>} /></Card>}</section>;
   } else if (location.page === "threads") {
     content = <section className="persona-workshop-content"><PageHeader eyebrow="PERSONA WORKSHOP" title="Conversations" description="Persona threads stay on this device for your chosen time, then expire automatically. They are separate from regular Chat and Coding history." actions={<div className="persona-retention-header-actions">{retentionControl}<Button type="button" onClick={() => open("library")}>Choose a persona</Button></div>} />{threadError && <p className="form-error" role="alert">{threadError}</p>}{threadLoading ? <Card><p className="settings-help">Loading persona conversations…</p></Card> : threadItems.length ? <div className="persona-thread-list">{threadItems.map((thread) => <button key={thread.id} type="button" onClick={() => openExistingThread(thread)}><span className="persona-thread-avatar">{thread.isPersonaGroup ? "✦" : (personas.find((item) => item.id === thread.personaId)?.name ?? "P").slice(0, 1)}</span><span><strong>{thread.title}</strong><small>{thread.isPersonaGroup ? (thread.personaIds ?? []).map((id) => personas.find((item) => item.id === id)?.name ?? "Persona").join(" · ") : personas.find((item) => item.id === thread.personaId)?.name ?? "Persona"}</small></span><time>{new Date(thread.updatedAt).toLocaleDateString()}</time></button>)}</div> : <Card><EmptyState title="No persona conversations yet" description="Start chatting from a persona card or create a group conversation." action={<Button type="button" onClick={() => open("library")}>Browse personas</Button>} /></Card>}</section>;
   } else if (location.page === "groups") {

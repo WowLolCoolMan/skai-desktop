@@ -1093,9 +1093,20 @@ async function main() {
         if (route === "persona-workshop" && process.env.UI_MATRIX_EXERCISE_PERSONA === "1") {
           const personaReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-library-picker > button')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
           if (!personaReady) throw new Error("Persona workflow did not load the seeded persona list.");
-          await cdp.evaluate(`([...document.querySelectorAll('.persona-library-picker > button')].find((button) => button.innerText.includes('Release Engineer'))?.click(), 1)`);
+          await cdp.evaluate(`([...document.querySelectorAll('.persona-library-picker > button')].find((button) => button.querySelector('strong')?.textContent?.trim() === 'Release Engineer')?.click(), 1)`);
           const selectedPersona = await cdp.evaluate(`document.querySelector('.persona-library-detail h2')?.textContent?.trim()`);
           if (selectedPersona !== "Release Engineer") throw new Error(`Persona profile selection failed: ${selectedPersona}`);
+          const duplicateControl = await cdp.evaluate(`([...document.querySelectorAll('.persona-library-profile-actions button')].find((button) => button.textContent?.trim() === 'Duplicate')?.click(), Boolean([...document.querySelectorAll('.persona-library-profile-actions button')].find((button) => button.textContent?.trim() === 'Duplicate')))`);
+          if (!duplicateControl) throw new Error('Persona details did not expose the Duplicate workflow.');
+          const personaCopyReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-library-detail h2')?.textContent?.trim() === 'Release Engineer copy') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!personaCopyReady) throw new Error('Duplicating a persona did not select the new profile in the library.');
+          const personaCopy = await cdp.evaluate(`(async () => { const response = await window.skaiAgent.request('persona.list'); const personas = response.ok ? response.result.personas : []; const copy = personas.find((item) => item.name === 'Release Engineer copy'); return copy && { id: copy.id, continuity: copy.personalContinuityEnabled, sourceCount: copy.sources.length, roles: copy.roles, scope: document.querySelector('.persona-library-effective-scope')?.innerText }; })()`);
+          if (!personaCopy?.id || personaCopy.continuity || !personaCopy.roles || personaCopy.scope?.includes('No project files or tools are attached') !== true) throw new Error(`Persona duplication did not copy its profile safely or explain its effective scope: ${JSON.stringify(personaCopy)}`);
+          if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
+            fs.mkdirSync(captureDirectory, { recursive: true });
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "persona-library-duplicate-1440.png"), Buffer.from(screenshot.data, "base64"));
+          }
         }
         await sleep(process.env.UI_MATRIX_CAPTURE === "1" ? 350 : 120);
         if (process.env.UI_MATRIX_CAPTURE === "1" && (route === "marketplace" || route === "memory")) {
