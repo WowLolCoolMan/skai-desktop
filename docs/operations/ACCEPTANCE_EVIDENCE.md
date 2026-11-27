@@ -146,6 +146,44 @@ platform or theme that was not recorded.
   turn-based Whisper privacy boundary. True audio-frame streaming, native
   output routing/levels, and representative voice/hardware quality fixtures
   are still explicit release boundaries.
+
+### Slice 21 — Visuals Workshop queue and activation readiness
+
+- Outcome: Visuals Workshop keeps its large canvas and gallery while making
+  generation jobs durable and honest about local prerequisites. Queue records
+  are bounded to twelve, pending work to eight, and batches to four. A job that
+  was running during shutdown is marked recoverable instead of replayed; queued
+  work can be resumed explicitly.
+- Reference / workflow: Revision 4 Visuals Workshop canvas/gallery/composer
+  layout and local image-generation workflow.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run package:electron`; focused packaged UI matrix with
+  `UI_MATRIX_EXERCISE_VISUALS=1`, `UI_MATRIX_QUICK=1`, and
+  `UI_MATRIX_ROUTE=images`.
+- Failure check: malformed persisted jobs are ignored; oversized prompt or
+  workflow records are rejected; interrupted jobs are not silently rerun; the
+  activation panel names the runtime, model, disk, license, endpoint,
+  checkpoint, and custom-node boundary before setup.
+- Disposable profile / cleanup: packaged UI matrix uses a throwaway Electron
+  profile. Queue state is local to that profile and no user gallery or model
+  cache is modified.
+- Platform / OS: Windows x64 packaged Electron; live ComfyUI/GPU acceptance and
+  native Linux/macOS remain unverified.
+- Viewport / theme / sidebar: focused 1440×900 dark expanded-sidebar image
+  exercise plus the shared five-size matrix.
+- Runtime / app revision: packaged Electron production build for the Slice 21
+  commit.
+- Network and privacy boundary: activation text clearly distinguishes one-time
+  runtime/model downloads from on-device generation; arbitrary ComfyUI model
+  and custom-node licenses remain upstream responsibilities.
+- Before screenshot: Visuals Workshop empty canvas with preset, batch, and
+  workflow controls.
+- After screenshot: same layout with activation-requirements disclosure and a
+  recoverable generation queue action; screenshot evidence does not claim live
+  GPU or ComfyUI compatibility.
+- Comparison: closes durable queue and pre-activation-readiness gaps while
+  preserving the honest Video/Music placeholders. Arbitrary local-media
+  browsing and runtime-specific failure diagnostics remain open.
 | MCP denied access, revoke, reconnect, delayed response | [`smoke:marketplace-host`](../../package.json), [`MCP client tests`](../../native/SkaiDesktop.Core.Tests/McpStreamableHttpClientTests.cs) | Loopback lifecycle verifies denied writes, revocation, and fresh-session reconnect; core test injects a delayed handler and checks the request deadline. Packaged timeout UI recovery remains unverified. |
 | GitHub authentication expiry | [`GitHub integration guide`](../guides/GITHUB_INTEGRATION.md), [`GitHub core tests`](../../native/SkaiDesktop.Core.Tests/GitHubTests.cs) | Device-flow expiry/polling and an injected HTTP 401 are covered; end-to-end refresh failure in the packaged UI remains unverified. |
 | Disk full / storage exhaustion | [`Atomic file writer fault-injection test`](../../native/SkaiDesktop.Core.Tests/AtomicFileWriterTests.cs), [`Agent Host smoke`](../../scripts/smoke-agent-host.cjs) | A deterministic injected ENOSPC write failure verifies that the last complete file is preserved and the partial temp file is cleaned up. It does not fill a real disk or verify the packaged UI recovery message; disk-growth quota remains unenforced. |
