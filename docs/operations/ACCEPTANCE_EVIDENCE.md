@@ -303,6 +303,21 @@ Known gaps in this table are intentionally explicit release limitations. A
 future slice may close them with bounded deterministic fixtures; do not simulate
 an OS-level disk-full condition by filling a developer or CI volume.
 
+### Slice 22 — agent harness adapter health
+
+- Outcome: keep external harness discovery honest while making local health
+  visible. The catalog remains contract v2; external adapters never become
+  executable merely because a binary is on PATH.
+- Success check: `npm run smoke:agent-host`; packaged Coding-route smoke with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=coding` verifies the catalog, `Check harness health`,
+  native-vs-Skai capability labels, and the bounded `--version` disclosure.
+- Safety boundary: the probe accepts only a catalog adapter ID, launches its
+  discovered executable with `--version`, redirects output, caps captured text
+  to 400 characters, and kills the process after four seconds. It never opens
+  a project, imports a session, authenticates, or executes a task.
+- Unverified: external login state, session import/resume, native terminal
+  sessions, and compatibility execution fixtures remain intentionally open.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record

@@ -12,7 +12,7 @@ public static partial class AgentHostLoop
 
         return request.Method switch
         {
-            "harness.adapters.list" => new(ProtocolVersion, request.Id, true, HarnessAdapterRegistry.Snapshot()),
+            "harness.adapters.list" => new(ProtocolVersion, request.Id, true, HarnessAdapterRegistry.Snapshot(OptionalBoolean(request, "probe"))),
             "runtime.health" => new(ProtocolVersion, request.Id, true, new RuntimeHealth(
                 "agent-host",
                 ProtocolVersion,

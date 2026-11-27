@@ -174,7 +174,7 @@ export type AppRouteActions = {
   onPullModel: (model: string, onProgress: (message: string) => void) => Promise<boolean>;
   onCancelModelPull?: () => Promise<boolean>;
   onImageChange: (key: "endpoint" | "prompt" | "workflow" | "threeDWorkflow" | "provider", value: string) => void;
-  onRefreshHarnessAdapters: () => Promise<DesktopHarnessAdapter[]>;
+  onRefreshHarnessAdapters: (probe?: boolean) => Promise<DesktopHarnessAdapter[]>;
   onImportWorkflow?: () => Promise<{ name: string; workflow: string } | null>;
   onSelectModel: (model: Model) => void;
   onGenerateImage: (source?: ChatAttachment, options?: { provider: "comfyui" | "diffusers"; prompt: string; workflow?: string; model?: string; seed?: number; width?: number; height?: number }) => Promise<boolean>;

@@ -37,6 +37,9 @@ export type DesktopHarnessAdapter = {
   ownsSessionFormat: boolean;
   taskJournal: string;
   healthNote: string;
+  healthStatus: "ready" | "missing" | "not-checked" | "failed" | "timeout";
+  healthCheckedAtUtc?: string | null;
+  healthVersion?: string | null;
   authenticationStatus: "not-applicable" | "unknown";
 };
 

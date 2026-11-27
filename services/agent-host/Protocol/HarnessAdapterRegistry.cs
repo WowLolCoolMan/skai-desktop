@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace SkaiDesktop.AgentHost.Protocol;
 
@@ -29,7 +30,7 @@ public static class HarnessAdapterRegistry
         new("openhands", "OpenHands", "OpenHands agent; listed for compatibility discovery only.", ["openhands"], ["planning", "coding", "session-resume"], ["OpenHands installed with its required runtime"], false, true),
     ];
 
-    public static object Snapshot() => new
+    public static object Snapshot(bool probeExternal = false) => new
     {
         contractVersion = ContractVersion,
         generatedAtUtc = DateTimeOffset.UtcNow,
@@ -38,6 +39,7 @@ public static class HarnessAdapterRegistry
             var executable = definition.Executables.Select(FindExecutable).FirstOrDefault(path => path is not null);
             var isBuiltIn = definition.Id == "skai-local";
             var installed = isBuiltIn || executable is not null;
+            var health = probeExternal && !isBuiltIn && executable is not null ? ProbeExecutable(executable) : null;
             return new
             {
                 contractVersion = ContractVersion,
@@ -56,12 +58,58 @@ public static class HarnessAdapterRegistry
                 healthNote = isBuiltIn
                     ? "Skai's local task adapter is available. Model availability is checked when a task starts."
                     : installed
-                        ? "Executable found on PATH. Authentication and runtime health have not been verified."
+                        ? health?.Detail ?? "Executable found on PATH. Authentication and runtime health have not been verified."
                         : "Executable was not found on PATH.",
+                healthStatus = isBuiltIn ? "ready" : executable is null ? "missing" : health?.Status ?? "not-checked",
+                healthCheckedAtUtc = health?.CheckedAtUtc,
+                healthVersion = health?.Version,
                 authenticationStatus = isBuiltIn ? "not-applicable" : "unknown",
             };
         }).ToArray(),
     };
+
+    private sealed record ProbeResult(string Status, string Detail, string? Version, DateTimeOffset CheckedAtUtc);
+
+    private static ProbeResult ProbeExecutable(string executable)
+    {
+        var checkedAt = DateTimeOffset.UtcNow;
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = executable,
+                    Arguments = "--version",
+                    WorkingDirectory = Path.GetDirectoryName(executable) ?? Environment.CurrentDirectory,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding = System.Text.Encoding.UTF8,
+                }
+            };
+            process.Start();
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(4_000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return new("timeout", "The safe --version probe timed out after 4 seconds.", null, checkedAt);
+            }
+            var output = (outputTask.GetAwaiter().GetResult() + "\n" + errorTask.GetAwaiter().GetResult()).Trim();
+            var bounded = output.Length > 400 ? output[..400] : output;
+            var version = string.IsNullOrWhiteSpace(bounded) ? null : bounded.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return process.ExitCode == 0
+                ? new("ready", version is null ? "Safe --version probe passed." : $"Safe --version probe passed: {version}", version, checkedAt)
+                : new("failed", version is null ? $"Safe --version probe exited with code {process.ExitCode}." : $"Safe --version probe exited with code {process.ExitCode}: {version}", version, checkedAt);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            return new("failed", $"Safe --version probe could not start: {error.Message}", null, checkedAt);
+        }
+    }
 
     private static string? FindExecutable(string command)
     {

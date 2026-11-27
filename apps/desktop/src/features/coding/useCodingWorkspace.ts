@@ -91,8 +91,8 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     }).catch(() => onError("Projects could not be loaded."));
   }, [connection, onError, request]);
 
-  const refreshHarnessAdapters = useCallback(async (): Promise<DesktopHarnessAdapter[]> => {
-    const response = await request("harness.adapters.list");
+  const refreshHarnessAdapters = useCallback(async (probe = false): Promise<DesktopHarnessAdapter[]> => {
+    const response = await request("harness.adapters.list", probe ? { probe: true } : undefined);
     if (!response.ok) throw new Error(response.error?.message ?? "Harness availability could not be refreshed.");
     const result = response.result as { adapters?: DesktopHarnessAdapter[] } | undefined;
     const adapters = result?.adapters ?? [];
