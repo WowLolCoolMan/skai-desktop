@@ -17,6 +17,16 @@ import { useWorkspaceSessionTabs } from "./useWorkspaceSessionTabs";
 export type { WorkspaceSessionTab } from "./workspaceTabStore";
 export type { DesktopWorkspace } from "./desktopWorkspaceTypes";
 
+function initialWorkspaceRoute(): Route {
+  const route = routeFromLocation();
+  const locationRoute = window.location.protocol === "file:"
+    ? window.location.hash.replace(/^#\/?/, "").split("/")[0]
+    : window.location.pathname.split("/").filter(Boolean)[0] ?? "";
+  const hasExplicitRoute = Boolean(locationRoute);
+  const firstRun = !localStorage.getItem("skai.navigation.route") && !hasExplicitRoute && localStorage.getItem("skai.onboarding.completed.v1") !== "true";
+  return route === "chat" && firstRun ? "onboarding" : route;
+}
+
 export function useDesktopWorkspace(): DesktopWorkspace {
   const agent = useMemo(() => createAgentClient((method, params) => {
     const bridge = window.skaiAgent;
@@ -24,7 +34,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     return bridge.request(method, params);
   }), []);
   const request = agent.request;
-  const [route, setRoute] = useState<Route>(routeFromLocation);
+  const [route, setRoute] = useState<Route>(initialWorkspaceRoute);
   const [settingsReturnRoute, setSettingsReturnRoute] = useState<Route>(() => routeFromLocation() === "settings" ? "chat" : routeFromLocation());
 
   const [navigation, setNavigation] = useState<NavigationState>(() => readNavigationState(routeFromLocation()));
@@ -149,7 +159,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   }, [agentMode, chat, onNavigate]);
 
   useEffect(() => {
-    const initialRoute = routeFromLocation();
+    const initialRoute = initialWorkspaceRoute();
     setRoute(initialRoute);
     setNavigation(initializeNavigation(initialRoute));
     const onPopState = () => {

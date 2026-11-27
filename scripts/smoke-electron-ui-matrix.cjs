@@ -31,6 +31,7 @@ const exerciseCodingPanels = process.env.UI_MATRIX_EXERCISE_CODING_PANELS === "1
 const exerciseSideChat = process.env.UI_MATRIX_EXERCISE_SIDE_CHAT === "1";
 const exerciseProjectTerminal = process.env.UI_MATRIX_EXERCISE_PROJECT_TERMINAL === "1";
 const exerciseMcpReview = process.env.UI_MATRIX_EXERCISE_MCP_REVIEW === "1";
+const exerciseOnboarding = process.env.UI_MATRIX_EXERCISE_ONBOARDING === "1";
 const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
@@ -326,6 +327,10 @@ async function main() {
   });
   await cdp.send("Runtime.enable");
   await cdp.evaluate("(async () => { for (let i = 0; i < 150 && !document.querySelector('[aria-label=\"Primary navigation\"]'); i++) await new Promise((r) => setTimeout(r, 100)); return 1; })()");
+  if (exerciseOnboarding) {
+    const firstRunRoute = await cdp.evaluate(`document.title.endsWith(' · onboarding')`);
+    if (!firstRunRoute) throw new Error(`A clean profile did not open the first-run checklist; initial page was ${await cdp.evaluate("document.title")}.`);
+  }
 
   // Long, awkward content: long titles, unbroken tokens, wide code, tables, many chats, long project names.
   phase = "seed";
@@ -417,6 +422,42 @@ async function main() {
         await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
         const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
         if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
+        if (route === "onboarding" && exerciseOnboarding && width === 1440 && height === 900) {
+          const beforeCounts = await cdp.evaluateWith(async function () {
+            const request = (method, params = {}) => window.skaiAgent.request(method, params);
+            const [projects, tasks, conversations] = await Promise.all([request("projects.list"), request("tasks.list"), request("conversations.list", { includeArchived: false })]);
+            const length = (result) => Array.isArray(result) ? result.length : Array.isArray(result?.projects) ? result.projects.length : Array.isArray(result?.conversations) ? result.conversations.length : 0;
+            return [length(projects.result), length(tasks.result), length(conversations.result)];
+          });
+          const originalProgress = await cdp.evaluate(`document.querySelector('.onboarding-progress')?.getAttribute('aria-valuenow')`);
+          await clickButtonText(cdp, "Preview workflows", ".onboarding-demo-card");
+          const demoVisible = await cdp.evaluate(`document.querySelectorAll('.onboarding-demo-grid section').length === 3`);
+          if (!demoVisible) throw new Error("The Getting Started workflow preview did not display all three no-write examples.");
+          const privacy = await cdp.evaluateWith(function () { const button = [...document.querySelectorAll('.onboarding-checklist button')].find((item) => item.innerText.trim() === 'Mark reviewed'); if (!button) return false; button.click(); return true; });
+          if (!privacy) throw new Error("The onboarding privacy review action was not available.");
+          await clickButtonText(cdp, "Dismiss", ".onboarding-navigation-guide");
+          const guideDismissed = await cdp.evaluate(`!document.querySelector('.onboarding-navigation-guide') && localStorage.getItem('skai.onboarding.navigation-guide-dismissed.v1') === 'true'`);
+          if (!guideDismissed) throw new Error("The navigation guide did not dismiss and persist its local preference.");
+          await clickButtonText(cdp, "Reset checklist", ".onboarding-checklist-card");
+          const resetProgress = await cdp.evaluate(`document.querySelector('.onboarding-progress')?.getAttribute('aria-valuenow')`);
+          const guideRestored = await cdp.evaluate(`Boolean(document.querySelector('.onboarding-navigation-guide'))`);
+          if (String(resetProgress) !== String(originalProgress) || !guideRestored) throw new Error(`Resetting onboarding did not restore checklist-only state (${originalProgress} -> ${resetProgress}; guide ${guideRestored}).`);
+          const afterCounts = await cdp.evaluateWith(async function () {
+            const request = (method, params = {}) => window.skaiAgent.request(method, params);
+            const [projects, tasks, conversations] = await Promise.all([request("projects.list"), request("tasks.list"), request("conversations.list", { includeArchived: false })]);
+            const length = (result) => Array.isArray(result) ? result.length : Array.isArray(result?.projects) ? result.projects.length : Array.isArray(result?.conversations) ? result.conversations.length : 0;
+            return [length(projects.result), length(tasks.result), length(conversations.result)];
+          });
+          if (JSON.stringify(beforeCounts) !== JSON.stringify(afterCounts)) throw new Error(`Preview/reset changed workspace data: ${JSON.stringify(beforeCounts)} -> ${JSON.stringify(afterCounts)}.`);
+          await clickButtonText(cdp, "Skip for now", ".onboarding-page");
+          const skippedToChat = await cdp.evaluate(`document.title.endsWith(' · chat') && localStorage.getItem('skai.onboarding.completed.v1') === 'true'`);
+          if (!skippedToChat) throw new Error("Skipping onboarding did not return to Chat and persist the optional skip.");
+          await clickInRenderer(cdp, '[aria-label="Extras"]');
+          await clickInRenderer(cdp, ".global-rail-extras-panel .global-rail-extra");
+          const reopened = await cdp.evaluate(`document.title.endsWith(' · onboarding')`);
+          if (!reopened) throw new Error("Getting Started could not be reopened from Extras after skipping.");
+          console.log(`[onboarding-workflow] ${JSON.stringify({ preview: demoVisible, resetPreservedWorkspace: true, skipAndReopen: reopened, checklistProgress: resetProgress })}`);
+        }
         if (route === "chat" && process.env.UI_MATRIX_CAPTURE === "1" && width === 390 && height === 844) {
           fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
           const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });

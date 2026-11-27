@@ -399,7 +399,7 @@ The screenshot's exact DeepSeek Harness and CodeWhale names could not be verifie
 220. Start with one read-only/plan adapter and one coding adapter before expanding the catalog.
 
 ## Slice 23 — Improve first-run onboarding and capability discovery
-**Outcome:** Help new users reach a useful first chat or project task with fewer surprises. Skai has local setup and Marketplace; Agent Orchestrator documents onboarding, and Odysseus offers model recommendations.
+**Outcome:** Help new users reach a useful first chat or project task with fewer surprises. Skai has local setup and Marketplace; Agent Orchestrator documents onboarding, and Odysseus offers model recommendations. **Implemented:** first-run checklist with device-local progress/reset, optional skip/re-entry, local model and folder readiness, a labeled model-fit advisory based on discovered inventory, local/network data handling notes, a short dismissible navigation guide, a non-writing workflow preview, and a sample-chat action guarded on a discovered model. External service setup remains explicitly opt-in; preview examples do not seed workspace data.
 
 221. Add a first-run checklist for local runtime, model, permissions, and workspace folder.
 222. Offer a sample prompt that exercises the installed model without touching project files.

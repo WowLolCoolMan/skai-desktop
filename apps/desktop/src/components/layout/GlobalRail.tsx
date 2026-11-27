@@ -40,6 +40,7 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape); };
   }, [menuOpen]);
   const menuItems = useMemo(() => [
+    { route: "onboarding" as Route, label: "Getting started", icon: "sparkle" as NavIconName, description: "Setup checklist, privacy, and local readiness", unavailable: false },
     { route: "models" as Route, label: "Models", icon: "model" as NavIconName, description: "Browse and manage local models", unavailable: false },
     { route: "compare" as Route, label: "Compare", icon: "compare" as NavIconName, description: "Compare model responses", unavailable: false },
     { route: "video" as Route, label: "Video · planned", icon: "video" as NavIconName, description: "Video tools planned for a future release", unavailable: false },
