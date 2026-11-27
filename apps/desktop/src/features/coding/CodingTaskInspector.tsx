@@ -94,6 +94,12 @@ export function CodingTaskInspector({ projectId, tasks, projectChecks, projectCh
           {taskStages.map((stage, index) => <li key={stage} className={index < taskStageIndex(task.status) ? "is-complete" : index === taskStageIndex(task.status) ? "is-current" : ""} aria-current={index === taskStageIndex(task.status) ? "step" : undefined}><span aria-hidden="true" />{stage}</li>)}
         </ol>}
         <p className="coding-task-instruction">{task.instruction}</p>
+        {tasks.some((child) => child.parentRunId === task.id) && <div className="coding-task-children" aria-label="Delegated subagents">
+          <strong>Delegated work</strong>
+          {tasks.filter((child) => child.parentRunId === task.id).map((child) => <div className="coding-task-child" key={child.id}>
+            <span>{child.title}</span><span className={`coding-task-status-pill is-${statusTone(child.status)}`}>{statusLabel(child.status)}</span>
+          </div>)}
+        </div>}
         {task.resultSummary && <p className="coding-task-result"><strong>Result</strong> {task.resultSummary}</p>}
         {task.changedFiles?.length ? <details className="coding-task-files"><summary>{task.changedFiles.length} changed file{task.changedFiles.length === 1 ? "" : "s"}</summary><ul>{task.changedFiles.slice(0, 12).map((path) => <li key={path}><code>{path}</code></li>)}</ul>{task.changedFiles.length > 12 && <small>And {task.changedFiles.length - 12} more</small>}</details> : <small>No changed files recorded</small>}
         {task.requiresApproval && <small className="coding-task-approval">This task required approval before execution.</small>}

@@ -1,0 +1,414 @@
+
+=== DIRECTORY TREE (max depth 3, source files only) ===
+.github
+.github\dependabot.yml
+.github\ISSUE_TEMPLATE
+.github\ISSUE_TEMPLATE\accessibility_barrier.yml
+.github\ISSUE_TEMPLATE\bug_report.yml
+.github\ISSUE_TEMPLATE\config.yml
+.github\ISSUE_TEMPLATE\feature_request.yml
+.github\PULL_REQUEST_TEMPLATE.md
+.github\workflows
+.github\workflows\electron-ci.yml
+.github\workflows\pages.yml
+.github\workflows\release.yml
+.gitignore
+.tmp
+.tmp\accessibility-review-after.txt
+.tmp\accessibility-review.txt
+.tmp\agent-host-filesystem-check
+.tmp\agent-host-filesystem-check\airllm
+.tmp\agent-host-filesystem-check\airllm\install.ps1
+.tmp\agent-host-filesystem-check\airllm\install.sh
+.tmp\agent-host-filesystem-check\airllm\README.md
+.tmp\agent-host-filesystem-check\airllm\requirements.txt
+.tmp\agent-host-filesystem-check\airllm\skai_airllm.py
+.tmp\agent-host-filesystem-check\diffusers
+.tmp\agent-host-filesystem-check\diffusers\requirements.txt
+.tmp\agent-host-filesystem-check\diffusers\skai_diffusers.py
+.tmp\agent-host-filesystem-check\diffusers\skai_pet_background.py
+.tmp\agent-host-filesystem-check\Porta.Pty.dll
+.tmp\agent-host-filesystem-check\runtimes
+.tmp\agent-host-filesystem-check\runtimes\linux-arm64
+.tmp\agent-host-filesystem-check\runtimes\linux-x64
+.tmp\agent-host-filesystem-check\runtimes\osx-arm64
+.tmp\agent-host-filesystem-check\runtimes\osx-x64
+.tmp\agent-host-filesystem-check\runtimes\win-arm64
+.tmp\agent-host-filesystem-check\runtimes\win-x64
+.tmp\agent-host-filesystem-check\runtimes\win-x86
+.tmp\agent-host-filesystem-check\SkaiDesktop.AgentHost.deps.json
+.tmp\agent-host-filesystem-check\SkaiDesktop.AgentHost.dll
+.tmp\agent-host-filesystem-check\SkaiDesktop.AgentHost.exe
+.tmp\agent-host-filesystem-check\SkaiDesktop.AgentHost.pdb
+.tmp\agent-host-filesystem-check\SkaiDesktop.AgentHost.runtimeconfig.json
+.tmp\agent-host-filesystem-check\SkaiDesktop.Core.deps.json
+.tmp\agent-host-filesystem-check\SkaiDesktop.Core.dll
+.tmp\agent-host-filesystem-check\SkaiDesktop.Core.pdb
+.tmp\agent-host-filesystem-check\System.Security.Cryptography.ProtectedData.dll
+.tmp\agent-host-filesystem-check\UglyToad.PdfPig.Core.dll
+.tmp\agent-host-filesystem-check\UglyToad.PdfPig.dll
+.tmp\agent-host-filesystem-check\UglyToad.PdfPig.DocumentLayoutAnalysis.dll
+.tmp\agent-host-filesystem-check\UglyToad.PdfPig.Fonts.dll
+.tmp\agent-host-filesystem-check\UglyToad.PdfPig.Package.dll
+.tmp\agent-host-filesystem-check\UglyToad.PdfPig.Tokenization.dll
+.tmp\agent-host-filesystem-check\UglyToad.PdfPig.Tokens.dll
+.tmp\agent-host-filesystem-check\XTerm.NET.dll
+.tmp\agent-host-local-only-check
+.tmp\agent-host-local-only-check\airllm
+.tmp\agent-host-local-only-check\airllm\install.ps1
+.tmp\agent-host-local-only-check\airllm\install.sh
+.tmp\agent-host-local-only-check\airllm\README.md
+.tmp\agent-host-local-only-check\airllm\requirements.txt
+.tmp\agent-host-local-only-check\airllm\skai_airllm.py
+.tmp\agent-host-local-only-check\diffusers
+.tmp\agent-host-local-only-check\diffusers\requirements.txt
+.tmp\agent-host-local-only-check\diffusers\skai_diffusers.py
+.tmp\agent-host-local-only-check\diffusers\skai_pet_background.py
+.tmp\agent-host-local-only-check\Porta.Pty.dll
+.tmp\agent-host-local-only-check\runtimes
+.tmp\agent-host-local-only-check\runtimes\linux-arm64
+.tmp\agent-host-local-only-check\runtimes\linux-x64
+.tmp\agent-host-local-only-check\runtimes\osx-arm64
+.tmp\agent-host-local-only-check\runtimes\osx-x64
+.tmp\agent-host-local-only-check\runtimes\win-arm64
+.tmp\agent-host-local-only-check\runtimes\win-x64
+.tmp\agent-host-local-only-check\runtimes\win-x86
+.tmp\agent-host-local-only-check\SkaiDesktop.AgentHost.deps.json
+.tmp\agent-host-local-only-check\SkaiDesktop.AgentHost.dll
+.tmp\agent-host-local-only-check\SkaiDesktop.AgentHost.exe
+.tmp\agent-host-local-only-check\SkaiDesktop.AgentHost.pdb
+.tmp\agent-host-local-only-check\SkaiDesktop.AgentHost.runtimeconfig.json
+.tmp\agent-host-local-only-check\SkaiDesktop.Core.deps.json
+.tmp\agent-host-local-only-check\SkaiDesktop.Core.dll
+.tmp\agent-host-local-only-check\SkaiDesktop.Core.pdb
+.tmp\agent-host-local-only-check\System.Security.Cryptography.ProtectedData.dll
+.tmp\agent-host-local-only-check\UglyToad.PdfPig.Core.dll
+.tmp\agent-host-local-only-check\UglyToad.PdfPig.dll
+.tmp\agent-host-local-only-check\UglyToad.PdfPig.DocumentLayoutAnalysis.dll
+.tmp\agent-host-local-only-check\UglyToad.PdfPig.Fonts.dll
+.tmp\agent-host-local-only-check\UglyToad.PdfPig.Package.dll
+.tmp\agent-host-local-only-check\UglyToad.PdfPig.Tokenization.dll
+.tmp\agent-host-local-only-check\UglyToad.PdfPig.Tokens.dll
+.tmp\agent-host-local-only-check\XTerm.NET.dll
+.tmp\agent-host-marketplace
+.tmp\agent-host-marketplace\airllm
+.tmp\agent-host-marketplace\airllm\install.ps1
+.tmp\agent-host-marketplace\airllm\install.sh
+.tmp\agent-host-marketplace\airllm\README.md
+.tmp\agent-host-marketplace\airllm\requirements.txt
+.tmp\agent-host-marketplace\airllm\skai_airllm.py
+.tmp\agent-host-marketplace\diffusers
+.tmp\agent-host-marketplace\diffusers\requirements.txt
+.tmp\agent-host-marketplace\diffusers\skai_diffusers.py
+.tmp\agent-host-marketplace\diffusers\skai_pet_background.py
+.tmp\agent-host-marketplace\Google.FlatBuffers.dll
+.tmp\agent-host-marketplace\Porta.Pty.dll
+.tmp\agent-host-marketplace\runtimes
+.tmp\agent-host-marketplace\runtimes\linux-arm64
+.tmp\agent-host-marketplace\runtimes\linux-x64
+.tmp\agent-host-marketplace\runtimes\osx-arm64
+.tmp\agent-host-marketplace\runtimes\osx-x64
+.tmp\agent-host-marketplace\runtimes\win-arm64
+.tmp\agent-host-marketplace\runtimes\win-x64
+.tmp\agent-host-marketplace\runtimes\win-x86
+.tmp\agent-host-marketplace\SkaiDesktop.AgentHost.deps.json
+.tmp\agent-host-marketplace\SkaiDesktop.AgentHost.dll
+.tmp\agent-host-marketplace\SkaiDesktop.AgentHost.exe
+.tmp\agent-host-marketplace\SkaiDesktop.AgentHost.pdb
+.tmp\agent-host-marketplace\SkaiDesktop.AgentHost.runtimeconfig.json
+.tmp\agent-host-marketplace\SkaiDesktop.Core.deps.json
+.tmp\agent-host-marketplace\SkaiDesktop.Core.dll
+.tmp\agent-host-marketplace\SkaiDesktop.Core.pdb
+.tmp\agent-host-marketplace\System.Security.Cryptography.ProtectedData.dll
+.tmp\agent-host-marketplace\UglyToad.PdfPig.Core.dll
+.tmp\agent-host-marketplace\UglyToad.PdfPig.dll
+.tmp\agent-host-marketplace\UglyToad.PdfPig.DocumentLayoutAnalysis.dll
+.tmp\agent-host-marketplace\UglyToad.PdfPig.Fonts.dll
+.tmp\agent-host-marketplace\UglyToad.PdfPig.Package.dll
+.tmp\agent-host-marketplace\UglyToad.PdfPig.Tokenization.dll
+.tmp\agent-host-marketplace\UglyToad.PdfPig.Tokens.dll
+.tmp\agent-host-marketplace\XTerm.NET.dll
+.tmp\agent-host-marketplace-check
+.tmp\agent-host-marketplace-check\airllm
+.tmp\agent-host-marketplace-check\airllm\install.ps1
+.tmp\agent-host-marketplace-check\airllm\install.sh
+.tmp\agent-host-marketplace-check\airllm\README.md
+.tmp\agent-host-marketplace-check\airllm\requirements.txt
+.tmp\agent-host-marketplace-check\airllm\skai_airllm.py
+.tmp\agent-host-marketplace-check\diffusers
+.tmp\agent-host-marketplace-check\diffusers\requirements.txt
+.tmp\agent-host-marketplace-check\diffusers\skai_diffusers.py
+.tmp\agent-host-marketplace-check\diffusers\skai_pet_background.py
+.tmp\agent-host-marketplace-check\Porta.Pty.dll
+.tmp\agent-host-marketplace-check\runtimes
+.tmp\agent-host-marketplace-check\runtimes\linux-arm64
+.tmp\agent-host-marketplace-check\runtimes\linux-x64
+.tmp\agent-host-marketplace-check\runtimes\osx-arm64
+.tmp\agent-host-marketplace-check\runtimes\osx-x64
+.tmp\agent-host-marketplace-check\runtimes\win-arm64
+.tmp\agent-host-marketplace-check\runtimes\win-x64
+.tmp\agent-host-marketplace-check\runtimes\win-x86
+.tmp\agent-host-marketplace-check\SkaiDesktop.AgentHost.deps.json
+.tmp\agent-host-marketplace-check\SkaiDesktop.AgentHost.dll
+.tmp\agent-host-marketplace-check\SkaiDesktop.AgentHost.exe
+.tmp\agent-host-marketplace-check\SkaiDesktop.AgentHost.pdb
+.tmp\agent-host-marketplace-check\SkaiDesktop.AgentHost.runtimeconfig.json
+.tmp\agent-host-marketplace-check\SkaiDesktop.Core.deps.json
+.tmp\agent-host-marketplace-check\SkaiDesktop.Core.dll
+.tmp\agent-host-marketplace-check\SkaiDesktop.Core.pdb
+.tmp\agent-host-marketplace-check\System.Security.Cryptography.ProtectedData.dll
+.tmp\agent-host-marketplace-check\UglyToad.PdfPig.Core.dll
+.tmp\agent-host-marketplace-check\UglyToad.PdfPig.dll
+.tmp\agent-host-marketplace-check\UglyToad.PdfPig.DocumentLayoutAnalysis.dll
+.tmp\agent-host-marketplace-check\UglyToad.PdfPig.Fonts.dll
+.tmp\agent-host-marketplace-check\UglyToad.PdfPig.Package.dll
+.tmp\agent-host-marketplace-check\UglyToad.PdfPig.Tokenization.dll
+.tmp\agent-host-marketplace-check\UglyToad.PdfPig.Tokens.dll
+.tmp\agent-host-marketplace-check\XTerm.NET.dll
+.tmp\agent-host-marketplace-mcp-check
+.tmp\agent-host-marketplace-mcp-check\airllm
+.tmp\agent-host-marketplace-mcp-check\airllm\install.ps1
+.tmp\agent-host-marketplace-mcp-check\airllm\install.sh
+.tmp\agent-host-marketplace-mcp-check\airllm\README.md
+.tmp\agent-host-marketplace-mcp-check\airllm\requirements.txt
+.tmp\agent-host-marketplace-mcp-check\airllm\skai_airllm.py
+.tmp\agent-host-marketplace-mcp-check\diffusers
+.tmp\agent-host-marketplace-mcp-check\diffusers\requirements.txt
+.tmp\agent-host-marketplace-mcp-check\diffusers\skai_diffusers.py
+.tmp\agent-host-marketplace-mcp-check\diffusers\skai_pet_background.py
+.tmp\agent-host-marketplace-mcp-check\Porta.Pty.dll
+.tmp\agent-host-marketplace-mcp-check\runtimes
+.tmp\agent-host-marketplace-mcp-check\runtimes\linux-arm64
+.tmp\agent-host-marketplace-mcp-check\runtimes\linux-x64
+.tmp\agent-host-marketplace-mcp-check\runtimes\osx-arm64
+.tmp\agent-host-marketplace-mcp-check\runtimes\osx-x64
+.tmp\agent-host-marketplace-mcp-check\runtimes\win-arm64
+.tmp\agent-host-marketplace-mcp-check\runtimes\win-x64
+.tmp\agent-host-marketplace-mcp-check\runtimes\win-x86
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.AgentHost.deps.json
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.AgentHost.dll
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.AgentHost.exe
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.AgentHost.pdb
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.AgentHost.runtimeconfig.json
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.Core.deps.json
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.Core.dll
+.tmp\agent-host-marketplace-mcp-check\SkaiDesktop.Core.pdb
+.tmp\agent-host-marketplace-mcp-check\System.Security.Cryptography.ProtectedData.dll
+.tmp\agent-host-marketplace-mcp-check\UglyToad.PdfPig.Core.dll
+.tmp\agent-host-marketplace-mcp-check\UglyToad.PdfPig.dll
+.tmp\agent-host-marketplace-mcp-check\UglyToad.PdfPig.DocumentLayoutAnalysis.dll
+.tmp\agent-host-marketplace-mcp-check\UglyToad.PdfPig.Fonts.dll
+.tmp\agent-host-marketplace-mcp-check\UglyToad.PdfPig.Package.dll
+.tmp\agent-host-marketplace-mcp-check\UglyToad.PdfPig.Tokenization.dll
+
+=== STACK DETECTION (manifest files) ===
+
+--- package-lock.json ---
+{
+  "name": "skai-desktop",
+  "version": "0.1.4",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "skai-desktop",
+      "version": "0.1.4",
+      "license": "MIT"
+    }
+  }
+}
+
+--- package.json ---
+{
+  "name": "skai-desktop",
+  "version": "0.1.4",
+  "description": "Skai Desktop — a local-first Electron workspace for chat, coding, projects, and local AI models",
+  "author": "Skai Desktop",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "start": "node scripts/start-desktop.cjs",
+    "start:desktop": "node scripts/start-desktop.cjs",
+    "build": "npm run desktop:build",
+    "open": "node scripts/open-desktop.cjs",
+    "open:desktop": "node scripts/open-desktop.cjs",
+    "check:syntax": "node --check scripts/start-desktop.cjs && node --check scripts/open-desktop.cjs && node --check scripts/check-repo-hygiene.cjs && node --check scripts/audit-release-workflow.cjs && node --check scripts/audit-future-features.cjs && node --check scripts/audit-electron-runtime.cjs && node --check scripts/audit-electron-tray.cjs && node --check scripts/audit-bridge-methods.cjs && node --check scripts/audit-local-only.cjs && node --check scripts/package-electron.cjs && node --check scripts/package-windows-installer.cjs && node --check scripts/smoke-windows-installer.cjs && node --check scripts/smoke-windows-ocr-installer.cjs && node --check scripts/smoke-windows-update-feed.cjs && node --check scripts/smoke-linux-update-feed.cjs && node --check scripts/smoke-published-update-feed.cjs && node --check scripts/smoke-electron-accessibility.cjs && node --check scripts/smoke-windows.cjs && node --check scripts/smoke-electron-artifact.cjs && node --check scripts/smoke-voice-acceptance.cjs && node --check scripts/smoke-voice-workbench.cjs && node --check scripts/smoke-chatterbox-adapter.cjs && node --check scripts/smoke-qwen3-tts.cjs && node --check scripts/validate-release-readiness.cjs && node --check scripts/smoke-electron-themes.cjs && node --check scripts/smoke-electron-overflow.cjs && node --check scripts/smoke-electron-ui-matrix.cjs && node --check scripts/smoke-task-replan.cjs && node --check scripts/smoke-agent-host.cjs && node --check scripts/smoke-agent-host-build.cjs && node --check scripts/smoke-marketplace-host.cjs && node --check scripts/smoke-comfy-live.cjs && node --check scripts/smoke-conversation-import.cjs && node --check scripts/smoke-project-browser.cjs && node --check scripts/smoke-project-terminal.cjs && node --check scripts/smoke-task-journal.cjs && node --check scripts/smoke-project-editor.cjs && node --check scripts/smoke-conversation-search.cjs && node --check scripts/smoke-conversation-metadata.cjs && node --check scripts/smoke-chat-queue.cjs && node --check scripts/smoke-memory.cjs && node --check scripts/smoke-pdf-attachment.cjs && node --check scripts/validate-release-config.cjs && node --check scripts/test-pet-wander.cjs && node --check scripts/test-linux-windowing.cjs && node --check scripts/test-update-policy.cjs && node --check apps/desktop/electron/update-policy.cjs && node --check apps/desktop/electron/update-manager.cjs && node --check scripts/test-update-manager.cjs && node --check apps/desktop/electron/agent-host-client.cjs && node --check scripts/test-agent-host-client.cjs && node --check apps/desktop/electron/main.cjs && node --check apps/desktop/electron/computer-use.cjs && node --check apps/desktop/electron/computer-use-ipc.cjs && node --check apps/desktop/electron/clipboard-ipc.cjs && node --check apps/desktop/electron/pet-window.cjs && node --check apps/desktop/electron/workspace-ipc.cjs && node --check apps/desktop/electron/pdf-ocr.cjs && node --check apps/desktop/electron/preload.cjs && node --check apps/desktop/electron/pet-wander.cjs && node --check apps/desktop/electron/linux-windowing.cjs && node --check apps/desktop/scripts/launch-electron.cjs && node --check scripts/audit-theme-tokens.cjs && node scripts/audit-theme-tokens.cjs && node --check apps/desktop/electron/theme-files.cjs && node --check scripts/theme-generate.cjs && node --check scripts/theme-community.cjs && node --check scripts/test-theme-files.cjs && node scripts/test-theme-files.cjs && node --check scripts/package-linux-appimage.cjs && node --check scripts/validate-update-metadata.cjs && node --check scripts/smoke-personas.cjs && node --check scripts/test-pet-wander.cjs && node --check apps/desktop/electron/pet-chase.cjs",
+    "test:pet": "node scripts/test-pet-wander.cjs && node scripts/test-pet-attack.cjs && node scripts/test-pet-animations.cjs",
+    "test:update-policy": "node scripts/test-update-policy.cjs && node scripts/test-update-manager.cjs",
+    "test:agent-host-client": "node scripts/test-agent-host-client.cjs",
+    "test:linux-windowing": "node scripts/test-linux-windowing.cjs",
+    "audit:future-features": "node scripts/audit-future-features.cjs",
+    "audit:electron-runtime": "node scripts/audit-electron-runtime.cjs",
+    "audit:electron-tray": "node scripts/audit-electron-tray.cjs",
+    "audit:bridge-methods": "node scripts/audit-bridge-methods.cjs",
+    "audit:local-only": "node scripts/audit-local-only.cjs",
+    "audit:theme-tokens": "node scripts/audit-theme-tokens.cjs",
+    "test:themes": "node scripts/test-theme-files.cjs",
+    "check:hygiene": "node scripts/check-repo-hygiene.cjs",
+    "check:release-config": "node scripts/validate-release-config.cjs",
+    "check:pet-assets": "node scripts/validate-pet-assets.cjs",
+    "build:motion-pets": "python scripts/build-motion-pets.py",
+    "check:motion-pet-assets": "python scripts/validate-motion-pet-assets.py",
+    "audit:release-workflow": "node scripts/audit-release-workflow.cjs",
+    "package:electron": "node scripts/package-electron.cjs",
+    "package:windows:installer": "node scripts/package-windows-installer.cjs",
+    "smoke:windows:installer": "node scripts/smoke-windows-installer.cjs",
+    "smoke:windows:ocr-installer": "node scripts/smoke-windows-ocr-installer.cjs",
+    "smoke:windows:update-feed": "node scripts/smoke-windows-update-feed.cjs",
+    "smoke:linux:update-feed": "node scripts/smoke-linux-update-feed.cjs",
+    "smoke:linux:update-feed:published": "node scripts/smoke-linux-update-feed.cjs --published-feed",
+    "smoke:published-update-feed": "node scripts/smoke-published-update-feed.cjs",
+    "smoke:electron:artifact": "node scripts/smoke-electron-artifact.cjs",
+    "smoke:voice:acceptance": "node scripts/smoke-voice-acceptance.cjs",
+    "check:syntax:voice-qwen3-tts": "node --check scripts/smoke-qwen3-tts.cjs",
+    "smoke:voice:qwen3-tts": "node scripts/smoke-qwen3-tts.cjs",
+    "smoke:voice:pocket-tts": "node scripts/smoke-pocket-tts.cjs",
+    "smoke:voice:piper": "node scripts/smoke-piper-adapter.cjs",
+    "check:syntax:voice-piper": "node --check scripts/smoke-piper-adapter.cjs",
+    "smoke:voice:kokoro": "node scripts/smoke-kokoro-adapter.cjs",
+    "check:syntax:voice-kokoro": "node --check scripts/smoke-kokoro-adapter.cjs",
+    "smoke:voice:workbench": "node scripts/smoke-voice-workbench.cjs",
+    "test:voice:activity": "node scripts/test-voice-activity.cjs",
+    "smoke:chatterbox-adapter": "node scripts/smoke-chatterbox-adapter.cjs",
+    "smoke:airllm": "node scripts/smoke-airllm.cjs",
+    "smoke:electron:accessibility": "node scripts/smoke-electron-accessibility.cjs",
+    "smoke:electron:themes": "node scripts/smoke-electron-themes.cjs",
+    "smoke:electron:overflow": "node scripts/smoke-electron-overflow.cjs",
+    "smoke:electron:ui-matrix": "node scripts/smoke-electron-ui-matrix.cjs",
+    "smoke:windows": "node scripts/smoke-windows.cjs",
+    "smoke:task-replan": "node scripts/smoke-task-replan.cjs",
+    "smoke:agent-host": "node scripts/smoke-agent-host.cjs",
+    "smoke:marketplace-host": "node scripts/smoke-marketplace-host.cjs",
+    "smoke:marketplace-real-ollama": "node scripts/smoke-marketplace-host.cjs --real-local-ollama",
+    "smoke:rea-mcp": "node scripts/smoke-rea-mcp.cjs",
+    "smoke:conversation-import": "node scripts/smoke-conversation-import.cjs",
+    "smoke:project-browser": "node scripts/smoke-project-browser.cjs",
+    "smoke:project-terminal": "node scripts/smoke-project-terminal.cjs",
+    "smoke:task-journal": "node scripts/smoke-task-journal.cjs",
+    "smoke:project-editor": "node scripts/smoke-project-editor.cjs",
+    "smoke:conversation-search": "node scripts/smoke-conversation-search.cjs",
+    "smoke:conversation-metadata": "node scripts/smoke-conversation-metadata.cjs",
+    "smoke:chat-queue": "node scripts/smoke-chat-queue.cjs",
+    "smoke:documents-only": "node scripts/smoke-documents-only.cjs",
+    "smoke:memory": "node scripts/smoke-memory.cjs",
+    "smoke:pdf-attachment": "node scripts/smoke-pdf-attachment.cjs",
+    "test": "dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj",
+    "agent-host:build": "dotnet build services/agent-host/SkaiDesktop.AgentHost.csproj",
+    "agent-host:build:smoke": "dotnet build services/agent-host/SkaiDesktop.AgentHost.csproj --configuration Debug --output .tmp/agent-host-smoke",
+    "desktop:install": "npm --prefix apps/desktop install",
+    "desktop:dev": "npm --prefix apps/desktop run dev",
+    "desktop:build": "npm --prefix apps/desktop run build",
+    "desktop:typecheck": "npm --prefix apps/desktop run typecheck",
+
+[TRUNCATED] Showing first 80 of 92 lines.
+
+=== ENTRY POINTS ===
+No common entry points found. Check 'main' or 'scripts.start' in manifest files above.
+
+=== LINTING AND FORMATTING CONFIG ===
+No linting or formatting config files found in project root.
+
+=== ENVIRONMENT VARIABLE TEMPLATES ===
+No .env.example or .env.template found. Identify required environment variables by searching the code and config for environment variable reads.
+
+=== TODO / FIXME / HACK (production code only, test dirs excluded) ===
+.tmp\bench-coder30-label\src\format-model-label.js:2: // TODO: derive a readable label from a local model identifier.
+.tmp\capability-bench-qwen27b-full\src\format-model-label.js:2: // TODO: derive a readable label from a local model identifier.
+.tmp\capability-bench-qwen27b-full\src\summarize-tasks.js:2: // TODO: summarize known statuses and median completed-task duration.
+.tmp\capability-bench-qwen3-14b\src\format-model-label.js:2: // TODO: derive a readable label from a local model identifier.
+.tmp\capability-bench-qwen3-14b\src\summarize-tasks.js:2: // TODO: summarize known statuses and median completed-task duration.
+.tmp\capability-bench-qwen3-coder-30b\src\summarize-tasks.js:2: // TODO: summarize known statuses and median completed-task duration.
+.tmp\capability-bench-qwen30b-summary\src\format-model-label.js:2: // TODO: derive a readable label from a local model identifier.
+.tmp\eval-30b-label\src\summarize-tasks.js:2: // TODO: summarize known statuses and median completed-task duration.
+native\SkaiDesktop.Core\Services\LocalProjectHealthAnalyzer.cs:3: // (TODOs, secret-looking strings, very large UI files) as a compact Markdown report.
+native\SkaiDesktop.Core\Services\LocalProjectHealthAnalyzer.cs:112: if (text.Contains("TODO", StringComparison.OrdinalIgnoreCase) || text.Contains("FIXME", StringComparison.OrdinalIgnoreCase))
+native\SkaiDesktop.Core\Services\LocalProjectHealthAnalyzer.cs:112: if (text.Contains("TODO", StringComparison.OrdinalIgnoreCase) || text.Contains("FIXME", StringComparison.OrdinalIgnoreCase))
+native\SkaiDesktop.Core\Services\LocalProjectHealthAnalyzer.cs:113: Add(findings, new("Info", "Deferred work marker", "TODO/FIXME marker found", relative));
+native\SkaiDesktop.Core\Services\LocalProjectHealthAnalyzer.cs:113: Add(findings, new("Info", "Deferred work marker", "TODO/FIXME marker found", relative));
+native\SkaiDesktop.Core.Tests\ProjectHealthTests.cs:18: await File.WriteAllTextAsync(Path.Combine(healthRoot, "Program.cs"), "// TODO: cover this path\nvar api_key=\"test\";\n");
+
+=== GIT RECENT COMMITS (last 20) ===
+3813e25b fix: route computer use through vision models
+f2650619 refine chat layout and response mode control
+f850ed21 fix: guard smart prompt rewrites
+b7481dfe Improve coding project navigation and task capacity
+59ffdad0 fix(ui): close refactor regressions and smoke checks
+f299e8e9 refactor(ui): split large renderer modules
+2adfe416 Refactor workspace workflows and document UI updates
+c4a77c91 refactor(ui): extract coding pane workspace
+c031b1cb feat(ui): make coding splits optional and improve tabs
+cbd9f13e fix(ui): keep Coding chat full width when sidebar is collapsed
+12027129 feat(ui): add Codex-style coding workspace panels
+494f2b5f fix(security): pass UI smoke inputs as CDP arguments
+3e10a1e8 docs: advance revision four review queue
+265fd97c fix(images): preserve history selection during edit
+251cfdfe feat: expand coding diff and git review workflows
+89e1e4d1 feat: refine coding inline diff workflow
+2c8f579e fix: finish project entry flow and task cancellation
+867e15e3 feat(voice): add local expressiveness controls
+0d3ac4aa test(ui): capture standalone schedule workflow
+983c67d5 fix(ui): show conversation schedule details rail
+
+=== HIGH-CHURN FILES (last 90 days, top 20) ===
+ 362 docs/GOAL_EXECUTION.md
+ 269 apps/desktop/src/styles.css
+ 269 docs/CAPABILITY_MATRIX.md
+ 179 docs/SKAI_PREMIUM_UI_PROGRESS.md
+ 145 scripts/audit-native-ui.cjs
+ 143 native/ServerRock.Native/MainPage.xaml.cs
+ 138 services/agent-host/Protocol/AgentHostLoop.cs
+ 131 apps/desktop/electron/main.cjs
+ 106 apps/desktop/src/app/useDesktopWorkspace.ts
+ 101 package.json
+ 100 docs/planning/TO_DO_NEXT.md
+  94 apps/desktop/src/app/AppRouteView.tsx
+  87 apps/desktop/src/App.tsx
+  86 docs/FUTURE_FEATURES.md
+  74 apps/desktop/src/features/chat/ChatPage.tsx
+  70 apps/desktop/shared/contracts.ts
+  69 README.md
+  67 native/ServerRock.Core.Tests/Program.cs
+  65 scripts/smoke-agent-host.cjs
+  61 apps/desktop/src/features/settings/SettingsPage.tsx
+
+=== MONOREPO SIGNALS ===
+Sub-package directory found: apps/
+Sub-package directory found: services/
+
+=== CODE METRICS ===
+Total files scanned: 2955
+Total lines of code: 262638
+
+Files by language:
+  Other: 2079
+  Python: 456
+  C#: 261
+  TypeScript/React: 69
+  TypeScript: 47
+  JavaScript: 43
+
+Top 10 largest files:
+.tmp\skai-electron-density\Skai Desktop.exe: 244229.5KB
+.tmp\skai-electron-panel-smoke\Skai Desktop.exe: 244229.5KB
+.tmp\skai-electron-r4\Skai Desktop.exe: 244229.5KB
+.tmp\skai-electron-r4-final\Skai Desktop.exe: 244229.5KB
+.tmp\skai-electron-r4-git\Skai Desktop.exe: 244229.5KB
+.tmp\skai-electron-density\resources\agent-host\SkaiDesktop.AgentHost.exe: 79859.9KB
+.tmp\skai-electron-panel-smoke\resources\agent-host\SkaiDesktop.AgentHost.exe: 79859.9KB
+.tmp\skai-electron-r4-final\resources\agent-host\SkaiDesktop.AgentHost.exe: 79859.9KB
+.tmp\skai-electron-r4-git\resources\agent-host\SkaiDesktop.AgentHost.exe: 79859.9KB
+.tmp\skai-electron-r4\resources\agent-host\SkaiDesktop.AgentHost.exe: 79859.4KB
+
+=== CI/CD PIPELINES ===
+CI/CD: GitHub Actions
+
+=== CONTAINERS & ORCHESTRATION ===
+No containerization configs detected.
+
+=== SECURITY & COMPLIANCE ===
+Security: SECURITY.md
+
+=== PERFORMANCE & TESTING ===
+No performance testing configs detected.
+
+=== SCAN COMPLETE ===

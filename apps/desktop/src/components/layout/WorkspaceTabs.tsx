@@ -15,7 +15,7 @@ function tabRunStatus(tab: WorkspaceSessionTab, tasks: DesktopTask[]) {
 
 type TabMenu = { tabId: string | null; left: number; top: number };
 
-export function WorkspaceTabs({ tabs, tasks, activeId, onSelect, onClose, onCloseMany, onReorder, onNew, canRestore = false, onRestore }: { tabs: WorkspaceSessionTab[]; tasks: DesktopTask[]; activeId: string; onSelect: (tab: WorkspaceSessionTab) => void; onClose: (id: string) => void; onCloseMany: (ids: string[]) => void; onReorder: (sourceId: string, targetId: string) => void; onNew: () => void; canRestore?: boolean; onRestore?: () => void }) {
+export function WorkspaceTabs({ tabs, tasks, activeId, onSelect, onClose, onCloseMany, onReorder, onNew, newActionLabel = "New tab", canRestore = false, onRestore }: { tabs: WorkspaceSessionTab[]; tasks: DesktopTask[]; activeId: string; onSelect: (tab: WorkspaceSessionTab) => void; onClose: (id: string) => void; onCloseMany: (ids: string[]) => void; onReorder: (sourceId: string, targetId: string) => void; onNew: () => void; newActionLabel?: string; canRestore?: boolean; onRestore?: () => void }) {
   const [menu, setMenu] = useState<TabMenu | null>(null);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -57,10 +57,10 @@ export function WorkspaceTabs({ tabs, tasks, activeId, onSelect, onClose, onClos
       <button className="workspace-tab-select" type="button" aria-current={tab.id === activeId ? "page" : undefined} title={`${tab.title}${status ? ` · ${status.label}` : ""}`} onClick={() => onSelect(tab)}><NavIcon name={tab.projectId ? "project" : "chat"} /><span>{tab.title}</span>{status && <small className={`workspace-tab-status is-${status.kind}`}>{status.label}</small>}</button>
       <button className="workspace-tab-close" type="button" aria-label={`Close ${tab.title}`} title="Close tab" onClick={() => onClose(tab.id)}><NavIcon name="close" /></button>
     </div>; })}</div>
-    <button className="workspace-tab-new" type="button" aria-label="New tab" title="New tab (Ctrl+T)" onClick={onNew}><NavIcon name="plus" /></button>
+    <button className="workspace-tab-new" type="button" aria-label={newActionLabel} title={`${newActionLabel} (Ctrl+T)`} onClick={onNew}><NavIcon name="plus" /></button>
     {menu && <div className="workspace-tab-context-menu" role="menu" aria-label="Tab actions" style={{ left: menu.left, top: menu.top }} onPointerDown={(event) => event.stopPropagation()}>
       {menu.tabId && <><button type="button" role="menuitem" onClick={() => { onClose(menu.tabId!); setMenu(null); }}>Close tab</button><button type="button" role="menuitem" disabled={tabs.length < 2} onClick={() => { onCloseMany(tabs.filter((tab) => tab.id !== menu.tabId).map((tab) => tab.id)); setMenu(null); }}>Close other tabs</button><button type="button" role="menuitem" disabled={menuTabIndex < 0 || menuTabIndex === tabs.length - 1} onClick={() => { onCloseMany(tabs.slice(menuTabIndex + 1).map((tab) => tab.id)); setMenu(null); }}>Close tabs to the right</button><div className="workspace-tab-menu-divider" />{onRestore && <button type="button" role="menuitem" disabled={!canRestore} onClick={() => { onRestore(); setMenu(null); }}>Reopen closed tab <kbd>Ctrl+Shift+T</kbd></button>}</>}
-      <button type="button" role="menuitem" onClick={() => { onNew(); setMenu(null); }}>New tab <kbd>Ctrl+T</kbd></button>
+      <button type="button" role="menuitem" onClick={() => { onNew(); setMenu(null); }}>{newActionLabel} <kbd>Ctrl+T</kbd></button>
     </div>}
   </div>;
 }

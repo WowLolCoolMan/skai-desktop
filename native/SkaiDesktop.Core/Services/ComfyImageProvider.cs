@@ -3,18 +3,20 @@
 // Depends on: HttpClient, BoundedHttpContent. Used by: the Electron Image Studio through the Agent Host.
 
 using System.Net.Http.Json;
+using System.Buffers.Binary;
 using System.Text.Json;
 using SkaiDesktop.Core.Infrastructure;
 
 namespace SkaiDesktop.Core.Services;
 
-public sealed record ComfyGeneratedImage(Uri Url, string FileName, string MediaType = "image");
+public sealed record ComfyGeneratedImage(Uri Url, string FileName, string MediaType = "image", byte[]? Content = null);
 
 /// <summary>Queues an explicitly configured workflow on a local ComfyUI server.</summary>
 public sealed class ComfyImageProvider(HttpClient? httpClient = null)
 {
     private const int MaxWorkflowCharacters = 1_000_000;
     private const int MaxPromptCharacters = 8_000;
+    private const int MaxGlbBytes = 100 * 1024 * 1024;
     private readonly HttpClient _http = httpClient ?? new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
     public async Task<IReadOnlyList<string>> DiscoverCheckpointsAsync(string endpoint, CancellationToken cancellationToken = default)
@@ -45,7 +47,7 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
             .ToArray();
     }
 
-    public async Task<IReadOnlyList<ComfyGeneratedImage>> GenerateAsync(string endpoint, string workflowTemplate, string prompt, Action<string>? progress = null, CancellationToken cancellationToken = default, string? sourceImageName = null, byte[]? sourceImage = null)
+    public async Task<IReadOnlyList<ComfyGeneratedImage>> GenerateAsync(string endpoint, string workflowTemplate, string prompt, Action<string>? progress = null, CancellationToken cancellationToken = default, string? sourceImageName = null, byte[]? sourceImage = null, bool modelOutputOnly = false)
     {
         var root = ValidateEndpoint(endpoint);
         if (string.IsNullOrWhiteSpace(prompt) || prompt.Length > MaxPromptCharacters)
@@ -115,20 +117,22 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
                     if (output.Value.ValueKind != JsonValueKind.Object) continue;
                     foreach (var resultSet in output.Value.EnumerateObject())
                     {
-                        if (resultSet.Name is not ("images" or "audio" or "videos" or "gifs") || resultSet.Value.ValueKind != JsonValueKind.Array) continue;
+                        if (resultSet.Value.ValueKind != JsonValueKind.Array) continue;
                         foreach (var result in resultSet.Value.EnumerateArray())
                         {
                             if (result.ValueKind != JsonValueKind.Object) continue;
                             var file = result.TryGetProperty("filename", out var name) ? name.GetString() : null;
                             if (string.IsNullOrWhiteSpace(file) || file.Length > 512 || file.Contains('/') || file.Contains('\\')) continue;
-                            var mediaType = ClassifyMedia(file);
-                            if (mediaType is null) continue;
+                            var mediaType = ClassifyMedia(file, modelOutputOnly);
+                            if (mediaType is null || modelOutputOnly && mediaType != "model") continue;
                             var subfolder = result.TryGetProperty("subfolder", out var sub) ? sub.GetString() ?? "" : "";
                             if (subfolder.Length > 512 || subfolder.Contains("..", StringComparison.Ordinal) || subfolder.Contains('\\')) continue;
                             var type = result.TryGetProperty("type", out var kind) ? kind.GetString() ?? "output" : "output";
                             if (type is not ("output" or "temp" or "input")) continue;
                             var query = $"view?filename={Uri.EscapeDataString(file)}&subfolder={Uri.EscapeDataString(subfolder)}&type={Uri.EscapeDataString(type)}";
-                            media.Add(new ComfyGeneratedImage(new Uri(root, query), file, mediaType));
+                            var outputUri = new Uri(root, query);
+                            var content = modelOutputOnly ? await ReadValidGlbAsync(outputUri, cancellationToken).ConfigureAwait(false) : null;
+                            media.Add(new ComfyGeneratedImage(outputUri, file, mediaType, content));
                         }
                     }
                 }
@@ -144,13 +148,39 @@ public sealed class ComfyImageProvider(HttpClient? httpClient = null)
         throw new TimeoutException("Timed out waiting for ComfyUI after 30 minutes.");
     }
 
-    private static string? ClassifyMedia(string fileName)
+    private static string? ClassifyMedia(string fileName, bool includeModel = false)
     {
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        if (includeModel && extension == ".glb") return "model";
         if (extension is ".png" or ".jpg" or ".jpeg" or ".webp" or ".gif" or ".avif") return "image";
         if (extension is ".mp4" or ".webm" or ".mov" or ".m4v") return "video";
         if (extension is ".wav" or ".mp3" or ".flac" or ".ogg" or ".opus" or ".m4a") return "audio";
         return null;
+    }
+
+    private async Task<byte[]> ReadValidGlbAsync(Uri uri, CancellationToken cancellationToken)
+    {
+        using var response = await _http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength is > MaxGlbBytes)
+            throw new InvalidDataException("ComfyUI returned a GLB larger than the 100 MB asset limit or could not serve it.");
+        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[64 * 1024];
+        while (true)
+        {
+            var read = await source.ReadAsync(chunk, cancellationToken).ConfigureAwait(false);
+            if (read == 0) break;
+            if (buffer.Length + read > MaxGlbBytes) throw new InvalidDataException("ComfyUI returned a GLB larger than the 100 MB asset limit.");
+            buffer.Write(chunk, 0, read);
+        }
+        var result = buffer.ToArray();
+        var bytes = result.AsSpan();
+        if (!(bytes.Length >= 12
+            && bytes[..4].SequenceEqual("glTF"u8)
+            && BinaryPrimitives.ReadUInt32LittleEndian(bytes[4..8]) == 2
+            && BinaryPrimitives.ReadUInt32LittleEndian(bytes[8..12]) == bytes.Length))
+            throw new InvalidDataException("ComfyUI returned a GLB file with an invalid header or declared length.");
+        return result;
     }
 
     private async Task CancelQueuedPromptAsync(Uri root, string promptId)

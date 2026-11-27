@@ -100,6 +100,59 @@ public static partial class AgentHostLoop
         });
     }
 
+    private static async Task<AgentResponse> Generate3DAssetAsync(AgentRequest request, CancellationToken cancellationToken = default)
+    {
+        var prompt = RequiredBoundedString(request, "prompt", 8_000);
+        var endpoint = RequiredLocalEndpoint(request, "endpoint", 512);
+        var workflow = RequiredBoundedString(request, "workflow", 1_000_000);
+        byte[]? sourceImage = null;
+        string? sourceImageName = null;
+        if (request.Params?.TryGetProperty("sourceImage", out var sourceValue) == true && sourceValue.ValueKind == JsonValueKind.String)
+        {
+            var encoded = sourceValue.GetString() ?? string.Empty;
+            if (encoded.Length > 8_400_000) throw new InvalidDataException("The source image exceeds the 6 MB limit.");
+            try { sourceImage = Convert.FromBase64String(encoded); }
+            catch (FormatException error) { throw new InvalidDataException("The source image encoding is invalid.", error); }
+            var mediaType = RequiredBoundedString(request, "sourceImageMediaType", 32);
+            if (!ChatAttachmentPolicy.IsAllowedImageMediaType(mediaType) || !ChatAttachmentPolicy.HasValidImageSignature(mediaType, sourceImage))
+                throw new InvalidDataException("The source image must be a valid PNG or JPEG.");
+            sourceImageName = mediaType == "image/png" ? "source.png" : "source.jpg";
+        }
+        var result = await new ComfyImageProvider().GenerateAsync(
+            endpoint,
+            workflow,
+            prompt,
+            cancellationToken: cancellationToken,
+            sourceImageName: sourceImageName,
+            sourceImage: sourceImage,
+            modelOutputOnly: true).ConfigureAwait(false);
+        if (result.Count == 0) throw new InvalidOperationException("ComfyUI did not return a GLB asset.");
+        var artifacts = new List<object>();
+        var projectId = OptionalString(request, "projectId");
+        if (!string.IsNullOrWhiteSpace(projectId))
+        {
+            var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == projectId)
+                ?? throw new InvalidOperationException("The project linked to this asset is no longer available.");
+            var root = project.FolderPaths.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(root)) throw new InvalidOperationException("Select a local project folder before saving generated assets.");
+            var artifactStore = new WorkspaceGlbArtifactService();
+            foreach (var asset in result)
+            {
+                var stored = artifactStore.Save(root, $"generated-assets/skai-{Guid.NewGuid():N}.glb", asset.Content ?? throw new InvalidDataException("ComfyUI did not return the validated GLB content."));
+                artifacts.Add(new { url = asset.Url.ToString(), fileName = asset.FileName, mediaType = asset.MediaType, workspacePath = stored.RelativePath, sha256 = stored.Sha256, bytes = stored.Bytes });
+            }
+        }
+        else
+        {
+            artifacts.AddRange(result.Select(asset => new { url = asset.Url.ToString(), fileName = asset.FileName, mediaType = asset.MediaType, workspacePath = (string?)null, sha256 = (string?)null, bytes = (long?)asset.Content?.LongLength }));
+        }
+        return new(ProtocolVersion, request.Id, true, new
+        {
+            prompt,
+            assets = artifacts,
+        });
+    }
+
     private static async Task<AgentResponse> ListImageCheckpointsAsync(AgentRequest request)
     {
         var endpoint = RequiredLocalEndpoint(request, "endpoint", 512);

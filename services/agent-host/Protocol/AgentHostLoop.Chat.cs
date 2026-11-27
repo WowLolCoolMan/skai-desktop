@@ -97,7 +97,7 @@ public static partial class AgentHostLoop
                 < 65 => "Use a natural, warm conversational delivery with varied sentence rhythm.",
                 _ => "Use an expressive, lively conversational delivery with natural emphasis and varied rhythm, without sounding theatrical.",
             };
-            messages.Insert(0, new ChatMessage("system", $"This reply will be spoken aloud in a live voice conversation. Write for listening: use natural spoken phrasing, contractions where appropriate, concise paragraphs, and clear transitions. Avoid markdown formatting, headings, tables, and stage directions. Preserve accuracy and answer the user's actual request. {style}"));
+            messages.Insert(0, new ChatMessage("system", $"This reply will be spoken aloud in a live, interruptible voice conversation. Start with the useful answer immediately. Use short natural sentences, contractions, and conversational transitions. Keep each turn to one or two compact paragraphs unless the user asks for depth. Avoid markdown formatting, headings, tables, lists, stage directions, and long preambles. Leave natural points where the listener could interrupt. Preserve accuracy and answer the user's actual request. {style}"));
         }
 
         var skillIds = ReadSkillIds(request);

@@ -23,6 +23,7 @@ type WorkspaceSessionTabOptions = {
 
 export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNavigate, agentMode, setAgentModeState, setModel, setProvider, setEndpoint, setError }: WorkspaceSessionTabOptions) {
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readWorkspaceTabs);
+  const [sideChatRequest, setSideChatRequest] = useState(0);
   const [hasStoredWorkspaceTabs] = useState(readHasStoredWorkspaceTabs);
   const [workspaceSessionRestored, setWorkspaceSessionRestored] = useState(false);
   const [closedWorkspaceTabs, setClosedWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readClosedWorkspaceTabs);
@@ -57,6 +58,33 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     chat.setResponseMode(agentMode === "Coding Agent" ? "coding" : "think");
     onNavigate("chat");
   }, [agentMode, chat, onNavigate]);
+  const openNewProjectThread = useCallback((project: import("../../shared/contracts").DesktopProject) => {
+    try {
+      const preferred = JSON.parse(localStorage.getItem("skai.preferredModels.v1") ?? "{}");
+      const choice = preferred?.coding as { model?: string; provider?: string; endpoint?: string | null } | undefined;
+      if (choice?.model) {
+        setModel(choice.model);
+        if (choice.provider) setProvider(localProviderOrFallback(choice.provider));
+        if (choice.endpoint && isLocalEndpoint(choice.endpoint)) setEndpoint(choice.endpoint);
+      }
+    } catch { /* keep the current model when task preferences are unavailable */ }
+    setAgentModeState("Coding Agent");
+    localStorage.setItem("skai.agentMode", "Coding Agent");
+    chat.startNewChat();
+    chat.setResponseMode("coding");
+    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: "New coding thread", route: "coding", conversationId: null, projectId: project.id };
+    setWorkspaceTabs((current) => [...current, tab].slice(-16));
+    setActiveWorkspaceTabId(tab.id);
+    void coding.selectProject(project);
+    onNavigate("coding");
+  }, [chat, coding, onNavigate, setAgentModeState, setEndpoint, setModel, setProvider]);
+  const openSideChat = useCallback(() => {
+    if (!coding.selectedProject || route !== "coding") {
+      openNewWorkspaceTab();
+      return;
+    }
+    setSideChatRequest((current) => current + 1);
+  }, [coding.selectedProject, openNewWorkspaceTab, route]);
   const startNewChat = openNewWorkspaceTab;
   const selectWorkspaceTab = useCallback((tab: WorkspaceSessionTab) => {
     setActiveWorkspaceTabId(tab.id);
@@ -200,5 +228,5 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     const removeNewChat = bridge?.onTrayNewChat?.(() => startNewChat());
     return () => { removeConversation?.(); removeNewChat?.(); };
   }, [onNavigate, selectConversation, startNewChat]);
-  return { workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, startNewChat, selectConversation, selectWorkspaceTab, closeWorkspaceTab, closeWorkspaceTabs, reorderWorkspaceTab, restoreWorkspaceTab, openProjectTab };
+  return { workspaceTabs, activeWorkspaceTabId, canRestoreWorkspaceTab: closedWorkspaceTabs.length > 0, openNewWorkspaceTab, openNewProjectThread, openSideChat, sideChatRequest, startNewChat, selectConversation, selectWorkspaceTab, closeWorkspaceTab, closeWorkspaceTabs, reorderWorkspaceTab, restoreWorkspaceTab, openProjectTab };
 }

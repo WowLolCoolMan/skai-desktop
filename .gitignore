@@ -16,4 +16,5 @@ test-results/
 playwright-report/
 .ui-shots/
 .tmp-live-slice*/
+.voice-runtime/
 output/

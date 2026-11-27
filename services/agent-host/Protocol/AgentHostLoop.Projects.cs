@@ -175,6 +175,34 @@ public static partial class AgentHostLoop
         return new(ProtocolVersion, request.Id, true, new { projectId, taskId, check, exitCode = result.ExitCode, output = result.Output, timedOut = result.TimedOut, outputTruncated = result.OutputTruncated, isolationStatus = result.IsolationStatus, startedAtUtc = started, completedAtUtc = completed, task = updated });
     }
 
+    private static async Task<AgentResponse> RunSshRemoteCommandAsync(AgentRequest request, CancellationToken cancellationToken = default)
+    {
+        var host = RequiredBoundedString(request, "host", 253);
+        var username = RequiredBoundedString(request, "username", 65);
+        var port = OptionalInt(request, "port") ?? 22;
+        var command = RequiredBoundedString(request, "command", SshRemoteCommandRunner.MaxCommandCharacters);
+        var timeoutSeconds = OptionalInt(request, "timeoutSeconds") ?? (int)SshRemoteCommandRunner.MaxTimeout.TotalSeconds;
+        if (timeoutSeconds < 1 || timeoutSeconds > (int)SshRemoteCommandRunner.MaxTimeout.TotalSeconds)
+            throw new ArgumentOutOfRangeException("timeoutSeconds", "SSH timeout must be between 1 and 120 seconds.");
+        var result = await new SshRemoteCommandRunner().RunAsync(
+            host,
+            username,
+            port,
+            command,
+            TimeSpan.FromSeconds(timeoutSeconds),
+            cancellationToken).ConfigureAwait(false);
+        return new(ProtocolVersion, request.Id, true, new
+        {
+            target = result.Target,
+            exitCode = result.ExitCode,
+            output = result.Output,
+            timedOut = result.TimedOut,
+            outputTruncated = result.OutputTruncated,
+            hostKeyPolicy = "StrictHostKeyChecking=yes",
+            forwarding = "disabled",
+        });
+    }
+
     private static async Task<AgentResponse> StartProjectTerminalAsync(AgentRequest request)
     {
         var id = RequiredBoundedString(request, "id", 128);

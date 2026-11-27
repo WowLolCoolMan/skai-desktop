@@ -192,6 +192,7 @@ export type DesktopTask = {
   responseMode?: "think" | "coding" | "security";
   projectId?: string | null;
   conversationId?: string | null;
+  parentRunId?: string | null;
   changedFiles?: string[];
   role: string;
   status: string;

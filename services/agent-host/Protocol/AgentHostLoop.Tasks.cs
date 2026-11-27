@@ -30,6 +30,7 @@ public static partial class AgentHostLoop
                 airLlmCompatible = task.AirLlmCompatible,
                 projectId = task.ProjectId,
                 conversationId = task.ConversationId,
+                parentRunId = task.ParentRunId,
                 changedFiles = task.ChangedFiles,
                 role = task.Role,
                 status = task.Status,
@@ -76,6 +77,118 @@ public static partial class AgentHostLoop
             requiresApproval = task.RequiresApproval,
             updatedAt = task.UpdatedAtUtc,
         });
+    }
+
+    private static AgentResponse DelegateTasks(AgentRequest request)
+    {
+        var store = CreateTaskStore();
+        var parentId = RequiredBoundedString(request, "parentId", 128);
+        var parent = store.Get(parentId);
+        if (parent.Status is not (AgentTaskStatuses.Queued or AgentTaskStatuses.Running))
+            throw new InvalidOperationException("Delegation requires a queued or running parent task.");
+
+        if (request.Params?.TryGetProperty("workers", out var workers) != true || workers.ValueKind != JsonValueKind.Array)
+            throw new ArgumentException("The workers field must be an array.");
+        var children = CreateDelegatedWorkers(parent, workers);
+
+        foreach (var child in children)
+        {
+            EnsureTaskJournal(child);
+            AppendTaskJournalEvent(child, "task.delegated", new Dictionary<string, string> { ["parentTaskId"] = parent.Id });
+        }
+
+        AppendTaskJournalEvent(parent, "task.delegation_created", new Dictionary<string, string> { ["childCount"] = children.Length.ToString(CultureInfo.InvariantCulture) });
+        return new(ProtocolVersion, request.Id, true, children.Select(child => new
+        {
+            id = child.Id,
+            parentId = parent.Id,
+            title = child.Title,
+            role = child.Role,
+            status = child.Status,
+        }).ToArray());
+    }
+
+    private static AgentTaskArtifact[] CreateDelegatedWorkers(AgentTaskArtifact parent, JsonElement workers)
+    {
+        if (parent.ParentRunId is not null)
+            throw new InvalidOperationException("Subagents cannot create nested subagents.");
+        if (workers.ValueKind != JsonValueKind.Array || workers.GetArrayLength() is < 1 or > 6)
+            throw new ArgumentException("A delegation request must contain between one and six workers.");
+
+        var specs = workers.EnumerateArray().Select(worker =>
+        {
+            if (worker.ValueKind != JsonValueKind.Object) throw new ArgumentException("Each worker must be an object.");
+            var title = ReadBoundedString(worker, "title", AgentTaskArtifactStore.MaxTitleCharacters);
+            var instruction = ReadBoundedString(worker, "instruction", AgentTaskArtifactStore.MaxInstructionCharacters);
+            var role = ReadOptionalBoundedString(worker, "role", AgentTaskArtifactStore.MaxRoleCharacters) ?? "subagent";
+            var model = ReadOptionalBoundedString(worker, "model", 512);
+            var modelProvider = ReadOptionalBoundedString(worker, "modelProvider", 128);
+            var modelSizeBytes = ReadOptionalPositiveInt64(worker, "modelSizeBytes");
+            var modelContextLength = ReadOptionalPositiveInt32(worker, "modelContextLength");
+            var airLlmCompatible = worker.TryGetProperty("airLlmCompatible", out var airLlmValue)
+                ? airLlmValue.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? airLlmValue.GetBoolean()
+                    : throw new ArgumentException("The airLlmCompatible field must be a boolean.")
+                : parent.AirLlmCompatible;
+            return (title, instruction, role, model, modelProvider, modelSizeBytes, modelContextLength, airLlmCompatible);
+        }).ToArray();
+
+        var store = CreateTaskStore();
+        var existingTasks = store.Load();
+        if (existingTasks.Count + specs.Length > AgentTaskArtifactStore.MaxTasks)
+            throw new InvalidOperationException($"Delegation would exceed the {AgentTaskArtifactStore.MaxTasks} task limit.");
+        if (existingTasks.Count(task => task.ParentRunId == parent.Id) + specs.Length > 6)
+            throw new InvalidOperationException("A parent task can have at most six delegated workers.");
+
+        return specs.Select(spec => store.Create(
+            spec.title,
+            spec.instruction,
+            role: spec.role,
+            parentRunId: parent.Id,
+            projectId: parent.ProjectId,
+            conversationId: parent.ConversationId,
+            responseMode: parent.ResponseMode,
+            model: spec.model ?? parent.Model,
+            modelProvider: spec.modelProvider ?? parent.ModelProvider,
+            modelSizeBytes: spec.modelSizeBytes ?? parent.ModelSizeBytes,
+            modelContextLength: spec.modelContextLength ?? parent.ModelContextLength,
+            airLlmCompatible: spec.airLlmCompatible)).ToArray();
+    }
+
+    private static string ReadBoundedString(JsonElement element, string property, int maxCharacters)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind != JsonValueKind.String)
+            throw new ArgumentException($"The {property} field is required.");
+        var text = value.GetString()?.Trim();
+        if (string.IsNullOrWhiteSpace(text) || text.Length > maxCharacters)
+            throw new ArgumentException($"The {property} field must contain 1 to {maxCharacters} characters.");
+        return text;
+    }
+
+    private static string? ReadOptionalBoundedString(JsonElement element, string property, int maxCharacters)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind == JsonValueKind.Null) return null;
+        if (value.ValueKind != JsonValueKind.String) throw new ArgumentException($"The {property} field must be a string.");
+        var text = value.GetString()?.Trim();
+        if (string.IsNullOrEmpty(text)) return null;
+        if (text.Length > maxCharacters) throw new ArgumentException($"The {property} field cannot exceed {maxCharacters} characters.");
+        return text;
+    }
+
+    private static long? ReadOptionalPositiveInt64(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind == JsonValueKind.Null) return null;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var number) || number <= 0)
+            throw new ArgumentException($"The {property} field must be a positive integer.");
+        return number;
+    }
+
+    private static int? ReadOptionalPositiveInt32(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind == JsonValueKind.Null) return null;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out var number) || number <= 0)
+            throw new ArgumentException($"The {property} field must be a positive integer.");
+        return number;
     }
 
     private static AgentResponse StartTaskExecution(AgentRequest request)
@@ -128,7 +241,27 @@ public static partial class AgentHostLoop
                 return;
             }
             lock (ActiveTaskExecutionsGate) execution.Started = true;
-            await ExecuteLocalModelTaskAsync(taskId, execution.Cancellation.Token).ConfigureAwait(false);
+            await ExecuteLocalModelTaskAsync(taskId, execution.Cancellation.Token, async (waitForDelegates, token) =>
+            {
+                if (acquired)
+                {
+                    lock (LocalExecutionGate)
+                    {
+                        LocalAdmittedTaskCount = Math.Max(0, LocalAdmittedTaskCount - 1);
+                        acquired = false;
+                        Monitor.PulseAll(LocalExecutionGate);
+                    }
+                }
+                try { await waitForDelegates().ConfigureAwait(false); }
+                finally
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        await WaitForLocalExecutionCapacityAsync(task, token).ConfigureAwait(false);
+                        acquired = true;
+                    }
+                }
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (execution.Cancellation.IsCancellationRequested)
         {
@@ -204,11 +337,13 @@ public static partial class AgentHostLoop
         return result;
     }
 
-    private static async Task ExecuteLocalModelTaskAsync(string taskId, CancellationToken cancellationToken)
+    private static async Task ExecuteLocalModelTaskAsync(string taskId, CancellationToken cancellationToken, Func<Func<Task>, CancellationToken, Task> yieldCapacity)
     {
         var settings = CreateSettingsStore().Load();
         var executor = new AgentTaskExecutor(CreateTaskStore());
         var journalTask = CreateTaskStore().Get(taskId);
+        if (!string.IsNullOrWhiteSpace(journalTask.Model)) settings.Model = journalTask.Model;
+        if (!string.IsNullOrWhiteSpace(journalTask.ModelProvider)) settings.ModelProvider = journalTask.ModelProvider;
         SetTaskJournalStatus(journalTask, AgentTaskStatuses.Running);
         AppendTaskJournalEvent(journalTask, "task.execution_started");
         var finalTask = await executor.ExecuteAsync(taskId, async (task, cancellationToken) =>
@@ -228,7 +363,11 @@ public static partial class AgentHostLoop
                 : WorkspaceFileContext.EnumerateTextFileBrowser(project.FolderPaths).Files;
             var system = project is null
                 ? "You are Skai's local coding agent. Work only from the user's prompt; do not claim file edits or commands. Return exactly one JSON object: {\"action\":\"done\",\"summary\":\"...\"}."
-                : $"You are Skai's local coding agent. Use the available file and command tools; for Ollama, call the named tools directly. Use exactly one tool per turn. If the model endpoint does not return a native tool call, return the same action as one JSON object. First inspect the relevant source, tests, and project instructions with read_file. Before editing, derive a short checklist from the acceptance requirements and preserve details explicitly required by tests (including digits, suffixes, and meaningful name tokens). Make a focused implementation, then run the requested verification. On failure, compare each exact expected/actual value and fix only the failing behavior; rerun verification after the fix. Keep earlier passing behavior. Use replace_text for small unique edits with the latest SHA-256; write_file is for new files or a necessary complete rewrite. Do not use commands to inspect or edit files. Commands run in the selected project folder with a two-minute timeout. You may make at most {MaxCodingActions} file or command actions and at most {MaxCodingCommands} commands. Never claim an action before its result returns; if a check still fails at the limit, report it honestly.";
+                : $"You are Skai's local coding agent. Use the available file, command, and configured 3D asset tools; for Ollama, call the named tools directly. Use exactly one tool per turn. If the model endpoint does not return a native tool call, return the same action as one JSON object. First inspect the relevant source, tests, and project instructions with read_file. Before editing, derive a short checklist from the acceptance requirements and preserve details explicitly required by tests (including digits, suffixes, and meaningful name tokens). Make a focused implementation, then run the requested verification. On failure, compare each exact expected/actual value and fix only the failing behavior; rerun verification after the fix. Keep earlier passing behavior. Use replace_text for small unique edits with the latest SHA-256; write_file is for new files or a necessary complete rewrite. Do not use commands to inspect or edit files. Commands run in the selected project folder with a two-minute timeout. You may make at most {MaxCodingActions} file or command actions and at most {MaxCodingCommands} commands. Never claim an action before its result returns; if a check still fails at the limit, report it honestly.";
+            if (project is not null && task.ParentRunId is null)
+                system += " You may delegate independent, bounded parts of this task to up to six subagents with delegate_workers. Each worker gets a separate task context and may use an explicit model override; wait for all workers to finish, inspect their summaries, then integrate and verify their work. A worker cannot delegate again.";
+            if (project is not null && !string.IsNullOrWhiteSpace(settings.ImageWorkflow))
+                system += " A local ComfyUI workflow is configured; when the user's task asks you to create a 3D asset, you may return {\"action\":\"generate_3d\",\"prompt\":\"...\"}. This saves a validated GLB in the project and returns its workspacePath. If the user also asks for rigging, use that path with the rig_3d action.";
             var messages = new List<ChatMessage>
             {
                 new("system", system),
@@ -238,7 +377,7 @@ public static partial class AgentHostLoop
             var ollamaMessages = useNativeOllamaTools
                 ? new List<OllamaToolChatMessage> { new("system", system), new("user", messages[1].Content) }
                 : null;
-            var codingTools = useNativeOllamaTools ? CreateCodingTools() : null;
+            var codingTools = useNativeOllamaTools ? CreateCodingTools(task.ParentRunId is null) : null;
             string? summary = null;
             for (var step = 0; step <= MaxCodingActions; step++)
             {
@@ -278,7 +417,7 @@ public static partial class AgentHostLoop
                         codingTools = null;
                         if (!string.IsNullOrWhiteSpace(toolResponse.Content))
                             messages.Add(new ChatMessage("assistant", toolResponse.Content.Trim()));
-                        messages.Add(new ChatMessage("user", "The Ollama model did not return exactly one native tool call. Continue using the same bounded coding actions as one JSON object per response (read_file, write_file, replace_text, run_command, or done). Do not repeat the previous response."));
+                        messages.Add(new ChatMessage("user", "The Ollama model did not return exactly one native tool call. Continue using the same bounded coding actions as one JSON object per response (read_file, write_file, replace_text, run_command, delegate_workers when you are the manager, or done). Do not repeat the previous response."));
                     }
                 }
                 if (parsedAction is null)
@@ -459,6 +598,89 @@ public static partial class AgentHostLoop
                         messages.Add(new ChatMessage("user", $"COMMAND RESULT (exit {result.ExitCode}, timed out: {result.TimedOut}):\n{result.Output}\n\n{repairInstruction}"));
                         break;
                     }
+                    case "delegate_workers":
+                    {
+                        if (task.ParentRunId is not null) throw new InvalidOperationException("Subagents cannot create nested subagents.");
+                        var workerSpecs = action.GetProperty("workers");
+                        var children = CreateDelegatedWorkers(task, workerSpecs);
+                        foreach (var child in children)
+                        {
+                            EnsureTaskJournal(child);
+                            AppendTaskJournalEvent(child, "task.delegated", new Dictionary<string, string> { ["parentTaskId"] = task.Id });
+                        }
+                        AppendTaskJournalEvent(task, "task.delegation_created", new Dictionary<string, string> { ["childCount"] = children.Length.ToString(CultureInfo.InvariantCulture) });
+                        try
+                        {
+                            foreach (var child in children)
+                            {
+                                CreateTaskStore().Queue(child.Id);
+                                _ = StartTaskExecution(new AgentRequest(ProtocolVersion, $"delegate-{child.Id}", "tasks.execute", JsonSerializer.SerializeToElement(new { id = child.Id }, JsonOptions)));
+                            }
+                            await yieldCapacity(async () =>
+                            {
+                                while (true)
+                                {
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    var current = CreateTaskStore().Load().Where(candidate => children.Any(child => child.Id == candidate.Id)).ToArray();
+                                    if (current.Length == children.Length && current.All(candidate => candidate.Status is AgentTaskStatuses.Completed or AgentTaskStatuses.Failed or AgentTaskStatuses.Cancelled or AgentTaskStatuses.Blocked))
+                                    {
+                                        var report = current.OrderBy(candidate => candidate.CreatedAtUtc).Select(candidate => new
+                                        {
+                                            id = candidate.Id,
+                                            title = candidate.Title,
+                                            status = candidate.Status,
+                                            summary = candidate.ResultSummary,
+                                            changedFiles = candidate.ChangedFiles,
+                                            artifacts = candidate.ArtifactLabels,
+                                        }).ToArray();
+                                        messages.Add(new ChatMessage("user", $"SUBAGENT RESULTS (all workers have finished):\n{JsonSerializer.Serialize(report, JsonOptions)}\nReview the results, integrate useful work, and run the required verification before finishing."));
+                                        foreach (var worker in current)
+                                            AppendTaskJournalEvent(task, "task.worker_finished", new Dictionary<string, string> { ["workerTaskId"] = worker.Id, ["status"] = worker.Status });
+                                        return;
+                                    }
+                                    await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
+                                }
+                            }, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            foreach (var child in children)
+                            {
+                                try
+                                {
+                                    var current = CreateTaskStore().Get(child.Id);
+                                    if (current.Status is AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued)
+                                        CreateTaskStore().CancelPlanned(child.Id, "Parent manager stopped while delegated work was pending.");
+                                    else if (current.Status == AgentTaskStatuses.Running)
+                                        TransitionTask(new AgentRequest(ProtocolVersion, $"cancel-{child.Id}", "tasks.cancel", JsonSerializer.SerializeToElement(new { id = child.Id }, JsonOptions)), "cancel");
+                                }
+                                catch (Exception error) when (error is KeyNotFoundException or InvalidOperationException) { }
+                            }
+                            throw;
+                        }
+                        break;
+                    }
+                    case "generate_3d":
+                    {
+                        var assetPrompt = action.GetProperty("prompt").GetString() ?? throw new InvalidOperationException("The model omitted the 3D asset prompt.");
+                        var assetParameters = JsonSerializer.SerializeToElement(new { endpoint = settings.ComfyEndpoint, workflow = settings.ImageWorkflow, prompt = assetPrompt, projectId = task.ProjectId }, JsonOptions);
+                        var assetResponse = await Generate3DAssetAsync(new AgentRequest(ProtocolVersion, $"task-{task.Id}-asset-{step}", "asset.generate3d", assetParameters), cancellationToken).ConfigureAwait(false);
+                        if (!assetResponse.Ok) throw new InvalidOperationException(assetResponse.Error?.Message ?? "The local 3D workflow failed.");
+                        AppendTaskJournalEvent(task, "tool.generate_3d.completed", new Dictionary<string, string> { ["prompt"] = assetPrompt[..Math.Min(assetPrompt.Length, 240)] });
+                        messages.Add(new ChatMessage("user", $"3D ASSET RESULT:\n{JsonSerializer.Serialize(assetResponse.Result, JsonOptions)}"));
+                        break;
+                    }
+                    case "rig_3d":
+                    {
+                        var inputPath = action.GetProperty("inputPath").GetString() ?? throw new InvalidOperationException("The model omitted the input GLB workspace path.");
+                        var outputPath = action.TryGetProperty("outputPath", out var outputValue) && outputValue.ValueKind == JsonValueKind.String
+                            ? outputValue.GetString() ?? $"generated-assets/skai-rigged-{Guid.NewGuid():N}.glb"
+                            : $"generated-assets/skai-rigged-{Guid.NewGuid():N}.glb";
+                        var (artifact, diagnostic) = await new SkinTokensRiggingService().RigAsync(root, inputPath, outputPath, cancellationToken: cancellationToken).ConfigureAwait(false);
+                        AppendTaskJournalEvent(task, "tool.rig_3d.completed", new Dictionary<string, string> { ["inputPath"] = inputPath, ["outputPath"] = artifact.RelativePath, ["sha256"] = artifact.Sha256 });
+                        messages.Add(new ChatMessage("user", $"RIGGED GLB RESULT: {JsonSerializer.Serialize(new { path = artifact.RelativePath, sha256 = artifact.Sha256, bytes = artifact.Bytes, diagnostic }, JsonOptions)}"));
+                        break;
+                    }
                     default:
                         throw new InvalidOperationException("The local model returned an unsupported coding-agent action. Ask it again with one valid JSON action.");
                 }
@@ -500,7 +722,7 @@ public static partial class AgentHostLoop
         return normalized.Length <= 4_000 ? normalized : normalized[..4_000].TrimEnd();
     }
 
-    private static IReadOnlyList<object> CreateCodingTools()
+    private static IReadOnlyList<object> CreateCodingTools(bool includeDelegation)
     {
         static object Property(object type, string description) => new { type, description };
         static object Tool(string name, string description, Dictionary<string, object> properties, params string[] required) => new
@@ -514,8 +736,8 @@ public static partial class AgentHostLoop
             },
         };
 
-        return
-        [
+        var tools = new List<object>
+        {
             Tool("read_file", "Read a project text file before editing it.", new Dictionary<string, object>
             {
                 ["path"] = Property("string", "Workspace-relative file path."),
@@ -538,11 +760,46 @@ public static partial class AgentHostLoop
                 ["command"] = Property("string", "Command to execute."),
                 ["cwd"] = Property("string", "Workspace-relative working directory, usually ."),
             }, "command"),
+            Tool("delegate_workers", "Delegate one to six independent project tasks to isolated subagent contexts, wait for all of them, then review their results.", new Dictionary<string, object>
+            {
+                ["workers"] = new
+                {
+                    type = "array",
+                    minItems = 1,
+                    maxItems = 6,
+                    items = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["title"] = Property("string", "Short task title."),
+                            ["instruction"] = Property("string", "Focused, independently executable task instruction."),
+                            ["role"] = Property("string", "Worker role, such as researcher, implementer, or reviewer."),
+                            ["model"] = Property("string", "Optional runtime model override; omitted workers inherit the manager model."),
+                            ["modelProvider"] = Property("string", "Optional provider override for the worker."),
+                            ["modelSizeBytes"] = Property("integer", "Optional estimated model weight size in bytes."),
+                            ["modelContextLength"] = Property("integer", "Optional context window length."),
+                        },
+                        required = new[] { "title", "instruction" },
+                    },
+                },
+            }, "workers"),
+            Tool("generate_3d", "Generate a textured GLB through the configured local ComfyUI workflow.", new Dictionary<string, object>
+            {
+                ["prompt"] = Property("string", "Description of the 3D asset to generate."),
+            }, "prompt"),
+            Tool("rig_3d", "Generate skeleton and skin weights for a GLB using the configured local SkinTokens CPU runtime.", new Dictionary<string, object>
+            {
+                ["inputPath"] = Property("string", "Workspace-relative GLB path returned by generate_3d."),
+                ["outputPath"] = Property("string", "New workspace-relative .glb output path."),
+            }, "inputPath"),
             Tool("done", "Finish after all requested changes and verification are complete.", new Dictionary<string, object>
             {
                 ["summary"] = Property("string", "Concise summary of changes and verification."),
             }, "summary"),
-        ];
+        };
+        if (!includeDelegation) tools.RemoveAll(tool => JsonSerializer.SerializeToElement(tool, JsonOptions).GetProperty("function").GetProperty("name").GetString() == "delegate_workers");
+        return tools;
     }
 
     private static AgentResponse TransitionTask(AgentRequest request, string operation)

@@ -10,6 +10,11 @@ public sealed class AppSettings
     public string Endpoint { get; set; } = "http://localhost:11434/v1";
     public string Model { get; set; } = "llama3.2";
     public string ModelProvider { get; set; } = "Ollama";
+    /// <summary>Optional local model assigned to delegated coding subagents.</summary>
+    public string SubagentModel { get; set; } = "";
+    public string SubagentModelProvider { get; set; } = "";
+    public long? SubagentModelSizeBytes { get; set; }
+    public int? SubagentModelContextLength { get; set; }
     /// <summary>Automatically retry a local model through AirLLM after a capacity/compatibility failure.</summary>
     public bool AirLlmAutoFallbackEnabled { get; set; } = true;
     /// <summary>Allows model repositories that require custom Python code. Off by default.</summary>

@@ -1074,14 +1074,14 @@ function createTray() { return trayController.createTray(); }
 const allowedMethods = new Set([
     "runtime.health", "models.list", "models.runtime.status", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files",
     "project.file.read", "project.preview.read", "tasks.list", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow",
-    "tasks.plan", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "image.generate.start",
+    "tasks.plan", "tasks.delegate", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "asset.generate3d", "image.generate.start",
     "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status",
     "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save",
     "conversation.metadata.save", "conversations.export", "conversations.import.preview", "conversations.import.apply", "conversation.fork", "memory.list", "memory.search",
     "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.research.force",
     "persona.draft", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add",
     "persona.source.remove", "settings.save", "profile.get", "profile.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start",
-    "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "chat.queue.list",
+    "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "project.ssh.run", "chat.queue.list",
     "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect",
     "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "workspace.attachment.extractSpreadsheet", "voice.models",
     "voice.speak", "voice.credentials.save", "voice.credentials.status", "voice.credentials.remove", "voice.stop", "voice.status", "marketplace.catalog",
@@ -1156,10 +1156,32 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true,
       preload: path.join(__dirname, "preload.cjs"),
     },
   });
   mainWindow.setMenuBarVisibility(false);
+
+  mainWindow.webContents.on("will-attach-webview", (event, webPreferences, params) => {
+    if (!isAllowedPreviewUrl(params.src || "about:blank")) {
+      event.preventDefault();
+      return;
+    }
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+    webPreferences.webviewTag = false;
+  });
+  mainWindow.webContents.on("did-attach-webview", (_event, guest) => {
+    const enforcePreviewOrigin = (event, url) => { if (!isAllowedPreviewUrl(url)) event.preventDefault(); };
+    guest.on("will-navigate", enforcePreviewOrigin);
+    guest.on("will-redirect", enforcePreviewOrigin);
+    guest.setWindowOpenHandler(() => ({ action: "deny" }));
+  });
 
   const devUrl = process.env.SKAI_DESKTOP_RENDERER_URL;
   if (devUrl) mainWindow.loadURL(devUrl);
@@ -1173,6 +1195,16 @@ function createWindow() {
   // A reload or renderer crash drops any open close prompt; let the next close ask again.
   mainWindow.webContents.on("did-start-loading", () => { closePromptOpen = false; });
   mainWindow.webContents.on("render-process-gone", () => { closePromptOpen = false; });
+}
+
+function isAllowedPreviewUrl(value) {
+  if (value === "about:blank") return true;
+  try {
+    const url = new URL(value);
+    if (!(["http:", "https:"].includes(url.protocol)) || url.username || url.password) return false;
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    return host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host);
+  } catch { return false; }
 }
 
 // --- Closing the main window -------------------------------------------------

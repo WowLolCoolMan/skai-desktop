@@ -688,6 +688,8 @@ async function main() {
           await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
           const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
+          const projectThreadButtons = await cdp.evaluate(`(() => ({ header: [...document.querySelectorAll('.coding-project-heading-actions button')].some((button) => button.textContent?.trim() === 'New thread'), sidebar: Boolean(document.querySelector('.sidebar-project-new-thread')) }))()`);
+          if (!projectThreadButtons.header || !projectThreadButtons.sidebar) throw new Error(`The active project did not expose project-scoped New thread actions in the header and sidebar: ${JSON.stringify(projectThreadButtons)}`);
           if (exerciseProjectTerminal && width === 1440 && height === 900) {
             await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
             const preflightChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const item = [...document.querySelectorAll('.overflow-menu-item')].find((entry) => entry.textContent?.trim() === 'Run preflight'); if (item) { item.click(); return true; } await new Promise((resolve) => setTimeout(resolve, 25)); } return false; })()`);
@@ -724,6 +726,14 @@ async function main() {
             const compactCodingPanels = width < 640;
             const singlePane = await cdp.evaluate(`(() => { const grid = document.querySelector('.coding-session-grid.is-chat'); const main = document.querySelector('.project-thread-panel'); const side = document.querySelector('.coding-project-browser'); const addSplit = document.querySelector('.coding-split-launcher button[aria-label="Add to split"]'); return { splitOpen: grid?.classList.contains('is-split-open') ?? true, columns: grid && getComputedStyle(grid).gridTemplateColumns, mainWidth: main?.getBoundingClientRect().width ?? 0, sideDisplay: side && getComputedStyle(side).display, addSplit: Boolean(addSplit), launcherWidth: addSplit?.getBoundingClientRect().width ?? 0, launcherText: addSplit?.textContent?.trim() ?? '' }; })()`);
             if (singlePane.splitOpen || !singlePane.addSplit || singlePane.launcherWidth < (compactCodingPanels ? 60 : 90) || singlePane.launcherText !== "Add to split" || singlePane.sideDisplay !== "none" || singlePane.mainWidth < (compactCodingPanels ? 250 : 800)) throw new Error(`A Coding Agent project should start as a full-width main chat with an optional split control: ${JSON.stringify(singlePane)}`);
+            await cdp.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true, bubbles: true })); true`);
+            const shortcutSideChatReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-pane-tab-strip.is-split-open') && document.querySelector('.coding-side-chat')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!shortcutSideChatReady) throw new Error("Ctrl+T did not open the project-scoped Side chat split.");
+            await cdp.evaluate(`(() => { const trigger = document.querySelector('button[aria-label="Add a page to the split view"]'); trigger?.click(); return Boolean(trigger); })()`);
+            const shortcutCloseSplitChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const choice = [...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((item) => item.textContent?.trim() === 'Close split view'); if (choice) { choice.click(); return true; } await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
+            if (!shortcutCloseSplitChoice) throw new Error("The split page menu did not expose Close split view after the Ctrl+T workflow.");
+            const shortcutSplitClosed = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!shortcutSplitClosed) throw new Error("Closing the Ctrl+T Side chat split did not restore the single-pane coding workspace.");
             const splitLauncher = await cdp.evaluate(`document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')?.click(); true`);
             const sideChatChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const choice = [...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((item) => item.textContent.trim() === 'Side chat'); if (choice) { choice.click(); return true; } await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
             if (!splitLauncher || !sideChatChoice) throw new Error("Could not add Side chat from the optional split control.");
@@ -882,6 +892,9 @@ async function main() {
             const splitClosed = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const grid = document.querySelector('.coding-session-grid.is-chat'); if (grid && !grid.classList.contains('is-split-open') && getComputedStyle(document.querySelector('.coding-project-browser')).display === 'none' && document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!splitClosed) throw new Error("Closing split view did not restore the full-width main chat.");
             await capturePanel("single-chat");
+            await cdp.evaluate(`document.querySelector('.sidebar-project-new-thread')?.click(); true`);
+            const projectThreadCreated = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { const active = document.querySelector('.workspace-tab.is-active .workspace-tab-select')?.textContent?.trim(); const project = document.querySelector('.coding-project-heading strong')?.textContent?.trim(); if (project && (active === 'New coding thread' || active === project)) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!projectThreadCreated) throw new Error("The project New thread action did not open a new coding workspace tab.");
           }
           if (exerciseTaskProgress) {
             await taskProgressServerReady;

@@ -12,6 +12,9 @@ export type DesktopWorkspace = {
   canRestoreWorkspaceTab: boolean;
   activeWorkspaceTabId: string;
   openNewWorkspaceTab: () => void;
+  openNewProjectThread: (project: import("../../shared/contracts").DesktopProject) => void;
+  openSideChat: () => void;
+  sideChatRequest: number;
   selectWorkspaceTab: (tab: WorkspaceSessionTab) => void;
   closeWorkspaceTab: (tabId: string) => void;
   closeWorkspaceTabs: (tabIds: string[]) => void;
