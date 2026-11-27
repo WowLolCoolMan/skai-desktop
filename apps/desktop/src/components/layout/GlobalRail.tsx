@@ -17,6 +17,8 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
 
 const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];
 const railOrderKey = "skai.global-rail.order.v1";
+const pinnedRoutesKey = "skai.global-rail.pinned.v1";
+const pinnableRoutes: Route[] = ["search", "onboarding", "compare", "video", "terminal", "persona-workshop", "memory", "voice-workbench", "pet-workshop"];
 
 function readRailOrder(): Route[] {
   const fallback = destinations.map((item) => item.route);
@@ -28,10 +30,18 @@ function readRailOrder(): Route[] {
   } catch { return fallback; }
 }
 
+function readPinnedRoutes(): Route[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(pinnedRoutesKey) ?? "[]") as unknown;
+    return Array.isArray(value) ? value.filter((item): item is Route => pinnableRoutes.includes(item as Route)).filter((route, index, items) => items.indexOf(route) === index) : [];
+  } catch { return []; }
+}
+
 export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: DesktopTask[]; onNavigate: (route: Route) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [customizeRail, setCustomizeRail] = useState(false);
   const [railOrder, setRailOrder] = useState<Route[]>(readRailOrder);
+  const [pinnedRoutes, setPinnedRoutes] = useState<Route[]>(readPinnedRoutes);
   const [showPetWorkshop, setShowPetWorkshop] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
   const [query, setQuery] = useState("");
   const [lastActivityVisit, setLastActivityVisit] = useState(() => Number(localStorage.getItem("skai.workspace-activity.last-visit.v1") ?? 0));
@@ -57,6 +67,7 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
     localStorage.setItem("skai.extras.recent", JSON.stringify(recentRoutes));
   }, [recentRoutes]);
   useEffect(() => { localStorage.setItem(railOrderKey, JSON.stringify(railOrder)); }, [railOrder]);
+  useEffect(() => { localStorage.setItem(pinnedRoutesKey, JSON.stringify(pinnedRoutes)); }, [pinnedRoutes]);
   useEffect(() => {
     if (!menuOpen) return;
     const closeOutside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
@@ -80,7 +91,10 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
     ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pets", icon: "sparkle" as NavIconName, description: "Customize your desktop companion", unavailable: false }] : []),
   ], [lastActivityVisit, showPetWorkshop, tasks]);
   const filteredItems = menuItems.filter((item) => !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase()));
-  const orderedDestinations = railOrder.map((itemRoute) => destinations.find((item) => item.route === itemRoute)).filter((item): item is (typeof destinations)[number] => Boolean(item));
+  const pinnedDestinations = pinnedRoutes.map((itemRoute) => menuItems.find((item) => item.route === itemRoute)).filter((item): item is (typeof menuItems)[number] => Boolean(item));
+  const railDestinations = [...destinations, ...pinnedDestinations];
+  const railRoutes = railDestinations.map((item) => item.route);
+  const orderedDestinations = [...railOrder.filter((itemRoute) => railRoutes.includes(itemRoute)), ...railRoutes.filter((itemRoute) => !railOrder.includes(itemRoute))].map((itemRoute) => railDestinations.find((item) => item.route === itemRoute)).filter((item): item is (typeof railDestinations)[number] => Boolean(item));
   const moveRailRoute = (targetRoute: Route) => {
     const sourceRoute = draggedRailRouteRef.current;
     draggedRailRouteRef.current = null;
@@ -90,6 +104,13 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
       const targetIndex = Math.max(0, next.indexOf(targetRoute));
       next.splice(targetIndex, 0, sourceRoute);
       return next;
+    });
+  };
+  const togglePinned = (itemRoute: Route) => {
+    setPinnedRoutes((current) => {
+      const isPinned = current.includes(itemRoute);
+      setRailOrder((order) => isPinned ? order.filter((route) => route !== itemRoute) : [...order.filter((route) => route !== itemRoute), itemRoute]);
+      return isPinned ? current.filter((route) => route !== itemRoute) : [...current, itemRoute];
     });
   };
   const openExtra = (itemRoute: Route) => {
@@ -113,7 +134,7 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
           {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search extras" aria-label="Search extras" /></label>}
           {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PICK UP WHERE YOU LEFT OFF</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
           <div className="global-rail-extras-group"><p className="global-rail-extras-label">FEATURES</p>
-          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching tools.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.description}</small></span>{item.attention ? <span className="global-rail-extra-status">{item.attention} new</span> : item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
+          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching tools.</p> : filteredItems.map((item) => <div className="global-rail-extra-row" key={item.route}><button className="global-rail-extra" type="button" onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.description}</small></span>{item.attention ? <span className="global-rail-extra-status">{item.attention} new</span> : item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button><button type="button" className={`global-rail-pin-toggle${pinnedRoutes.includes(item.route) ? " is-pinned" : ""}`} aria-pressed={pinnedRoutes.includes(item.route)} aria-label={pinnedRoutes.includes(item.route) ? `Unpin ${item.label} from rail` : `Pin ${item.label} to rail`} title={pinnedRoutes.includes(item.route) ? "Unpin from rail" : "Pin to rail"} onClick={() => togglePinned(item.route)}>★</button></div>)}
           </div>
         </section>}
       </div>
