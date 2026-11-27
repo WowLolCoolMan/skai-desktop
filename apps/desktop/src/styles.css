@@ -836,14 +836,23 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .coding-task-worktree strong { color: var(--skai-color-text); font-size: var(--skai-text-2xs); }
 .coding-task-worktree code { color: var(--skai-color-accent-text); font-family: var(--skai-font-mono); font-size: var(--skai-text-2xs); }
 .coding-task-worktree small { overflow-wrap: anywhere; }
-.coding-task-steering, .coding-task-follow-ups { padding-top: 5px; border-top: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
-.coding-task-steering summary, .coding-task-follow-ups summary { cursor: pointer; color: var(--skai-color-text); }
+.coding-task-steering, .coding-task-follow-ups, .coding-task-delegation { padding-top: 5px; border-top: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.coding-task-steering summary, .coding-task-follow-ups summary, .coding-task-delegation summary { cursor: pointer; color: var(--skai-color-text); }
 .coding-task-steering form { display: grid; gap: 6px; margin-top: 7px; }
 .coding-task-steering textarea { width: 100%; min-height: 54px; resize: vertical; padding: 7px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; font-size: var(--skai-text-2xs); }
 .coding-task-steering form > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .coding-task-steering form small { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
 .coding-task-follow-ups ol { display: grid; gap: 5px; margin: 7px 0 0; padding-left: 18px; }
 .coding-task-follow-ups li { color: var(--skai-color-text-muted); overflow-wrap: anywhere; }
+.coding-task-delegation > p { margin: 7px 0; line-height: 1.45; }
+.coding-task-delegation form { display: grid; gap: 8px; margin-top: 8px; }
+.coding-task-delegation-worker { display: grid; gap: 7px; min-width: 0; margin: 0; padding: 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); }
+.coding-task-delegation-worker legend { padding: 0 5px; color: var(--skai-color-text); font-size: var(--skai-text-2xs); }
+.coding-task-delegation-worker label { display: grid; gap: 4px; color: var(--skai-color-text-muted); }
+.coding-task-delegation-worker input, .coding-task-delegation-worker textarea, .coding-task-delegation-worker select { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; font-size: var(--skai-text-2xs); }
+.coding-task-delegation-worker textarea { resize: vertical; }
+.coding-task-delegation-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px; }
+.coding-task-delegation-error { margin: 0; color: var(--skai-color-danger); }
 .coding-task-next-step strong, .coding-task-verification-summary strong { color: var(--skai-color-text); font-size: var(--skai-text-2xs); }
 .coding-task-next-step span, .coding-task-verification-summary > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.4; }
 .coding-task-next-step.is-attention { border-color: color-mix(in srgb, var(--skai-color-danger) 38%, var(--skai-color-border)); }

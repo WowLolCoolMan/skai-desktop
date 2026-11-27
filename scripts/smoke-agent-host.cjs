@@ -612,6 +612,19 @@ async function run() {
   const persistedWorktreePlan = worktreePlanList.result?.find(task => task.id === worktreePlan.result.id);
   if (!worktreePlanList.ok || persistedWorktreePlan?.environment !== "worktree" || persistedWorktreePlan?.projectId !== project.result.id)
     throw new Error(`tasks.list did not preserve the isolated worktree plan: ${JSON.stringify(persistedWorktreePlan)}`);
+  const delegationParent = await request("tasks.plan", { title: "Manual delegation smoke", instruction: "Coordinate two independent review tasks.", environment: "local", projectId: project.result.id });
+  if (!delegationParent.ok) throw new Error(`Could not create the manual delegation parent: ${JSON.stringify(delegationParent)}`);
+  const queuedDelegationParent = await request("tasks.queue", { id: delegationParent.result.id });
+  if (!queuedDelegationParent.ok) throw new Error(`Could not queue the manual delegation parent: ${JSON.stringify(queuedDelegationParent)}`);
+  const delegatedWorkers = await request("tasks.delegate", { parentId: delegationParent.result.id, workers: [
+    { title: "Review reliability", instruction: "Inspect failure recovery behavior and report concrete findings.", role: "reviewer" },
+    { title: "Review accessibility", instruction: "Inspect keyboard and screen reader behavior and report concrete findings.", role: "verifier" },
+  ] });
+  if (!delegatedWorkers.ok || delegatedWorkers.result?.length !== 2) throw new Error(`The host did not create the requested specialist tasks: ${JSON.stringify(delegatedWorkers)}`);
+  const delegationSnapshot = await request("tasks.list");
+  const persistedWorkers = delegationSnapshot.result?.filter(task => task.parentRunId === delegationParent.result.id) ?? [];
+  if (!delegationSnapshot.ok || persistedWorkers.length !== 2 || persistedWorkers.some(task => task.status !== "proposed") || !persistedWorkers.some(task => task.role === "reviewer") || !persistedWorkers.some(task => task.role === "verifier"))
+    throw new Error(`Manual specialist tasks were not persisted as reviewable proposed work: ${JSON.stringify(persistedWorkers)}`);
   const retainedCleanWorktree = attachSmokeWorktree(worktreePlan.result.id);
   const releasedWorktree = await request("tasks.worktree.release", { id: worktreePlan.result.id });
   if (!releasedWorktree.ok || releasedWorktree.result?.worktreePath !== null || fs.existsSync(retainedCleanWorktree.worktreePath))
@@ -659,7 +672,7 @@ async function run() {
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
   await new Promise(resolve => scheduledModelServer.close(resolve));
   pendingSmokeServers.delete(scheduledModelServer);
-  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, live task steering, task cancellation, isolated-worktree planning and guarded release, scheduled automation lifecycle, and direct host lifecycle.");
+  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, live task steering, explicit specialist delegation, task cancellation, isolated-worktree planning and guarded release, scheduled automation lifecycle, and direct host lifecycle.");
 }
 
 async function stopHost() {

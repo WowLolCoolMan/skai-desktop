@@ -222,6 +222,8 @@ export type DesktopTask = {
   updatedAt: string;
 };
 
+export type DesktopTaskWorkerDraft = { title: string; instruction: string; role: string };
+
 export type DesktopProjectCheck = {
   id: string;
   label: string;
