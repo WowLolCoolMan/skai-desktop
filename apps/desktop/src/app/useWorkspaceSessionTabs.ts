@@ -205,7 +205,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     else if (restoredTab.projectId && !project) {
       setError("The project saved in this workspace tab is no longer available. Reconnect it from Projects.");
       if (shouldNavigateToWorkspace) onNavigate("projects");
-    } else if (shouldNavigateToWorkspace) onNavigate(restoredTab.route === "coding" ? "projects" : "chat");
+    } else if (route === "chat") onNavigate(restoredTab.route === "coding" ? "projects" : "chat");
     setWorkspaceSessionRestored(true);
   }, [activeWorkspaceTabId, chat.conversationId, chat.conversations, chat.conversationsLoaded, chat.selectConversation, chat.setResponseMode, chat.startNewChat, coding.projects, coding.projectsLoaded, coding.selectProject, connection, hasStoredWorkspaceTabs, onNavigate, route, workspaceSessionRestored, workspaceTabs]);
   useEffect(() => {

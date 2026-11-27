@@ -18,7 +18,7 @@ export type Tool = {
   status: string;
 };
 
-export type MarketplaceCatalogSection = "Discover" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed" | "Updates" | "Skai built-ins" | "Compatible plugins";
+export type MarketplaceCatalogSection = "Discover" | "Internet" | "Staff Picks" | "Models" | "Voices" | "MCP Servers" | "Skills" | "Plugins" | "Installed" | "Updates" | "Skai built-ins" | "Compatible plugins";
 
 export type MarketplaceEntry = {
   id: string;
@@ -32,12 +32,16 @@ export type MarketplaceEntry = {
   installed: boolean;
   tone: "success" | "neutral" | "warning";
   source: string;
+  sourceUrl?: string;
   license?: string;
   installReview?: string;
   adapter?: string;
+  remote?: boolean;
 };
 
 export type CuratedCatalogEntry = { id: string; name: string; provider: string; category: string; license: string; description: string; runtime: string; capabilities: string[]; source: string; localOnly: boolean; adapter: string; installable: boolean; installReview: string };
+
+export type InternetMarketplaceItem = { id: string; name: string; category: string; source: string; description: string; sourceUrl: string; license?: string | null; downloads?: number | null; likes?: number | null; tags: string[]; installable: boolean };
 
 export type McpConnectionStatus = {
   serverId: string;
@@ -50,6 +54,7 @@ export function createMarketplaceEntries(
   connections: McpConnectionStatus[],
   query: string,
   curated: CuratedCatalogEntry[] = [],
+  internet: InternetMarketplaceItem[] = [],
 ): MarketplaceEntry[] {
   const term = query.trim().toLowerCase();
   const skillEntries: MarketplaceEntry[] = skills.map((skill) => ({
@@ -106,17 +111,34 @@ export function createMarketplaceEntries(
     const localNpmPackage = ["local-mcp-filesystem", "local-mcp-playwright", "local-mcp-postgres"].includes(item.adapter);
     const voiceStorageKey = item.adapter === "local-voice-kokoro" ? "skai.voice.kokoroInstalled" : item.adapter === "local-voice-piper" ? "skai.voice.piperInstalled" : item.adapter === "local-voice-chatterbox" ? "skai.voice.chatterboxInstalled" : item.adapter === "local-voice-pocket-tts" ? "skai.voice.pocketTtsInstalled" : item.adapter === "local-voice-qwen3-tts" ? "skai.voice.qwen3TtsInstalled" : "skai.voice.whisperInstalled";
     const localVoiceInstalled = item.adapter?.startsWith("local-voice-") && localStorage.getItem(voiceStorageKey) === "true";
-    const statusLabel = item.adapter === "local-model-search" ? "Local model search" : item.adapter?.startsWith("local-voice-") ? "Local voice" : "Local MCP";
+    const statusLabel = item.adapter === "local-model-search" ? "Local model search" : item.adapter?.startsWith("local-voice-") ? "Local voice" : item.adapter?.startsWith("model-transform-") ? "Model transformer" : "Local MCP";
     return {
       id: `catalog:${item.id}`, kind: "Catalog", name: item.name, description: item.description,
       category: item.category, access: item.capabilities.join(" · "), status: localVoiceInstalled ? "Installed · local voice" : restrictedLicense
         ? `License review · ${item.license}`
         : `${statusLabel} · ${item.license}`,
-      availability: localVoiceInstalled ? "Ready for local speech" : item.adapter === "local-model-search" ? "Search and install local model files" : item.adapter?.startsWith("local-voice-") ? "Install isolated local speech runtime" : localNpmPackage ? "Install local package and connect" : "Connect to a running local service", installed: Boolean(localVoiceInstalled), tone: restrictedLicense && !localVoiceInstalled ? "warning" : "success", source: `${item.provider} · ${item.source}`,
+      availability: localVoiceInstalled ? "Ready for local speech" : item.adapter === "local-model-search" ? "Search and install local model files" : item.adapter?.startsWith("local-voice-") ? "Install isolated local speech runtime" : item.adapter?.startsWith("model-transform-") ? "Run against a selected local model folder" : localNpmPackage ? "Install local package and connect" : "Connect to a running local service", installed: Boolean(localVoiceInstalled), tone: restrictedLicense && !localVoiceInstalled ? "warning" : "success", source: `${item.provider} · ${item.source}`,
       license: item.license, installReview: item.installReview, adapter: item.adapter,
     };
   });
-  return [...skillEntries, ...toolEntries, ...curatedEntries].filter((entry) =>
+  const internetEntries: MarketplaceEntry[] = internet.map((item) => ({
+    id: `internet:${item.id}`,
+    kind: "Catalog",
+    name: item.name,
+    description: item.description,
+    category: item.category,
+    access: item.tags.length > 0 ? item.tags.slice(0, 8).join(" · ") : "Internet discovery",
+    status: `Online · ${item.source}`,
+    availability: item.installable ? "Available through a reviewed local adapter" : "Review source online · no Skai installer",
+    installed: false,
+    tone: "neutral",
+    source: item.source,
+    sourceUrl: item.sourceUrl,
+    license: item.license ?? undefined,
+    installReview: item.installable ? "This result has a compatible local adapter. Review the source and local resource fit before installing." : "Internet discovery only. Skai does not execute or install arbitrary remote repositories.",
+    remote: true,
+  }));
+  return [...skillEntries, ...toolEntries, ...curatedEntries, ...internetEntries].filter((entry) =>
     !term || `${entry.name} ${entry.description} ${entry.category} ${entry.access} ${entry.source}`.toLowerCase().includes(term),
   );
 }
@@ -126,6 +148,7 @@ export function filterMarketplaceEntries(
   section: MarketplaceCatalogSection,
 ): MarketplaceEntry[] {
   return entries.filter((entry) => {
+    if (section === "Internet") return entry.remote === true;
     if (section === "Voices") return entry.kind === "Catalog" && entry.category === "Voice (TTS/STT)";
     if (section === "Skills") return entry.kind === "Skills";
     if (section === "MCP Servers") return (entry.kind === "Tools" && (entry.id === "tool:rea" || /mcp/i.test(entry.category))) || (entry.kind === "Catalog" && entry.category === "MCP Servers");

@@ -147,7 +147,7 @@ export type DesktopConversation = {
   personaIds?: string[];
   isPersonaGroup?: boolean;
   airLlmCompatible?: boolean;
-  messages: Array<{ role: "user" | "assistant" | "system"; content: string; attachments?: ChatAttachment[] }>;
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string; attachments?: ChatAttachment[]; createdAtUtc?: string }>;
   projectId?: string | null;
   projectName?: string | null;
   includeProjectFilesInChat?: boolean;

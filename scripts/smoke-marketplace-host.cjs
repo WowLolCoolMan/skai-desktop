@@ -263,7 +263,12 @@ async function run() {
   const providers = catalog.result?.providers ?? [];
   if (!catalog.ok || !providers.some(provider => provider.id === "huggingface") || !providers.some(provider => provider.id === "modelscope") || !Array.isArray(catalog.result?.skills) || !Array.isArray(catalog.result?.tools)) throw new Error("marketplace.catalog did not return the provider and capability catalog.");
   const curated = catalog.result?.catalogEntries ?? [];
-  if (curated.length !== 90) throw new Error(`Expected the 90 requested curated entries, got ${curated.length}.`);
+  // Keep this contract additive: the catalog grows as new reviewed adapters
+  // land, but the original 90-entry baseline must remain intact.
+  if (curated.length < 90) throw new Error(`Expected at least the 90-entry curated baseline, got ${curated.length}.`);
+  for (const requiredId of ["heretic-transform", "obliteratus-transform", "transformers-refusal-direction"]) {
+    if (!curated.some(entry => entry.id === requiredId)) throw new Error(`The curated catalog is missing ${requiredId}.`);
+  }
   for (const entry of curated) {
     const expectedAdapter = entry.id === "filesystem-mcp"
       ? "local-mcp-filesystem"
@@ -277,13 +282,20 @@ async function run() {
       : entry.id === "qwen3-tts" ? (process.platform === "win32" && process.arch === "x64" ? "local-voice-qwen3-tts" : "none")
       : entry.id === "piper" ? "local-voice-piper"
       : entry.id === "whisper-large-v3" ? "local-voice-whisper"
+      : entry.id === "heretic-transform" ? "model-transform-heretic"
+      : entry.id === "obliteratus-transform" ? "model-transform-obliteratus"
+      : entry.id === "transformers-refusal-direction" ? "model-transform-transformers"
       : entry.category === "Coding" || entry.category === "Chat / General LLM" ? "local-model-search" : "none";
-    if (entry.localOnly !== true || entry.installable !== (expectedAdapter !== "none") || entry.adapter !== expectedAdapter) {
+    const isResearchTransform = expectedAdapter.startsWith("model-transform-");
+    const expectedInstallable = isResearchTransform
+      ? expectedAdapter === "model-transform-obliteratus" && fs.existsSync(path.join(root, ".tmp", "github-checkouts", "obliteratus"))
+      : expectedAdapter !== "none";
+    if (entry.localOnly !== true || entry.installable !== expectedInstallable || entry.adapter !== expectedAdapter) {
       throw new Error(`Marketplace adapter boundary is inconsistent for ${entry.name}.`);
     }
   }
   const backedEntries = curated.filter(entry => entry.installable === true);
-  const expectedBackedEntries = process.platform === "win32" && process.arch === "x64" ? 43 : 42;
+  const expectedBackedEntries = process.platform === "win32" && process.arch === "x64" ? 44 : 43;
   if (backedEntries.length !== expectedBackedEntries) throw new Error(`Expected ${expectedBackedEntries} entries with real local adapters; found ${backedEntries.length}.`);
   const figma = curated.find(entry => entry.id === "figma-mcp");
   if (figma?.adapter !== "local-mcp-figma" || !figma.installable

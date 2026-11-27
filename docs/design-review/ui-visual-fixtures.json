@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "captureProfile": "revision4-ui-matrix",
+  "viewport": { "width": 1440, "height": 900 },
+  "theme": "dark",
+  "fixtures": [
+    { "id": "coding-no-selected-file", "route": "coding", "state": "no selected file", "selector": ".coding-editor-empty-state", "annotation": "Compact editor placeholder keeps the coding thread and composer in the first viewport." },
+    { "id": "coding-scratchpad-open", "route": "coding", "state": "scratchpad visible", "selector": "#coding-project-scratchpad", "annotation": "Scratchpad is a secondary workspace page and must not occupy a full-width band above the thread." },
+    { "id": "coding-preview-open", "route": "coding", "state": "preview visible", "selector": "#coding-local-preview", "annotation": "Preview remains attached to the active project workspace and scrolls independently." },
+    { "id": "coding-narrow-editor", "route": "coding", "state": "narrow editor", "selector": ".coding-project-workspace", "annotation": "The file name and primary editor actions remain reachable at the minimum split width." },
+    { "id": "coding-minimum-height", "route": "coding", "state": "minimum window height", "selector": ".coding-chat-composer", "annotation": "The composer stays in view while the transcript and editor own overflow." },
+    { "id": "shared-components-states", "route": "?ui-workbench=1", "state": "error, empty, loading, disabled, focused", "selector": "[data-testid=component-workbench]", "annotation": "Shared primitive states are rendered from props in the isolated developer workbench." }
+  ],
+  "overlayTool": "node scripts/compare-ui-captures.cjs <before.png> <after.png> <overlay.png>"
+}

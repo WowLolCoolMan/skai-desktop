@@ -10,7 +10,8 @@ public sealed record ChatMessage(
     string Role,
     string Content,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<ChatAttachment>? Attachments = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<ChatSource>? Sources = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<ChatSource>? Sources = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? CreatedAtUtc = null)
 {
     /// <summary>Creates the provider payload version without local-only UI metadata.</summary>
     public ChatMessage ForModel(string content) => new(Role, content, Attachments?.ToList());

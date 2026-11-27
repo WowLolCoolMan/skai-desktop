@@ -2,21 +2,21 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { NavIcon } from "./NavIcon";
 
 export function Card({ children, className = "", ...props }: HTMLAttributes<HTMLElement> & { children: ReactNode }) {
-  return <section className={`ui-card ${className}`} {...props}>{children}</section>;
+  return <section className={`ui-card ${className}`} data-ui-component="card" {...props}>{children}</section>;
 }
 
 export function Button({ children, variant = "secondary", className = "", title, "aria-label": ariaLabel, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" }) {
-  return <button className={`ui-button ui-button-${variant} ${className}`} title={title ?? ariaLabel} aria-label={ariaLabel} {...props}>{children}</button>;
+  return <button className={`ui-button ui-button-${variant} ${className}`} data-ui-component="button" title={title ?? ariaLabel} aria-label={ariaLabel} {...props}>{children}</button>;
 }
 
 export function PageHeader({ eyebrow, title, description, actions, className = "" }: { eyebrow: string; title: string; description: string; actions?: ReactNode; className?: string }) {
-  return <header className={`page-header ${className}`}><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-description">{description}</p></div>{actions && <div className="page-actions">{actions}</div>}</header>;
+  return <header className={`page-header ${className}`} data-ui-component="page-header"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-description">{description}</p></div>{actions && <div className="page-actions">{actions}</div>}</header>;
 }
 
 export function StatusBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "danger" }) {
-  return <span className={`status-badge status-badge-${tone}`}><span className="status-badge-dot" />{children}</span>;
+  return <span className={`status-badge status-badge-${tone}`} data-ui-component="status-badge" data-tone={tone}><span className="status-badge-dot" />{children}</span>;
 }
 
 export function EmptyState({ title, description, action, visual }: { title: string; description: string; action?: ReactNode; visual?: ReactNode }) {
-  return <div className="ui-empty">{visual ? <div className="ui-empty-visual" aria-hidden="true">{visual}</div> : <div className="ui-empty-icon" aria-hidden="true"><NavIcon name="sparkle" /></div>}<strong>{title}</strong><p>{description}</p>{action}</div>;
+  return <div className="ui-empty" data-ui-component="empty-state">{visual ? <div className="ui-empty-visual" aria-hidden="true">{visual}</div> : <div className="ui-empty-icon" aria-hidden="true"><NavIcon name="sparkle" /></div>}<strong>{title}</strong><p>{description}</p>{action}</div>;
 }

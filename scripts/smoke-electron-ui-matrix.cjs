@@ -27,7 +27,8 @@ const exerciseGitReview = process.env.UI_MATRIX_EXERCISE_GIT_REVIEW === "1";
 const exerciseChatSchedule = process.env.UI_MATRIX_EXERCISE_CHAT_SCHEDULE === "1";
 const exerciseScheduledPage = process.env.UI_MATRIX_EXERCISE_SCHEDULED_PAGE === "1";
 const exerciseProjectCreate = process.env.UI_MATRIX_EXERCISE_PROJECT_CREATE === "1";
-const exerciseCodingPanels = process.env.UI_MATRIX_EXERCISE_CODING_PANELS === "1";
+const exerciseFocusLayout = process.env.UI_MATRIX_EXERCISE_FOCUS_LAYOUT === "1";
+const exerciseCodingPanels = process.env.UI_MATRIX_EXERCISE_CODING_PANELS === "1" || exerciseFocusLayout;
 const exerciseSideChat = process.env.UI_MATRIX_EXERCISE_SIDE_CHAT === "1";
 const exerciseProjectTerminal = process.env.UI_MATRIX_EXERCISE_PROJECT_TERMINAL === "1";
 const exerciseMcpReview = process.env.UI_MATRIX_EXERCISE_MCP_REVIEW === "1";
@@ -348,7 +349,9 @@ const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [960, 64
 const testedRoutes = process.env.UI_MATRIX_ROUTE ? routes.filter((route) => process.env.UI_MATRIX_ROUTE.split(",").includes(route)) : routes;
 const requestedViewport = /^(\d+)x(\d+)$/.exec(process.env.UI_MATRIX_VIEWPORT || "");
 const testedViewports = requestedViewport ? [[Number(requestedViewport[1]), Number(requestedViewport[2])]] : viewports;
-const variants = process.env.UI_MATRIX_QUICK === "1" ? [["dark", "false"]] : [["dark", "false"], ["light", "false"], ["dark", "true"], ["light", "true"]];
+const variantParts = process.env.UI_MATRIX_VARIANT?.split(",");
+const requestedVariant = variantParts?.length === 2 && ["dark", "light"].includes(variantParts[0]) && ["true", "false"].includes(variantParts[1]) ? variantParts : null;
+const variants = requestedVariant ? [[requestedVariant[0], requestedVariant[1]]] : process.env.UI_MATRIX_QUICK === "1" ? [["dark", "false"]] : [["dark", "false"], ["light", "false"], ["dark", "true"], ["light", "true"]];
 
 async function main() {
   let target;
@@ -1041,6 +1044,25 @@ async function main() {
               await assertMainChat(label);
             };
             await selectPanel("Editor");
+            if (exerciseFocusLayout && width === 1440 && height === 900) {
+              await clickButtonText(cdp, "Scratchpad", ".coding-project-browser.is-editor-panel");
+              await clickButtonText(cdp, "Preview", ".coding-project-browser.is-editor-panel");
+              const focusToggle = await cdp.evaluateWith(function () { const root = document.querySelector('.coding-project-browser.is-editor-panel'); const button = [...(root?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.trim() === 'Focus layout'); if (!button) return false; button.click(); return true; });
+              const focusedState = await cdp.evaluate(`(() => { const composer = document.querySelector('.project-thread-panel .composer-card')?.getBoundingClientRect(); const emptyEditor = document.querySelector('.coding-editor-empty-state')?.getBoundingClientRect(); return { active: document.querySelector('.coding-session-grid')?.classList.contains('is-focus-layout'), metadata: getComputedStyle(document.querySelector('.coding-project-context')).display, projectHeading: getComputedStyle(document.querySelector('.coding-project-heading')).display, projectOverview: getComputedStyle(document.querySelector('.coding-project-overview')).display, contextStrip: getComputedStyle(document.querySelector('.coding-context-strip')).display, harnessCatalog: getComputedStyle(document.querySelector('.coding-harness-adapters')).display, tree: getComputedStyle(document.querySelector('.coding-project-browser .project-file-explorer')).display, scratchpad: getComputedStyle(document.querySelector('#coding-project-scratchpad')).display, preview: getComputedStyle(document.querySelector('#coding-local-preview')).display, emptyEditorHeight: emptyEditor?.height ?? null, composerTop: composer?.top ?? null, composerBottom: composer?.bottom ?? null, viewportHeight: innerHeight, composerReachable: Boolean(composer && composer.top >= 0 && composer.bottom <= innerHeight) }; })()`);
+              if (!focusToggle || !focusedState.active || focusedState.metadata !== 'none' || focusedState.projectHeading !== 'none' || focusedState.projectOverview !== 'none' || focusedState.contextStrip !== 'none' || focusedState.harnessCatalog !== 'none' || focusedState.tree !== 'none' || focusedState.scratchpad !== 'none' || focusedState.preview !== 'none' || !focusedState.composerReachable || focusedState.emptyEditorHeight > 220) throw new Error(`Focus layout did not hide secondary UI, compact the empty editor, and keep the active composer in the viewport: ${JSON.stringify(focusedState)}`);
+              if (process.env.UI_MATRIX_CAPTURE === "1") {
+                fs.mkdirSync(captureDirectory, { recursive: true });
+                const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+                fs.writeFileSync(path.join(captureDirectory, "coding-focus-layout-1440.png"), Buffer.from(screenshot.data, "base64"));
+              }
+              await clickButtonText(cdp, "Exit focus", ".coding-project-browser.is-editor-panel");
+              const restoredState = await cdp.evaluate(`(() => ({ active: document.querySelector('.coding-session-grid')?.classList.contains('is-focus-layout'), metadata: getComputedStyle(document.querySelector('.coding-project-context')).display, tree: getComputedStyle(document.querySelector('.coding-project-browser .project-file-explorer')).display, scratchpad: getComputedStyle(document.querySelector('#coding-project-scratchpad')).display, preview: getComputedStyle(document.querySelector('#coding-local-preview')).display }))()`);
+              if (restoredState.active || restoredState.metadata === 'none' || restoredState.tree === 'none' || restoredState.scratchpad === 'none' || restoredState.preview === 'none') throw new Error(`Exiting focus layout did not restore the previous panes: ${JSON.stringify(restoredState)}`);
+              await clickButtonText(cdp, "Scratchpad", ".coding-project-browser.is-editor-panel");
+              await clickButtonText(cdp, "Preview", ".coding-project-browser.is-editor-panel");
+              console.log(`[coding-focus-layout] ${JSON.stringify({ focusedState, restoredState })}`);
+            }
+            if (exerciseFocusLayout) continue;
             const editorExplorerReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel .project-file-layout .project-file-explorer') && document.querySelector('.coding-project-browser.is-editor-panel .coding-explorer-project-files'))`);
             if (!editorExplorerReady) throw new Error("Editor did not show the project file tree on its right side.");
             await capturePanel("editor-with-files");
@@ -1052,6 +1074,7 @@ async function main() {
             if (!sideDraftWorks) throw new Error("Side chat did not accept a focused subagent instruction.");
             await capturePanel("side-chat");
             if (exerciseSideChat && width === 1440 && height === 900) {
+              console.log("[coding-side-chat] exercising isolated model-backed subagent split");
               await sideChatServerReady;
               const sideChatConfigured = await cdp.evaluateWith(async function (endpoint) {
                 const request = (method, params) => window.skaiAgent.request(method, params);
@@ -1084,16 +1107,18 @@ async function main() {
                 for (let i = 0; i < 40; i++) {
                   const panel = document.querySelector('.coding-side-chat');
                   const mainThread = document.querySelector('.project-thread-panel .chat-page.is-coding-agent');
-                  if (panel?.innerText.toLowerCase().includes("completed") && panel.innerText.includes(summary) && mainThread?.innerText.includes("Review this project structure")) return { visible: true };
+                  if (panel?.innerText.toLowerCase().includes("completed") && panel.innerText.includes(summary) && mainThread?.innerText.includes("Review this project structure")) return { visible: true, overview: getComputedStyle(document.querySelector('.coding-project-overview')).display, projectHeading: getComputedStyle(document.querySelector('.coding-project-heading')).display, projectContext: getComputedStyle(document.querySelector('.coding-project-context')).display, contextStrip: getComputedStyle(document.querySelector('.coding-context-strip')).display, harness: getComputedStyle(document.querySelector('.coding-harness-adapters')).display, split: document.querySelector('.coding-session-grid')?.classList.contains('is-split-open') };
                   await new Promise((resolve) => setTimeout(resolve, 100));
                 }
                 const response = await window.skaiAgent.request("tasks.list");
                 return { visible: false, projectId: document.querySelector('.coding-project-heading-actions select')?.value, panel: document.querySelector('.coding-side-chat')?.innerText ?? null, mainThreadFound: Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent')), mainThread: document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText?.slice(0, 240) ?? null, task: response.ok ? response.result.find((item) => item.id === taskId) ?? null : response };
               }, completedSideTask.resultSummary, sideTask.id);
-              if (!sideTaskState?.visible) throw new Error(`The completed Side chat result did not appear alongside the still-visible main Coding Agent thread: ${JSON.stringify(sideTaskState)}`);
+              if (!sideTaskState?.visible || sideTaskState.overview !== "none" || !sideTaskState.split) throw new Error(`The completed Side chat result did not appear in the Codex-style split beside the still-visible main Coding Agent thread: ${JSON.stringify(sideTaskState)}`);
+              if (sideTaskState.projectHeading !== "none" || sideTaskState.projectContext !== "none" || sideTaskState.contextStrip !== "none" || sideTaskState.harness !== "none") throw new Error(`Side chat split retained secondary project chrome: ${JSON.stringify(sideTaskState)}`);
               await capturePanel("side-chat");
               console.log(`[coding-side-chat] ${JSON.stringify({ status: completedSideTask.status, requests: sideChatRequests, changedFiles: completedSideTask.changedFiles, summary: completedSideTask.resultSummary })}`);
             }
+            if (exerciseSideChat) continue;
             await selectPanel("Editor");
             const readmeButton = await cdp.evaluate(`([...document.querySelectorAll('.coding-project-browser.is-editor-panel .project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)`);
             if (!readmeButton) throw new Error("The inline project file tree did not show the seeded README.md.");
@@ -1923,7 +1948,8 @@ async function main() {
               if (harnessCatalog?.summary?.includes('1 ready') && harnessCatalog.refreshAvailable) break;
               await sleep(200);
             };
-            if (!harnessCatalog?.available || !harnessCatalog.externalNotClaimedReady || !harnessCatalog.distinguishesNativeAndSkai || !harnessCatalog.authUnknownIsDisclosed || !harnessCatalog.refreshAvailable || !harnessCatalog.probeDisclosure || !harnessCatalog.summary.includes("contract v2")) throw new Error(`The Coding workspace did not show the versioned, honest harness capability/health catalog: ${JSON.stringify(harnessCatalog)}`);
+            if (!harnessCatalog) harnessCatalog = await cdp.evaluate(`(() => ({ available: false, page: document.querySelector(".feature-page")?.className, title: document.title, body: document.body.innerText.slice(0, 500) }))()`);
+            if (!harnessCatalog?.available || !harnessCatalog.externalNotClaimedReady || !harnessCatalog.distinguishesNativeAndSkai || !harnessCatalog.authUnknownIsDisclosed || !harnessCatalog.refreshAvailable || !harnessCatalog.probeDisclosure || !harnessCatalog.summary.includes("contract v2")) throw new Error(`The Coding workspace did not show the versioned, honest harness capability/health catalog at ${phase}: ${JSON.stringify(harnessCatalog)}`);
             await clickButtonText(cdp, "Check harness health", ".coding-harness-adapters");
             let refreshedHarnesses = false;
             for (let attempt = 0; attempt < 80; attempt += 1) {

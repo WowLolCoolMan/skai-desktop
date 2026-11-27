@@ -6,6 +6,21 @@ import { ChatMessage } from "./ChatMessage";
 const CHAT_SCROLL_KEY_PREFIX = "skai.chat.scroll.";
 const chatScrollKey = (conversationId: string | null) => `${CHAT_SCROLL_KEY_PREFIX}${conversationId ?? "new"}`;
 
+function localDayKey(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function dayLabel(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  if (localDayKey(value) === localDayKey(today.toISOString())) return "Today";
+  if (localDayKey(value) === localDayKey(yesterday.toISOString())) return "Yesterday";
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+
 type ChatMessageListProps = {
   conversationId: string | null;
   messages: Message[];
@@ -24,6 +39,9 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
   const [newActivityStartIndex, setNewActivityStartIndex] = useState<number | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const previousConversationIdRef = useRef(conversationId);
+  const lastReadMessageCountRef = useRef(messages.length);
+  const messagesCountRef = useRef(messages.length);
+  messagesCountRef.current = messages.length;
   const previousMessageCountRef = useRef(messages.length);
   const previousLatestContentRef = useRef(messages.at(-1)?.content ?? "");
   const restoreScrollPendingRef = useRef(false);
@@ -32,8 +50,12 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
 
   useEffect(() => {
     const key = chatScrollKey(conversationId);
-    return () => { localStorage.setItem(key, String(Math.max(0, Math.round(messageListRef.current?.scrollTop ?? 0)))); };
-  }, [conversationId]);
+    return () => {
+      const node = messageListRef.current;
+      const distanceFromLatest = node ? node.scrollHeight - node.scrollTop - node.clientHeight : 0;
+      localStorage.setItem(key, JSON.stringify({ top: Math.max(0, Math.round(node?.scrollTop ?? 0)), messageCount: lastReadMessageCountRef.current, wasAtLatest: distanceFromLatest < 56 }));
+    };
+  }, [conversationId, messages.length]);
 
   useEffect(() => {
     const node = messageListRef.current;
@@ -42,6 +64,7 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
       const distanceFromLatest = node.scrollHeight - node.scrollTop - node.clientHeight;
       const atLatest = distanceFromLatest < 56;
       stickToLatestRef.current = atLatest;
+      if (atLatest) lastReadMessageCountRef.current = messagesCountRef.current;
       setShowJumpToLatest(!atLatest && node.scrollHeight > node.clientHeight + 12);
       if (atLatest) { setNewOutputCount(0); setNewActivityStartIndex(null); }
     };
@@ -57,8 +80,12 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
       restoreScrollPendingRef.current = true;
       previousMessageCountRef.current = messages.length;
       previousLatestContentRef.current = latestContent;
-      setNewOutputCount(0);
-      setNewActivityStartIndex(null);
+      let saved: { messageCount?: number; wasAtLatest?: boolean } | null = null;
+      try { const raw = JSON.parse(localStorage.getItem(chatScrollKey(conversationId)) ?? "null"); if (raw && typeof raw === "object") saved = raw; } catch { /* Older builds stored only the scroll offset. */ }
+      lastReadMessageCountRef.current = saved?.messageCount ?? messages.length;
+      const unseenCount = Math.max(0, messages.length - (saved?.messageCount ?? messages.length));
+      setNewOutputCount(saved?.wasAtLatest === false ? unseenCount : 0);
+      setNewActivityStartIndex(saved?.wasAtLatest === false && unseenCount > 0 ? Math.min(saved?.messageCount ?? 0, messages.length - 1) : null);
     } else {
       const addedMessages = Math.max(0, messages.length - previousMessageCountRef.current);
       const contentChanged = latestContent !== previousLatestContentRef.current;
@@ -71,8 +98,10 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
     }
     if (conversationChanged || restoreScrollPendingRef.current) {
       restoreScrollPendingRef.current = false;
-      const saved = Number(localStorage.getItem(chatScrollKey(conversationId)) ?? "0");
-      const top = Number.isFinite(saved) ? Math.max(0, saved) : 0;
+      const raw = localStorage.getItem(chatScrollKey(conversationId)) ?? "0";
+      let savedTop: number;
+      try { const value = JSON.parse(raw) as { top?: number } | number; savedTop = typeof value === "number" ? value : Number(value.top ?? 0); } catch { savedTop = Number(raw); }
+      const top = Number.isFinite(savedTop) ? Math.max(0, savedTop) : 0;
       window.requestAnimationFrame(() => { if (messageListRef.current) messageListRef.current.scrollTop = top; });
       return;
     }
@@ -96,7 +125,12 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
   }, [conversationId, messages.length]);
 
   return <>
-    <div className="message-list" ref={messageListRef}>{messages.map((message, index) => <Fragment key={`message-${index}`}>{newActivityStartIndex === index && <div className="new-activity-divider" role="separator">New activity</div>}<ChatMessage message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={onCopy} onRetry={onRetry} onFork={onFork} onEdit={onEdit} /></Fragment>)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>
+    <div className="message-list" ref={messageListRef}>{messages.map((message, index) => {
+      const timestamp = message.createdAtUtc && Number.isFinite(Date.parse(message.createdAtUtc)) ? message.createdAtUtc : null;
+      const previousTimestamp = index > 0 ? messages[index - 1].createdAtUtc : null;
+      const dayChanged = timestamp && (!previousTimestamp || !Number.isFinite(Date.parse(previousTimestamp)) || localDayKey(timestamp) !== localDayKey(previousTimestamp));
+      return <Fragment key={`message-${index}`}>{dayChanged && <time className="chat-date-separator" dateTime={timestamp!}>{dayLabel(timestamp!)}</time>}{newActivityStartIndex === index && <div className="new-activity-divider" role="separator">New activity</div>}<ChatMessage message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={onCopy} onRetry={onRetry} onFork={onFork} onEdit={onEdit} /></Fragment>;
+    })}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>
     {showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>{newOutputCount ? `${newOutputCount} new ${newOutputCount === 1 ? "message" : "messages"} · ` : ""}Jump to latest ↓</Button></div>}
   </>;
 }

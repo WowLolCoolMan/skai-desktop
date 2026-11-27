@@ -13,6 +13,12 @@ function entryIcon(entry: MarketplaceEntry) {
     if (entry.category === "Chat / General LLM") return "model" as const;
     if (entry.category === "Voice (TTS/STT)") return "audio" as const;
     if (entry.category === "Image Generation") return "image" as const;
+    if (entry.category === "Model Transformation") return "model" as const;
+    if (entry.category === "LLM models") return "model" as const;
+    if (entry.category === "Image models") return "image" as const;
+    if (entry.category === "Voice models") return "audio" as const;
+    if (entry.category === "MCP servers") return "terminal" as const;
+    if (entry.category === "Skills") return "sparkle" as const;
   }
   return "terminal" as const;
 }
@@ -72,11 +78,12 @@ type Props = {
   onFindLocalPackage: (entry: MarketplaceEntry) => void;
   onInstallMcp: (entry: MarketplaceEntry, connectionString?: string) => void;
   onInstallVoice: (entry: MarketplaceEntry) => void;
+  onRunModelTransformer: (entry: MarketplaceEntry) => void;
   voiceBusy: boolean;
 };
 
 export function MarketplaceCatalogBrowser({
-  groups, selected, connections, busy, error, onToggleSelect, onDownloadRea, onConnectRea, onFindLocalPackage, onInstallMcp, onInstallVoice, voiceBusy,
+  groups, selected, connections, busy, error, onToggleSelect, onDownloadRea, onConnectRea, onFindLocalPackage, onInstallMcp, onInstallVoice, onRunModelTransformer, voiceBusy,
 }: Props) {
   const [postgresUser, setPostgresUser] = useState("postgres");
   const [postgresDatabase, setPostgresDatabase] = useState("postgres");
@@ -132,7 +139,7 @@ export function MarketplaceCatalogBrowser({
                             >
                               <strong>{entry.name}</strong>
                               <small>{entry.description}</small>
-                              <span>{entry.availability}</span>
+                              <span className="plugins-catalog-copy-meta"><StatusBadge tone={entry.tone}>{entry.status}</StatusBadge><em>{entry.availability}</em></span>
                             </button>
                             <Button
                               variant="ghost"
@@ -179,7 +186,7 @@ export function MarketplaceCatalogBrowser({
                           <dt>Type</dt>
                           <dd>
                             {selected.kind === "Catalog"
-                              ? selected.category === "MCP Servers" ? "Local MCP server integration" : "Self-hostable model listing"
+                              ? selected.remote ? "Internet catalog result" : selected.category === "MCP Servers" ? "Local MCP server integration" : "Self-hostable model listing"
                               : selected.kind === "Skills"
                                 ? "Reusable local skill"
                                 : "Tool integration"}
@@ -195,18 +202,25 @@ export function MarketplaceCatalogBrowser({
                         </div>
                         <div>
                           <dt>Publisher</dt>
-                          <dd>{selected.source}</dd>
+                          <dd>{selected.source}{selected.sourceUrl && <> · <a href={selected.sourceUrl} target="_blank" rel="noreferrer">Open source</a></>}</dd>
                         </div>
                         {selected.license && <div><dt>License</dt><dd>{selected.license}</dd></div>}
                       </dl>
                       {selected.kind === "Catalog" ? (
                         <div className="plugins-detail-note">
-                            <strong>{selected.adapter === "local-model-search" ? "Local model adapter" : selected.adapter?.startsWith("local-mcp-") ? "Local MCP adapter" : selected.adapter?.startsWith("local-voice-") ? "Local voice adapter" : "Not available in Skai yet"}</strong>
+                            <strong>{selected.remote ? "Online result · review before use" : selected.adapter === "local-model-search" ? "Local model adapter" : selected.adapter?.startsWith("local-mcp-") ? "Local MCP adapter" : selected.adapter?.startsWith("local-voice-") ? "Local voice adapter" : selected.adapter?.startsWith("model-transform-") ? "Local model transformation adapter" : "Not available in Skai yet"}</strong>
                           <span>{selected.installReview}{selected.adapter === "local-model-search" ? " Model files download through the selected local runtime; inference remains on this device." : ""}</span>
                           {selected.adapter === "local-model-search" && (
                             <div className="plugins-detail-actions">
                               <Button variant="primary" type="button" onClick={() => onFindLocalPackage(selected)}>
                                 Search local model packages
+                              </Button>
+                            </div>
+                          )}
+                          {selected.adapter?.startsWith("model-transform-") && (
+                            <div className="plugins-detail-actions">
+                              <Button variant="primary" type="button" disabled={busy} onClick={() => onRunModelTransformer(selected)}>
+                                {busy ? "Preparing…" : "Choose model and run locally"}
                               </Button>
                             </div>
                           )}

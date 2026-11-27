@@ -110,6 +110,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const computerStopRef = useRef(false);
   const computerApprovalResolver = useRef<((approved: boolean) => void) | null>(null);
   const draftTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const draftSelectionRef = useRef({ start: draft.length, end: draft.length });
+  const attachmentCountRef = useRef(attachments.length);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const accessMenuRef = useRef<HTMLDivElement>(null);
   const addTriggerRef = useRef<HTMLButtonElement>(null);
@@ -131,6 +133,19 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, [draft]);
+  useEffect(() => {
+    if (attachmentCountRef.current === attachments.length) return;
+    attachmentCountRef.current = attachments.length;
+    window.requestAnimationFrame(() => {
+      const textarea = draftTextareaRef.current;
+      if (!textarea) return;
+      const start = Math.min(draftSelectionRef.current.start, textarea.value.length);
+      const end = Math.min(draftSelectionRef.current.end, textarea.value.length);
+      textarea.focus({ preventScroll: true });
+      textarea.setSelectionRange(start, Math.max(start, end));
+    });
+  }, [attachments.length]);
+  const rememberDraftSelection = (textarea: HTMLTextAreaElement) => { draftSelectionRef.current = { start: textarea.selectionStart, end: textarea.selectionEnd }; };
   const commandMatches = useMemo(() => commandQuery === null ? [] : [...composerCommands, ...workflowPreferences.savedPrompts.map((prompt) => ({ id: prompt.id, label: prompt.name, detail: prompt.prompt.slice(0, 100) || "Saved prompt template", shortcut: `/${prompt.alias}`, prompt: prompt.prompt }))].filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery, workflowPreferences.savedPrompts]);
   const contextMatches = useMemo(() => {
     if (contextQuery === null) return [];
@@ -398,7 +413,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}>{editingQueueIndex === queued.index ? <div className="queued-message-edit"><textarea autoFocus value={queueEditDraft} maxLength={50_000} aria-label={`Edit queued message ${queued.index + 1}`} onChange={(event) => setQueueEditDraft(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void saveQueuedEdit(queued.index); } if (event.key === "Escape") { setEditingQueueIndex(null); setQueueEditDraft(""); } }} /><div><button type="button" disabled={queueUpdateBusy || !queueEditDraft.trim()} onClick={() => void saveQueuedEdit(queued.index)}>Save</button><button type="button" disabled={queueUpdateBusy} onClick={() => { setEditingQueueIndex(null); setQueueEditDraft(""); }}>Cancel</button></div><small>Ctrl+Enter saves · Esc cancels</small></div> : <span>{queued.text}</span>}{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<div className="queued-message-actions"><button type="button" disabled={queueUpdateBusy} title="Edit this queued prompt" onClick={() => { if (editingQueueIndex !== queued.index) { setEditingQueueIndex(queued.index); setQueueEditDraft(queued.text); } }} aria-label={`Edit queued message ${queued.index + 1}`}>Edit</button><button type="button" disabled={queued.index === 0} onClick={() => void onMoveQueued(queued.index, queued.index - 1)} aria-label={`Move queued message ${queued.index + 1} up`} title="Move up">↑</button><button type="button" disabled={queued.index === queuedMessages.length - 1} onClick={() => void onMoveQueued(queued.index, queued.index + 1)} aria-label={`Move queued message ${queued.index + 1} down`} title="Move down">↓</button><button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`} title="Remove queued message">×</button></div></div>)}</div>}
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} trustLabel="User content · local-only" />
     <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
-    <textarea ref={draftTextareaRef} value={draft} disabled={rewriteBusy} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : placeholder} aria-label={placeholder.replace(/…$/, "")} aria-controls={commandQuery !== null || contextQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : contextQuery !== null ? activeContextId : undefined} aria-autocomplete={commandQuery !== null || contextQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : contextQuery !== null ? contextMatches.length > 0 : undefined} rows={3} />
+    <textarea ref={draftTextareaRef} value={draft} disabled={rewriteBusy} onChange={(event) => { rememberDraftSelection(event.currentTarget); onDraftChange(event.target.value); }} onSelect={(event) => rememberDraftSelection(event.currentTarget)} onClick={(event) => rememberDraftSelection(event.currentTarget)} onKeyUp={(event) => rememberDraftSelection(event.currentTarget)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : placeholder} aria-label={placeholder.replace(/…$/, "")} aria-controls={commandQuery !== null || contextQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : contextQuery !== null ? activeContextId : undefined} aria-autocomplete={commandQuery !== null || contextQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : contextQuery !== null ? contextMatches.length > 0 : undefined} rows={3} />
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
     {voiceListening && whisperRecorderRef.current && <p className="composer-hint" role="status">Recording locally. Select the microphone again to transcribe, or leave it to stop automatically after five minutes.</p>}
     {audioTranscribing && <p className="composer-hint" role="status">Transcribing audio with local Whisper on this device…</p>}

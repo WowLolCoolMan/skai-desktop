@@ -46,6 +46,18 @@ public sealed partial class WebSearchProvider(HttpClient? httpClient = null)
     {
         if (string.IsNullOrWhiteSpace(query)) throw new ArgumentException("Enter a search query.", nameof(query));
         if (query.Length > 500) throw new ArgumentException("Search queries are limited to 500 characters.", nameof(query));
+        var firecrawl = new FirecrawlWebProvider(_http);
+        if (await firecrawl.IsAvailableAsync(cancellationToken).ConfigureAwait(false))
+        {
+            try
+            {
+                var firecrawlResults = await firecrawl.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+                if (firecrawlResults.Count > 0) return firecrawlResults;
+            }
+            catch (HttpRequestException) { }
+            catch (JsonException) { }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        }
         var uri = new Uri("https://html.duckduckgo.com/html/?q=" + Uri.EscapeDataString(query));
         var html = string.Empty;
         // DuckDuckGo blocks or times out on some networks. After a failure, skip it for a while

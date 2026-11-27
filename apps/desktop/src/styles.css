@@ -2474,6 +2474,8 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .plugins-heading-meta { display: flex; align-items: center; gap: 10px; padding-bottom: 5px; white-space: nowrap; }
 .plugins-topbar-actions { display: flex; align-items: center; gap: 8px; padding-bottom: 1px; }
 .plugins-search input { width: min(260px, 25vw); height: 40px; border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
+.plugins-search select { width: min(190px, 18vw); height: 40px; padding: 0 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; font-size: var(--skai-text-xs); }
+.plugins-catalog-more { display: flex; justify-content: center; padding: 4px 0 22px; }
 .plugins-catalog-notice, .plugins-start-panel, .plugins-browser { width: 100%; max-width: none; margin-inline: 0; }
 .plugins-catalog-notice { margin-top: 0; margin-bottom: 15px; }
 .plugins-start-panel { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); gap: 24px; margin-bottom: 18px; padding: 24px; border-radius: var(--skai-radius-3xl); background: radial-gradient(circle at 92% 5%, color-mix(in srgb, var(--skai-color-accent) 20%, transparent), transparent 35%), linear-gradient(135deg, color-mix(in srgb, var(--skai-color-accent) 10%, var(--skai-color-surface)), var(--skai-color-surface)); box-shadow: 0 18px 38px color-mix(in srgb, var(--skai-color-accent) 6%, transparent); }
@@ -3496,6 +3498,61 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .marketplace-model-more { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 @media (max-width: 1120px) { .marketplace-model-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .marketplace-model-card-grid { grid-template-columns: minmax(0, 1fr); }.marketplace-model-size-filters { width: 100%; justify-content: flex-start; }.marketplace-model-size-filters button { flex: 0 0 auto; }.marketplace-model-filter-bar { align-items: flex-start; flex-direction: column; } }
+
+/* Marketplace catalog finish: one scan pattern for local, curated, and internet results. */
+.app-content-marketplace .plugins-topbar { min-height: 76px; margin-bottom: 14px; padding: 16px 20px 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: color-mix(in srgb, var(--skai-color-surface) 96%, transparent); box-shadow: 0 8px 22px color-mix(in srgb, var(--skai-color-canvas) 12%, transparent); }
+.app-content-marketplace .plugins-heading-lockup { align-items: center; gap: 11px; }
+.app-content-marketplace .plugins-heading-mark { width: 36px; height: 36px; flex-basis: 36px; margin-top: 0; border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 8%, var(--skai-color-surface)); }
+.app-content-marketplace .plugins-heading-description { max-width: 760px; font-size: var(--skai-text-xs); line-height: 1.45; }
+.app-content-marketplace .plugins-topbar-actions { gap: 7px; }
+.app-content-marketplace .plugins-search input,
+.app-content-marketplace .plugins-search select { height: 36px; border-radius: var(--skai-radius-md); background: var(--skai-color-surface-raised); }
+.app-content-marketplace .plugins-browser { gap: 18px; }
+.app-content-marketplace .plugins-category { margin-bottom: 24px; }
+.app-content-marketplace .plugins-category > h3 { min-height: 24px; margin-bottom: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.app-content-marketplace .plugins-category-count { display: inline-grid; min-width: 20px; height: 20px; place-items: center; margin-left: 3px; padding-inline: 5px; border: 1px solid var(--skai-color-border); border-radius: 999px; color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-2xs); letter-spacing: 0; }
+.app-content-marketplace .plugins-category > h3 .nav-icon { margin-left: auto; opacity: .55; }
+.app-content-marketplace .plugins-category-grid { gap: 8px; }
+.app-content-marketplace .plugins-catalog-item { min-height: 104px; padding: 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease; }
+.app-content-marketplace .plugins-catalog-item:hover { transform: translateY(-1px); }
+.app-content-marketplace .plugins-catalog-item.is-selected { box-shadow: 0 8px 20px color-mix(in srgb, var(--skai-color-canvas) 16%, transparent); }
+.app-content-marketplace .plugins-catalog-copy { align-content: start; gap: 5px; }
+.app-content-marketplace .plugins-catalog-copy strong { overflow: hidden; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.app-content-marketplace .plugins-catalog-copy small { display: -webkit-box; min-height: 2.7em; line-height: 1.35; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.app-content-marketplace .plugins-catalog-copy-meta { display: flex; min-width: 0; align-items: center; gap: 7px; overflow: hidden; }
+.app-content-marketplace .plugins-catalog-copy-meta .status-badge { flex: 0 0 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-content-marketplace .plugins-catalog-copy-meta em { min-width: 0; overflow: hidden; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.app-content-marketplace .plugins-inspector { top: 12px; max-height: calc(100vh - 150px); }
+.app-content-marketplace .plugins-detail { padding: 18px; }
+.app-content-marketplace .plugins-detail-heading { align-items: center; }
+.app-content-marketplace .plugins-detail > p { font-size: var(--skai-text-sm); line-height: 1.55; }
+.app-content-marketplace .model-detail-list { gap: 0; overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); }
+.app-content-marketplace .model-detail-list > div { grid-template-columns: minmax(92px, .65fr) minmax(0, 1.35fr); gap: 12px; padding: 9px 11px; border-bottom: 1px solid var(--skai-color-border); }
+.app-content-marketplace .model-detail-list > div:last-child { border-bottom: 0; }
+.app-content-marketplace .model-detail-list dd { overflow-wrap: anywhere; }
+.app-content-marketplace .model-detail-list a { color: var(--skai-color-accent-text); }
+.app-content-marketplace .plugins-detail-note { border-radius: var(--skai-radius-lg); }
+.app-content-marketplace .plugins-catalog-more { padding: 2px 0 18px; }
+.app-content-marketplace .marketplace-remote-results { padding: 0; }
+.app-content-marketplace .marketplace-model-card { min-height: 238px; padding: 14px; border-radius: var(--skai-radius-lg); }
+.app-content-marketplace .marketplace-model-card-heading h4 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.app-content-marketplace .marketplace-model-card-actions { padding-top: 4px; border-top: 1px solid var(--skai-color-border); }
+@media (max-width: 980px) {
+  .app-content-marketplace .plugins-topbar { align-items: flex-start; padding: 14px; }
+  .app-content-marketplace .plugins-heading-meta { display: none; }
+  .app-content-marketplace .plugins-topbar-actions { width: 100%; padding-top: 2px; }
+  .app-content-marketplace .plugins-search { flex: 1 1 180px; }
+  .app-content-marketplace .plugins-search input,
+  .app-content-marketplace .plugins-search select { width: 100%; }
+}
+@media (max-width: 680px) {
+  .app-content-marketplace .plugins-topbar { position: static; min-height: 0; margin-bottom: 10px; padding: 12px; }
+  .app-content-marketplace .plugins-heading-description { display: none; }
+  .app-content-marketplace .plugins-browser { gap: 12px; }
+  .app-content-marketplace .plugins-catalog-item { min-height: 96px; }
+  .app-content-marketplace .plugins-detail { padding: 14px; }
+  .app-content-marketplace .model-detail-list > div { grid-template-columns: 1fr; gap: 3px; }
+}
 
 /* Visuals Workshop: a canvas-first workspace with a compact mode bar and prompt dock. */
 .app-content-images { padding: 8px 10px 10px; overflow: hidden; }
@@ -5174,16 +5231,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel .conversation-surface {
   overflow: hidden;
 }
-.coding-project-browser.is-empty-editor .project-file-layout { min-height: 0; }
-.coding-project-browser.is-empty-editor .file-editor-panel { min-height: 0; }
+.coding-project-browser.is-empty-editor .project-file-layout { min-height: 0; align-content: start; }
+.coding-project-browser.is-empty-editor .file-editor-panel { min-height: 0; align-self: start; }
 .coding-editor-empty-state {
   display: grid;
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   align-content: center;
   justify-items: center;
   gap: 8px;
-  padding: clamp(18px, 4vh, 36px);
+  min-height: 168px;
+  padding: 20px;
+  border: 1px dashed var(--skai-color-border);
+  border-radius: var(--skai-radius-lg);
+  background: var(--skai-color-canvas);
   color: var(--skai-color-text-muted);
   text-align: center;
 }
@@ -5345,15 +5406,28 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 1100px) { .coding-project-browser .file-editor-heading > .file-editor-heading-copy { width: 100%; } }
 /* Focus layout hides secondary UI through presentation only, so every pane's
    open state and scroll position return unchanged when focus mode ends. */
+body:has(.coding-session-grid.is-split-open) .app-content-coding .coding-project-overview { display: none !important; }
+body:has(.coding-project-browser.is-side-chat-panel) .app-content-coding .coding-project-heading,
+body:has(.coding-project-browser.is-side-chat-panel) .app-content-coding .coding-project-context,
+body:has(.coding-project-browser.is-side-chat-panel) .app-content-coding .coding-context-strip,
+body:has(.coding-project-browser.is-side-chat-panel) .app-content-coding .coding-harness-adapters,
+body:has(.coding-project-browser.is-side-chat-panel) .app-content-coding .coding-health-banner,
+body:has(.coding-project-browser.is-side-chat-panel) .app-content-coding .project-preflight { display: none !important; }
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-page > .page-header,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-session-bar,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-context,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-heading,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-overview,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-context-strip,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-harness-adapters,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-health-banner,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .project-preflight,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-scratchpad,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-local-preview,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-task-inspector,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-terminal-inspector { display: none !important; }
-body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser .project-file-explorer { display: none; }
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser .project-file-explorer { display: none !important; }
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser.is-file-explorer-hidden .project-file-layout,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser .project-file-layout { grid-template-columns: minmax(0, 1fr); }
+.message-timestamp { align-self: center; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-variant-numeric: tabular-nums; opacity: .82; }
+.chat-date-separator { display: block; width: fit-content; margin: 12px auto; padding: 4px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-xs); font-variant-numeric: tabular-nums; }

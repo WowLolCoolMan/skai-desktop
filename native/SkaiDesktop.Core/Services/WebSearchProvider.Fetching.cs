@@ -14,6 +14,18 @@ public sealed partial class WebSearchProvider
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             throw new ArgumentException("Only HTTP and HTTPS research sources are supported.", nameof(url));
+        var firecrawl = new FirecrawlWebProvider(_http);
+        if (await firecrawl.IsAvailableAsync(cancellationToken).ConfigureAwait(false))
+        {
+            try
+            {
+                var extracted = await firecrawl.FetchTextAsync(url, cancellationToken).ConfigureAwait(false);
+                if (extracted is not null) return extracted;
+            }
+            catch (HttpRequestException) { }
+            catch (JsonException) { }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        }
         if (uri.Host.Equals("youtu.be", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith("youtube.com", StringComparison.OrdinalIgnoreCase))
         {
             var transcript = await FetchYouTubeTranscriptAsync(uri, cancellationToken).ConfigureAwait(false);

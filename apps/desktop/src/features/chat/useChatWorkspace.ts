@@ -229,7 +229,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   const sendMessage = async (text: string, messageAttachments: ChatAttachment[], documentsOnly = false, speakReply = false, temporary = false) => {
     if (!isLocalEndpoint(endpoint)) { onError(LOCAL_ENDPOINT_ERROR); return; }
     stopNativeSpeech();
-    const next = [...messages, { role: "user" as const, content: text || "Attached files", attachments: messageAttachments.length ? messageAttachments : undefined }];
+    const next = [...messages, { role: "user" as const, content: text || "Attached files", createdAtUtc: new Date().toISOString(), attachments: messageAttachments.length ? messageAttachments : undefined }];
     setMessages(next); setAttachments([]); setBusy(true); onError(null);
     const savedId = temporary ? null : await saveConversation(next);
     if (mode === "Coding Agent") {
@@ -266,6 +266,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const responseModel = hasImageAttachment ? readPreferredModel("vision", model) : model;
     const progressChannel = crypto.randomUUID();
     const operationId = crypto.randomUUID();
+    const assistantCreatedAtUtc = new Date().toISOString();
     activeChatOperationId.current = operationId;
     const voiceExpressiveness = speakReply ? selectedVoiceSettings().expressiveness : undefined;
     let streamedText = "";
@@ -292,7 +293,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         speechQueue = Promise.resolve();
       }
       streamedText += delta;
-      setMessages([...next, { role: "assistant", content: streamedText }]);
+      setMessages([...next, { role: "assistant", content: streamedText, createdAtUtc: assistantCreatedAtUtc }]);
       if (speakReply && !speechCancelled) {
         const drained = takeSpeakableText((speechBuffer += delta));
         speechBuffer = drained.remaining;
@@ -318,7 +319,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       setBusy(false);
       return;
     }
-    const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
+    const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content, createdAtUtc: assistantCreatedAtUtc }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
     if (speakReply) {
       const drained = takeSpeakableText(speechBuffer, true);
@@ -401,7 +402,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: prefix, responseMode, skills: skillMentions(prefix) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
-    const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content }];
+    const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content, createdAtUtc: new Date().toISOString() }];
     setMessages(completed); await saveConversation(completed, conversationId);
     void speakNativeResponse(completed.at(-1)?.content ?? "", false);
   };
@@ -419,7 +420,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The edited message could not be completed."); return false; }
-    const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
+    const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content, createdAtUtc: new Date().toISOString() }];
     setMessages(completed); await saveConversation(completed, conversationId);
     void speakNativeResponse(completed.at(-1)?.content ?? "", false);
     return true;

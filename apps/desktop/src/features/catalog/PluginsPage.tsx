@@ -19,6 +19,7 @@ import {
   type Skill,
   type Tool,
   type CuratedCatalogEntry,
+  type InternetMarketplaceItem,
   type MarketplaceEntry,
 } from "./marketplaceEntries";
 import { useMarketplaceMcp, type McpConnection, type McpTool } from "./useMarketplaceMcp";
@@ -42,6 +43,12 @@ export function PluginsPage({
   const [skills, setSkills] = useState<Skill[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
   const [curated, setCurated] = useState<CuratedCatalogEntry[]>([]);
+  const [internetItems, setInternetItems] = useState<InternetMarketplaceItem[]>([]);
+  const [internetCategory, setInternetCategory] = useState("all");
+  const [internetLoading, setInternetLoading] = useState(false);
+  const [internetError, setInternetError] = useState<string | null>(null);
+  const [internetHasMore, setInternetHasMore] = useState(false);
+  const [internetPage, setInternetPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +151,47 @@ export function PluginsPage({
     } finally { setVoiceBusy(false); }
   };
 
+  const runModelTransformer = async (entry: MarketplaceEntry) => {
+    const pickFolder = async (message: string) => {
+      setNotice(message);
+      const response = await request("workspace.pickFolder");
+      if (!response.ok) throw new Error(response.error?.message ?? "The folder picker could not be opened.");
+      const path = (response.result as { path?: string | null }).path;
+      if (!path) throw new Error("No folder was selected.");
+      return path;
+    };
+    try {
+      const modelPath = await pickFolder("Choose the source model folder…");
+      const outputPath = await pickFolder("Choose a different output folder…");
+      const planResponse = await request("model.transformers.plan", { adapterId: entry.adapter, modelPath, outputPath });
+      if (!planResponse.ok) throw new Error(planResponse.error?.message ?? "The model transformation plan could not be created.");
+      const plan = planResponse.result as { command: string; canRun: boolean; warnings?: string[] };
+      if (!plan.canRun) throw new Error([...(plan.warnings ?? []), "This adapter is available for inspection but not executable through Skai yet."].join(" "));
+      if (!window.confirm(`Run this local model transformation?\n\n${plan.command}\n\n${(plan.warnings ?? []).join("\n")}`)) {
+        setNotice("Model transformation cancelled before launch.");
+        return;
+      }
+      const started = await request("model.transformers.start", { adapterId: entry.adapter, modelPath, outputPath, confirm: true });
+      if (!started.ok) throw new Error(started.error?.message ?? "The model transformation could not start.");
+      const run = started.result as { id: string };
+      setNotice("Model transformation started. Skai will keep the output in the selected folder.");
+      for (let attempt = 0; attempt < 7_200; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+        const statusResponse = await request("model.transformers.status", { id: run.id });
+        if (!statusResponse.ok) throw new Error(statusResponse.error?.message ?? "The model transformation status could not be read.");
+        const status = statusResponse.result as { status: string; output?: string; error?: string };
+        if (["completed", "failed", "cancelled"].includes(status.status)) {
+          setNotice(status.status === "completed" ? "Model transformation completed. Review the output folder before adding it to a runtime." : status.error ?? `Model transformation ${status.status}.`);
+          return;
+        }
+        if (attempt % 10 === 0) setNotice(`Model transformation running…${status.output ? ` ${status.output.slice(-180)}` : ""}`);
+      }
+      setNotice("Model transformation is still running. Reopen the adapter to inspect its status.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Model transformation failed.");
+    }
+  };
+
   const callMcpTool = async (connection: McpConnection, tool: McpTool, argumentsValue: Record<string, unknown>) => {
     const capabilities = tool.requiredCapabilities.length > 0
       ? tool.requiredCapabilities
@@ -168,6 +216,23 @@ export function PluginsPage({
       setQuery(nextQuery ?? localStorage.getItem(`skai.marketplace.query.${next.toLowerCase()}`) ?? "");
       setSelectedId(null);
     }
+  };
+
+  const searchInternetMarketplace = async (category: string, page: number, replace: boolean) => {
+    setInternetLoading(true);
+    setInternetError(null);
+    try {
+      const response = await request("marketplace.internet.search", { category, query, page });
+      if (!response.ok) {
+        setInternetError(response.error?.message ?? "Internet Marketplace search failed.");
+        return;
+      }
+      const result = response.result as { items?: InternetMarketplaceItem[]; hasMore?: boolean; page?: number };
+      setInternetItems((current) => replace ? (result.items ?? []) : [...current, ...(result.items ?? [])]);
+      setInternetPage(result.page ?? page);
+      setInternetHasMore(Boolean(result.hasMore));
+    } catch { setInternetError("Internet Marketplace search failed."); }
+    finally { setInternetLoading(false); }
   };
 
   const load = async () => {
@@ -243,6 +308,11 @@ export function PluginsPage({
     return () => { active = false; };
   }, [loading, view]);
   useEffect(() => {
+    if (catalogSection !== "Internet") return;
+    const timer = window.setTimeout(() => void searchInternetMarketplace(internetCategory, 1, true), 300);
+    return () => window.clearTimeout(timer);
+  }, [catalogSection, internetCategory, query]);
+  useEffect(() => {
     if (view === "catalog")
       localStorage.setItem(
         `skai.marketplace.query.${catalogSection.toLowerCase()}`,
@@ -250,7 +320,7 @@ export function PluginsPage({
       );
   }, [catalogSection, query, view]);
 
-  const entries = useMemo(() => createMarketplaceEntries(skills, tools, connections, query, curated), [connections, curated, query, skills, tools]);
+  const entries = useMemo(() => createMarketplaceEntries(skills, tools, connections, query, curated, internetItems), [connections, curated, internetItems, query, skills, tools]);
   const sectionEntries = useMemo(() => filterMarketplaceEntries(entries, catalogSection), [catalogSection, entries]);
   const selected = sectionEntries.find((entry) => entry.id === selectedId) ?? null;
   const groupedEntries = useMemo(() => groupMarketplaceEntries(sectionEntries), [sectionEntries]);
@@ -270,6 +340,7 @@ export function PluginsPage({
         <p className="plugins-customize-label">CATEGORIES</p>
         {([
           ["Discover", "sparkle"],
+          ["Internet", "marketplace"],
           ["Models", "model"],
           ["Voices", "activity"],
           ["Skills", "sparkle"],
@@ -309,10 +380,10 @@ export function PluginsPage({
           <>
             <header className="plugins-topbar">
               <div className="plugins-heading-lockup">
-                <span className="plugins-heading-mark" aria-hidden="true"><NavIcon name={catalogSection === "Discover" ? "sparkle" : catalogSection === "MCP Servers" || catalogSection === "Skai built-ins" || catalogSection === "Compatible plugins" ? "terminal" : "project"} /></span>
-                <div><p className="plugins-eyebrow">SKAI MARKETPLACE</p><h2>{catalogSection === "MCP Servers" ? "MCP servers" : catalogSection}</h2><p className="plugins-heading-description">{catalogSection === "Discover" ? "Search local models and inspect what can be installed on this device." : catalogSection === "MCP Servers" ? "Connect a local MCP server or review the available package." : catalogSection === "Skai built-ins" ? "Hand-picked capabilities already built into Skai." : catalogSection === "Compatible plugins" ? "Plugins and skills that work inside Skai Desktop." : `Browse ${catalogSection.toLowerCase()} available on this device.`}</p></div>
+                <span className="plugins-heading-mark" aria-hidden="true"><NavIcon name={catalogSection === "Discover" ? "sparkle" : catalogSection === "Internet" ? "marketplace" : catalogSection === "MCP Servers" || catalogSection === "Skai built-ins" || catalogSection === "Compatible plugins" ? "terminal" : "project"} /></span>
+                <div><p className="plugins-eyebrow">SKAI MARKETPLACE</p><h2>{catalogSection === "MCP Servers" ? "MCP servers" : catalogSection}</h2><p className="plugins-heading-description">{catalogSection === "Discover" ? "Search local models and inspect what can be installed on this device." : catalogSection === "Internet" ? "Discover public models, skills, tools, and MCP servers without implying they are safe or installable." : catalogSection === "MCP Servers" ? "Connect a local MCP server or review the available package." : catalogSection === "Skai built-ins" ? "Hand-picked capabilities already built into Skai." : catalogSection === "Compatible plugins" ? "Plugins and skills that work inside Skai Desktop." : `Browse ${catalogSection.toLowerCase()} available on this device.`}</p></div>
               </div>
-              <div className="plugins-heading-meta"><StatusBadge tone="success">Local catalog</StatusBadge><span className="plugins-count">{sectionEntries.length} {catalogSection === "Discover" ? "available" : catalogSection.toLowerCase()}</span></div>
+              <div className="plugins-heading-meta"><StatusBadge tone={catalogSection === "Internet" ? "neutral" : "success"}>{catalogSection === "Internet" ? "Internet discovery" : "Local catalog"}</StatusBadge><span className="plugins-count">{sectionEntries.length} {catalogSection === "Discover" ? "available" : catalogSection.toLowerCase()}</span></div>
               <div className="plugins-topbar-actions">
                 <label className="plugins-search">
                   <span className="sr-only">Search marketplace</span>
@@ -322,6 +393,7 @@ export function PluginsPage({
                     placeholder={`Search ${catalogSection.toLowerCase()}`}
                   />
                 </label>
+                {catalogSection === "Internet" && <label className="plugins-search plugins-internet-filter"><span className="sr-only">Internet category</span><select value={internetCategory} onChange={(event) => setInternetCategory(event.target.value)}><option value="all">All online categories</option><option value="llm">LLM models</option><option value="image">Image models</option><option value="voice">Voice models</option><option value="skills">Skills</option><option value="tools">Developer tools</option><option value="mcp">MCP servers</option></select></label>}
                 <Button
                   variant="ghost"
                   className="plugins-icon-button"
@@ -365,11 +437,13 @@ export function PluginsPage({
                   Retry
                 </Button>
               </div>
-            ) : loading ? (
+            ) : loading || (catalogSection === "Internet" && internetLoading && sectionEntries.length === 0) ? (
               <EmptyState
-                title="Loading Marketplace…"
-                description="Reading tools and skills available in Skai."
+                title={catalogSection === "Internet" ? "Searching the Internet Marketplace…" : "Loading Marketplace…"}
+                description={catalogSection === "Internet" ? "Reading public registries and keeping source provenance attached to every result." : "Reading tools and skills available in Skai."}
               />
+            ) : internetError && catalogSection === "Internet" ? (
+              <div className="surface-error" role="alert"><strong>Internet discovery is unavailable</strong><p>{internetError}</p><Button variant="secondary" onClick={() => void searchInternetMarketplace(internetCategory, 1, true)}>Retry</Button></div>
             ) : sectionEntries.length === 0 ? (
               <EmptyState
                 title="No matching items"
@@ -398,9 +472,11 @@ export function PluginsPage({
               onFindLocalPackage={(entry) => changeCatalogSection("Models", entry.name)}
                 onInstallMcp={(entry) => void installMcpEntry(entry)}
                 onInstallVoice={(entry) => void installVoiceEntry(entry)}
+                onRunModelTransformer={(entry) => void runModelTransformer(entry)}
                 voiceBusy={voiceBusy}
               />
             )}
+            {catalogSection === "Internet" && internetHasMore && <div className="plugins-catalog-more"><Button variant="secondary" disabled={internetLoading} onClick={() => void searchInternetMarketplace(internetCategory, internetPage + 1, false)}>{internetLoading ? "Loading online results…" : "Load more online results"}</Button></div>}
             {catalogSection === "MCP Servers" && <McpConnectionsPanel
               connections={connections}
               toolsByConnection={mcpTools}
