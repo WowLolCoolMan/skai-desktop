@@ -192,10 +192,10 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     return true;
   };
 
-  const createGitPullRequest = async (title: string, body: string) => {
+  const createGitPullRequest = async (title: string, body: string, draft = false) => {
     if (!selectedProject || gitPullRequestBusy || !title.trim()) return false;
     setGitPullRequestBusy(true);
-    const response = await request("project.git.pullRequest", { id: selectedProject.id, title: title.trim(), body: body.trim() });
+    const response = await request("project.git.pullRequest", { id: selectedProject.id, title: title.trim(), body: body.trim(), draft });
     setGitPullRequestBusy(false);
     if (!response.ok) { onError(response.error?.message ?? "Pull request creation was unavailable."); return false; }
     onError(null);

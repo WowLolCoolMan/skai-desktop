@@ -169,7 +169,7 @@ public sealed partial class GitHubWorkspaceService
     }
 
     /// <summary>Creates a pull request with the user's authenticated local GitHub CLI session.</summary>
-    public async Task<string> CreatePullRequestAsync(string repositoryPath, string title, string body,
+    public async Task<string> CreatePullRequestAsync(string repositoryPath, string title, string body, bool draft = false,
         CancellationToken cancellationToken = default)
     {
         title = (title ?? "").Trim();
@@ -186,7 +186,9 @@ public sealed partial class GitHubWorkspaceService
         if (status.CommitsBehind > 0) throw new InvalidOperationException("The remote branch has newer commits. Fetch and review them before creating a pull request.");
 
         var root = await GetRepositoryRootAsync(repositoryPath, cancellationToken).ConfigureAwait(false);
-        var result = await RunToolAsync(root, "gh", ["pr", "create", "--title", title, "--body", body, "--base", "main", "--head", status.Branch],
+        var arguments = new List<string> { "pr", "create", "--title", title, "--body", body, "--head", status.Branch };
+        if (draft) arguments.Add("--draft");
+        var result = await RunToolAsync(root, "gh", arguments,
             TimeSpan.FromMinutes(2), cancellationToken).ConfigureAwait(false);
         EnsureSuccess(result, "Pull request creation is unavailable. Install GitHub CLI and run `gh auth login`, then try again.");
         return (result.StandardOutput + result.StandardError).Trim();

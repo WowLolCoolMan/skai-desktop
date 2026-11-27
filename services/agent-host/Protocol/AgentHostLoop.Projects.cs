@@ -306,7 +306,8 @@ public static partial class AgentHostLoop
             ?? throw new InvalidOperationException("Select a project folder before creating a pull request.");
         var title = RequiredBoundedString(request, "title", 256);
         var body = OptionalString(request, "body") ?? string.Empty;
-        var output = await new GitHubWorkspaceService().CreatePullRequestAsync(root, title, body, CancellationToken.None).ConfigureAwait(false);
+        var draft = OptionalBoolean(request, "draft");
+        var output = await new GitHubWorkspaceService().CreatePullRequestAsync(root, title, body, draft, CancellationToken.None).ConfigureAwait(false);
         return new(ProtocolVersion, request.Id, true, new { repository = project.Name, created = true, output });
     }
 

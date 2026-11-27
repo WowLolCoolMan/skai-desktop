@@ -4483,3 +4483,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     box-sizing: border-box;
   }
 }
+
+.ui-dialog .coding-pr-draft-toggle { display: flex; align-items: center; gap: 9px; color: var(--skai-color-text); cursor: pointer; }
+.ui-dialog .coding-pr-draft-toggle input { width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--skai-color-accent); }
