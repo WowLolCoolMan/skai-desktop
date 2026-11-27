@@ -640,6 +640,17 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .computer-use-model > span { color: var(--skai-color-accent-text); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); letter-spacing: .08em; text-transform: uppercase; }
 .computer-use-model > strong { min-width: 0; overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-sm); text-overflow: ellipsis; white-space: nowrap; }
 .computer-use-model > small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.computer-use-approval { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
+.computer-use-approval input { margin-top: 3px; accent-color: var(--skai-color-accent); }
+.computer-use-approval span { display: grid; gap: 3px; }
+.computer-use-approval strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); font-weight: 600; }
+.computer-use-approval small { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.4; }
+.computer-use-review { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 12px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 45%, var(--skai-color-border)); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 7%, var(--skai-color-surface)); }
+.computer-use-review > div:first-child { display: grid; min-width: 0; gap: 4px; }
+.computer-use-review .section-kicker { margin: 0; }
+.computer-use-review strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
+.computer-use-review pre { max-height: 110px; margin: 3px 0 0; padding: 8px; overflow: auto; border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.computer-use-review > div:last-child { display: flex; flex-wrap: wrap; gap: 7px; }
 .computer-screen-picker { display: flex !important; align-items: center; gap: 12px !important; margin: 14px 0; }
 .computer-screen-picker select, .computer-use-controls select { min-height: 38px; padding: 7px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
 .computer-screen-preview { position: relative; display: block; width: 100%; max-height: 56vh; margin: 14px 0; padding: 0; overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); cursor: crosshair; }

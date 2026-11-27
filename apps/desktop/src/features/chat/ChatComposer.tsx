@@ -43,6 +43,39 @@ type ChatComposerProps = {
   onOpenProject?: (project: DesktopProject) => void;
 };
 
+type PlannedComputerAction =
+  | { action: "click"; x: number; y: number; button: "left" | "right" }
+  | { action: "type"; text: string }
+  | { action: "key"; key: string }
+  | { action: "scroll"; x: number; y: number; delta: number };
+
+function parsePlannedComputerAction(value: Record<string, unknown>): PlannedComputerAction {
+  const coordinate = (key: "x" | "y") => {
+    const number = value[key];
+    if (typeof number !== "number" || !Number.isFinite(number) || number < 0 || number > 1) throw new Error("The model proposed an invalid screen coordinate. No input was sent.");
+    return number;
+  };
+  if (value.action === "click") {
+    const button = value.button === undefined ? "left" : value.button;
+    if (button !== "left" && button !== "right") throw new Error("The model proposed an unsupported mouse button. No input was sent.");
+    return { action: "click", x: coordinate("x"), y: coordinate("y"), button };
+  }
+  if (value.action === "type") {
+    if (typeof value.text !== "string" || !value.text.trim() || value.text.length > 2_000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value.text)) throw new Error("The model proposed invalid text. No input was sent.");
+    return { action: "type", text: value.text };
+  }
+  if (value.action === "key") {
+    const allowed = ["Enter", "Tab", "Escape", "Backspace", "Delete", "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown", "Space"];
+    if (typeof value.key !== "string" || !allowed.includes(value.key)) throw new Error("The model proposed an unsupported key. No input was sent.");
+    return { action: "key", key: value.key };
+  }
+  if (value.action === "scroll") {
+    if (typeof value.delta !== "number" || !Number.isFinite(value.delta) || Math.abs(value.delta) > 2_000) throw new Error("The model proposed an unsupported scroll distance. No input was sent.");
+    return { action: "scroll", x: coordinate("x"), y: coordinate("y"), delta: value.delta };
+  }
+  throw new Error("The model proposed an unsupported action. No input was sent.");
+}
+
 
 
 export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onEditQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject }: ChatComposerProps) {
@@ -61,9 +94,12 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [computerBusy, setComputerBusy] = useState(false);
   const [computerTask, setComputerTask] = useState("");
   const [computerSteps, setComputerSteps] = useState<string[]>([]);
+  const [computerRequireApproval, setComputerRequireApproval] = useState(true);
+  const [pendingComputerAction, setPendingComputerAction] = useState<PlannedComputerAction | null>(null);
   const voice = useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTranscript, onAudioTranscript, onFilesDropped });
   const { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack } = voice;
   const computerStopRef = useRef(false);
+  const computerApprovalResolver = useRef<((approved: boolean) => void) | null>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const accessMenuRef = useRef<HTMLDivElement>(null);
   const addTriggerRef = useRef<HTMLButtonElement>(null);
@@ -176,7 +212,9 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     setOmniOpen(false); setComputerOpen(false); setComputerStatus("Screen image attached. Review it in the composer before sending.");
   };
 
-  const stopComputerTask = () => { computerStopRef.current = true; setComputerStatus("Stopping after the current model response…"); };
+  const stopComputerTask = () => { computerStopRef.current = true; setComputerStatus("Stopping after the current model response…"); computerApprovalResolver.current?.(false); computerApprovalResolver.current = null; setPendingComputerAction(null); };
+  const approveComputerAction = () => { const resolve = computerApprovalResolver.current; computerApprovalResolver.current = null; setPendingComputerAction(null); resolve?.(true); };
+  const skipComputerAction = () => { computerStopRef.current = true; const resolve = computerApprovalResolver.current; computerApprovalResolver.current = null; setPendingComputerAction(null); resolve?.(false); setComputerStatus("Session stopped before the proposed action was sent."); };
   const startComputerTask = async () => {
     if (!computerTask.trim() || !selectedComputerScreen || computerBusy) return;
     if (!isLocalEndpoint(endpoint)) { setComputerStatus("Computer-use model calls require a local endpoint so screen contents stay on this device."); return; }
@@ -204,12 +242,19 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         const json = raw.match(/\{[\s\S]*\}/)?.[0];
         if (!json) throw new Error("The model response was not a computer action. No action was sent.");
         const action = JSON.parse(json) as Record<string, unknown>;
-        if (action.action === "done") { taskFinished = true; setComputerSteps((steps) => [...steps, `Finished: ${String(action.summary ?? "Task complete")}`]); setComputerStatus("Computer-use task finished."); break; }
+        if (action.action === "done") { taskFinished = true; const summary = typeof action.summary === "string" ? action.summary.slice(0, 300) : "Task complete"; setComputerSteps((steps) => [...steps, `Finished: ${summary}`]); setComputerStatus("Computer-use task finished."); break; }
+        const plannedAction = parsePlannedComputerAction(action);
         if (computerStopRef.current) break;
-        const bounded = { action: action.action, x: action.x, y: action.y, button: action.button, text: action.text, key: action.key, delta: action.delta };
+        if (computerRequireApproval) {
+          setPendingComputerAction(plannedAction);
+          setComputerStatus("Review the proposed action before it is sent.");
+          const approved = await new Promise<boolean>((resolve) => { computerApprovalResolver.current = resolve; });
+          if (!approved || computerStopRef.current) break;
+        }
+        const bounded = plannedAction;
         setComputerStatus(`Sending action ${step + 1} of 12…`);
         await window.skaiAgent.computer?.action({ ...bounded, displayId: currentScreen.displayId } as Parameters<NonNullable<typeof window.skaiAgent.computer>["action"]>[0]);
-        const label = action.action === "click" ? `Click at ${Number(action.x).toFixed(2)}, ${Number(action.y).toFixed(2)}` : action.action === "type" ? `Type: ${String(action.text).slice(0, 80)}` : action.action === "key" ? `Press ${String(action.key)}` : `Scroll ${Number(action.delta) < 0 ? "up" : "down"}`;
+        const label = plannedAction.action === "click" ? `Click at ${plannedAction.x.toFixed(2)}, ${plannedAction.y.toFixed(2)}` : plannedAction.action === "type" ? `Type: ${plannedAction.text.slice(0, 80)}` : plannedAction.action === "key" ? `Press ${plannedAction.key}` : `Scroll ${plannedAction.delta < 0 ? "down" : "up"}`;
         setComputerSteps((steps) => [...steps, label]);
         const freshScreens = await window.skaiAgent.computer?.capture();
         const refreshed = freshScreens?.find((screen) => screen.id === currentScreen.id) ?? freshScreens?.[0];
@@ -222,7 +267,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       else if (reachedLimit) setComputerStatus("Stopped at the 12-action session limit. Review the display before starting another session.");
       else if (!taskFinished) setComputerStatus("Computer-use session ended.");
     } catch (error) { setComputerStatus(error instanceof Error ? error.message : "Computer-use session failed."); }
-    finally { computerStopRef.current = false; setComputerBusy(false); }
+    finally { computerStopRef.current = false; computerApprovalResolver.current = null; setPendingComputerAction(null); setComputerBusy(false); }
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -314,6 +359,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         <strong>{computerVisionModel.displayName || computerVisionModel.model}</strong>
         <small>{computerVisionModel.provider ?? provider} · local screenshot reasoning</small>
       </div>
+      <label className="computer-use-approval"><input type="checkbox" checked={computerRequireApproval} disabled={computerBusy} onChange={(event) => setComputerRequireApproval(event.target.checked)} /><span><strong>Review every action before it runs</strong><small>Default on · Skai pauses after planning each click, keypress, scroll, or text entry.</small></span></label>
       {computerScreens.length > 1 && <label className="computer-screen-picker">Display<select value={computerScreenId} onChange={(event) => { setComputerScreenId(event.target.value); setComputerPoint(null); }} aria-label="Select display">{computerScreens.map((screen) => <option value={screen.id} key={screen.id}>{screen.name}</option>)}</select></label>}
       {selectedComputerScreen && <button type="button" className="computer-screen-preview" onClick={(event) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -335,6 +381,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         <Button variant="secondary" type="button" disabled={computerBusy} onClick={() => void captureComputerScreens()}>Refresh screen</Button>
         <Button variant="secondary" type="button" disabled={!selectedComputerScreen || attachments.length >= 5 || computerBusy} onClick={attachComputerScreenshot}>Attach screenshot</Button>
       </div>
+      {pendingComputerAction && <section className="computer-use-review" aria-label="Review proposed computer action"><div><p className="section-kicker">ACTION PREVIEW</p><strong>{pendingComputerAction.action === "click" ? `${pendingComputerAction.button === "right" ? "Right click" : "Click"} at ${Math.round(pendingComputerAction.x * 100)}%, ${Math.round(pendingComputerAction.y * 100)}%` : pendingComputerAction.action === "type" ? "Type this text" : pendingComputerAction.action === "key" ? `Press ${pendingComputerAction.key}` : `Scroll ${pendingComputerAction.delta < 0 ? "down" : "up"} at ${Math.round(pendingComputerAction.x * 100)}%, ${Math.round(pendingComputerAction.y * 100)}%`}</strong>{pendingComputerAction.action === "type" && <pre>{pendingComputerAction.text}</pre>}</div><div><Button variant="primary" type="button" onClick={approveComputerAction}>Approve action</Button><Button variant="secondary" type="button" onClick={skipComputerAction}>Stop session</Button></div></section>}
       <div className="computer-use-controls">
         <Button variant="secondary" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "left" })}>Click point</Button>
         <Button variant="ghost" type="button" disabled={!selectedComputerScreen || !computerPoint || computerBusy} onClick={() => void runComputerAction({ action: "click", ...computerPoint, button: "right" })}>Right click</Button>
