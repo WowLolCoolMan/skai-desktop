@@ -43,7 +43,7 @@ This is now the active implementation backlog, not an approval queue. Existing c
 | 30 · Notifications and mobile follow-up | In progress | Local desktop notifications already group repeated task transitions, hide task titles by default, support quiet hours and project muting, deep-link back to the local task inbox, and retain bounded delivery history for recovery. Settings now exposes a local-host freshness status with last-observed time and a stale warning so cached task state is not mistaken for live remote/mobile status. Trusted-host mobile links, lock-screen task actions, and remote approvals remain intentionally unavailable until task-scoped approval and host identity exist. |
 | 31 · Shortcuts and command workflows | In progress | Command palette, contextual/recent/pinned actions, conflict-aware shortcut editing, slash aliases, toolbar/send preferences, and visible menu shortcuts already exist. This slice adds `aria-keyshortcuts` and shortcut tooltips to native menus and palette actions, while the remaining boundary is richer selection-aware command dispatch and OS-level accelerator parity. |
 | 32 · Evidence-driven completion | In progress | Acceptance records, screenshot sidecar metadata, capability-matrix evidence links, disposable UI profiles, deterministic failure fixtures, and release-readiness limitations are documented and validated by the evidence checker. Broader visual-diff automation and native platform gates remain open. |
-| 33 | Not audited | Verify current implementation before changing or closing items. |
+| 33 · Marketplace inventory | In progress | Installed models, voices, skills, tools, MCP connections, personas, and image assets share a category-filtered inspector with provenance, version, size, compatibility, dependencies, removal impact, update/remove actions, and explicit Skai-app update routing. Model and pinned-MCP install reviews now disclose package contents, requested local access, integrity/license status, and network boundaries before confirmation. Broader package previews and recovery fixtures remain open. |
 
 ## How to use this roadmap
 
@@ -579,6 +579,8 @@ The screenshot's exact DeepSeek Harness and CodeWhale names could not be verifie
 328. Protect active projects and workflows from removing a dependency in use.
 329. Confirm uninstall while identifying data that will be removed or retained.
 330. Test install, use, update, removal, and recovery across supported item categories.
+
+**Implementation status (2026-11-27):** The unified Installed & updates surface already aggregates local models, voice runtimes, skills, tools, MCP connections, personas, and image assets into one category-filtered inspector. It shows source, version, update date, disk use, compatibility, known dependents, removal impact, integrity when available, and the correct owner for updates; active model/voice/workflow dependencies block unsafe removal. This slice adds a pre-confirmation package-review facts panel to model and pinned-MCP installation flows: contents, requested local access, license/integrity availability, and explicit network boundaries are visible before the download or connection starts. **Remaining boundary:** LoRA and every third-party package type still need equivalent package previews and deterministic install/update/remove recovery fixtures; native Linux/macOS inventory acceptance remains open.
 
 ---
 

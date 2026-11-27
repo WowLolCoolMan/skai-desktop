@@ -4981,3 +4981,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .composer-card.is-compact-toolbar .composer-toolbar-label { display:none; }
 @media(max-width:640px){.composer-toolbar-label{display:none}}
 @media(max-width:640px){.settings-command-fields{grid-template-columns:1fr}.settings-command-workflows{padding:14px}.command-filter-tabs{padding-left:12px;padding-right:12px}}
+.marketplace-review-facts { display: grid; gap: 8px; margin: 5px 0 2px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: color-mix(in srgb, var(--skai-color-surface-soft) 74%, transparent); }
+.marketplace-review-facts div { display: grid; gap: 2px; }
+.marketplace-review-facts dt { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); letter-spacing: .08em; text-transform: uppercase; }
+.marketplace-review-facts dd { margin: 0; color: var(--skai-color-text); font-size: var(--skai-text-xs); line-height: 1.4; overflow-wrap: anywhere; }

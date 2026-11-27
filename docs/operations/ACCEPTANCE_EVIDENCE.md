@@ -268,7 +268,10 @@ platform or theme that was not recorded.
   provenance, digest, install/update timestamps, size, and removal of only the
   selected package and its rollback copies. The packaged route verifies category
   filtering, the common inspector metadata, voice availability, and sticky
-  action reachability.
+  action reachability. The implementation's model and pinned-MCP installation
+  reviews expose package contents, requested local access, license/integrity
+  status, and the explicit network boundary before confirmation; those live
+  download paths remain outside the deterministic packaged smoke fixture.
 - Failure check: the UI matrix rejects missing inspector details or unreachable
   actions; installer tests reject missing packages and unsafe package content;
   removal handlers refuse selected chat/subagent models, assigned Qwen voices,
@@ -296,8 +299,9 @@ platform or theme that was not recorded.
   List rows avoid repeating version and size already available in the inspector.
 - Unverified platforms, integrations, or hardware: native Linux/macOS UI; live
   deletion/update against the user's installed runtimes; install/update/remove
-  recovery for every Marketplace category; third-party item dependency metadata
-  not reported by its owning runtime.
+  recovery for every Marketplace category; LoRA/package previews outside the
+  model and pinned-MCP routes; third-party item dependency metadata not
+  reported by its owning runtime.
 
 Known gaps in this table are intentionally explicit release limitations. A
 future slice may close them with bounded deterministic fixtures; do not simulate
