@@ -43,6 +43,8 @@ type ChatComposerProps = {
   projects?: DesktopProject[];
   projectId?: string | null;
   onOpenProject?: (project: DesktopProject) => void;
+  modeLabel?: string;
+  modeDescription?: string;
 };
 
 type PlannedComputerAction =
@@ -80,7 +82,7 @@ function parsePlannedComputerAction(value: Record<string, unknown>): PlannedComp
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response" }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
@@ -349,6 +351,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
           </div>}
         </div>
         {projects.length > 0 && onOpenProject && <label className="composer-project-switcher"><NavIcon name="project" /><span className="sr-only">Open a project workspace</span><select aria-label="Open a project workspace" value={projectId ?? ""} onChange={(event) => { const project = projects.find((item) => item.id === event.target.value); if (project) onOpenProject(project); }}><option value="">Open project…</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}
+        <span className="composer-mode-chip" title={modeDescription}><span className="composer-mode-chip-dot" aria-hidden="true" />{modeLabel}</span>
         <div className="composer-access-anchor" ref={accessMenuRef}>
           <button ref={accessTriggerRef} type="button" className="composer-access-button" onClick={() => setAccessOpen((open) => !open)} aria-haspopup="dialog" aria-expanded={accessOpen}>{accessLabel}<span aria-hidden="true">⌄</span></button>
           {accessOpen && <section className="composer-access-popover" role="dialog" aria-label={`${accessLabel} and available tools`}>
