@@ -43,7 +43,7 @@ export function ChatMessage({ message, index, model, busy, conversationId, copie
   return <article id={messageId} className={`message-bubble chat-message ${message.role}`}>
     <div className="message-meta"><span>{message.role === "user" ? "You" : model}</span><div className="message-actions">
       <Button variant="ghost" onClick={() => onCopy(message.content, index)}>{copied ? "Copied" : "Copy"}</Button>
-      <Button variant="ghost" type="button" title="Copy link to this message" onClick={() => { const url = new URL(window.location.href); url.hash = messageId; void navigator.clipboard.writeText(url.toString()).then(() => { setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 1500); }).catch(() => { window.location.hash = messageId; }); }}>{linkCopied ? "Link copied" : "Copy link"}</Button>
+      <Button variant="ghost" type="button" title="Copy link to this message" onClick={() => { const url = new URL(window.location.href); url.hash = messageId; const copy = navigator.clipboard?.writeText; if (!copy) { window.location.hash = messageId; return; } void copy.call(navigator.clipboard, url.toString()).then(() => { setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 1500); }).catch(() => { window.location.hash = messageId; }); }}>{linkCopied ? "Link copied" : "Copy link"}</Button>
       {message.role === "user" && <Button variant="ghost" disabled={busy || !conversationId || saving} onClick={() => setEditing(true)}>Edit</Button>}
       {message.role === "assistant" && <Button variant="ghost" disabled={busy} onClick={() => onRetry(index)}>Retry</Button>}
       <Button variant="ghost" onClick={() => onFork(index)} disabled={!conversationId}>Fork from here</Button>
