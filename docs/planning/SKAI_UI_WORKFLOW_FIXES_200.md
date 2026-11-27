@@ -1,10 +1,11 @@
-# Skai UI and workflow overhaul: 200 fixes
+# Skai UI and workflow overhaul: 400 fixes
 
 This is a proposal backlog, not a claim that every item is already implemented.
 The order is intentional: items 1–50 remove the highest-friction shell and
-composer problems; 51–150 improve the agent work loop; 151–200 make the
-product safer, more adaptable, and easier to operate at scale. Each line is
-written as a testable fix that can become its own implementation slice.
+composer problems; 51–200 improve the agent work loop; 201–400 deepen the
+product's extensibility, observability, collaboration, accessibility, and finish
+quality. Each line is written as a testable fix that can become its own
+implementation slice.
 
 ## Research basis
 
@@ -290,13 +291,276 @@ Windows-first safety model.
 199. `[P2][Codex]` Add a release checklist that requires typecheck, native tests, package build, UI matrix, accessibility scan, and evidence links.
 200. `[P2][Codex]` Add a “workflow comparison” review step that captures before/after screenshots and records which reference pattern each change adopts.
 
+## Additional 200 fixes
+
+## 21. Shell polish and responsive composition
+
+201. `[P0][Codex]` Add a compact shell mode that collapses labels while retaining tooltips and keyboard access.
+202. `[P0][Open WebUI]` Add a split-pane drag handle with a visible percentage and snap points.
+203. `[P0][Codex]` Keep the primary action fixed when a page scrolls, while allowing secondary controls to scroll.
+204. `[P1][Codex]` Add a shell-wide focus ring that identifies the active pane and restores focus after route changes.
+205. `[P1][Odysseus]` Add a “workspace overview” shortcut that opens a visual map of open chats, tasks, files, and tools.
+206. `[P1][Open WebUI]` Add pane presets for single, chat-plus-files, chat-plus-terminal, review, and research layouts.
+207. `[P1][Codex]` Add a mobile-width bottom navigation fallback for compact windows instead of squeezing the left rail.
+208. `[P2][Codex]` Add density preview cards that show the same screen at comfortable, compact, and touch sizes.
+209. `[P2][Happy]` Preserve shell layout when the app is reopened on a different monitor or DPI scale.
+210. `[P2][Codex]` Add an empty-space inspector that suggests useful panels when a workspace has no active artifact.
+
+## 22. Chat workflow intelligence
+
+211. `[P0][Continue]` Add a one-click “explain before changing” action that switches a draft to Plan mode.
+212. `[P0][Codex]` Add an explicit target selector for answering, editing, reviewing, researching, or generating media.
+213. `[P0][AnythingLLM]` Add tool recommendations beside the draft without enabling them automatically.
+214. `[P1][Codex]` Add draft linting for missing project, vague goal, absent acceptance criteria, and unsupported requested output.
+215. `[P1][Continue]` Add recent `@` context suggestions based on the active file, branch, and last task.
+216. `[P1][Codex]` Add a “send and keep editing” command for users who want to queue multiple prompts.
+217. `[P1][Codex]` Add a visible queue preview with reorder, edit, remove, and send-now actions.
+218. `[P2][Happy]` Add voice/text handoff so a voice turn can become an editable text draft before sending.
+219. `[P2][Odysseus]` Add prompt starters generated from the current project state, not generic sample prompts.
+220. `[P2][Codex]` Add a composer history drawer for restoring recently discarded drafts without reopening a chat.
+
+## 23. Conversation history and organization
+
+221. `[P0][Codex]` Add folders and tags to the chat list with keyboard shortcuts for assignment.
+222. `[P0][Odysseus]` Add saved views such as Active work, Needs review, Research, Unfinished, and Media.
+223. `[P0][Codex]` Add conversation-level status: open, waiting, blocked, complete, archived, or deleted.
+224. `[P1][Happy]` Add session resume cards that show last device, last model, pending approvals, and last activity.
+225. `[P1][Codex]` Add timeline search across user messages, assistant messages, tool calls, files, and task events.
+226. `[P1][Odysseus]` Add a conversation summary card with decisions, open questions, files touched, and next actions.
+227. `[P1][Codex]` Add bulk archive, move, tag, export, and delete actions with undo.
+228. `[P2][Codex]` Add duplicate-conversation detection with side-by-side merge planning.
+229. `[P2][Happy]` Add a “continue elsewhere” marker when a session moves between local windows or devices.
+230. `[P2][Codex]` Add retention previews before automatic cleanup removes old chats or artifacts.
+
+## 24. Plans, tasks, and durable artifacts
+
+231. `[P0][Codex]` Render a plan as a first-class artifact with steps, dependencies, risks, and acceptance criteria.
+232. `[P0][OpenHands]` Add checkpoints that can be reopened as a task, review, or fresh branch.
+233. `[P0][Codex]` Add task-level scope chips for files, folders, commands, tools, and network access.
+234. `[P1][Ruflo]` Add dependency graph view for tasks that wait on other tasks or approvals.
+235. `[P1][Codex]` Add “mark as blocked” with a structured reason and requested user input.
+236. `[P1][Codex]` Add task artifacts for plan, diff, test evidence, review notes, and release notes.
+237. `[P1][OpenHands]` Add recovery from the latest checkpoint without replaying completed side effects.
+238. `[P2][Codex]` Add task templates that include test commands, reviewers, tool policy, and branch naming.
+239. `[P2][Ruflo]` Add an execution budget for time, tokens, retries, disk, and worker count.
+240. `[P2][Codex]` Add a completion report that distinguishes requested work, verified work, and deferred work.
+
+## 25. Multi-agent team experience
+
+241. `[P0][Ruflo]` Add a team canvas where agents are connected by explicit input and output edges.
+242. `[P0][Omnigent]` Add agent capability cards showing harness, model, tools, filesystem, network, and review role.
+243. `[P0][Ruflo]` Add a “suggest team” action that proposes roles from the task goal and project state.
+244. `[P1][Omnigent]` Add per-agent conversation tabs without duplicating the parent task transcript.
+245. `[P1][Ruflo]` Add consensus controls for majority vote, lead decision, reviewer veto, and user decision.
+246. `[P1][Codex]` Add a shared findings board where agents can pin evidence, questions, risks, and conflicts.
+247. `[P1][Omnigent]` Add handoff packets with summary, files, commands, assumptions, and unverified claims.
+248. `[P2][Ruflo]` Add agent heartbeat and stale-worker recovery with a manual takeover action.
+249. `[P2][Omnigent]` Add cross-harness transcript normalization so tool calls are comparable.
+250. `[P2][Codex]` Add an agent cost/latency panel without exposing secrets or provider credentials.
+
+## 26. GitHub, CI, and review depth
+
+251. `[P0][Codex]` Add a review dashboard that groups changed files by risk, owner, test coverage, and dependency.
+252. `[P0][Codex]` Add check-run cards for local, GitHub Actions, and external CI with stale-result labels.
+253. `[P0][Codex]` Add a required-review policy preview before creating or updating a pull request.
+254. `[P1][OpenHands]` Add issue templates that convert acceptance criteria into task checklist items.
+255. `[P1][Codex]` Add commit message suggestions derived from the selected diff and task goal.
+256. `[P1][Codex]` Add a safe branch cleanup wizard that checks open tasks, worktrees, and unpushed commits.
+257. `[P1][Omnigent]` Add an independent reviewer harness selector for pull request validation.
+258. `[P2][Codex]` Add release-note drafts grouped by user-visible behavior and breaking changes.
+259. `[P2][Codex]` Add conflict previews that explain both sides before offering a merge action.
+260. `[P2][Happy]` Add remote review notifications for new comments, failed checks, and requested changes.
+
+## 27. Context and knowledge quality
+
+261. `[P0][Continue]` Add a ranked context explanation showing relevance score and selection reason per item.
+262. `[P0][AnythingLLM]` Add document collection policies for chunk size, overlap, metadata, and embedding runtime.
+263. `[P0][Codex]` Add a “context freeze” action that keeps the exact request inputs while the user edits the draft.
+264. `[P1][Odysseus]` Add research source cards with fetch date, source type, credibility note, and extracted claims.
+265. `[P1][Codex]` Add stale-context warnings when an attached file changed after it was selected.
+266. `[P1][AnythingLLM]` Add retrieval evaluation prompts and a local relevance score report.
+267. `[P1][Odysseus]` Add note linking between chats, documents, research reports, tasks, and projects.
+268. `[P2][Ruflo]` Add memory decay and review dates for durable patterns.
+269. `[P2][Codex]` Add a context-diff view between two task runs.
+270. `[P2][Codex]` Add an exportable context manifest for reproducing a request locally.
+
+## 28. Tools, MCP, and extension platform
+
+271. `[P0][AnythingLLM]` Add an effective-tool list that shows only tools available for the current mode and project.
+272. `[P0][Ruflo]` Add plugin dependency graphs with version conflicts and safe disable suggestions.
+273. `[P0][Codex]` Add schema previews for tool arguments with examples and sensitive-field markings.
+274. `[P1][Omnigent]` Add a connector contract that describes authentication, sandbox, network, and data retention.
+275. `[P1][Ruflo]` Add extension lifecycle events for install, enable, disable, update, rollback, and revoke.
+276. `[P1][Codex]` Add a one-click “copy tool call as reproducible request” action.
+277. `[P2][AnythingLLM]` Add tool-selection telemetry stored locally for prompt-size and latency analysis.
+278. `[P2][Ruflo]` Add a plugin compatibility matrix across OS, runtime, model, and permission profiles.
+279. `[P2][Codex]` Add a dry-run sandbox for new tool calls that records intended side effects only.
+280. `[P2][Omnigent]` Add extension hot reload with a visible generation number and rollback action.
+
+## 29. Workflow graphs and orchestration
+
+281. `[P0][Ruflo]` Add a visual DAG editor for composing agents, tools, approvals, conditions, and outputs.
+282. `[P0][Codex]` Add a step inspector that shows inputs, outputs, retries, timeout, policy, and artifacts.
+283. `[P0][Ruflo]` Add a workflow simulator that walks the graph without invoking mutating tools.
+284. `[P1][Omnigent]` Add reusable agent definitions with versioned YAML/JSON export and validation.
+285. `[P1][Codex]` Add branch and join nodes with explicit failure semantics.
+286. `[P1][Ruflo]` Add workflow-level concurrency limits and fairness across projects.
+287. `[P2][Codex]` Add a local event bus for task, file, Git, schedule, and runtime events.
+288. `[P2][Ruflo]` Add idempotency keys to prevent duplicate workflow side effects after restart.
+289. `[P2][Omnigent]` Add remote execution adapters that expose their sandbox capabilities before dispatch.
+290. `[P2][Codex]` Add workflow version comparison and migration hints when a saved graph changes.
+
+## 30. Models, benchmarks, and runtime ergonomics
+
+291. `[P0][Odysseus]` Add a model cookbook organized by task role, hardware fit, license, and install size.
+292. `[P0][Continue]` Add role capability tests for tool calling, edit format, JSON, vision, and long context.
+293. `[P0][Codex]` Add benchmark result cards with prompt, context, runtime, quantization, and temperature.
+294. `[P1][Codex]` Add warm/cold start latency and memory use to local model health.
+295. `[P1][AnythingLLM]` Add per-workspace provider fallback chains with explicit routing explanation.
+296. `[P1][Happy]` Preserve reasoning effort and tool policy when switching provider or harness.
+297. `[P2][Odysseus]` Add model compare labels for blind, named, and weighted scoring modes.
+298. `[P2][Codex]` Add a “why this model?” explanation on every task and automation run.
+299. `[P2][Codex]` Add runtime logs that separate model error, network error, capacity error, and policy denial.
+300. `[P2][Codex]` Add a model cleanup advisor that identifies unused weights and dependent workflows.
+
+## 31. Voice and audio depth
+
+301. `[P0][Codex]` Add a voice-mode preflight for microphone, speaker, runtime, permissions, and fallback engine.
+302. `[P0][Happy]` Add reconnect-safe voice sessions that resume without sending duplicate turns.
+303. `[P0][Codex]` Add an interrupt timeline showing where the user barged in and where speech stopped.
+304. `[P1][Codex]` Add per-turn audio playback speed, replay, download, and transcript correction.
+305. `[P1][Odysseus]` Add pronunciation dictionaries scoped to persona, project, and global voice settings.
+306. `[P1][Codex]` Add a local voice quality test using a bounded phrase and latency report.
+307. `[P2][Happy]` Add remote voice permission prompts with an encrypted session-state indicator.
+308. `[P2][Codex]` Add audio clip trimming and naming in the Voice Workbench.
+309. `[P2][Codex]` Add waveform and transcript alignment for generated speech.
+310. `[P2][Codex]` Add retention and export controls for microphone input and generated audio.
+
+## 32. Visual generation and media workflow
+
+311. `[P0][Codex]` Add a generation brief that separates subject, composition, style, motion, exclusions, and output constraints.
+312. `[P0][Codex]` Add an inspector for model, workflow, checkpoint, custom nodes, seed, and output dimensions.
+313. `[P0][Odysseus]` Add media collections with cover image, description, tags, and project links.
+314. `[P1][Codex]` Add a contact sheet for queued image candidates with select, compare, and promote actions.
+315. `[P1][Open WebUI]` Add comments and annotations on generated media without altering the source file.
+316. `[P1][Codex]` Add workflow validation before queueing missing checkpoint, node, disk, and endpoint errors.
+317. `[P2][Codex]` Add a seed lock and variation slider for controlled iteration.
+318. `[P2][Ruflo]` Add media batch orchestration with bounded concurrency and per-item retry.
+319. `[P2][Codex]` Add provenance badges for generated, edited, imported, and user-authored assets.
+320. `[P2][Codex]` Add a local media cleanup view that previews what history removal will and will not delete.
+
+## 33. Data portability and history
+
+321. `[P0][Codex]` Add a portable workspace manifest that lists projects, chats, tasks, tools, models, and layouts.
+322. `[P0][Codex]` Add an import dry run that identifies conflicts, unsupported fields, and redacted secrets.
+323. `[P0][Happy]` Add per-device export keys and a clear statement of what encrypted sync stores.
+324. `[P1][Codex]` Add versioned migration reports with before/after record counts.
+325. `[P1][Odysseus]` Add a unified artifact library that can reattach files to a new conversation or task.
+326. `[P1][Codex]` Add undo for reversible deletion of chats, projects, tasks, skills, and media history.
+327. `[P2][Codex]` Add selective export by tag, project, date range, or workflow.
+328. `[P2][Happy]` Add offline export when a relay or remote device is unavailable.
+329. `[P2][Codex]` Add an archive browser that can inspect old versions without restoring them.
+330. `[P2][Codex]` Add data ownership summaries showing local path, owner, retention, and deletion action per category.
+
+## 34. Collaboration and distributed sessions
+
+331. `[P0][Omnigent]` Add a collaboration lobby that explains who can observe, steer, approve, or edit.
+332. `[P0][Happy]` Add device pairing with QR/code fallback and a revocable local identity.
+333. `[P0][Happy]` Add conflict-safe message ordering when two devices send turns close together.
+334. `[P1][Omnigent]` Add collaborator comments anchored to a message, diff hunk, file line, or task step.
+335. `[P1][Codex]` Add a “request owner decision” card for conflicts and risky actions.
+336. `[P1][Happy]` Add push-notification preferences per project, task, and approval type.
+337. `[P2][Omnigent]` Add a shared watch mode that hides secrets and sensitive paths from viewers.
+338. `[P2][Happy]` Add session takeover with explicit transfer and previous-owner notification.
+339. `[P2][Codex]` Add collaborative task notes with revision history and authorship.
+340. `[P2][Happy]` Add reconnect reconciliation that displays missing events instead of silently merging them.
+
+## 35. Security and governance
+
+341. `[P0][Codex]` Add a permission center summary to every task start and tool approval.
+342. `[P0][Omnigent]` Add policy simulation that answers “would this action be allowed?” before execution.
+343. `[P0][Codex]` Add secret redaction previews before exporting logs, transcripts, or collaboration links.
+344. `[P1][Ruflo]` Add plugin trust levels based on publisher, digest, permissions, and update history.
+345. `[P1][Codex]` Add a prompt-injection quarantine for files or web content flagged as instruction-like.
+346. `[P1][Omnigent]` Add time-limited grants with countdown and automatic expiry.
+347. `[P2][Codex]` Add an access ledger that links each external effect to the approving user and policy.
+348. `[P2][Ruflo]` Add security review workflows for new tools, skills, and agent definitions.
+349. `[P2][Codex]` Add a safe-mode startup that disables all mutating tools until the user opts in.
+350. `[P2][Codex]` Add policy snapshots so a run can be audited against the exact rules active at execution time.
+
+## 36. Performance and offline resilience
+
+351. `[P0][Codex]` Add route-level loading skeletons that preserve layout instead of flashing empty pages.
+352. `[P0][Codex]` Add virtualized chat history and file trees for large projects and conversations.
+353. `[P0][Happy]` Add an offline banner that distinguishes read-only cached work from queued mutations.
+354. `[P1][Codex]` Add local cache health with size, last cleanup, and safe clear actions.
+355. `[P1][Ruflo]` Add backpressure indicators when agents, tool calls, or model requests are queued.
+356. `[P1][Codex]` Add lazy loading for heavy editors, media previews, and model catalogs.
+357. `[P2][Codex]` Add a startup diagnostic that identifies slow extensions, runtimes, and corrupted caches.
+358. `[P2][Happy]` Add resumable synchronization after network loss with progress and retry controls.
+359. `[P2][Codex]` Add memory-pressure mode that reduces previews and pauses nonessential workers.
+360. `[P2][Codex]` Add a performance trace export with route timing, render timing, and runtime waits.
+
+## 37. Accessibility and internationalization
+
+361. `[P0][Codex]` Add landmark regions and heading hierarchy checks to every route.
+362. `[P0][Continue]` Add keyboard-only workflows for context selection, mode change, approval, and file navigation.
+363. `[P0][Codex]` Add high-contrast states for selected, focused, disabled, pending, warning, and error controls.
+364. `[P1][Codex]` Add reduced-motion alternatives for task progress, pane transitions, and voice visualization.
+365. `[P1][Codex]` Add locale-aware dates, sizes, durations, and decimal formatting everywhere.
+366. `[P1][Codex]` Add translation-safe labels that do not rely on fixed-width buttons.
+367. `[P2][Codex]` Add right-to-left layout checks for shell, composer, chat, and code views.
+368. `[P2][Codex]` Add text scaling acceptance at 125%, 150%, and 200% without clipping.
+369. `[P2][Codex]` Add accessible descriptions for generated media, charts, diffs, and terminal output.
+370. `[P2][Codex]` Add an accessibility report to the release evidence bundle.
+
+## 38. Diagnostics and developer experience
+
+371. `[P0][Codex]` Add a developer diagnostics page with bridge health, Agent Host health, runtime health, and last errors.
+372. `[P0][Codex]` Add copyable correlation IDs for tasks, tool calls, model requests, and background jobs.
+373. `[P0][Ruflo]` Add a live worker/event stream with filters for agent, project, severity, and event type.
+374. `[P1][Codex]` Add a request inspector that shows bounded request shape without exposing secrets or raw credentials.
+375. `[P1][Omnigent]` Add harness conformance checks for supported commands, tools, sessions, and cancellation.
+376. `[P1][Codex]` Add a “reproduce this failure” bundle that recreates only safe local inputs.
+377. `[P2][Ruflo]` Add health probes for every plugin, memory namespace, scheduler, and worker pool.
+378. `[P2][Codex]` Add diagnostics redaction tests for paths, tokens, cookies, and model prompts.
+379. `[P2][Codex]` Add a support mode that lets users attach evidence without granting remote control.
+380. `[P2][Codex]` Add a debug overlay that can be enabled per session and never persists by default.
+
+## 39. Testing and release confidence
+
+381. `[P0][Codex]` Add deterministic fixtures for empty, loading, success, error, retry, blocked, and recovery states on every major route.
+382. `[P0][Continue]` Add contract tests proving mode permissions stay aligned with visible tool availability.
+383. `[P0][Ruflo]` Add topology tests proving cancellation and failure propagation for every graph shape.
+384. `[P1][Codex]` Add screenshot assertions for no overlap, clipped labels, unreachable actions, and hidden focus.
+385. `[P1][Happy]` Add session continuity tests across close, restart, reconnect, and device handoff.
+386. `[P1][Omnigent]` Add sandbox capability tests for each supported host backend.
+387. `[P2][Codex]` Add migration fixtures for every persisted store and every previous schema version.
+388. `[P2][Ruflo]` Add plugin upgrade/rollback tests with incompatible dependency graphs.
+389. `[P2][Codex]` Add performance smoke thresholds to the packaged UI matrix.
+390. `[P2][Codex]` Add release evidence links directly from the relevant screen and task artifacts.
+
+## 40. Product quality and hard-finish checks
+
+391. `[P0][Codex]` Add a product-wide empty-state language guide and apply it consistently.
+392. `[P0][Codex]` Add a consistent action hierarchy for primary, secondary, ghost, destructive, and recovery buttons.
+393. `[P0][Odysseus]` Add a page-level “what can I do here?” summary to every workspace route.
+394. `[P1][Continue]` Add inline help that explains modes and tools without taking users to a separate manual.
+395. `[P1][Codex]` Add a visual consistency audit for spacing, borders, radii, typography, and status colors.
+396. `[P1][Codex]` Add an interaction audit for every button, link, picker, toggle, dialog, and keyboard shortcut.
+397. `[P2][Happy]` Add a recovery audit for every session, task, upload, download, and sync operation.
+398. `[P2][Ruflo]` Add a trust audit for every plugin, subagent, tool, model, and external connector.
+399. `[P2][Codex]` Add a user-facing changelog grouped by workflow improvements instead of internal commits.
+400. `[P2][Codex]` Require a final before/after review that checks visual hierarchy, state completeness, accessibility, recovery, and local privacy before calling a slice done.
+
 ## Suggested delivery order
 
 Start with 1–20 (shell and composer), then 21–40 (conversation and context),
-then 51–80 (coding and orchestration). Those three groups create the largest
-workflow improvement. The remaining groups can be delivered in vertical slices
-that each include UI, Agent Host/native behavior, persistence, and a focused
-packaged smoke flow.
+then 51–80 (coding and orchestration). Next take 201–240 for the second pass on
+shell, conversation, and durable task artifacts, followed by 241–300 for
+orchestration and runtime depth. Finish with 301–400 as the media, portability,
+collaboration, safety, platform, and hard-finish pass. Each slice should include
+UI, Agent Host/native behavior, persistence, and a focused packaged smoke flow.
 
 ## Research caveats
 
