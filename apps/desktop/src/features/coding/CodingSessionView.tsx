@@ -13,6 +13,7 @@ import { ProjectFileTree } from "./ProjectFileTree";
 import { CodingTaskInspector } from "./CodingTaskInspector";
 import { BrowserPreview } from "./BrowserPreview";
 import { CodingSideChat } from "./CodingSideChat";
+import { ProjectScratchpad } from "./ProjectScratchpad";
 import { CodingPaneTabs } from "./CodingPaneTabs";
 import { useCodingPaneWorkspace, type CodingPanePanel } from "./useCodingPaneWorkspace";
 import { useCodingFileTabs } from "./useCodingFileTabs";
@@ -324,6 +325,7 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
 
   const renderFileExplorerPanel = (onSelectFile: (path: string) => void = openFile, allowHide = true) => <aside className={`project-file-explorer${allowHide ? "" : " is-standalone-files-page"}`} aria-label="Project files and changes">
     {allowHide && <div className="project-file-explorer-heading"><strong>Files</strong><Button variant="ghost" type="button" aria-label="Hide file explorer" title="Hide file explorer" onClick={() => setFileExplorerVisible(false)}>Hide</Button></div>}
+    <ProjectScratchpad projectId={selectedProject.id} />
     <div className="file-list-toolbar"><input ref={fileSearchRef} value={fileQuery} onChange={(event) => setFileQuery(event.target.value)} placeholder="Filter files…" aria-label="Filter project files" /><kbd>Ctrl P</kbd></div>
     {gitStatus?.changes.length ? <details className="coding-explorer-changes" open>
       <summary><strong>Changed files</strong><span>{gitStatus.changes.length}</span></summary>
