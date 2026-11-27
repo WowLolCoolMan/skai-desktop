@@ -49,6 +49,12 @@ public static partial class AgentHostLoop
             persona.LastResearchSummary = previous.LastResearchSummary;
             persona.ResearchHistory = previous.ResearchHistory;
             persona.LatestDistillation = previous.LatestDistillation;
+            persona.Continuity = previous.Continuity;
+            if (string.IsNullOrWhiteSpace(persona.PresetId)) persona.PresetId = previous.PresetId;
+            if (persona.SkillIds.Count == 0) persona.SkillIds = previous.SkillIds ?? [];
+            if (persona.ToolIds.Count == 0) persona.ToolIds = previous.ToolIds ?? [];
+            if (string.IsNullOrWhiteSpace(persona.MemoryScope)) persona.MemoryScope = previous.MemoryScope;
+            if (string.IsNullOrWhiteSpace(persona.MemoryProjectId)) persona.MemoryProjectId = previous.MemoryProjectId;
             if (persona.ProfileEvidenceUrls.Count == 0) persona.ProfileEvidenceUrls = previous.ProfileEvidenceUrls;
             persona.ExcludedResearchUrls = previous.ExcludedResearchUrls.Where(url => persona.Sources.All(source => !source.Url.Equals(url, StringComparison.OrdinalIgnoreCase))).ToList();
         }
@@ -294,6 +300,15 @@ public static partial class AgentHostLoop
         persona.EvidenceBoundaries = BoundPersonaText(persona.EvidenceBoundaries, 6_000);
         persona.Timeline = BoundPersonaText(persona.Timeline, 12_000);
         persona.SourceMaterial = BoundPersonaText(persona.SourceMaterial, 200_000);
+        persona.PresetId = BoundPersonaText(persona.PresetId, 128);
+        persona.SkillIds ??= [];
+        persona.SkillIds = persona.SkillIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => BoundPersonaText(id, 80)).Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList();
+        persona.ToolIds ??= [];
+        persona.ToolIds = persona.ToolIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => BoundPersonaText(id, 160)).Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToList();
+        persona.MemoryScope = persona.MemoryScope is "project" or "workspace" ? persona.MemoryScope : "persona";
+        persona.MemoryProjectId = string.IsNullOrWhiteSpace(persona.MemoryProjectId) ? null : BoundPersonaText(persona.MemoryProjectId, 128);
+        if (persona.MemoryScope == "project" && string.IsNullOrWhiteSpace(persona.MemoryProjectId))
+            throw new InvalidOperationException("Project-scoped persona memory requires a project identity.");
         if (persona.SourceMode == "public-research" && persona.Sources.Count == 0)
             throw new InvalidOperationException("Research a name before saving a researched persona so the card retains the sources and warning context.");
         if (persona.SourceMode == "own-material" && persona.SourceMaterial.Length == 0 && persona.Instructions.Length == 0)
@@ -343,6 +358,11 @@ public static partial class AgentHostLoop
         instructions = persona.Instructions,
         sourceMaterial = persona.SourceMaterial,
         personalContinuityEnabled = persona.PersonalContinuityEnabled,
+        presetId = persona.PresetId,
+        skillIds = persona.SkillIds,
+        toolIds = persona.ToolIds,
+        memoryScope = persona.MemoryScope,
+        memoryProjectId = persona.MemoryProjectId,
         progressiveResearchEnabled = persona.ProgressiveResearchEnabled,
         interactionCount = persona.InteractionCount,
         researchPassCount = persona.ResearchPassCount,

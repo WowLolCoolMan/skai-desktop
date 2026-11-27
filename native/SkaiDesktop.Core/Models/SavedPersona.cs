@@ -32,6 +32,16 @@ public sealed class SavedPersona
     public string Timeline { get; set; } = string.Empty;
     public string SourceMaterial { get; set; } = string.Empty;
     public string Instructions { get; set; } = string.Empty;
+    /// <summary>Optional local preset whose instructions, knowledge, and tool guidance are layered into persona chats.</summary>
+    public string PresetId { get; set; } = string.Empty;
+    /// <summary>Explicit local skills to apply whenever this persona is active.</summary>
+    public List<string> SkillIds { get; set; } = [];
+    /// <summary>Named tool grants are retained as an auditable binding; persona chat remains non-mutating until a tool-capable surface is selected.</summary>
+    public List<string> ToolIds { get; set; } = [];
+    /// <summary>Persona continuity scope: persona, project, or workspace.</summary>
+    public string MemoryScope { get; set; } = "persona";
+    /// <summary>Project identity used when MemoryScope is project.</summary>
+    public string? MemoryProjectId { get; set; }
     /// <summary>Chosen once at creation. When true, user-specific continuity is durable.</summary>
     public bool PersonalContinuityEnabled { get; set; }
     public bool ProgressiveResearchEnabled { get; set; } = true;

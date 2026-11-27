@@ -194,6 +194,11 @@ export type DesktopPersona = {
   instructions: string;
   sourceMaterial: string;
   personalContinuityEnabled: boolean;
+  presetId?: string;
+  skillIds?: string[];
+  toolIds?: string[];
+  memoryScope?: "persona" | "project" | "workspace";
+  memoryProjectId?: string | null;
   progressiveResearchEnabled: boolean;
   interactionCount: number;
   researchPassCount: number;

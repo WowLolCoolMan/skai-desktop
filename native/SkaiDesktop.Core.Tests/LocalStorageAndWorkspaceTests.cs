@@ -52,6 +52,13 @@ internal static class LocalStorageAndWorkspaceTests
             var reloaded = settingsStore.Load();
             Check(reloaded.Model == "persisted-model" && Math.Abs(reloaded.Temperature - 1.2) < 0.001 && reloaded.EffortMode == "adaptive" && reloaded.FullTextContextInjectionEnabled && reloaded.WebSearchEnabled && reloaded.SmartPromptRewritingEnabled, "settings, adaptive effort, and full-text attachment mode survive save and reload");
             Check(reloaded.AccentColor == "violet" && reloaded.ThemeMode == "dark" && reloaded.BackdropPreset == "deep-space" && reloaded.ReduceMotion && reloaded.InterfaceDensity == "compact" && reloaded.HostLabel == "Test workstation" && reloaded.RequireLocalModelEndpoints && reloaded.PromptSnippets is [{ Title: "Review", Text: "Review this carefully." }] && reloaded.SavedPersonas is [{ Id: "reviewer", Name: "Reviewer", Instructions: "Find defects." }] && reloaded.ActivePersonaId == "reviewer" && reloaded.SavedPresets is [{ Id: "launch", Name: "Launch reviewer", Knowledge: "The product is local-first.", ToolGuidance: "Inspect tests before edits." }] && reloaded.ActivePresetId == "launch", "appearance, backdrop, snippets, personas, presets, and host settings survive save and reload");
+            reloaded.SavedPersonas[0].PresetId = "launch";
+            reloaded.SavedPersonas[0].SkillIds = ["coding", "research"];
+            reloaded.SavedPersonas[0].ToolIds = ["github/issues.read"];
+            reloaded.SavedPersonas[0].MemoryScope = "workspace";
+            settingsStore.Save(reloaded);
+            var composedPersonaSettings = settingsStore.Load();
+            Check(composedPersonaSettings.SavedPersonas[0].PresetId == "launch" && composedPersonaSettings.SavedPersonas[0].SkillIds.SequenceEqual(["coding", "research"]) && composedPersonaSettings.SavedPersonas[0].ToolIds.SequenceEqual(["github/issues.read"]) && composedPersonaSettings.SavedPersonas[0].MemoryScope == "workspace", "persona preset, skill, tool, and memory-scope bindings survive settings save and reload");
             Check(reloaded.Quicklinks is [{ Title: "Project docs", Url: "https://example.com/docs" }], "quicklinks survive save and reload");
             Check(reloaded.DeveloperMode, "developer mode preference survives save and reload");
             Check(reloaded.VoiceOutputEnabled, "voice output preference survives save and reload");

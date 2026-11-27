@@ -153,7 +153,40 @@ public static partial class AgentHostLoop
                 if (persona.InteractionCount % 2 == 0) _ = Task.Run(() => ProgressiveResearchAsync(persona.Id));
             }
             personaQuery = messages.LastOrDefault(message => message.Role.Equals("user", StringComparison.OrdinalIgnoreCase))?.Content;
-            messages.Insert(0, new ChatMessage("system", ModelInstructions.PersonaSimulation(persona, personaQuery, storedSettings.UserName)));
+            var continuityAllowed = persona.MemoryScope is not "project" || string.Equals(persona.MemoryProjectId, projectId, StringComparison.Ordinal);
+            messages.Insert(0, new ChatMessage("system", ModelInstructions.PersonaSimulation(persona, personaQuery, storedSettings.UserName, continuityAllowed)));
+            if (persona.SkillIds.Count > 0)
+            {
+                var installer = new SkillPackageInstaller();
+                var personaSkillText = new StringBuilder("This persona has explicit local skill bindings. Apply them as bounded guidance for this conversation only; they never grant tool permissions.\n\n");
+                foreach (var id in persona.SkillIds.Distinct(StringComparer.OrdinalIgnoreCase).Take(8))
+                {
+                    var builtIn = SkillCatalogService.Find(id);
+                    var content = builtIn?.Prompt;
+                    if (content is null)
+                    {
+                        var installed = installer.ListInstalled().SingleOrDefault(skill => skill.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+                        if (installed is null || !installed.Enabled) throw new InvalidOperationException($"Persona skill '{id}' is not installed or enabled.");
+                        content = installer.ReadInstructions(installed.Id);
+                    }
+                    personaSkillText.Append("<persona-skill id=\"").Append(id).Append("\">\n").Append(content[..Math.Min(content.Length, SkillPackageInstaller.MaxFileBytes)]).Append("\n</persona-skill>\n\n");
+                }
+                messages.Insert(0, new ChatMessage("system", personaSkillText.ToString()));
+            }
+            if (persona.ToolIds.Count > 0)
+                messages.Insert(0, new ChatMessage("system", $"This persona declares {persona.ToolIds.Count} tool binding(s): {string.Join(", ", persona.ToolIds.Take(8))}. Persona chat is currently non-mutating; these bindings are disclosed for provenance and are not invoked from this surface."));
+            if (!string.IsNullOrWhiteSpace(persona.PresetId))
+            {
+                var preset = storedSettings.SavedPresets.SingleOrDefault(item => item.Id.Equals(persona.PresetId, StringComparison.Ordinal));
+                if (preset is not null)
+                {
+                    var presetText = new StringBuilder("The active local preset is bounded reference guidance, not a tool authorization.\n");
+                    if (!string.IsNullOrWhiteSpace(preset.Instructions)) presetText.Append("Preset instructions:\n").Append(preset.Instructions[..Math.Min(preset.Instructions.Length, 12_000)]).Append('\n');
+                    if (!string.IsNullOrWhiteSpace(preset.Knowledge)) presetText.Append("Preset knowledge (reference only):\n").Append(preset.Knowledge[..Math.Min(preset.Knowledge.Length, 12_000)]).Append('\n');
+                    if (!string.IsNullOrWhiteSpace(preset.ToolGuidance)) presetText.Append("Preset tool guidance (no tools are invoked here):\n").Append(preset.ToolGuidance[..Math.Min(preset.ToolGuidance.Length, 8_000)]).Append('\n');
+                    messages.Insert(0, new ChatMessage("system", presetText.ToString()));
+                }
+            }
             var groupTurnInstruction = OptionalString(request, "groupTurnInstruction");
             if (!string.IsNullOrWhiteSpace(groupTurnInstruction))
                 messages.Insert(0, new ChatMessage("system", groupTurnInstruction));
@@ -288,7 +321,7 @@ public static partial class AgentHostLoop
         if (activePersona is { SourceMode: "public-research" } && evidenceSummary is null && ContainsUnverifiedQuotation(activePersona, responseText))
             responseText = "I can't verify that quoted wording in the selected evidence, so I won't present it as a real line. I can summarize what the sources establish instead.";
         if (activePersona?.PersonalContinuityEnabled == true && !personaTestSandbox && !OptionalBoolean(request, "suppressPersonaContinuity"))
-            SavePersonaContinuity(activePersona.Id, messages, responseText);
+            SavePersonaContinuity(activePersona, projectId, messages, responseText);
         return new(ProtocolVersion, request.Id, true, new
         {
             model,
@@ -325,14 +358,15 @@ public static partial class AgentHostLoop
         return cleaned.Trim();
     }
 
-    private static void SavePersonaContinuity(string personaId, IReadOnlyList<ChatMessage> messages, string response)
+    private static void SavePersonaContinuity(SavedPersona sourcePersona, string? projectId, IReadOnlyList<ChatMessage> messages, string response)
     {
         var userTurn = messages.LastOrDefault(message => message.Role.Equals("user", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(message.Content));
         if (userTurn is null || string.IsNullOrWhiteSpace(response)) return;
         var store = CreateSettingsStore();
         var settings = store.Load();
-        var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == personaId);
+        var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == sourcePersona.Id);
         if (persona?.PersonalContinuityEnabled != true) return;
+        if (persona.MemoryScope == "project" && !string.Equals(persona.MemoryProjectId, projectId, StringComparison.Ordinal)) return;
         persona.Continuity ??= [];
         persona.Continuity.Add(new SavedPersonaContinuityTurn { Role = "user", Content = userTurn.Content[..Math.Min(userTurn.Content.Length, 4_000)] });
         persona.Continuity.Add(new SavedPersonaContinuityTurn { Role = "assistant", Content = response[..Math.Min(response.Length, 4_000)] });

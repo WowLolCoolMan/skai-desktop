@@ -35,6 +35,7 @@ const exerciseOnboarding = process.env.UI_MATRIX_EXERCISE_ONBOARDING === "1";
 const exerciseWorkspaceSearch = process.env.UI_MATRIX_EXERCISE_WORKSPACE_SEARCH === "1";
 const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
 const exerciseRetention = process.env.UI_MATRIX_EXERCISE_RETENTION === "1";
+const exercisePersona = process.env.UI_MATRIX_EXERCISE_PERSONA === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
 let sideChatRequests = 0;
@@ -375,7 +376,7 @@ async function main() {
 
   // Long, awkward content: long titles, unbroken tokens, wide code, tables, many chats, long project names.
   phase = "seed";
-  const captureMode = process.env.UI_MATRIX_CAPTURE === "1" || process.env.UI_MATRIX_EXERCISE_CHAT_COLLABORATION === "1";
+  const captureMode = process.env.UI_MATRIX_CAPTURE === "1" || process.env.UI_MATRIX_EXERCISE_CHAT_COLLABORATION === "1" || exercisePersona;
   const exerciseChatActions = process.env.UI_MATRIX_EXERCISE_CHAT_ACTIONS === "1";
   const exerciseChatBase = process.env.UI_MATRIX_EXERCISE_CHAT_BASE === "1";
   const exerciseDocuments = process.env.UI_MATRIX_EXERCISE_DOCUMENTS === "1";
@@ -1323,6 +1324,8 @@ async function main() {
           await clickButtonText(cdp, "New persona");
           const starterReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-starter-templates')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!starterReady) throw new Error('The persona create page did not show starter templates.');
+          const compositionReady = await cdp.evaluate(`(() => ({ card: Boolean(document.querySelector('.persona-composition-card')), scope: Boolean([...document.querySelectorAll('select')].find((select) => [...select.options].some((option) => option.textContent === 'Selected project'))), skills: Boolean(document.querySelector('.persona-skill-grid')) }))()`);
+          if (!compositionReady.card || !compositionReady.scope || !compositionReady.skills) throw new Error(`Persona composition controls did not render: ${JSON.stringify(compositionReady)}`);
           const starterTemplates = await cdp.evaluate(`(() => [...document.querySelectorAll('.persona-starter-templates button')].map((button) => button.textContent.trim()))()`);
           if (!['Coding', 'Research', 'Writing', 'Support'].every((label) => starterTemplates.includes(label))) throw new Error(`Starter persona templates are incomplete: ${JSON.stringify(starterTemplates)}`);
           await clickButtonText(cdp, "Coding", ".persona-starter-templates");

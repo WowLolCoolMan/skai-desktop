@@ -294,6 +294,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .persona-library-profile-fields > div { display: grid; gap: 6px; }
 .persona-library-profile-fields dt { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
 .persona-library-profile-fields dd { min-height: 48px; margin: 0; padding: 12px 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); color: var(--skai-color-text); background: var(--skai-color-surface-soft); white-space: pre-wrap; }
+.persona-composition-card { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.persona-composition-card > div:first-child { display: grid; gap: 4px; }
+.persona-composition-card > div:first-child small, .persona-composition-card small { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
+.persona-skill-grid { display: grid; gap: 8px; }
+.persona-skill-grid > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); font-weight: 700; }
+.persona-skill-grid > label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 9px; padding: 9px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); cursor: pointer; }
+.persona-skill-grid > label:has(input:checked) { border-color: color-mix(in srgb, var(--skai-color-accent) 60%, var(--skai-color-border)); background: color-mix(in srgb, var(--skai-color-accent) 7%, var(--skai-color-surface)); }
+.persona-skill-grid > label > span { display: grid; gap: 3px; min-width: 0; }
 .persona-library-start { display: grid; justify-items: center; gap: 10px; padding-top: 4px; text-align: center; }
 .persona-library-start > .ui-button { min-width: min(260px, 100%); min-height: 46px; }
 .persona-library-start > span { max-width: 430px; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.5; }

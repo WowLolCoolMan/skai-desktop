@@ -68,6 +68,47 @@ platform or theme that was not recorded.
 | Scenario | Existing focused evidence | Current boundary |
 | --- | --- | --- |
 | Local image runtime/model unavailable | [`smoke:image:runtime-unavailable`](../../package.json), [`smoke:image:model-unavailable`](../../package.json) | Covers image runtime/model setup recovery; does not establish recovery for every chat provider. |
+
+### Slice 19 — composable personas and agent presets
+
+- Outcome: persona cards can bind a saved instruction preset, installed local
+  skills, auditable tool IDs, and persona/project/workspace memory scope. Chat
+  layers bounded preset and skill guidance, discloses tool bindings without
+  invoking them, and gates project continuity to the matching project identity.
+- Reference / workflow: Persona Workshop composition bindings, effective-access
+  panel, instruction provenance, duplicate/import/export, and private test
+  sandbox.
+- Success check: `npm test`; `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run smoke:agent-host`; packaged Electron UI matrix with the Persona
+  Workshop exercise enabled.
+- Failure check: project-scoped continuity with a different or missing project
+  identity is omitted; disabled or missing persona skills are rejected before a
+  model request; tool bindings remain visible metadata and are not executed by
+  the private sandbox.
+- Disposable profile / cleanup: core tests use temporary settings stores;
+  Agent Host smoke uses its isolated loopback profile; packaged UI smoke uses a
+  throwaway Electron profile. No user persona, skill, model, or tool data is
+  modified.
+- Platform / OS: Windows x64 packaged acceptance; native Linux/macOS remains
+  unverified.
+- Viewport / theme / sidebar: 1440×900 dark expanded-sidebar matrix plus the
+  responsive widths already covered by the shared UI smoke.
+- Runtime / app revision: local Agent Host and packaged Electron production
+  build for the Slice 19 commit.
+- Network and privacy boundary: persona core/host checks are local and use no
+  hosted inference; public-research paths are not exercised by this acceptance
+  record. Export excludes project identity, credentials, memory, and tool
+  permissions.
+- Before screenshot: Persona Workshop before composition bindings and scope
+  disclosure.
+- After screenshot: Persona Workshop with preset/skill/tool binding controls,
+  explicit memory scope, effective access, and provenance details.
+- Comparison: matches the roadmap's composable-persona workflow while keeping
+  the existing all-model support and non-mutating sandbox boundary. A future
+  tool-capable persona surface is still required before bindings can execute.
+- Unverified platforms, integrations, or hardware: native Linux/macOS UI,
+  external MCP/GitHub tool execution from personas, and user-specific local
+  model/voice combinations.
 | MCP denied access, revoke, reconnect, delayed response | [`smoke:marketplace-host`](../../package.json), [`MCP client tests`](../../native/SkaiDesktop.Core.Tests/McpStreamableHttpClientTests.cs) | Loopback lifecycle verifies denied writes, revocation, and fresh-session reconnect; core test injects a delayed handler and checks the request deadline. Packaged timeout UI recovery remains unverified. |
 | GitHub authentication expiry | [`GitHub integration guide`](../guides/GITHUB_INTEGRATION.md), [`GitHub core tests`](../../native/SkaiDesktop.Core.Tests/GitHubTests.cs) | Device-flow expiry/polling and an injected HTTP 401 are covered; end-to-end refresh failure in the packaged UI remains unverified. |
 | Disk full / storage exhaustion | [`Atomic file writer fault-injection test`](../../native/SkaiDesktop.Core.Tests/AtomicFileWriterTests.cs), [`Agent Host smoke`](../../scripts/smoke-agent-host.cjs) | A deterministic injected ENOSPC write failure verifies that the last complete file is preserved and the partial temp file is cleaned up. It does not fill a real disk or verify the packaged UI recovery message; disk-growth quota remains unenforced. |

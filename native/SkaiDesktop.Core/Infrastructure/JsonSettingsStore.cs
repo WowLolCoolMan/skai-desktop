@@ -178,6 +178,13 @@ public sealed class JsonSettingsStore
                 turn.Role = turn.Role is "user" or "assistant" ? turn.Role : "user";
                 turn.Content = Bound(turn.Content, 4_000);
             }
+            persona.PresetId = Bound(persona.PresetId, 128);
+            persona.SkillIds ??= [];
+            persona.SkillIds = persona.SkillIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => Bound(id.Trim(), 80)).Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList();
+            persona.ToolIds ??= [];
+            persona.ToolIds = persona.ToolIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => Bound(id.Trim(), 160)).Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToList();
+            persona.MemoryScope = persona.MemoryScope is "project" or "workspace" ? persona.MemoryScope : "persona";
+            persona.MemoryProjectId = string.IsNullOrWhiteSpace(persona.MemoryProjectId) ? null : Bound(persona.MemoryProjectId, 128);
         }
         if (settings.ActivePersonaId is not null && !settings.SavedPersonas.Any(persona => persona.Id == settings.ActivePersonaId))
             settings.ActivePersonaId = null;
