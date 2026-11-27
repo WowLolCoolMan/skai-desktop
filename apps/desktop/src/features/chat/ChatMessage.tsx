@@ -43,6 +43,6 @@ export function ChatMessage({ message, index, model, busy, conversationId, copie
       <Button variant="ghost" onClick={() => onFork(index)} disabled={!conversationId}>Fork from here</Button>
     </div></div>
     {editing ? <div className="message-edit-form"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} aria-label="Edit user message" autoFocus /><div className="message-edit-actions"><Button variant="ghost" type="button" disabled={saving} onClick={() => { setDraft(message.content); setEditing(false); }}>Cancel</Button><Button variant="primary" type="button" disabled={saving || !draft.trim()} onClick={() => void saveEdit()}>{saving ? "Regenerating…" : "Save & regenerate"}</Button></div></div> : <MessageContent content={message.content} />}
-    <AttachmentList attachments={message.attachments ?? []} />
+    <AttachmentList attachments={message.attachments ?? []} trustLabel="Conversation content · retained locally" />
   </article>;
 }
