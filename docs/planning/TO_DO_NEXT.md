@@ -60,6 +60,20 @@ Mark an item done only when the linked workflow has evidence.
   UI matrix for `#/models` and `#/marketplace` at 1440×900 passed without
   runtime or layout failures.
 
+### Coding workspace hierarchy — completed in this pass
+
+- **Status / owner:** Done · Codex
+- **Result:** The Coding Agent canvas now keeps the conversation and Monaco
+  workspace above the fold. The local browser preview is an explicitly
+  collapsed utility drawer with a compact summary, bounded open height, and
+  a smaller console region, so opening it cannot push the primary thread and
+  editor out of view.
+- **Evidence:** Desktop typecheck, production build, syntax/theme audits,
+  Electron packaging, and the packaged UI matrix (including Coding project,
+  editor, Files, Changes, and Side chat paths) passed. The combined Side chat
+  plus Markdown preview fixture remains timing-sensitive in the isolated
+  smoke harness and should be rerun independently before release.
+
 1. **UI and accessibility acceptance — In progress · Codex.** The freshly
    packaged audit passes all 16 routes with zero WCAG violations; axe reports
    one incomplete contrast check for decorative symbol-only icons on Pet
