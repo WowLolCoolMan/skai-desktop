@@ -1,10 +1,10 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { AppRouteView } from "./app/AppRouteView";
 import { useDesktopWorkspace } from "./app/useDesktopWorkspace";
 import { Sidebar } from "./components/layout/Sidebar";
 import { GlobalRail } from "./components/layout/GlobalRail";
 import { WorkspaceTabs } from "./components/layout/WorkspaceTabs";
-import { Toolbar } from "./components/layout/Toolbar";
+import { Toolbar, type WorkspaceLayoutPreset } from "./components/layout/Toolbar";
 import { CommandPalette } from "./components/overlays/CommandPalette";
 import { CloseChoiceDialog } from "./components/overlays/CloseChoiceDialog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -37,6 +37,20 @@ export default function App() {
   const codingSplitOpen = workspaceTabsVisible && workspace.route === "coding" && Boolean(workspace.routeState.selectedProject);
   const contextualTabAction = workspace.route === "coding" && workspace.routeState.selectedProject ? workspace.openSideChat : workspace.openNewWorkspaceTab;
   const contextualTabLabel = workspace.route === "coding" && workspace.routeState.selectedProject ? "New side chat" : "New tab";
+  const applyLayoutPreset = useCallback((preset: WorkspaceLayoutPreset) => {
+    const layouts: Record<WorkspaceLayoutPreset, { route: Parameters<typeof workspace.onNavigate>[0]; sidebarOpen: boolean; sidebarWidth: number }> = {
+      chat: { route: "chat", sidebarOpen: false, sidebarWidth: 276 },
+      coding: { route: "coding", sidebarOpen: true, sidebarWidth: 300 },
+      review: { route: "coding", sidebarOpen: true, sidebarWidth: 276 },
+      research: { route: "memory", sidebarOpen: true, sidebarWidth: 288 },
+      media: { route: "images", sidebarOpen: false, sidebarWidth: 276 },
+    };
+    const layout = layouts[preset];
+    workspace.resizeSidebar(layout.sidebarWidth);
+    setDesktopSidebarOpen(layout.sidebarOpen);
+    setMobileSidebarOpen(false);
+    workspace.onNavigate(layout.route);
+  }, [workspace.onNavigate, workspace.resizeSidebar]);
   useEffect(() => {
     const toggleWithShortcut = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.key.toLowerCase() !== "s") return;
@@ -47,10 +61,21 @@ export default function App() {
     window.addEventListener("keydown", toggleWithShortcut);
     return () => window.removeEventListener("keydown", toggleWithShortcut);
   }, [compactViewport]);
+  useEffect(() => {
+    const applyWithShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || !event.altKey || !["1", "2", "3", "4", "5"].includes(event.key)) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      event.preventDefault();
+      applyLayoutPreset(({ "1": "chat", "2": "coding", "3": "review", "4": "research", "5": "media" } as const)[event.key as "1" | "2" | "3" | "4" | "5"]);
+    };
+    window.addEventListener("keydown", applyWithShortcut);
+    return () => window.removeEventListener("keydown", applyWithShortcut);
+  }, [applyLayoutPreset]);
   const isSidebarOpen = compactViewport ? mobileSidebarOpen : desktopSidebarOpen;
   return <ErrorBoundary><div className={`app-shell ${workspaceTabsVisible && workspace.workspaceTabs.length ? "has-workspace-tabs" : ""} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""} ${desktopSidebarOpen ? "" : "workspace-sidebar-collapsed"}`} style={shellStyle}>
     <a className="skip-link" href="#main-content">Skip to content</a>
-    <Toolbar connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onToggleSidebar={() => { if (compactViewport) setMobileSidebarOpen((open) => !open); else setDesktopSidebarOpen((open) => !open); }} sidebarOpen={isSidebarOpen} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
+    <Toolbar connection={workspace.connection} canGoBack={workspace.canGoBack} canGoForward={workspace.canGoForward} onBack={workspace.goBack} onForward={workspace.goForward} onRetryConnection={workspace.retryConnection} onNavigate={workspace.onNavigate} onNewChat={workspace.startNewChat} onApplyLayoutPreset={applyLayoutPreset} onToggleSidebar={() => { if (compactViewport) setMobileSidebarOpen((open) => !open); else setDesktopSidebarOpen((open) => !open); }} sidebarOpen={isSidebarOpen} windowsTitleBarOverlay={window.skaiAgent?.window?.platform === "win32"} />
     <GlobalRail route={workspace.route} onNavigate={workspace.onNavigate} />
     {mobileSidebarOpen && <button className="mobile-sidebar-backdrop" type="button" aria-label="Close workspace navigation" onClick={() => setMobileSidebarOpen(false)} />}
     <Sidebar className={`workspace-sidebar ${mobileSidebarOpen ? "is-mobile-open" : ""}`} route={workspace.route} activeConversationId={workspace.routeState.conversationId} agentMode={workspace.agentMode} onAgentModeChange={workspace.setAgentMode} onNavigate={(route) => { workspace.onNavigate(route); setMobileSidebarOpen(false); }} conversations={workspace.conversations} projects={workspace.routeState.projects} query={workspace.conversationQuery} sidebarWidth={workspace.sidebarWidth} onSidebarWidthChange={workspace.resizeSidebar} onQueryChange={workspace.setConversationQuery} onNewChat={() => { workspace.startNewChat(); setMobileSidebarOpen(false); }} onNewProjectThread={(project) => { workspace.openNewProjectThread(project); setMobileSidebarOpen(false); }} onOpenProject={(project) => { workspace.routeActions.onOpenProject(project); setMobileSidebarOpen(false); }} onSelectConversation={(id) => { workspace.selectConversation(id); setMobileSidebarOpen(false); }} onConversationMetadata={workspace.updateConversationMetadata} />
