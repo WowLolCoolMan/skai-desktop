@@ -85,6 +85,18 @@ internal static class ModelLibraryTests
         Check(ModelDisplayNameFormatter.Format("qwen3:14b") == "Qwen3 14B", "Ollama parameter-size tags become readable model labels");
         Check(ModelDisplayNameFormatter.Format("hf.co/Thaurock/Qwen3-Coder-30B-A3B-Instruct-abliterated-GGUF:Q4_K_M") == "Qwen3 Coder 30B A3B Instruct · Q4_K_M", "Hugging Face Ollama IDs expose the model name and quantization instead of the runtime family alias");
         Check(ModelDisplayNameFormatter.Format("hf.co/example/model-name:latest") == "Model Name" && ModelDisplayNameFormatter.Format("") == "Unknown model", "generic and empty model IDs receive safe readable labels");
+        var llamaRoute = ModelRuntimeRouter.Route("Ollama", "qwen3:8b", capabilities: ["completion"]);
+        Check(llamaRoute.Format == ModelFormat.Gguf && llamaRoute.Runtime == "llama.cpp-compatible server" && llamaRoute.Task == ModelTask.TextGeneration,
+            "runtime router maps local LLM providers to the GGUF llama.cpp-compatible route");
+        var visionRoute = ModelRuntimeRouter.Route("LM Studio", "qwen2-vl", files: ["model.gguf", "mmproj.gguf"], capabilities: ["vision"]);
+        Check(visionRoute.Format == ModelFormat.Gguf && visionRoute.Task == ModelTask.VisionLanguage && visionRoute.Evidence.StartsWith("Detected from local artifact files", StringComparison.Ordinal),
+            "runtime router preserves file evidence for GGUF vision models");
+        var onnxRoute = ModelRuntimeRouter.Route("Local voice", "kokoro", files: ["model.onnx"], capabilities: ["speech"]);
+        Check(onnxRoute.Format == ModelFormat.Onnx && onnxRoute.Runtime == "ONNX Runtime" && onnxRoute.Task == ModelTask.TextToSpeech,
+            "runtime router maps ONNX speech models to the in-process ONNX adapter");
+        var imageRoute = ModelRuntimeRouter.Route("ComfyUI", "flux1-dev", files: ["diffusion_model.safetensors"]);
+        Check(imageRoute.Format == ModelFormat.SafeTensors && imageRoute.Runtime == "ComfyUI" && imageRoute.Task == ModelTask.TextToImage,
+            "runtime router maps diffusion weights to the ComfyUI adapter");
         var resilientInventory = new ModelLibraryService(new HttpClient(new StubHandler((request, _) =>
         {
             if (request.RequestUri?.Port == 1234 && request.RequestUri.AbsolutePath == "/api/v1/models")

@@ -67,6 +67,10 @@ type SettingsProps = {
   provider: string;
   endpoint: string;
   model: string;
+  subagentModel?: string;
+  subagentModelProvider?: string;
+  subagentModelSizeBytes?: number | null;
+  subagentModelContextLength?: number | null;
   models: Model[];
   ollamaContextWindowTokens: number;
   localRamBudgetBytes: number;
@@ -99,6 +103,9 @@ export function SettingsPage(props: SettingsProps) {
   const [query, setQuery] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [discoveringModels, setDiscoveringModels] = useState(false);
+  const [subagentChoice, setSubagentChoice] = useState("");
+  const [subagentSizeBytes, setSubagentSizeBytes] = useState<number | null>(props.subagentModelSizeBytes ?? null);
+  const [subagentContextLength, setSubagentContextLength] = useState<number | null>(props.subagentModelContextLength ?? null);
   const [airLlmStatus, setAirLlmStatus] = useState<AirLlmRuntimeStatus | null>(null);
   const [checkingAirLlm, setCheckingAirLlm] = useState(false);
   const [airLlmInstall, setAirLlmInstall] = useState<AirLlmInstallSession | null>(null);
@@ -114,6 +121,17 @@ export function SettingsPage(props: SettingsProps) {
   const [updateChecksEnabled, setUpdateChecksEnabled] = useState(true);
   const [achievements, setAchievements] = useState<SkaiAchievement[]>(readAchievements);
   const normalizedQuery = query.trim().toLowerCase();
+  useEffect(() => {
+    let active = true;
+    void window.skaiAgent?.request("settings.get").then((response) => {
+      if (!active || !response?.ok) return;
+      const settings = response.result as { subagentModel?: string; subagentModelProvider?: string; subagentModelSizeBytes?: number | null; subagentModelContextLength?: number | null };
+      setSubagentChoice(settings.subagentModel ? `${settings.subagentModelProvider || props.provider}::${settings.subagentModel}` : "");
+      setSubagentSizeBytes(settings.subagentModelSizeBytes ?? null);
+      setSubagentContextLength(settings.subagentModelContextLength ?? null);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [props.provider]);
   const visibleCategories = useMemo(() => categories.filter((category) => !normalizedQuery || `${category} ${categoryDescription(category)} ${categorySearchText[category]}`.toLowerCase().includes(normalizedQuery)), [normalizedQuery]);
   useEffect(() => {
     if (!normalizedQuery || visibleCategories.includes(activeCategory)) return;
@@ -186,7 +204,7 @@ export function SettingsPage(props: SettingsProps) {
   const selectedOllamaModel = props.models.find((entry) => entry.model === props.model && (entry.provider ?? "").toLowerCase() === "ollama");
   const contextSupport = selectedOllamaModel?.contextLength == null ? "unknown" : selectedOllamaModel.contextLength >= 1_048_576 ? "supported" : "unsupported";
   const contextMismatch = props.provider === "Ollama" && props.ollamaContextWindowTokens > 0 && selectedOllamaModel?.contextLength != null && props.ollamaContextWindowTokens > selectedOllamaModel.contextLength;
-  const save = async () => { if (saveState === "saving") return; setSaveState("saving"); try { setSaveState(await props.onSave() ? "saved" : "idle"); } catch { setSaveState("idle"); } };
+  const save = async () => { if (saveState === "saving") return; setSaveState("saving"); try { if (!await props.onSave()) { setSaveState("idle"); return; } const selected = props.models.find((entry) => `${entry.provider ?? "Local API"}::${entry.model}` === subagentChoice); const response = await window.skaiAgent?.request("settings.save", { provider: props.provider, endpoint: props.endpoint, model: props.model, subagentModel: selected?.model ?? "", subagentModelProvider: selected?.provider ?? "", subagentModelSizeBytes: selected?.sizeBytes ?? subagentSizeBytes, subagentModelContextLength: selected?.contextLength ?? subagentContextLength }); if (!response?.ok) throw new Error(response?.error?.message ?? "The subagent model preference could not be saved."); setSaveState("saved"); } catch { setSaveState("idle"); } };
   const discoverModels = async () => { if (discoveringModels) return; setDiscoveringModels(true); await props.onDiscoverModels(); setDiscoveringModels(false); };
   const checkAirLlm = async () => {
     if (checkingAirLlm) return;
@@ -256,7 +274,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Image Generation" && <><div className="settings-field"><label>ComfyUI endpoint<input value={props.imageEndpoint} onChange={(event) => props.onImageChange("endpoint", event.target.value)} placeholder="http://127.0.0.1:8188" /></label><label>Workflow JSON<input value={props.imageWorkflow} onChange={(event) => props.onImageChange("workflow", event.target.value)} placeholder="Paste a ComfyUI workflow JSON" /></label></div><p className="settings-help">Image Studio offers direct local Stable Diffusion Turbo generation after you install its optional runtime. ComfyUI remains available for custom workflows and image editing.</p></>}
 
-        {activeCategory === "Agents" && <><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Use saved memory in prompts" detail="Inject enabled memory entries into local conversations." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><Toggle label="Rewrite typed prompts before sending" detail="Use the selected local model to improve a draft. Skai shows an editable preview; choose the rewrite, the original, or cancel before anything is sent." checked={props.smartPromptRewritingEnabled} onChange={(value) => change("smartPromptRewritingEnabled", value)} /><div className="settings-callout"><strong>Review stays in your hands</strong><span>Prompt rewriting uses the active local model and never replaces or sends your draft without your choice.</span></div><div className="settings-callout"><strong>Safe by default</strong><span>Agent tasks are proposed before they run, and the selected environment is shown before execution.</span></div></>}
+        {activeCategory === "Agents" && <><div className="settings-field"><label>Subagent model<select value={subagentChoice} onChange={(event) => { const value = event.target.value; setSubagentChoice(value); const selected = props.models.find((entry) => `${entry.provider ?? "Local API"}::${entry.model}` === value); setSubagentSizeBytes(selected?.sizeBytes ?? null); setSubagentContextLength(selected?.contextLength ?? null); }}><option value="">Use the main coding model</option>{props.models.map((entry) => <option key={`${entry.provider ?? "Local API"}::${entry.model}`} value={`${entry.provider ?? "Local API"}::${entry.model}`}>{entry.displayName || entry.model} · {entry.provider ?? "Local API"}</option>)}</select></label><span className="settings-help">The main coding model remains your selected model. Delegated workers use this model and its discovered size estimate, so you can assign Bonsai 2 9B here and keep Bonsai 2.5 27B as the main coding model.</span></div><Toggle label="Developer mode" detail="Show extra diagnostics and development controls." checked={props.developerMode} onChange={(value) => change("developerMode", value)} /><Toggle label="Use saved memory in prompts" detail="Inject enabled memory entries into local conversations." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><Toggle label="Rewrite typed prompts before sending" detail="Use the selected local model to improve a draft. Skai shows an editable preview; choose the rewrite, the original, or cancel before anything is sent." checked={props.smartPromptRewritingEnabled} onChange={(value) => change("smartPromptRewritingEnabled", value)} /><div className="settings-callout"><strong>Review stays in your hands</strong><span>Prompt rewriting uses the active local model and never replaces or sends your draft without your choice.</span></div><div className="settings-callout"><strong>Safe by default</strong><span>Agent tasks are proposed before they run, and the selected environment is shown before execution.</span></div></>}
 
         {activeCategory === "Integrations" && <><Integration title="GitHub project workflow" detail="Available from the Coding workspace through your local GitHub CLI session. Skai does not collect a separate token here." status="Available" /><Integration title="Local services" detail="Ollama, LM Studio, AirLLM, OS speech, and ComfyUI use local endpoints." status={localRoute ? "Available" : "Needs setup"} /></>}
 

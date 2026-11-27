@@ -4,7 +4,7 @@ import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../compone
 import { NavIcon } from "../../components/ui/NavIcon";
 
 function modelProvider(model: Model) {
-  return model.provider ?? "Local runtime";
+  return `${model.provider ?? "Local runtime"} · ${model.runtime ?? "Runtime route unknown"}`;
 }
 
 function modelVisionLabel(vision: string) {
@@ -22,7 +22,7 @@ export function ModelsPage({ models, onDiscover, onPull, onCancelPull, onSelect 
   const [pullProgress, setPullProgress] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [reviewPullName, setReviewPullName] = useState<string | null>(null);
-  const filtered = useMemo(() => models.filter((model) => `${model.displayName ?? ""} ${model.model} ${model.provider ?? ""} ${model.capabilities.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase())), [models, query]);
+  const filtered = useMemo(() => models.filter((model) => `${model.displayName ?? ""} ${model.model} ${model.provider ?? ""} ${model.runtime ?? ""} ${model.format ?? ""} ${model.task ?? ""} ${model.capabilities.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase())), [models, query]);
   const selected = models.find((model) => modelKey(model) === selectedModel) ?? null;
   const discover = async () => {
     if (discovering) return;

@@ -134,6 +134,7 @@ public static partial class AgentHostLoop
         }).ToArray();
 
         var store = CreateTaskStore();
+        var settings = CreateSettingsStore().Load();
         var existingTasks = store.Load();
         if (existingTasks.Count + specs.Length > AgentTaskArtifactStore.MaxTasks)
             throw new InvalidOperationException($"Delegation would exceed the {AgentTaskArtifactStore.MaxTasks} task limit.");
@@ -148,10 +149,10 @@ public static partial class AgentHostLoop
             projectId: parent.ProjectId,
             conversationId: parent.ConversationId,
             responseMode: parent.ResponseMode,
-            model: spec.model ?? parent.Model,
-            modelProvider: spec.modelProvider ?? parent.ModelProvider,
-            modelSizeBytes: spec.modelSizeBytes ?? parent.ModelSizeBytes,
-            modelContextLength: spec.modelContextLength ?? parent.ModelContextLength,
+            model: spec.model ?? (string.IsNullOrWhiteSpace(settings.SubagentModel) ? parent.Model : settings.SubagentModel),
+            modelProvider: spec.modelProvider ?? (string.IsNullOrWhiteSpace(settings.SubagentModelProvider) ? parent.ModelProvider : settings.SubagentModelProvider),
+            modelSizeBytes: spec.modelSizeBytes ?? (string.IsNullOrWhiteSpace(settings.SubagentModel) ? parent.ModelSizeBytes : settings.SubagentModelSizeBytes),
+            modelContextLength: spec.modelContextLength ?? (string.IsNullOrWhiteSpace(settings.SubagentModel) ? parent.ModelContextLength : settings.SubagentModelContextLength),
             airLlmCompatible: spec.airLlmCompatible)).ToArray();
     }
 

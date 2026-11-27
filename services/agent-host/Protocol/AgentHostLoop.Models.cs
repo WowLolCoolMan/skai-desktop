@@ -140,12 +140,17 @@ public static partial class AgentHostLoop
             var profile = model.Endpoint.Equals(endpoint, StringComparison.OrdinalIgnoreCase)
                 ? profiles.FirstOrDefault(item => item.Model.Equals(model.Model, StringComparison.OrdinalIgnoreCase))
                 : null;
+            var route = ModelRuntimeRouter.Route(model.Provider, model.Model, capabilities: profile?.Capabilities);
             return new
             {
                 model = model.Model,
                 displayName = model.DisplayName,
                 vision = profile?.Vision.ToString() ?? "unknown",
                 capabilities = profile?.Capabilities ?? Array.Empty<string>(),
+                format = route.Format.ToString(),
+                task = route.Task.ToString(),
+                runtime = route.Runtime,
+                routingEvidence = route.Evidence,
                 provider = model.Provider == "Current local endpoint" ? providerId : model.Provider,
                 endpoint = model.Provider == "AirLLM" ? null : model.Endpoint,
                 sizeBytes = model.SizeBytes,
