@@ -22,6 +22,7 @@ public static partial class AgentHostLoop
                 id = task.Id,
                 title = task.Title,
                 instruction = task.Instruction,
+                followUpInstructions = task.FollowUpInstructions,
                 responseMode = ChatResponseModes.IsValid(task.ResponseMode) ? task.ResponseMode : ChatResponseModes.Coding,
                 environment = task.Environment,
                 worktreePath = task.WorktreePath,
@@ -461,9 +462,24 @@ public static partial class AgentHostLoop
                 : null;
             var codingTools = useNativeOllamaTools ? CreateCodingTools(task.ParentRunId is null && task.Environment == "local", agentPluginTools, task.Environment == "local") : null;
             string? summary = null;
+            var appliedFollowUpCount = 0;
+            var verificationAlreadyStarted = false;
+            void ApplyPendingFollowUps()
+            {
+                var current = CreateTaskStore().Get(task.Id);
+                while (appliedFollowUpCount < current.FollowUpInstructions.Count)
+                {
+                    var followUp = current.FollowUpInstructions[appliedFollowUpCount++];
+                    var content = $"USER FOLLOW-UP #{appliedFollowUpCount} (added while this task was running):\n{followUp}\n\nIncorporate this direction into the current task. Preserve earlier requirements unless this follow-up explicitly changes them, and explain any conflict before finishing.";
+                    messages.Add(new ChatMessage("user", content));
+                    ollamaMessages?.Add(new OllamaToolChatMessage("user", content));
+                    AppendTaskJournalEvent(task, "task.follow_up_applied", new Dictionary<string, string> { ["index"] = appliedFollowUpCount.ToString(CultureInfo.InvariantCulture) });
+                }
+            }
             for (var step = 0; step <= MaxCodingActions; step++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                ApplyPendingFollowUps();
                 JsonDocument? parsedAction = null;
                 OllamaToolFunctionCall? nativeCall = null;
                 if (ollamaMessages is not null && codingTools is not null)
@@ -563,6 +579,18 @@ public static partial class AgentHostLoop
                         continue;
                     }
                     summary = proposedSummary;
+                    var resultLabels = changedFiles.Count == 0 ? new[] { "local-model-response" } : changedFiles.ToArray();
+                    var normalizedSummary = NormalizeTaskSummary(summary);
+                    if (!CreateTaskStore().TryBeginVerificationAfterFollowUps(task.Id, appliedFollowUpCount, normalizedSummary, resultLabels))
+                    {
+                        summary = null;
+                        ApplyPendingFollowUps();
+                        continue;
+                    }
+                    verificationAlreadyStarted = true;
+                    var verifyingTask = CreateTaskStore().Get(task.Id);
+                    SetTaskJournalStatus(verifyingTask, AgentTaskStatuses.Verifying);
+                    AppendTaskJournalEvent(verifyingTask, "task.verification.started", new Dictionary<string, string> { ["artifactCount"] = resultLabels.Length.ToString(CultureInfo.InvariantCulture) });
                     break;
                 }
                 if (step >= MaxCodingActions) throw new InvalidOperationException($"The coding agent reached its {MaxCodingActions}-action limit before finishing.");
@@ -837,7 +865,7 @@ public static partial class AgentHostLoop
             }
             if (string.IsNullOrWhiteSpace(summary)) throw new InvalidOperationException("The local model did not return a final summary.");
             var labels = changedFiles.Count == 0 ? new[] { "local-model-response" } : changedFiles.ToArray();
-            return new AgentTaskExecutionResult(NormalizeTaskSummary(summary), labels);
+            return new AgentTaskExecutionResult(NormalizeTaskSummary(summary), labels, verificationAlreadyStarted);
         }, cancellationToken).ConfigureAwait(false);
         if (finalTask.Status == AgentTaskStatuses.Completed)
         {
@@ -1031,6 +1059,27 @@ public static partial class AgentHostLoop
             status = task.Status,
             worktreePath = task.WorktreePath,
             worktreeBranch = task.WorktreeBranch,
+            updatedAt = task.UpdatedAtUtc,
+        });
+    }
+
+    private static AgentResponse SteerTask(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 128);
+        var instruction = RequiredBoundedString(request, "instruction", AgentTaskArtifactStore.MaxInstructionCharacters);
+        var store = CreateTaskStore();
+        var task = store.AddFollowUpInstruction(id, instruction);
+        SetTaskJournalStatus(task, task.Status);
+        AppendTaskJournalEvent(task, "task.follow_up_added", new Dictionary<string, string>
+        {
+            ["index"] = task.FollowUpInstructions.Count.ToString(CultureInfo.InvariantCulture),
+            ["characters"] = instruction.Length.ToString(CultureInfo.InvariantCulture),
+        });
+        return new(ProtocolVersion, request.Id, true, new
+        {
+            id = task.Id,
+            status = task.Status,
+            followUpInstructions = task.FollowUpInstructions,
             updatedAt = task.UpdatedAtUtc,
         });
     }

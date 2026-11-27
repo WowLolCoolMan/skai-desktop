@@ -22,6 +22,7 @@ public sealed class AgentTaskArtifact
     public string? ConversationId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Instruction { get; set; } = string.Empty;
+    public List<string> FollowUpInstructions { get; set; } = [];
     public string ResponseMode { get; set; } = ChatResponseModes.Coding;
     public string Environment { get; set; } = "local";
     public string? Model { get; set; }

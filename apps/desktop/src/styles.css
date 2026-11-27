@@ -836,6 +836,14 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .coding-task-worktree strong { color: var(--skai-color-text); font-size: var(--skai-text-2xs); }
 .coding-task-worktree code { color: var(--skai-color-accent-text); font-family: var(--skai-font-mono); font-size: var(--skai-text-2xs); }
 .coding-task-worktree small { overflow-wrap: anywhere; }
+.coding-task-steering, .coding-task-follow-ups { padding-top: 5px; border-top: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.coding-task-steering summary, .coding-task-follow-ups summary { cursor: pointer; color: var(--skai-color-text); }
+.coding-task-steering form { display: grid; gap: 6px; margin-top: 7px; }
+.coding-task-steering textarea { width: 100%; min-height: 54px; resize: vertical; padding: 7px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; font-size: var(--skai-text-2xs); }
+.coding-task-steering form > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.coding-task-steering form small { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.coding-task-follow-ups ol { display: grid; gap: 5px; margin: 7px 0 0; padding-left: 18px; }
+.coding-task-follow-ups li { color: var(--skai-color-text-muted); overflow-wrap: anywhere; }
 .coding-task-next-step strong, .coding-task-verification-summary strong { color: var(--skai-color-text); font-size: var(--skai-text-2xs); }
 .coding-task-next-step span, .coding-task-verification-summary > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.4; }
 .coding-task-next-step.is-attention { border-color: color-mix(in srgb, var(--skai-color-danger) 38%, var(--skai-color-border)); }
@@ -1201,6 +1209,15 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .usage-stat > strong { overflow: hidden; color: var(--skai-color-text); font-size: clamp(25px, 3vw, 34px); font-variant-numeric: tabular-nums; line-height: 1.1; text-overflow: ellipsis; }
 .usage-stat > small { overflow: hidden; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); text-overflow: ellipsis; white-space: nowrap; }
 .usage-dashboard { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, .85fr); gap: 14px; align-items: start; }
+.usage-task-inbox { grid-column: 1 / -1; }
+.usage-task-filter select { min-height: 32px; padding: 5px 10px; border: 1px solid var(--skai-color-border); border-radius: 8px; background: var(--skai-color-surface-raised); color: var(--skai-color-text); font: inherit; }
+.usage-task-inbox-list { display: grid; }
+.usage-task-inbox-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-top: 1px solid var(--skai-color-border); }
+.usage-task-inbox-copy { display: grid; min-width: 0; gap: 5px; }
+.usage-task-inbox-copy > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.usage-task-inbox-copy strong { overflow: hidden; color: var(--skai-color-text); text-overflow: ellipsis; white-space: nowrap; }
+.usage-task-inbox-copy small, .usage-task-inbox-copy p { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.usage-task-inbox-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .usage-card { min-width: 0; padding: 18px; }
 .usage-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 15px; }
 .usage-card-heading .section-kicker { margin-bottom: 4px; }
@@ -1247,6 +1264,8 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 @media (max-width: 1100px) {
   .usage-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .usage-dashboard { grid-template-columns: minmax(0, 1fr); }
+  .usage-task-inbox-item { align-items: flex-start; flex-direction: column; }
+  .usage-task-inbox-actions { justify-content: flex-start; }
 }
 @media (max-width: 700px) {
   .usage-overview { gap: 8px; margin-top: 12px; }

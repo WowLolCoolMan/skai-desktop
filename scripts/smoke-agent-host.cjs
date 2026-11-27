@@ -444,6 +444,55 @@ async function run() {
   const nativeToolPayload = nativeToolRequestBodies.length === 1 ? JSON.parse(nativeToolRequestBodies[0]) : null;
   if (!nativeToolTerminal || nativeToolTerminal.status !== "completed" || nativeToolRequests !== 1 || nativeToolPayload?.model !== "native-tools-smoke-model" || !nativeToolPayload?.tools?.some(tool => tool.function?.name === "replace_text"))
     throw new Error(`Native Ollama coding tools did not complete with the expected local tool schema: ${JSON.stringify({ nativeToolTerminal, nativeToolRequests, nativeToolPayload })}`);
+  let steeringFirstRequestReceived;
+  const steeringFirstRequest = new Promise(resolve => { steeringFirstRequestReceived = resolve; });
+  const steeringRequestBodies = [];
+  let steeringFollowUpObserved = false;
+  let releaseFirstSteeringResponse = null;
+  const steeringServer = http.createServer((request, response) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", chunk => { body += chunk; });
+    request.on("end", () => {
+      if (!request.url?.endsWith("/chat/completions")) { response.writeHead(404).end(); return; }
+      steeringRequestBodies.push(body);
+      if (steeringRequestBodies.length === 1) {
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        releaseFirstSteeringResponse = () => response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ action: "done", summary: "Initial task result." }) } }] })}\n\ndata: [DONE]\n\n`);
+        steeringFirstRequestReceived();
+        return;
+      }
+      if (steeringRequestBodies.length > 1 && body.includes("USER FOLLOW-UP #1") && body.includes("Keep the retry behavior compatible with 3.11")) steeringFollowUpObserved = true;
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ action: "done", summary: "Applied the live task follow-up." }) } }] })}\n\ndata: [DONE]\n\n`);
+    });
+  });
+  pendingSmokeServers.add(steeringServer);
+  await new Promise(resolve => steeringServer.listen(0, "127.0.0.1", resolve));
+  const steeringSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${steeringServer.address().port}/v1`, model: "steering-smoke-model", provider: "Local API" });
+  if (!steeringSettings.ok) throw new Error("settings.save could not prepare the live task steering fixture.");
+  const steeringTask = await request("tasks.plan", { title: "Live task steering", instruction: "Wait for a user follow-up before completing.", environment: "local", projectId: project.result.id, model: "steering-smoke-model", modelProvider: "Local API" });
+  if (!steeringTask.ok) throw new Error(`Could not plan the live task steering fixture: ${JSON.stringify(steeringTask)}`);
+  const steeringQueued = await request("tasks.queue", { id: steeringTask.result.id });
+  if (!steeringQueued.ok) throw new Error("Could not queue the live task steering fixture.");
+  const steeringExecution = await request("tasks.execute", { id: steeringTask.result.id });
+  if (!steeringExecution.ok) throw new Error(`Could not start the live task steering fixture: ${JSON.stringify(steeringExecution)}`);
+  await Promise.race([steeringFirstRequest, new Promise((_, reject) => setTimeout(() => reject(new Error("The live task steering model request did not start.")), 10_000))]);
+  const steered = await request("tasks.steer", { id: steeringTask.result.id, instruction: "Keep the retry behavior compatible with 3.11." });
+  if (!steered.ok || steered.result?.followUpInstructions?.length !== 1) throw new Error(`The host did not persist a live task follow-up: ${JSON.stringify(steered)}`);
+  releaseFirstSteeringResponse?.();
+  let steeredTerminal = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const snapshot = await request("tasks.list");
+    if (!snapshot.ok) throw new Error("tasks.list failed while observing live task steering.");
+    steeredTerminal = snapshot.result.find(item => item.id === steeringTask.result.id) ?? null;
+    if (steeredTerminal && ["completed", "failed", "cancelled", "blocked"].includes(steeredTerminal.status)) break;
+  }
+  await new Promise(resolve => steeringServer.close(resolve));
+  pendingSmokeServers.delete(steeringServer);
+  if (steeredTerminal?.status !== "completed" || !steeringFollowUpObserved || !steeredTerminal.activity?.some(item => item.type === "task.follow_up_applied"))
+    throw new Error(`The coding agent did not apply a live follow-up before completion: ${JSON.stringify({ status: steeredTerminal?.status, steeringFollowUpObserved, followUpEvents: steeredTerminal?.activity?.filter(item => item.type.includes("follow_up")) })}`);
   const repairSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "action-repair-smoke-model", provider: "Local API" });
   if (!repairSettings.ok) throw new Error("settings.save could not prepare the malformed-action repair smoke endpoint.");
   const repairTask = await request("tasks.plan", { title: "Malformed action repair", instruction: "Complete the malformed action JSON repair smoke.", environment: "local" });
@@ -610,7 +659,7 @@ async function run() {
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
   await new Promise(resolve => scheduledModelServer.close(resolve));
   pendingSmokeServers.delete(scheduledModelServer);
-  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, task cancellation and isolated-worktree planning, scheduled automation lifecycle, and direct host lifecycle.");
+  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, live task steering, task cancellation, isolated-worktree planning and guarded release, scheduled automation lifecycle, and direct host lifecycle.");
 }
 
 async function stopHost() {

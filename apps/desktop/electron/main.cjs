@@ -1120,7 +1120,7 @@ function createTray() { return trayController.createTray(); }
 const allowedMethods = new Set([
     "runtime.health", "models.list", "models.runtime.status", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files",
     "project.file.read", "project.preview.read", "tasks.list", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow",
-    "tasks.plan", "tasks.delegate", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "tasks.worktree.release", "project.preflight", "project.checks.list", "project.check.run", "asset.generate3d", "image.generate.start",
+    "tasks.plan", "tasks.delegate", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "tasks.steer", "tasks.worktree.release", "project.preflight", "project.checks.list", "project.check.run", "asset.generate3d", "image.generate.start",
     "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status",
     "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save",
     "conversation.metadata.save", "conversations.export", "conversations.import.preview", "conversations.import.apply", "conversation.fork", "memory.list", "memory.search",

@@ -189,6 +189,7 @@ export type DesktopTask = {
   id: string;
   title: string;
   instruction: string;
+    followUpInstructions?: string[];
   responseMode?: "think" | "coding" | "security";
   environment?: TaskEnvironment;
   worktreePath?: string | null;

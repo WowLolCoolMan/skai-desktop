@@ -16,6 +16,7 @@ type CodingTaskInspectorProps = {
   onRunProjectCheck: (projectId: string, taskId: string, checkId: string) => Promise<unknown>;
   onCancelTask: (taskId: string) => void;
   onTransitionTask: (taskId: string, operation: "queue" | "approve" | "deny" | "retry" | "release") => void;
+  onSteerTask: (taskId: string, instruction: string) => Promise<boolean>;
   onExecuteTask: (taskId: string) => void;
 };
 
@@ -73,6 +74,8 @@ function activityLabel(type: string) {
     "task.worker_finished": "Worker finished",
     "task.verification.completed": "Task completed",
     "task.cancelled": "Task stopped",
+    "task.follow_up_added": "Follow-up added",
+    "task.follow_up_applied": "Follow-up applied",
     "task.failed": "Task failed",
     "tool.read_file.completed": "Read a file",
     "tool.write_file.completed": "Edited a file",
@@ -114,12 +117,14 @@ function taskStageIndex(status: string) {
   return 0;
 }
 
-export function CodingTaskInspector({ projectId, tasks, projectChecks, projectChecksBusy, projectCheckBusy, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges, onLoadProjectChecks, onRunProjectCheck, onCancelTask, onTransitionTask, onExecuteTask }: CodingTaskInspectorProps) {
+export function CodingTaskInspector({ projectId, tasks, projectChecks, projectChecksBusy, projectCheckBusy, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges, onLoadProjectChecks, onRunProjectCheck, onCancelTask, onTransitionTask, onSteerTask, onExecuteTask }: CodingTaskInspectorProps) {
   const recentTasks = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedCheckId, setSelectedCheckId] = useState("");
   const [stoppingTaskIds, setStoppingTaskIds] = useState<string[]>([]);
   const [pendingTaskActions, setPendingTaskActions] = useState<Record<string, string>>({});
+  const [followUpDraft, setFollowUpDraft] = useState("");
+  const [steeringTaskId, setSteeringTaskId] = useState<string | null>(null);
   const changedPaths = gitStatus?.changes.map((change) => change.path) ?? [];
   const attentionCount = tasks.filter((task) => task.status === "failed" || task.status === "blocked").length;
   const activeCount = tasks.filter((task) => task.status === "running" || task.status === "verifying").length;
@@ -177,6 +182,8 @@ export function CodingTaskInspector({ projectId, tasks, projectChecks, projectCh
         {task.status === "queued" && <div className="coding-task-actions"><Button variant="primary" type="button" disabled={Boolean(pendingTaskActions[task.id])} onClick={() => runTaskAction(task, () => onExecuteTask(task.id))}>{pendingTaskActions[task.id] ? "Starting…" : "Start task"}</Button><small>Starting runs this task against its selected local environment.</small></div>}
         {task.status === "blocked" && <div className="coding-task-actions"><Button variant="secondary" type="button" disabled={Boolean(pendingTaskActions[task.id]) || Boolean(task.worktreePath)} title={task.worktreePath ? "Review or release the retained worktree before retrying." : undefined} onClick={() => runTaskAction(task, () => onTransitionTask(task.id, "retry"))}>{pendingTaskActions[task.id] ? "Re-queueing…" : "Retry task"}</Button>{task.worktreePath && <small>Review or release the retained worktree before retrying.</small>}</div>}
         {task.status === "failed" && <small>This run failed. Review its output, then create a fresh plan before running it again.</small>}
+        {task.status === "running" && <details className="coding-task-steering"><summary>Steer this task</summary><form onSubmit={(event) => { event.preventDefault(); const instruction = followUpDraft.trim(); if (!instruction || steeringTaskId) return; setSteeringTaskId(task.id); void onSteerTask(task.id, instruction).then((added) => { if (added) setFollowUpDraft(""); }).finally(() => setSteeringTaskId(null)); }}><label><span className="sr-only">Follow-up instruction for {task.title}</span><textarea value={followUpDraft} onChange={(event) => setFollowUpDraft(event.target.value)} maxLength={4_000} rows={2} placeholder="Add direction while this task is running…" /></label><div><small>Added to task history and applied on its next model turn.</small><Button variant="secondary" type="submit" disabled={!followUpDraft.trim() || Boolean(steeringTaskId)}>{steeringTaskId === task.id ? "Adding…" : "Send follow-up"}</Button></div></form></details>}
+        {!!task.followUpInstructions?.length && <details className="coding-task-follow-ups"><summary>{task.followUpInstructions.length} follow-up instruction{task.followUpInstructions.length === 1 ? "" : "s"}</summary><ol>{task.followUpInstructions.map((instruction, index) => <li key={`${index}-${instruction}`}>{instruction}</li>)}</ol></details>}
         {task.environment === "worktree" && <div className="coding-task-worktree"><strong>{task.worktreePath ? "Retained isolated worktree" : "Isolated worktree"}</strong>{task.worktreeBranch && <code>{task.worktreeBranch}</code>}{task.worktreePath ? <><small title={task.worktreePath}>{task.worktreePath}</small>{!["proposed", "queued", "awaiting_approval", "running", "verifying"].includes(task.status) && <Button variant="secondary" type="button" disabled={Boolean(pendingTaskActions[task.id])} onClick={() => { if (window.confirm(`Release the clean worktree for “${task.title}”? This removes the checkout from disk and keeps the Git branch.`)) runTaskAction(task, () => onTransitionTask(task.id, "release")); }}>{pendingTaskActions[task.id] ? "Releasing worktree…" : "Release clean worktree"}</Button>}<small>Only a clean checkout can be released. The task branch remains available in Git.</small></> : task.status === "completed" || task.status === "failed" || task.status === "blocked" || task.status === "cancelled" ? <small>Its retained checkout has been released.</small> : <small>The isolated checkout will be attached when execution starts.</small>}</div>}
         {task.status === "cancelled" ? <small>Stopped before verification.</small> : <ol className="coding-task-progress" aria-label={`Task progress: ${statusLabel(task.status)}`}>
           {taskStages.map((stage, index) => <li key={stage} className={index < taskStageIndex(task.status) ? "is-complete" : index === taskStageIndex(task.status) ? "is-current" : ""} aria-current={index === taskStageIndex(task.status) ? "step" : undefined}><span aria-hidden="true" />{stage}</li>)}

@@ -10,6 +10,7 @@ public sealed class AgentTaskArtifactStore
     public const int MaxTasks = 256;
     public const int MaxTitleCharacters = 200;
     public const int MaxInstructionCharacters = 4_000;
+    public const int MaxFollowUpInstructions = 16;
     public const int MaxRoleCharacters = 80;
     public const int MaxResultCharacters = 2_000;
     public const int MaxArtifactLabelCharacters = 160;
@@ -86,6 +87,42 @@ public sealed class AgentTaskArtifactStore
     public AgentTaskArtifact Deny(string id) => Transition(id, AgentTaskStatuses.AwaitingApproval, AgentTaskStatuses.Cancelled, "Approval denied locally; no execution was started.");
 
     public AgentTaskArtifact Get(string id) => Copy(Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist."));
+
+    /// <summary>Persists a user steering message for a task that is actively running.</summary>
+    public AgentTaskArtifact AddFollowUpInstruction(string id, string instruction)
+    {
+        lock (StoreGate)
+        {
+            var tasks = Load().ToList();
+            var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+            if (task.Status != AgentTaskStatuses.Running) throw new InvalidOperationException("Follow-up instructions can only be added while a task is running.");
+            var normalized = NormalizeFollowUpInstruction(instruction);
+            if (task.FollowUpInstructions.Count >= MaxFollowUpInstructions) throw new InvalidOperationException($"A task can have at most {MaxFollowUpInstructions} follow-up instructions.");
+            task.FollowUpInstructions.Add(normalized);
+            task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            Save(tasks);
+            return Copy(task);
+        }
+    }
+
+    /// <summary>Atomically enters verification only when every accepted steering message was applied.</summary>
+    public bool TryBeginVerificationAfterFollowUps(string id, int appliedFollowUpCount, string resultSummary, IEnumerable<string>? artifactLabels = null)
+    {
+        lock (StoreGate)
+        {
+            var tasks = Load().ToList();
+            var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+            if (task.Status != AgentTaskStatuses.Running) throw new InvalidOperationException("Only a running task can enter verification.");
+            if (appliedFollowUpCount < 0 || appliedFollowUpCount > task.FollowUpInstructions.Count) throw new ArgumentOutOfRangeException(nameof(appliedFollowUpCount));
+            if (appliedFollowUpCount != task.FollowUpInstructions.Count) return false;
+            task.Status = AgentTaskStatuses.Verifying;
+            task.ResultSummary = Normalize(resultSummary, MaxResultCharacters, "task result");
+            task.ArtifactLabels = NormalizeLabels(artifactLabels);
+            task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            Save(tasks);
+            return true;
+        }
+    }
 
     /// <summary>Persists a successfully edited project path while the task is still running so it can be reviewed immediately.</summary>
     public AgentTaskArtifact RecordChangedFile(string id, string relativePath)
@@ -345,6 +382,9 @@ public sealed class AgentTaskArtifactStore
         {
             Normalize(task.Title, MaxTitleCharacters, "task title");
             Normalize(task.Instruction, MaxInstructionCharacters, "task instruction");
+            task.FollowUpInstructions ??= [];
+            if (task.FollowUpInstructions.Count > MaxFollowUpInstructions) throw new InvalidDataException("The agent task has too many follow-up instructions.");
+            task.FollowUpInstructions = task.FollowUpInstructions.Select(NormalizeFollowUpInstruction).ToList();
             if (!ChatResponseModes.IsValid(task.ResponseMode)) task.ResponseMode = ChatResponseModes.Coding;
             task.Environment = NormalizeEnvironment(task.Environment);
             Normalize(task.Role, MaxRoleCharacters, "task role");
@@ -383,6 +423,13 @@ public sealed class AgentTaskArtifactStore
         return value.Trim();
     }
 
+    private static string NormalizeFollowUpInstruction(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > MaxInstructionCharacters || value.Any(character => char.IsControl(character) && character is not ('\r' or '\n' or '\t')))
+            throw new ArgumentException("The follow-up instruction is invalid.", nameof(value));
+        return value.Trim();
+    }
+
     private static string? NormalizeOptional(string? value, int maxLength, string label)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
@@ -418,6 +465,7 @@ public sealed class AgentTaskArtifactStore
         ConversationId = source.ConversationId,
         Title = source.Title,
         Instruction = source.Instruction,
+        FollowUpInstructions = source.FollowUpInstructions.ToList(),
         ResponseMode = source.ResponseMode,
         Environment = source.Environment,
         Model = source.Model,

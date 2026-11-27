@@ -1,5 +1,6 @@
+import { useMemo, useState } from "react";
 import type { DesktopConversation, DesktopProject, DesktopScheduledTask, DesktopTask, LocalCapacitySnapshot } from "../../../shared/contracts";
-import { Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
+import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
 
 type UsagePageProps = {
   conversations: DesktopConversation[];
@@ -12,6 +13,10 @@ type UsagePageProps = {
   provider: string;
   model: string;
   capacity: LocalCapacitySnapshot | null;
+  onTransitionTask: (id: string, operation: "queue" | "approve" | "deny" | "cancel" | "retry" | "release") => void;
+  onExecuteTask: (id: string) => void;
+  onOpenProject: (project: DesktopProject) => void;
+  onOpenConversation: (id: string) => void;
 };
 
 const numberFormat = new Intl.NumberFormat();
@@ -38,7 +43,9 @@ function StatCard({ label, value, detail }: { label: string; value: number | str
   return <Card className="usage-stat"><span>{label}</span><strong>{value}</strong><small>{detail}</small></Card>;
 }
 
-export function UsagePage({ conversations, projects, tasks, scheduledTasks, memoryCount, corpusCount, savedImageCount, provider, model, capacity }: UsagePageProps) {
+export function UsagePage({ conversations, projects, tasks, scheduledTasks, memoryCount, corpusCount, savedImageCount, provider, model, capacity, onTransitionTask, onExecuteTask, onOpenProject, onOpenConversation }: UsagePageProps) {
+  const [taskFilter, setTaskFilter] = useState("all");
+  const [pendingTask, setPendingTask] = useState<string | null>(null);
   const messages = conversations.flatMap((conversation) => conversation.messages.filter((message) => message.role !== "system"));
   const userPrompts = messages.filter((message) => message.role === "user").length;
   const completedTasks = tasks.filter((task) => task.status === "completed").length;
@@ -47,6 +54,14 @@ export function UsagePage({ conversations, projects, tasks, scheduledTasks, memo
   const queuedTasks = tasks.filter((task) => task.status === "queued").length;
   const recentConversations = [...conversations].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5);
   const recentTasks = [...tasks].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5);
+  const inboxTasks = useMemo(() => [...tasks]
+    .filter((task) => taskFilter === "all" || (taskFilter === "active" ? ["running", "verifying"].includes(task.status) : taskFilter === "queued" ? ["queued", "awaiting_approval", "proposed"].includes(task.status) : ["failed", "blocked", "awaiting_approval"].includes(task.status)))
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)), [tasks, taskFilter]);
+  const runTaskAction = async (id: string, action: () => void) => {
+    if (pendingTask) return;
+    setPendingTask(id);
+    try { action(); } finally { window.setTimeout(() => setPendingTask((current) => current === id ? null : current), 500); }
+  };
   const modelCounts = new Map<string, number>();
   const providerCounts = new Map<string, number>();
   for (const conversation of conversations) {
@@ -71,6 +86,25 @@ export function UsagePage({ conversations, projects, tasks, scheduledTasks, memo
     </section>
 
     <div className="usage-dashboard">
+      <Card className="usage-card usage-task-inbox">
+        <div className="usage-card-heading"><div><p className="section-kicker">TASK INBOX</p><h3>Agent task inbox</h3></div><label className="usage-task-filter"><span className="sr-only">Filter agent tasks</span><select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}><option value="needs-attention">Needs attention</option><option value="active">Active</option><option value="queued">Queued and proposed</option><option value="all">All tasks</option></select></label></div>
+        {inboxTasks.length ? <div className="usage-task-inbox-list">{inboxTasks.slice(0, 12).map((task) => {
+          const project = task.projectId ? projects.find((item) => item.id === task.projectId) : undefined;
+          const busy = pendingTask === task.id;
+          return <article className="usage-task-inbox-item" key={task.id}>
+            <div className="usage-task-inbox-copy"><div><strong title={task.title}>{task.title}</strong><span className={`usage-task-status is-${task.status}`}>{task.status.replaceAll("_", " ")}</span></div><small>{project?.name ?? (task.conversationId ? "Conversation task" : "Workspace task")} · Updated {formatDate(task.updatedAt)}</small>{task.resultSummary && <p>{task.resultSummary}</p>}</div>
+            <div className="usage-task-inbox-actions">
+              {task.status === "awaiting_approval" && <><Button variant="primary" disabled={busy} onClick={() => void runTaskAction(task.id, () => onTransitionTask(task.id, "approve"))}>{busy ? "Approving…" : "Approve"}</Button><Button variant="secondary" disabled={busy} onClick={() => void runTaskAction(task.id, () => onTransitionTask(task.id, "deny"))}>Decline</Button></>}
+              {task.status === "proposed" && <Button variant="secondary" disabled={busy} onClick={() => void runTaskAction(task.id, () => onTransitionTask(task.id, "queue"))}>{busy ? "Queueing…" : "Queue plan"}</Button>}
+              {task.status === "queued" && <Button variant="primary" disabled={busy} onClick={() => void runTaskAction(task.id, () => onExecuteTask(task.id))}>{busy ? "Starting…" : "Start"}</Button>}
+              {["running", "verifying"].includes(task.status) && <Button variant="secondary" disabled={busy} onClick={() => void runTaskAction(task.id, () => onTransitionTask(task.id, "cancel"))}>{busy ? "Stopping…" : "Stop"}</Button>}
+              {task.status === "blocked" && !task.worktreePath && <Button variant="secondary" disabled={busy} onClick={() => void runTaskAction(task.id, () => onTransitionTask(task.id, "retry"))}>{busy ? "Re-queueing…" : "Retry"}</Button>}
+              {project && <Button variant="ghost" onClick={() => onOpenProject(project)}>Open project</Button>}
+              {!project && task.conversationId && conversations.some((conversation) => conversation.id === task.conversationId) && <Button variant="ghost" onClick={() => onOpenConversation(task.conversationId!)}>Open chat</Button>}
+            </div>
+          </article>;
+        })}</div> : <EmptyState title={tasks.length ? "Nothing in this view" : "No agent tasks yet"} description={tasks.length ? "Try another filter to see more task activity." : "Tasks created by Chat or Coding agents will appear in this inbox."} />}
+      </Card>
       <Card className="usage-card usage-activity">
         <div className="usage-card-heading"><div><p className="section-kicker">RECENT ACTIVITY</p><h3>Your latest work</h3></div><StatusBadge tone={activeTasks > 0 ? "warning" : "neutral"}>{activeTasks > 0 ? `${activeTasks} active` : "All caught up"}</StatusBadge></div>
         <div className="usage-activity-columns">

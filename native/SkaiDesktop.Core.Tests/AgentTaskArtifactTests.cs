@@ -28,6 +28,11 @@ internal static class AgentTaskArtifactTests
             store.RecordChangedFile(first.Id, "src/layout.ts");
             var runningWithChanges = store.RecordChangedFile(first.Id, "src/layout.ts");
             Check(runningWithChanges.Status == AgentTaskStatuses.Running && runningWithChanges.ChangedFiles.SequenceEqual(["src/layout.ts"]), "successful edits are persisted immediately on a running task and duplicate paths are ignored");
+            var followUp = "Keep the retry behavior compatible with 3.11.\nAdd a regression test too.";
+            var steeredFirst = store.AddFollowUpInstruction(first.Id, followUp);
+            Check(steeredFirst.FollowUpInstructions.SequenceEqual([followUp]) && store.Get(first.Id).FollowUpInstructions.Count == 1, "running task steering persists a bounded multiline follow-up message");
+            Check(!store.TryBeginVerificationAfterFollowUps(first.Id, 0, "Finished without applying the follow-up.", ["local-review"]) && store.Get(first.Id).Status == AgentTaskStatuses.Running, "task cannot enter verification while an accepted follow-up remains unapplied");
+            Check(store.TryBeginVerificationAfterFollowUps(first.Id, 1, "Reviewed the retry behavior with the follow-up applied.", ["local-review"]) && store.Get(first.Id).Status == AgentTaskStatuses.Verifying, "task enters verification atomically after applying every accepted follow-up");
             try
             {
                 store.RecordChangedFile(second.Id, "src/plant.ts");

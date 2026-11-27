@@ -42,7 +42,7 @@ public sealed class AgentTaskExecutor
         try
         {
             var result = await handler(task, cancellationToken).ConfigureAwait(false);
-            _store.BeginVerification(task.Id, result.Summary, result.ArtifactLabels);
+            if (!result.VerificationAlreadyStarted) _store.BeginVerification(task.Id, result.Summary, result.ArtifactLabels);
             return _store.Verify(task.Id);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -123,4 +123,4 @@ public sealed class AgentTaskExecutor
     }
 }
 
-public sealed record AgentTaskExecutionResult(string Summary, IReadOnlyList<string>? ArtifactLabels = null);
+public sealed record AgentTaskExecutionResult(string Summary, IReadOnlyList<string>? ArtifactLabels = null, bool VerificationAlreadyStarted = false);
