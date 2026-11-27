@@ -20,6 +20,32 @@ keep this queue focused on unfinished work.
 Ordered around open acceptance blockers and the user's explicit priorities.
 Mark an item done only when the linked workflow has evidence.
 
+### Engineering health gate — completed in this pass
+
+- **Status / owner:** Done · Codex
+- **Result:** Restored the theme-token CI gate by migrating new pet-editor and
+  workspace styles to semantic color, text-size, and radius tokens. The
+  repository hygiene gate now explicitly allows the high-resolution Revision
+  workflow reference images while continuing to reject generated artifacts,
+  secrets, and unapproved large files. CI and release workflows now run a
+  high-severity production dependency audit after dependency installation.
+- **Evidence:** `npm run audit:theme-tokens`, `npm run test:themes`,
+  `npm run check:syntax`, `npm run check:hygiene`, `npm run check:release-config`,
+  `npm run audit:release-workflow`, `npm run audit:electron-runtime`,
+  `npm run audit:electron-tray`, `npm run audit:bridge-methods`,
+  `npm run audit:local-only`, `npm run desktop:typecheck`, `npm run build`,
+  Agent Host build, native core checks, and `npm audit --audit-level=high`
+  all pass locally. The exact packaged smoke also covers the main renderer,
+  companion window, OCR, video sampling, Marketplace, and voice paths; the
+  local Whisper barge-in follow-up remains an environment-sensitive open check
+  when the installed CPU runtime does not finish its second transcription
+  before the bounded acceptance window. The Coding workspace smoke also found
+  and fixed an eager in-app browser-preview WebView mount that could crash the
+  renderer before the project split opened; preview now mounts only when the
+  user expands it. The post-fix packaged UI matrix passes all 20 routes at the
+  1440×900 reference size, including project open, Monaco/editor, Files,
+  Changes, and local Side chat split coverage.
+
 1. **UI and accessibility acceptance — In progress · Codex.** The freshly
    packaged audit passes all 16 routes with zero WCAG violations; axe reports
    one incomplete contrast check for decorative symbol-only icons on Pet

@@ -186,7 +186,7 @@ public static partial class AgentHostLoop
         }
     }
 
-    private static async Task<AgentResponse> CallMcpToolAsync(AgentRequest request)
+    private static async Task<AgentResponse> CallMcpToolAsync(AgentRequest request, CancellationToken cancellationToken = default)
     {
         var connectionId = RequiredBoundedString(request, "connectionId", 128);
         var toolName = RequiredBoundedString(request, "toolName", 128);
@@ -211,7 +211,7 @@ public static partial class AgentHostLoop
             ConnectionId = connectionId,
             ApprovalId = approvalId,
             Capabilities = capabilities,
-        }, arguments).ConfigureAwait(false);
+        }, arguments, cancellationToken).ConfigureAwait(false);
         return new(ProtocolVersion, request.Id, true, new { toolName, isError = result.IsError, text = result.Text });
     }
 

@@ -18,7 +18,7 @@ export function PetFrameEditor({ strip, animation, onSave, busy, readOnly = fals
   const blankFrames = () => Array.from({ length: activeFrameCount }, () => "");
   const [frameThumbs, setFrameThumbs] = useState<string[]>(blankFrames);
   const [tool, setTool] = useState<"brush" | "eraser">("brush");
-  const [color, setColor] = useState("#ff793f");
+  const [color, setColor] = useState(() => (typeof document === "undefined" ? "" : getComputedStyle(document.documentElement).getPropertyValue("--skai-color-accent").trim()));
   const [brushSize, setBrushSize] = useState(8);
   const [onionSkin, setOnionSkin] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export function PetFrameEditor({ strip, animation, onSave, busy, readOnly = fals
     drawing.current = true;
     lastPoint.current = pointAt(event);
     context.beginPath();
-    context.fillStyle = tool === "eraser" ? "rgba(0,0,0,1)" : color;
+    context.fillStyle = tool === "eraser" ? getComputedStyle(canvas).getPropertyValue("--skai-color-shadow").trim() || "black" : color;
     context.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
     context.arc(lastPoint.current.x, lastPoint.current.y, brushSize / 2, 0, Math.PI * 2);
     context.fill();
@@ -109,7 +109,7 @@ export function PetFrameEditor({ strip, animation, onSave, busy, readOnly = fals
     context.lineCap = "round";
     context.lineJoin = "round";
     context.lineWidth = brushSize;
-    context.strokeStyle = tool === "eraser" ? "rgba(0,0,0,1)" : color;
+    context.strokeStyle = tool === "eraser" ? getComputedStyle(event.currentTarget).getPropertyValue("--skai-color-shadow").trim() || "black" : color;
     context.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
     context.moveTo(lastPoint.current.x, lastPoint.current.y);
     context.lineTo(next.x, next.y);

@@ -57,6 +57,7 @@ public sealed class JsonSettingsStore
         settings.OllamaContextWindowTokens = settings.OllamaContextWindowTokens is 32_768 or 131_072 or 1_048_576 ? settings.OllamaContextWindowTokens : 0;
         settings.ComfyEndpoint ??= defaults.ComfyEndpoint;
         settings.ImageWorkflow ??= defaults.ImageWorkflow;
+        settings.ThreeDWorkflow ??= defaults.ThreeDWorkflow;
         settings.GitHubAppClientId ??= defaults.GitHubAppClientId;
         settings.PromptUserName ??= defaults.PromptUserName;
         settings.VoicePrimaryModelId = VoiceModelCatalog.Resolve(settings.VoicePrimaryModelId).Id;

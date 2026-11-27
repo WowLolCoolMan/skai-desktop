@@ -30,6 +30,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes bubblewrap python3
       - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --audit-level=high --omit=dev
       - run: npm run check:syntax
       - run: npm run check:hygiene
       - run: npm run check:release-config

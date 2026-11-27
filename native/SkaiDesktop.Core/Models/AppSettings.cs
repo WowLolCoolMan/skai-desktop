@@ -15,6 +15,11 @@ public sealed class AppSettings
     public string SubagentModelProvider { get; set; } = "";
     public long? SubagentModelSizeBytes { get; set; }
     public int? SubagentModelContextLength { get; set; }
+    /// <summary>Optional local model assigned to manager coding tasks.</summary>
+    public string CodingModel { get; set; } = "";
+    public string CodingModelProvider { get; set; } = "";
+    public long? CodingModelSizeBytes { get; set; }
+    public int? CodingModelContextLength { get; set; }
     /// <summary>Automatically retry a local model through AirLLM after a capacity/compatibility failure.</summary>
     public bool AirLlmAutoFallbackEnabled { get; set; } = true;
     /// <summary>Allows model repositories that require custom Python code. Off by default.</summary>
@@ -83,6 +88,8 @@ public sealed class AppSettings
     public bool RequireLocalModelEndpoints { get; set; } = true;
     public string ComfyEndpoint { get; set; } = "http://127.0.0.1:8188";
     public string ImageWorkflow { get; set; } = "";
+    /// <summary>Optional ComfyUI API workflow that produces a GLB for coding-agent asset generation.</summary>
+    public string ThreeDWorkflow { get; set; } = "";
     public string GitHubAppClientId { get; set; } = "";
     public List<string> ChatFolders { get; set; } = [];
     /// <summary>Bounded local prompt snippets; never sent unless inserted or explicitly expanded.</summary>

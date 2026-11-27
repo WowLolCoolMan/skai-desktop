@@ -2,6 +2,18 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("skaiAgent", {
   request: (method, params) => ipcRenderer.invoke("agent:request", method, params),
+  browserPreview: {
+    onRequest: (handler) => {
+      const listener = (_event, request) => {
+        Promise.resolve(handler(request?.parameters)).then(
+          (result) => ipcRenderer.send("browser-preview:response", { id: request?.id, result }),
+          (error) => ipcRenderer.send("browser-preview:response", { id: request?.id, result: { error: error instanceof Error ? error.message : "The browser preview operation failed." } }),
+        );
+      };
+      ipcRenderer.on("browser-preview:request", listener);
+      return () => ipcRenderer.removeListener("browser-preview:request", listener);
+    },
+  },
   onProgress: (handler) => {
     const listener = (_event, message) => handler(message);
     ipcRenderer.on("agent:progress", listener);

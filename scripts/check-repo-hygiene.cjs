@@ -10,6 +10,11 @@ const LARGE_FILE_ALLOWLIST = new Set([
   // Runtime transparent animation atlas; lossless recompression offers little until atlas splitting is supported.
   "assets/pets/generated/blaze-fire-breath-body-v2-atlas.png",
 ]);
+const LARGE_FILE_ALLOWLIST_PREFIXES = [
+  // Revision workflow references are intentionally high-resolution evidence
+  // used for visual continuity review; they are not runtime payloads.
+  "docs/design-review/workflow-collection/",
+];
 
 const tracked = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
   .split("\0")
@@ -23,7 +28,10 @@ const forbidden = tracked.filter((file) => {
 });
 
 const oversized = tracked
-  .filter((file) => !LARGE_FILE_ALLOWLIST.has(file.replaceAll("\\", "/")))
+  .filter((file) => {
+    const normalized = file.replaceAll("\\", "/");
+    return !LARGE_FILE_ALLOWLIST.has(normalized) && !LARGE_FILE_ALLOWLIST_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  })
   .map((file) => ({ file, bytes: fs.statSync(file, { throwIfNoEntry: false })?.size ?? 0 }))
   .filter(({ bytes }) => bytes > MAX_FILE_BYTES);
 

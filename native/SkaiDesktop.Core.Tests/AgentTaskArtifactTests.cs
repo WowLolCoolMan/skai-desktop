@@ -15,7 +15,9 @@ internal static class AgentTaskArtifactTests
             var store = new AgentTaskArtifactStore(Path.Combine(root, "agent-tasks.json"));
             var first = store.Create("Inspect provider routing", "Review capability preflight evidence.", "researcher", "run-1", responseMode: ChatResponseModes.Security, model: "org/model-8b", modelProvider: "AirLLM", modelSizeBytes: 8L << 30, modelContextLength: 131072, airLlmCompatible: true);
             var second = store.Create("Verify the routing change", "Check the result against the first task.", "verifier", dependsOn: [first.Id]);
+            var isolated = store.Create("Isolated task", "Keep the main checkout unchanged.", environment: "worktree");
             Check(first.Status == AgentTaskStatuses.Proposed && first.ResponseMode == ChatResponseModes.Security && store.Get(first.Id).ResponseMode == ChatResponseModes.Security && store.Get(first.Id).Model == "org/model-8b" && store.Get(first.Id).AirLlmCompatible && second.DependsOn.SequenceEqual([first.Id]), "agent task artifacts persist response mode and model capacity metadata alongside roles and dependencies");
+            Check(isolated.Environment == "worktree" && store.Get(isolated.Id).Environment == "worktree", "agent task environment persists across store reloads");
             Check(store.GetNextReady() is null, "agent task readiness preview ignores proposed tasks");
             Check(store.TryClaimReady() is null, "queued dependent agent task is not claimable before its prerequisite is queued and completed");
             store.Queue(first.Id);
@@ -93,13 +95,23 @@ internal static class AgentTaskArtifactTests
             var worktreeExecutor = new AgentTaskExecutor(store);
             var coordinator = new GitWorktreeCoordinator();
             var worktreeParent = Path.Combine(root, "w");
+            var activeWorktreeReleaseBlocked = false;
             var isolatedResult = await worktreeExecutor.ExecuteNextInWorktreeAsync(coordinator, isolatedRepository, worktreeParent, async (task, lease, _) =>
             {
                 Check(task.WorktreePath == lease.WorktreePath && File.Exists(Path.Combine(lease.WorktreePath, "README.md")), "agent executor injects a real isolated worktree into the handler");
                 Check(RunGitOutput(lease.WorktreePath, "branch", "--show-current").Trim() == lease.Branch, "agent executor persists the isolated task branch");
+                try
+                {
+                    await worktreeExecutor.ReleaseTaskWorktreeAsync(task.Id, coordinator);
+                }
+                catch (InvalidOperationException error) when (error.Message.Contains("active or unapproved", StringComparison.Ordinal))
+                {
+                    activeWorktreeReleaseBlocked = true;
+                }
                 await Task.CompletedTask;
                 return new AgentTaskExecutionResult("Isolated review completed.", ["isolated-review"]);
             });
+            Check(activeWorktreeReleaseBlocked, "an active isolated task worktree cannot be released from disk");
             Check(isolatedResult?.Status == AgentTaskStatuses.Completed && isolatedResult.WorktreePath is not null && string.Equals(isolatedResult.WorktreeRepositoryRoot, isolatedRepository, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal), "agent executor durably retains the worktree lease after handler completion");
             var releasedResult = await worktreeExecutor.ReleaseTaskWorktreeAsync(isolatedResult!.Id, coordinator);
             Check(releasedResult.WorktreePath is null && !Directory.Exists(Path.Combine(worktreeParent, $"agent-task-{isolatedResult.Id}")), "agent executor releases a retained clean worktree explicitly");

@@ -62,6 +62,7 @@ let nextId = 1;
 const pending = new Map();
 let stderr = "";
 const pendingSmokeServers = new Set();
+const smokeWorktreePaths = new Set();
 
 child.stderr.on("data", chunk => { stderr += chunk.toString(); });
 reader.on("line", line => {
@@ -80,6 +81,24 @@ function request(method, params, onProgress) {
     const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out waiting for ${method}.`)); }, method === "airllm.status" ? 30_000 : 10_000);
     pending.set(id, { onProgress, resolve: response => { clearTimeout(timer); resolve(response); } });
   });
+}
+
+function attachSmokeWorktree(taskId, dirty = false) {
+  const branch = `smoke/release/${taskId.slice(0, 10)}`;
+  const worktreePath = path.join(os.tmpdir(), `skai-worktree-smoke-${taskId}`);
+  const added = spawnSync("git", ["worktree", "add", "-b", branch, worktreePath, "HEAD"], { cwd: tempRoot, encoding: "utf8", windowsHide: true });
+  if (added.status !== 0) throw new Error(`Could not create the isolated worktree release fixture: ${added.stderr || added.stdout}`);
+  smokeWorktreePaths.add(worktreePath);
+  if (dirty) fs.writeFileSync(path.join(worktreePath, "uncommitted-smoke.txt"), "keep until reviewed\n");
+  const records = JSON.parse(fs.readFileSync(env.SRAI_TASKS_PATH, "utf8"));
+  const task = records.find(item => item.id === taskId);
+  if (!task) throw new Error("The isolated worktree release task was not saved.");
+  task.status = "completed";
+  task.worktreeRepositoryRoot = tempRoot;
+  task.worktreePath = worktreePath;
+  task.worktreeBranch = branch;
+  fs.writeFileSync(env.SRAI_TASKS_PATH, JSON.stringify(records, null, 2));
+  return { branch, worktreePath };
 }
 
 async function run() {
@@ -533,8 +552,32 @@ async function run() {
   await new Promise(resolve => heldModelServer.close(resolve));
   pendingSmokeServers.delete(heldModelServer);
   if (heldModelTerminal?.status !== "cancelled") throw new Error(`Running cancellation did not reach its terminal state: ${JSON.stringify(heldModelTerminal)}`);
-  const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "worktree" });
-  if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Only the Local environment")) throw new Error("tasks.plan accepted an unsupported environment.");
+  const rejectedEnvironment = await request("tasks.plan", { title: "Unsupported environment", instruction: "Must be rejected.", environment: "remote-host" });
+  if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Choose Local or isolated worktree")) throw new Error("tasks.plan accepted an unsupported environment.");
+  const missingWorktreeProject = await request("tasks.plan", { title: "Missing worktree project", instruction: "Must be rejected.", environment: "worktree" });
+  if (missingWorktreeProject.ok || !missingWorktreeProject.error?.message.includes("need one existing project folder")) throw new Error("tasks.plan accepted an isolated worktree without a selected project.");
+  const worktreePlan = await request("tasks.plan", { title: "Isolated worktree plan", instruction: "Verify the isolated environment selection.", environment: "worktree", projectId: project.result.id });
+  if (!worktreePlan.ok || worktreePlan.result?.environment !== "worktree" || worktreePlan.result?.projectId !== project.result.id)
+    throw new Error(`tasks.plan did not preserve the isolated worktree and project selection: ${JSON.stringify(worktreePlan)}`);
+  const worktreePlanList = await request("tasks.list");
+  const persistedWorktreePlan = worktreePlanList.result?.find(task => task.id === worktreePlan.result.id);
+  if (!worktreePlanList.ok || persistedWorktreePlan?.environment !== "worktree" || persistedWorktreePlan?.projectId !== project.result.id)
+    throw new Error(`tasks.list did not preserve the isolated worktree plan: ${JSON.stringify(persistedWorktreePlan)}`);
+  const retainedCleanWorktree = attachSmokeWorktree(worktreePlan.result.id);
+  const releasedWorktree = await request("tasks.worktree.release", { id: worktreePlan.result.id });
+  if (!releasedWorktree.ok || releasedWorktree.result?.worktreePath !== null || fs.existsSync(retainedCleanWorktree.worktreePath))
+    throw new Error(`The host did not release a clean retained worktree: ${JSON.stringify(releasedWorktree)}`);
+  const dirtyWorktreePlan = await request("tasks.plan", { title: "Dirty worktree protection", instruction: "Keep uncommitted work safe.", environment: "worktree", projectId: project.result.id });
+  if (!dirtyWorktreePlan.ok) throw new Error(`Could not plan the dirty worktree release fixture: ${JSON.stringify(dirtyWorktreePlan)}`);
+  const retainedDirtyWorktree = attachSmokeWorktree(dirtyWorktreePlan.result.id, true);
+  const refusedDirtyRelease = await request("tasks.worktree.release", { id: dirtyWorktreePlan.result.id });
+  const dirtyStillExists = fs.existsSync(path.join(retainedDirtyWorktree.worktreePath, "uncommitted-smoke.txt"));
+  if (refusedDirtyRelease.ok || !refusedDirtyRelease.error?.message.includes("uncommitted changes") || !dirtyStillExists)
+    throw new Error(`The host did not preserve uncommitted work when refusing release: ${JSON.stringify({ refusedDirtyRelease, dirtyStillExists })}`);
+  fs.rmSync(path.join(retainedDirtyWorktree.worktreePath, "uncommitted-smoke.txt"), { force: true });
+  const releasedCleanAfterReview = await request("tasks.worktree.release", { id: dirtyWorktreePlan.result.id });
+  if (!releasedCleanAfterReview.ok || fs.existsSync(retainedDirtyWorktree.worktreePath))
+    throw new Error(`The reviewed clean worktree could not be released: ${JSON.stringify(releasedCleanAfterReview)}`);
   let scheduledRequests = 0;
   const scheduledModelServer = http.createServer((request, response) => {
     scheduledRequests += 1;
@@ -567,7 +610,7 @@ async function run() {
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
   await new Promise(resolve => scheduledModelServer.close(resolve));
   pendingSmokeServers.delete(scheduledModelServer);
-  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, held-model task cancellation, scheduled automation lifecycle, and direct host lifecycle.");
+  console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, task cancellation and isolated-worktree planning, scheduled automation lifecycle, and direct host lifecycle.");
 }
 
 async function stopHost() {
@@ -585,6 +628,10 @@ async function stopHost() {
     });
   }
   reader.close();
+  for (const worktreePath of smokeWorktreePaths) {
+    const removed = spawnSync("git", ["worktree", "remove", "--force", "--", worktreePath], { cwd: tempRoot, stdio: "ignore", windowsHide: true });
+    if (removed.status !== 0 && fs.existsSync(worktreePath)) fs.rmSync(worktreePath, { recursive: true, force: true });
+  }
   fs.rmSync(tempRoot, { recursive: true, force: true });
   if (child.exitCode !== 0) throw new Error("The direct Agent Host did not exit cleanly after the smoke test.");
 }

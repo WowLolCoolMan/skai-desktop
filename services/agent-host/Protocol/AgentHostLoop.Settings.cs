@@ -37,10 +37,17 @@ public static partial class AgentHostLoop
             endpoint = LocalEndpoint.IsLocal(settings.Endpoint) ? settings.Endpoint : "http://localhost:11434/v1",
             model = settings.Model,
             provider = settings.ModelProvider,
+            comfyEndpoint = settings.ComfyEndpoint,
+            imageWorkflow = settings.ImageWorkflow,
+            threeDWorkflow = settings.ThreeDWorkflow,
             subagentModel = settings.SubagentModel,
             subagentModelProvider = settings.SubagentModelProvider,
             subagentModelSizeBytes = settings.SubagentModelSizeBytes,
             subagentModelContextLength = settings.SubagentModelContextLength,
+            codingModel = settings.CodingModel,
+            codingModelProvider = settings.CodingModelProvider,
+            codingModelSizeBytes = settings.CodingModelSizeBytes,
+            codingModelContextLength = settings.CodingModelContextLength,
             ollamaContextWindowTokens = settings.OllamaContextWindowTokens,
             localRamBudgetBytes = settings.LocalRamBudgetBytes,
             localGpuBudgetBytes = settings.LocalGpuBudgetBytes,
@@ -64,6 +71,25 @@ public static partial class AgentHostLoop
         settings.Model = RequiredBoundedString(request, "model", 256);
         if (request.Params is { } parameters)
         {
+            if (parameters.TryGetProperty("comfyEndpoint", out var comfyEndpoint) && comfyEndpoint.ValueKind == JsonValueKind.String)
+            {
+                var value = comfyEndpoint.GetString()?.Trim() ?? "";
+                if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || !LocalEndpoint.IsLocal(value) || uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps || uri.AbsolutePath != "/" || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+                    throw new InvalidOperationException("ComfyUI must use a local HTTP or HTTPS endpoint such as http://127.0.0.1:8188.");
+                settings.ComfyEndpoint = value;
+            }
+            if (parameters.TryGetProperty("imageWorkflow", out var imageWorkflow) && imageWorkflow.ValueKind == JsonValueKind.String)
+            {
+                var value = imageWorkflow.GetString() ?? "";
+                if (value.Length > 1_000_000) throw new InvalidOperationException("The ComfyUI image workflow exceeds 1 MB.");
+                settings.ImageWorkflow = value;
+            }
+            if (parameters.TryGetProperty("threeDWorkflow", out var threeDWorkflow) && threeDWorkflow.ValueKind == JsonValueKind.String)
+            {
+                var value = threeDWorkflow.GetString() ?? "";
+                if (value.Length > 1_000_000) throw new InvalidOperationException("The ComfyUI 3D workflow exceeds 1 MB.");
+                settings.ThreeDWorkflow = value;
+            }
             if (parameters.TryGetProperty("provider", out var provider) && provider.ValueKind == JsonValueKind.String)
             {
                 var requestedProvider = provider.GetString();
@@ -97,6 +123,30 @@ public static partial class AgentHostLoop
                 if (subagentContext.ValueKind == JsonValueKind.Null) settings.SubagentModelContextLength = null;
                 else if (subagentContext.TryGetInt32(out var tokens) && tokens is >= 0 and <= 16_777_216) settings.SubagentModelContextLength = tokens;
                 else throw new InvalidOperationException("The subagent model context length is invalid.");
+            }
+            if (parameters.TryGetProperty("codingModel", out var codingModel) && codingModel.ValueKind == JsonValueKind.String)
+            {
+                var value = codingModel.GetString()?.Trim() ?? "";
+                if (value.Length > 256 || value.Any(char.IsControl)) throw new InvalidOperationException("The coding model exceeds the safety limit.");
+                settings.CodingModel = value;
+            }
+            if (parameters.TryGetProperty("codingModelProvider", out var codingProvider) && codingProvider.ValueKind == JsonValueKind.String)
+            {
+                var value = codingProvider.GetString()?.Trim() ?? "";
+                if (value.Length > 128 || value.Any(char.IsControl)) throw new InvalidOperationException("The coding model provider exceeds the safety limit.");
+                settings.CodingModelProvider = value;
+            }
+            if (parameters.TryGetProperty("codingModelSizeBytes", out var codingSize))
+            {
+                if (codingSize.ValueKind == JsonValueKind.Null) settings.CodingModelSizeBytes = null;
+                else if (codingSize.TryGetInt64(out var bytes) && bytes is >= 0 and <= (1L << 50)) settings.CodingModelSizeBytes = bytes;
+                else throw new InvalidOperationException("The coding model size must be between 0 and 1024 GiB.");
+            }
+            if (parameters.TryGetProperty("codingModelContextLength", out var codingContext))
+            {
+                if (codingContext.ValueKind == JsonValueKind.Null) settings.CodingModelContextLength = null;
+                else if (codingContext.TryGetInt32(out var tokens) && tokens is >= 0 and <= 16_777_216) settings.CodingModelContextLength = tokens;
+                else throw new InvalidOperationException("The coding model context length is invalid.");
             }
             if (parameters.TryGetProperty("ollamaContextWindowTokens", out var contextWindow) && contextWindow.TryGetInt32(out var contextTokens))
             {
@@ -138,7 +188,7 @@ public static partial class AgentHostLoop
             }
         }
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, subagentModel = settings.SubagentModel, subagentModelProvider = settings.SubagentModelProvider, subagentModelSizeBytes = settings.SubagentModelSizeBytes, subagentModelContextLength = settings.SubagentModelContextLength, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled, personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes });
+        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, comfyEndpoint = settings.ComfyEndpoint, imageWorkflow = settings.ImageWorkflow, threeDWorkflow = settings.ThreeDWorkflow, subagentModel = settings.SubagentModel, subagentModelProvider = settings.SubagentModelProvider, subagentModelSizeBytes = settings.SubagentModelSizeBytes, subagentModelContextLength = settings.SubagentModelContextLength, codingModel = settings.CodingModel, codingModelProvider = settings.CodingModelProvider, codingModelSizeBytes = settings.CodingModelSizeBytes, codingModelContextLength = settings.CodingModelContextLength, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled, personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes });
     }
 
 

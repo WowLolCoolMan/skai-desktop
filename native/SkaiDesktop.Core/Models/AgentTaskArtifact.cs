@@ -23,6 +23,7 @@ public sealed class AgentTaskArtifact
     public string Title { get; set; } = string.Empty;
     public string Instruction { get; set; } = string.Empty;
     public string ResponseMode { get; set; } = ChatResponseModes.Coding;
+    public string Environment { get; set; } = "local";
     public string? Model { get; set; }
     public string? ModelProvider { get; set; }
     public long? ModelSizeBytes { get; set; }

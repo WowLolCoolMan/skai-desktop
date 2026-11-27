@@ -29,6 +29,7 @@ function createAgentHostClient(options) {
     process: processObject,
     repoRoot,
     sendPetMessage,
+    handleBridgeRequest,
     spawn,
     longRequestTimeouts = {},
     isQuitting = () => false,
@@ -92,6 +93,19 @@ function createAgentHostClient(options) {
       try {
         message = JSON.parse(line);
       } catch {
+        return;
+      }
+      if (message.kind === "bridge_request") {
+        const bridge = message.result;
+        Promise.resolve(handleBridgeRequest?.(bridge?.method, bridge?.parameters))
+          .then((result) => {
+            if (host !== startedHost || startedHost.stdin.destroyed) return;
+            startedHost.stdin.write(`${JSON.stringify({ v: 1, id: message.id, method: "bridge.response", params: { result: result ?? null } })}\n`);
+          })
+          .catch((error) => {
+            if (host !== startedHost || startedHost.stdin.destroyed) return;
+            startedHost.stdin.write(`${JSON.stringify({ v: 1, id: message.id, method: "bridge.response", params: { result: { error: error instanceof Error ? error.message : "The desktop bridge request failed." } } })}\n`);
+          });
         return;
       }
       const entry = pending.get(message.id);

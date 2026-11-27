@@ -190,6 +190,9 @@ export type DesktopTask = {
   title: string;
   instruction: string;
   responseMode?: "think" | "coding" | "security";
+  environment?: TaskEnvironment;
+  worktreePath?: string | null;
+  worktreeBranch?: string | null;
   projectId?: string | null;
   conversationId?: string | null;
   parentRunId?: string | null;
@@ -379,6 +382,9 @@ export interface AppearanceBridge {
 
 export interface AgentBridge {
   request(method: string, params?: Record<string, unknown>): Promise<AgentResponse>;
+  browserPreview?: {
+    onRequest(handler: (parameters: { projectId?: string; url?: string | null } | undefined) => unknown | Promise<unknown>): () => void;
+  };
   onProgress?(handler: (message: { channel: string; delta: string; reset?: boolean }) => void): () => void;
   computer?: {
     capture(): Promise<Array<{ id: string; name: string; displayId: string; display: { x: number; y: number; width: number; height: number; scaleFactor: number } | null; previewWidth: number; previewHeight: number; content: string; mediaType: "image/png" }>>;

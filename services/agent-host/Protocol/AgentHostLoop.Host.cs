@@ -41,6 +41,7 @@ public static partial class AgentHostLoop
                 try { await writer.WriteLineAsync(json).ConfigureAwait(false); }
                 finally { writeGate.Release(); }
             }
+            WriteHostMessage = WriteResponseAsync;
             AgentResponse HandleSafely(AgentRequest request)
             {
                 var previous = ChatProgress.Value;
@@ -73,6 +74,16 @@ public static partial class AgentHostLoop
                     continue;
                 }
 
+                if (request.Method == "bridge.response")
+                {
+                    if (request.Params is { } bridgeParams && bridgeParams.TryGetProperty("result", out var bridgeResult)
+                        && PendingBridgeRequests.TryRemove(request.Id, out var pendingBridge))
+                        pendingBridge.TrySetResult(bridgeResult.Clone());
+                    else if (PendingBridgeRequests.TryRemove(request.Id, out var missingBridge))
+                        missingBridge.TrySetException(new InvalidDataException("The desktop preview bridge returned an invalid response."));
+                    continue;
+                }
+
                 if (RunsInBackground(request.Method))
                 {
                     _ = Task.Run(async () => await WriteResponseAsync(HandleSafely(request)).ConfigureAwait(false), CancellationToken.None);
@@ -95,6 +106,50 @@ public static partial class AgentHostLoop
         }
         await DisposeTerminalSessionsAsync().ConfigureAwait(false);
         await DisposeMcpClientsAsync().ConfigureAwait(false);
+        WriteHostMessage = null;
+        foreach (var pendingBridge in PendingBridgeRequests.Values) pendingBridge.TrySetCanceled();
+        PendingBridgeRequests.Clear();
+    }
+
+    private static async Task<JsonElement> RequestDesktopPreviewAsync(string projectId, string? url, CancellationToken cancellationToken)
+    {
+        if (projectId.Length is < 1 or > 128 || projectId.Any(char.IsControl)) throw new ArgumentException("The preview project identity is invalid.", nameof(projectId));
+        var id = $"preview-{Guid.NewGuid():N}";
+        var completion = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!PendingBridgeRequests.TryAdd(id, completion)) throw new InvalidOperationException("A desktop preview request could not be registered.");
+        try
+        {
+            var writer = WriteHostMessage ?? throw new InvalidOperationException("The desktop preview bridge is unavailable.");
+            await writer(new(ProtocolVersion, id, true, new { method = "browser.preview.inspect", parameters = new { projectId, url } }, Kind: "bridge_request")).ConfigureAwait(false);
+            return await completion.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
+        }
+        finally { PendingBridgeRequests.TryRemove(id, out _); }
+    }
+
+    private static async Task<JsonElement> RequestDesktopMcpToolApprovalAsync(string connectionId, McpToolDescriptor tool, bool isMutating, JsonElement arguments, CancellationToken cancellationToken)
+    {
+        var id = $"mcp-approval-{Guid.NewGuid():N}";
+        var completion = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!PendingBridgeRequests.TryAdd(id, completion)) throw new InvalidOperationException("A plugin approval request could not be registered.");
+        try
+        {
+            var writer = WriteHostMessage ?? throw new InvalidOperationException("The desktop plugin approval bridge is unavailable.");
+            await writer(new(ProtocolVersion, id, true, new
+            {
+                method = "mcp.tool.approval",
+                parameters = new
+                {
+                    connectionId,
+                    serverId = tool.ServerId,
+                    toolName = tool.ToolName,
+                    description = tool.Description,
+                    isMutating,
+                    arguments,
+                },
+            }, Kind: "bridge_request")).ConfigureAwait(false);
+            return await completion.Task.WaitAsync(TimeSpan.FromMinutes(5), cancellationToken).ConfigureAwait(false);
+        }
+        finally { PendingBridgeRequests.TryRemove(id, out _); }
     }
 
     internal static bool RunsInBackground(string method) => method is "chat.complete" or "persona.group.complete" or "persona.discover"

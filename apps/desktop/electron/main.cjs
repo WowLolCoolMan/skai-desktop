@@ -150,6 +150,52 @@ function warnSafely(...values) {
 
 const petMotionEngine = createPetMotionEngine({ onError: (id, error) => warnSafely(`[pet-motion] stopping ${id} after an update error`, error instanceof Error ? error.message : String(error)) });
 const pendingPetMessages = [];
+const pendingBrowserPreviewRequests = new Map();
+ipcMain.on("browser-preview:response", (event, response) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || !response || typeof response.id !== "string") return;
+  const pending = pendingBrowserPreviewRequests.get(response.id);
+  if (!pending) return;
+  pendingBrowserPreviewRequests.delete(response.id);
+  clearTimeout(pending.timer);
+  pending.resolve(response.result ?? null);
+});
+
+function requestBrowserPreview(parameters) {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed())
+    return Promise.resolve({ error: "Open the Coding workspace to use its in-app browser preview." });
+  const id = `browser-preview-${randomUUID()}`;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingBrowserPreviewRequests.delete(id);
+      resolve({ error: "The in-app browser preview did not respond. Open the Coding workspace and try again." });
+    }, 25_000);
+    pendingBrowserPreviewRequests.set(id, { resolve, timer });
+    mainWindow.webContents.send("browser-preview:request", { id, parameters });
+  });
+}
+async function requestMcpToolApproval(parameters) {
+  if (!mainWindow || mainWindow.isDestroyed()) return { approved: false };
+  const safeText = (value, limit) => typeof value === "string"
+    ? value.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, limit)
+    : "";
+  const connectionId = safeText(parameters?.connectionId, 128);
+  const serverId = safeText(parameters?.serverId, 128);
+  const toolName = safeText(parameters?.toolName, 128);
+  if (!connectionId || !serverId || !toolName || typeof parameters?.isMutating !== "boolean") return { approved: false };
+  let argumentSummary = "{}";
+  try { argumentSummary = JSON.stringify(parameters.arguments ?? {}).slice(0, 6_000); } catch { argumentSummary = "[arguments could not be rendered]"; }
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: parameters.isMutating ? "warning" : "question",
+    title: "Approve plugin tool call",
+    message: `${serverId} · ${toolName}`,
+    detail: `${parameters.isMutating ? "This tool may change data." : "This is a read-only tool."}\nConnection: ${connectionId}\n\nArguments:\n${argumentSummary}\n\nTool description (untrusted):\n${safeText(parameters.description, 1_000)}`,
+    buttons: ["Approve once", "Deny"],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  });
+  return result.response === 0 ? { approved: true, approvalId: `desktop-${randomUUID()}` } : { approved: false };
+}
 const PET_WINDOW_WIDTH = 220;
 const PET_WINDOW_HEIGHT = 190;
 const PET_WINDOW_MARGIN = 16;
@@ -1074,7 +1120,7 @@ function createTray() { return trayController.createTray(); }
 const allowedMethods = new Set([
     "runtime.health", "models.list", "models.runtime.status", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files",
     "project.file.read", "project.preview.read", "tasks.list", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow",
-    "tasks.plan", "tasks.delegate", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "project.preflight", "project.checks.list", "project.check.run", "asset.generate3d", "image.generate.start",
+    "tasks.plan", "tasks.delegate", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "tasks.worktree.release", "project.preflight", "project.checks.list", "project.check.run", "asset.generate3d", "image.generate.start",
     "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status",
     "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save",
     "conversation.metadata.save", "conversations.export", "conversations.import.preview", "conversations.import.apply", "conversation.fork", "memory.list", "memory.search",
@@ -1108,6 +1154,11 @@ const agentHostClient = createAgentHostClient({
   process,
   repoRoot,
   sendPetMessage,
+  handleBridgeRequest: (method, parameters) => method === "browser.preview.inspect"
+    ? requestBrowserPreview(parameters)
+    : method === "mcp.tool.approval"
+      ? requestMcpToolApproval(parameters)
+      : { error: "That host-to-desktop operation is not supported." },
   spawn,
   longRequestTimeouts: {
     "chat.complete": 5 * 60_000,

@@ -137,7 +137,10 @@ if (process.platform === "win32") {
   microphoneFixtureReady = synthesis.status === 0 && fs.existsSync(microphoneFixturePath)
     && fs.readFileSync(microphoneFixturePath).subarray(0, 4).toString("ascii") === "RIFF";
   if (microphoneFixtureReady) {
-    const oneUtterance = extendPcmSpeechFixture(microphoneFixturePath);
+    // Keep the deterministic loop long enough for every voice acceptance path,
+    // but use short gaps so barge-in capture cannot drift into a multi-minute
+    // silent recording before local Whisper gets a turn to transcribe it.
+    const oneUtterance = extendPcmSpeechFixture(microphoneFixturePath, 60, 0.75);
     microphoneFixtureReady = Buffer.isBuffer(oneUtterance);
     if (microphoneFixtureReady) microphoneSpeechFixtureBase64 = oneUtterance.toString("base64");
   }
@@ -551,7 +554,11 @@ async function main() {
       handsFreeBargeInState.completionCount = bargeInCompletionCount;
       handsFreeBargeInState.followupTranscribed = bargeInCompletionCount >= 2 && current.turns.split("voice fixture").length > 2;
       handsFreeBargeInState.peakInputLevel = Math.max(handsFreeBargeInState.peakInputLevel, current.level);
-      if (!current.modal && (current.detail.includes("Whisper") || current.turns)) break;
+      // The first captured turn is expected to appear before the interrupted
+      // turn is transcribed. Do not treat that user message as completion of
+      // the barge-in flow; wait for the second model request or a terminal
+      // Whisper error instead.
+      if (!current.modal && current.detail.includes("Whisper") && !handsFreeBargeInState.followupTranscribed) break;
       await sleep(100);
     }
     if (handsFreeState.started) {

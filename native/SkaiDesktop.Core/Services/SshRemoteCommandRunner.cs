@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -12,7 +14,7 @@ public sealed class SshRemoteCommandRunner
     public const int MaxCommandCharacters = 4_000;
     public const int MaxOutputCharacters = 30_000;
     public static readonly TimeSpan MaxTimeout = TimeSpan.FromMinutes(2);
-    private static readonly Regex HostPattern = new(@"^(?:[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?|(?:\d{1,3}\.){3}\d{1,3}|\[[0-9a-f:]+\])$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex DnsLabelPattern = new(@"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex UserPattern = new(@"^[a-z_][a-z0-9_.-]{0,63}\$?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public async Task<SshRemoteCommandResult> RunAsync(
@@ -25,7 +27,7 @@ public sealed class SshRemoteCommandRunner
     {
         host = (host ?? string.Empty).Trim();
         username = (username ?? string.Empty).Trim();
-        if (!HostPattern.IsMatch(host) || host.Contains("..", StringComparison.Ordinal))
+        if (!IsValidHost(host))
             throw new ArgumentException("Enter a valid SSH host name or IP address.", nameof(host));
         if (!UserPattern.IsMatch(username)) throw new ArgumentException("Enter a valid SSH username.", nameof(username));
         if (port is < 1 or > 65_535) throw new ArgumentOutOfRangeException(nameof(port), "SSH port must be between 1 and 65535.");
@@ -67,7 +69,7 @@ public sealed class SshRemoteCommandRunner
             "-o", "ClearAllForwardings=yes",
             "-o", "PermitLocalCommand=no",
             "-o", "ConnectTimeout=10",
-            "--", target, command,
+            target, command,
         }) start.ArgumentList.Add(argument);
 
         using var process = new Process { StartInfo = start, EnableRaisingEvents = true };
@@ -121,6 +123,18 @@ public sealed class SshRemoteCommandRunner
                 if (count > remaining) markTruncated();
             }
         }
+    }
+
+    private static bool IsValidHost(string host)
+    {
+        if (host.Length is < 1 or > 253 || host[0] == '-') return false;
+        if (host[0] == '[' && host[^1] == ']')
+            return IPAddress.TryParse(host[1..^1], out var ipv6) && ipv6.AddressFamily == AddressFamily.InterNetworkV6;
+        if (IPAddress.TryParse(host, out var address))
+            return address.AddressFamily == AddressFamily.InterNetwork;
+        if (host.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '.' and not '-')) return false;
+        var labels = host.TrimEnd('.').Split('.');
+        return labels.Length > 0 && labels.All(label => DnsLabelPattern.IsMatch(label));
     }
 
     private static void TryKill(Process process)

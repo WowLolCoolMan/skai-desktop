@@ -17,7 +17,7 @@ function consumeTaskPrefill(): TaskPrefill | null {
     return {
       title: value.title.trim().slice(0, 200),
       instruction: value.instruction.trim().slice(0, 6000),
-      environment: value.environment === "local" ? "local" : "local",
+      environment: value.environment === "worktree" ? "worktree" : "local",
     };
   } catch {
     try { localStorage.removeItem(PREFILL_KEY); } catch { /* Storage may be disabled. */ }
@@ -25,13 +25,14 @@ function consumeTaskPrefill(): TaskPrefill | null {
   }
 }
 
-export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expanded, showToggle = true, onExpand }: {
+export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expanded, showToggle = true, onExpand, worktreeAvailable = false }: {
   busy: boolean;
   onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, requiresApproval: boolean) => Promise<boolean>;
   initialOpen?: boolean;
   expanded?: boolean;
   showToggle?: boolean;
   onExpand?: () => void;
+  worktreeAvailable?: boolean;
 }) {
   const [localOpen, setLocalOpen] = useState(initialOpen);
   const open = expanded ?? localOpen;
@@ -47,7 +48,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
       if (!prefill) return;
       setTitle(prefill.title);
       setInstruction(prefill.instruction);
-      setEnvironment(prefill.environment);
+      setEnvironment(prefill.environment === "worktree" && !worktreeAvailable ? "local" : prefill.environment);
       if (expanded === undefined) setLocalOpen(true);
       else onExpand?.();
       setStatus("");
@@ -62,7 +63,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
       window.removeEventListener("skai:task-prefill", applyPrefill);
       window.removeEventListener("storage", onStorage);
     };
-  }, []);
+  }, [onExpand, expanded, worktreeAvailable]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -80,7 +81,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
     </div>
     {open && <form id="chat-task-composer-fields" onSubmit={(event) => void submit(event)}>
       <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={3} onChange={(event) => setInstruction(event.target.value)} required /></label></div>
-      <EnvironmentPicker value={environment} onChange={setEnvironment} />
+      <EnvironmentPicker value={environment} worktreeAvailable={worktreeAvailable} onChange={setEnvironment} />
       <label className="task-require-approval"><input type="checkbox" checked={requiresApproval} onChange={(event) => setRequiresApproval(event.target.checked)} /> Require approval before starting the local agent run</label>
       <div className="task-composer-footer"><span role="status">{status || "Review the brief before saving the plan."}</span><Button variant="primary" type="submit" disabled={busy || !title.trim() || !instruction.trim()}>{busy ? "Saving plan…" : "Save plan in thread"}</Button></div>
     </form>}

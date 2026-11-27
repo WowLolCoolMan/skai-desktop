@@ -42,7 +42,7 @@ public sealed class AgentTaskArtifactStore
         }
     }
 
-    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null, string responseMode = ChatResponseModes.Coding, string? model = null, string? modelProvider = null, long? modelSizeBytes = null, int? modelContextLength = null, bool airLlmCompatible = false)
+    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null, string responseMode = ChatResponseModes.Coding, string? model = null, string? modelProvider = null, long? modelSizeBytes = null, int? modelContextLength = null, bool airLlmCompatible = false, string environment = "local")
     {
         var now = DateTimeOffset.UtcNow;
         var task = new AgentTaskArtifact
@@ -50,6 +50,7 @@ public sealed class AgentTaskArtifactStore
             Title = Normalize(title, MaxTitleCharacters, "task title"),
             Instruction = Normalize(instruction, MaxInstructionCharacters, "task instruction"),
             ResponseMode = ChatResponseModes.IsValid(responseMode) ? responseMode : throw new ArgumentException("The response mode is invalid.", nameof(responseMode)),
+            Environment = NormalizeEnvironment(environment),
             Model = NormalizeOptional(model, 512, "model"),
             ModelProvider = NormalizeOptional(modelProvider, 128, "model provider"),
             ModelSizeBytes = modelSizeBytes,
@@ -345,6 +346,7 @@ public sealed class AgentTaskArtifactStore
             Normalize(task.Title, MaxTitleCharacters, "task title");
             Normalize(task.Instruction, MaxInstructionCharacters, "task instruction");
             if (!ChatResponseModes.IsValid(task.ResponseMode)) task.ResponseMode = ChatResponseModes.Coding;
+            task.Environment = NormalizeEnvironment(task.Environment);
             Normalize(task.Role, MaxRoleCharacters, "task role");
             NormalizeOptional(task.Model, 512, "model");
             NormalizeOptional(task.ModelProvider, 128, "model provider");
@@ -387,6 +389,13 @@ public sealed class AgentTaskArtifactStore
         return Normalize(value, maxLength, label);
     }
 
+    private static string NormalizeEnvironment(string? value)
+    {
+        if (string.Equals(value, "local", StringComparison.OrdinalIgnoreCase)) return "local";
+        if (string.Equals(value, "worktree", StringComparison.OrdinalIgnoreCase)) return "worktree";
+        throw new ArgumentException("The task environment must be local or worktree.", nameof(value));
+    }
+
     private static List<string> NormalizeIds(IEnumerable<string>? values)
     {
         var result = (values ?? []).Select(value => Normalize(value, 128, "task dependency ID")).Distinct(StringComparer.Ordinal).ToList();
@@ -410,6 +419,7 @@ public sealed class AgentTaskArtifactStore
         Title = source.Title,
         Instruction = source.Instruction,
         ResponseMode = source.ResponseMode,
+        Environment = source.Environment,
         Model = source.Model,
         ModelProvider = source.ModelProvider,
         ModelSizeBytes = source.ModelSizeBytes,

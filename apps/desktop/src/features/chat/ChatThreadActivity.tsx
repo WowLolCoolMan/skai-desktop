@@ -29,7 +29,7 @@ export function ChatThreadActivity({ tasks, taskBusy, workspaceMode, onTaskActio
     {(task.changedFiles?.length || task.artifactLabels?.length) ? <div className="thread-run-files">{(task.changedFiles?.length ? task.changedFiles : task.artifactLabels ?? []).map((file) => <code key={file}>{file}</code>)}</div> : null}
     <div className="thread-run-actions">
       {["queued", "running", "verifying"].includes(task.status) && <Button variant="ghost" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "cancel")}>Stop</Button>}
-      {["failed", "blocked"].includes(task.status) && <Button variant="secondary" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "retry")}>Retry</Button>}
+      {task.status === "blocked" && <Button variant="secondary" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "retry")}>Retry</Button>}
       {task.status === "completed" && <Button variant="secondary" type="button" onClick={() => { const file = task.changedFiles?.[0]; if (file && workspaceMode === "project") onOpenFile(file); onNavigate("coding"); }}>{task.changedFiles?.length ? "Review first file" : "Review changes"}</Button>}
     </div>
   </article>;

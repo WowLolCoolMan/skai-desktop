@@ -328,6 +328,9 @@ native\SkaiDesktop.Core\Services\LocalProjectHealthAnalyzer.cs:113: Add(findings
 native\SkaiDesktop.Core.Tests\ProjectHealthTests.cs:18: await File.WriteAllTextAsync(Path.Combine(healthRoot, "Program.cs"), "// TODO: cover this path\nvar api_key=\"test\";\n");
 
 === GIT RECENT COMMITS (last 20) ===
+5182d958 feat: route delegated tasks to selected local models
+8ec796b1 feat: persist subagent model settings
+1a4b0ef0 feat: consolidate desktop workflow and project tooling
 3813e25b fix: route computer use through vision models
 f2650619 refine chat layout and response mode control
 f850ed21 fix: guard smart prompt rewrites
@@ -345,45 +348,42 @@ cbd9f13e fix(ui): keep Coding chat full width when sidebar is collapsed
 251cfdfe feat: expand coding diff and git review workflows
 89e1e4d1 feat: refine coding inline diff workflow
 2c8f579e fix: finish project entry flow and task cancellation
-867e15e3 feat(voice): add local expressiveness controls
-0d3ac4aa test(ui): capture standalone schedule workflow
-983c67d5 fix(ui): show conversation schedule details rail
 
 === HIGH-CHURN FILES (last 90 days, top 20) ===
  362 docs/GOAL_EXECUTION.md
- 269 apps/desktop/src/styles.css
+ 270 apps/desktop/src/styles.css
  269 docs/CAPABILITY_MATRIX.md
  179 docs/SKAI_PREMIUM_UI_PROGRESS.md
  145 scripts/audit-native-ui.cjs
  143 native/ServerRock.Native/MainPage.xaml.cs
  138 services/agent-host/Protocol/AgentHostLoop.cs
- 131 apps/desktop/electron/main.cjs
- 106 apps/desktop/src/app/useDesktopWorkspace.ts
+ 132 apps/desktop/electron/main.cjs
+ 108 apps/desktop/src/app/useDesktopWorkspace.ts
  101 package.json
  100 docs/planning/TO_DO_NEXT.md
-  94 apps/desktop/src/app/AppRouteView.tsx
-  87 apps/desktop/src/App.tsx
+  96 apps/desktop/src/app/AppRouteView.tsx
+  88 apps/desktop/src/App.tsx
   86 docs/FUTURE_FEATURES.md
   74 apps/desktop/src/features/chat/ChatPage.tsx
-  70 apps/desktop/shared/contracts.ts
+  71 apps/desktop/shared/contracts.ts
   69 README.md
   67 native/ServerRock.Core.Tests/Program.cs
   65 scripts/smoke-agent-host.cjs
-  61 apps/desktop/src/features/settings/SettingsPage.tsx
+  62 apps/desktop/src/features/settings/SettingsPage.tsx
 
 === MONOREPO SIGNALS ===
 Sub-package directory found: apps/
 Sub-package directory found: services/
 
 === CODE METRICS ===
-Total files scanned: 2955
-Total lines of code: 262638
+Total files scanned: 3000
+Total lines of code: 264380
 
 Files by language:
-  Other: 2079
-  Python: 456
-  C#: 261
-  TypeScript/React: 69
+  Other: 2116
+  Python: 459
+  C#: 265
+  TypeScript/React: 70
   TypeScript: 47
   JavaScript: 43
 

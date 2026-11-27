@@ -116,6 +116,8 @@ public sealed class AgentTaskExecutor
         ArgumentNullException.ThrowIfNull(coordinator);
         var task = _store.Get(taskId);
         if (task.WorktreeRepositoryRoot is null || task.WorktreePath is null || task.WorktreeBranch is null) throw new InvalidOperationException("The task has no retained worktree.");
+        if (task.Status is AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Running or AgentTaskStatuses.Verifying)
+            throw new InvalidOperationException("An active or unapproved task worktree cannot be released.");
         await coordinator.ReleaseCleanAsync(task.WorktreeRepositoryRoot, task.WorktreePath, cancellationToken).ConfigureAwait(false);
         return _store.ClearWorktree(task.Id);
     }

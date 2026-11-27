@@ -269,11 +269,15 @@ const PROBE = String.raw`(() => {
   const visibleRect = (el) => { const r = el.getBoundingClientRect(); let box = { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll|hidden|clip)/.test(s.overflow + s.overflowX + s.overflowY)) { const ar = a.getBoundingClientRect(); box = { left: Math.max(box.left, ar.left), top: Math.max(box.top, ar.top), right: Math.min(box.right, ar.right), bottom: Math.min(box.bottom, ar.bottom) }; } } return { left: box.left, top: box.top, right: Math.max(box.left, box.right), bottom: Math.max(box.top, box.bottom), width: Math.max(0, box.right - box.left), height: Math.max(0, box.bottom - box.top) }; };
   const controls = all.filter((el) => el.matches('button,input,select,textarea') && !el.closest('.sr-only') && !outOfView(el));
   const overlayRoot = (el) => el.closest('[role="dialog"], [role="menu"], [role="listbox"], .global-rail-extras-panel');
-  for (let i = 0; i < controls.length; i++) for (let j = i + 1; j < controls.length; j++) {
-    const a = controls[i], b = controls[j]; if (a.contains(b) || b.contains(a)) continue;
+  const visibleControls = controls.map((el) => ({ el, rect: visibleRect(el) }))
+    .filter(({ rect }) => rect.width > 0 && rect.height > 0)
+    .sort((a, b) => a.rect.left - b.rect.left);
+  for (let i = 0; i < visibleControls.length; i++) for (let j = i + 1; j < visibleControls.length; j++) {
+    const { el: a, rect: ra } = visibleControls[i], { el: b, rect: rb } = visibleControls[j];
+    if (rb.left >= ra.right) break;
+    if (rb.top >= ra.bottom || rb.bottom <= ra.top || a.contains(b) || b.contains(a)) continue;
     const overlayA = overlayRoot(a), overlayB = overlayRoot(b);
     if (overlayA !== overlayB && (overlayA || overlayB)) continue;
-    const ra = visibleRect(a), rb = visibleRect(b);
     const ix = Math.max(0, Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left)), iy = Math.max(0, Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top));
     const small = Math.min(ra.width * ra.height, rb.width * rb.height);
     if (small > 0 && ix * iy > small * 0.3) issues.overlap.push([describe(a), describe(b)]);
@@ -680,7 +684,7 @@ async function main() {
             await clickInRenderer(cdp, ".project-directory-open-action");
           }
           const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-          if (!projectReady) throw new Error("Coding workflow could not open the seeded project.");
+          if (!projectReady) throw new Error(`Coding workflow could not open the seeded project: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, url: location.href, body: document.body.innerText.slice(0, 900), projectHeading: document.querySelector('.coding-project-heading')?.innerText ?? null, noProject: document.querySelector('.coding-no-project')?.innerText ?? null, addToSplit: Boolean(document.querySelector('.coding-split-launcher button')), projects: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText) }))()`))}`);
           const seededCodingThreadVisible = await cdp.evaluate(`Boolean([...document.querySelectorAll('.sidebar-project-thread')].find((button) => button.innerText.trim() === 'Review the starter project'))`);
           if (!seededCodingThreadVisible) await cdp.evaluate(`document.querySelector('button[aria-label="Expand Skai Starter Project"]')?.click(); 1`);
           const seededCodingThreadReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.sidebar-project-thread')].some((button) => button.innerText.trim() === 'Review the starter project')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
@@ -950,6 +954,18 @@ async function main() {
             await clickButtonText(cdp, "Save plan in thread", ".project-task-planner-slot");
             const planSaved = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.project-task-planner-slot [role="status"]')?.textContent.includes('Plan saved to this conversation for review')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!planSaved) throw new Error(`Saving the project task plan did not confirm it for review in the conversation: ${JSON.stringify(await cdp.evaluate(`(() => ({ status: document.querySelector('.project-task-planner-slot [role="status"]')?.textContent, planner: document.querySelector('.project-task-planner-slot')?.innerText, saveDisabled: document.querySelector('.project-task-planner-slot button[type="submit"]')?.disabled }))()`))}`);
+            const approvalPlan = await cdp.evaluateWith(async function (title) { const response = await window.skaiAgent.request('tasks.list', {}); const task = response.ok ? response.result.find((item) => item.title === title) : null; return task ? { status: task.status, requiresApproval: task.requiresApproval } : null; }, "Add tests for API client");
+            if (approvalPlan?.status !== "proposed" || approvalPlan.requiresApproval !== true) throw new Error(`A newly saved plan did not retain its required approval state: ${JSON.stringify(approvalPlan)}`);
+            await cdp.evaluate(`document.querySelector('.coding-project-context-actions button')?.click()`);
+            await clickButtonText(cdp, "Open activity", ".overflow-menu-item");
+            const planActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); if (item?.innerText.includes('Queue plan')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!planActionReady) throw new Error("A saved task plan did not appear with an explicit Queue plan action in project activity.");
+            await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); [...item.querySelectorAll('button')].find((button) => button.textContent?.includes('Queue plan'))?.click(); return Boolean(item); })()`);
+            const approvalActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); if (item?.innerText.includes('Approve') && item?.innerText.includes('Waiting for you')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!approvalActionReady) throw new Error("Queueing a plan that requires approval did not expose the explicit approval decision.");
+            await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); [...item.querySelectorAll('button')].find((button) => button.textContent?.includes('Approve'))?.click(); return Boolean(item); })()`);
+            const queuedActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); if (item?.innerText.includes('Start task') && item?.innerText.toLowerCase().includes('queued')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!queuedActionReady) throw new Error("Queue plan did not transition the saved plan to an explicit Start task state.");
             if (width < 640) await clickButtonText(cdp, "Close planner", ".project-thread-panel");
           }
           const readme = await cdp.evaluate(`(() => [...document.querySelectorAll('.project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)()`);
@@ -1073,7 +1089,7 @@ async function main() {
           console.log(`[memory-workflow] ${JSON.stringify({ notesSaved: 3, selectedForEdit: true, documentSaved: true, documentSearch: true, documentRemoved: true, noteText })}`);
         }
         if (process.env.UI_MATRIX_CAPTURE === "1" && route === "images") {
-          await cdp.evaluate(`(async () => { for (let i = 0; i < 300; i++) { const status = document.querySelector('.visuals-runtime-settings .status-badge')?.textContent?.trim().toLowerCase(); if (status && status !== 'checking') return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          await cdp.evaluate(`(async () => { const panel = document.querySelector('.visuals-runtime-settings'); if (!panel) return true; for (let i = 0; i < 50; i++) { const status = panel.querySelector('.status-badge')?.textContent?.trim().toLowerCase(); if (!status || status !== 'checking') return true; await new Promise((r) => setTimeout(r, 50)); } return true; })()`);
         }
         if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT_BASE === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
           const selectedThread = await cdp.evaluate(`(() => { const row = [...document.querySelectorAll('.sidebar-history-row')].find((item) => item.innerText.includes('Plan a simple herb garden')); row?.querySelector('.sidebar-history-item')?.click(); return Boolean(row); })()`);

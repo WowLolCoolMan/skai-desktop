@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -13,6 +14,8 @@ public static partial class AgentHostLoop
     private const int ProtocolVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Dictionary<string, ActiveTaskExecution> ActiveTaskExecutions = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> PendingBridgeRequests = new(StringComparer.Ordinal);
+    private static Func<AgentResponse, Task>? WriteHostMessage;
     private static readonly object ActiveTaskExecutionsGate = new();
     private static readonly object LocalExecutionGate = new();
     private static int LocalAdmittedTaskCount;
