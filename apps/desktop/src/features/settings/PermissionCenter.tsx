@@ -88,6 +88,12 @@ export function PermissionCenter() {
           <p className="permission-center-muted">Skai currently has no reusable global tool grants and no unattended high-risk tool mode. Per-call MCP approval cannot be inherited across calls.</p>
         </article>
         <article className="permission-center-card permission-center-span">
+          <p className="section-kicker">UNTRUSTED CONTENT BOUNDARY</p><h3>Prompts do not grant access</h3>
+          <p className="permission-center-muted">Text from files, webpages, model output, MCP metadata, and imported transcripts is treated as untrusted content. It cannot change these grants, authorize a tool, widen a project folder, or disable the sandbox.</p>
+          <div className="permission-center-boundary"><strong>Before a risky action</strong><span>Skai shows the target resource, scope, duration, and review step. Keep the request paused when the source is unexpected or asks for secrets, credentials, or policy changes.</span></div>
+          <div className="permission-center-boundary"><strong>Recovery</strong><span>Revoke project access to cancel active project tasks and terminals, then inspect the local audit history for the action metadata.</span></div>
+        </article>
+        <article className="permission-center-card permission-center-span">
           <div className="permission-center-card-heading"><div><p className="section-kicker">LOCAL HISTORY</p><h3>Permission audit</h3></div><StatusBadge tone="neutral">{overview.audit.length} recent</StatusBadge></div>
           <p className="permission-center-muted">{overview.auditStorage}</p>
           {overview.audit.length === 0 ? <p className="permission-center-empty">No permission events recorded yet.</p> : <ol className="permission-center-audit">{overview.audit.map((event) => <li key={event.eventId}><div><strong>{eventLabel(event.type)}</strong><time dateTime={event.timestamp}>{new Date(event.timestamp).toLocaleString()}</time></div><small>{event.payload.projectName ?? event.projectId ?? "Workspace"}{event.payload.resource ? ` · ${event.payload.resource}` : ""}{event.payload.toolName ? ` · ${event.payload.toolName}` : ""}{event.payload.scope ? ` · ${event.payload.scope}` : ""}</small></li>)}</ol>}

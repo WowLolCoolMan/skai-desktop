@@ -1724,6 +1724,11 @@ async function main() {
             await cdp.evaluateWith(function (category) { [...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === category)?.click(); return 1; }, category);
             await sleep(90);
             phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
+            if (route === "settings" && category === "Privacy & Security" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+              const permissionCenter = await cdp.evaluate(`(() => { const panel = document.querySelector('.permission-center'); return { ready: Boolean(panel), heading: panel?.querySelector('h2')?.innerText, sandbox: panel?.innerText.includes('What is sandboxed'), grants: panel?.innerText.includes('CURRENT GRANT RULES'), injection: panel?.innerText.includes('Prompts do not grant access'), audit: panel?.innerText.includes('Permission audit') }; })()`);
+              if (!permissionCenter.ready || permissionCenter.heading !== 'Permission center' || !permissionCenter.sandbox || !permissionCenter.grants || !permissionCenter.injection || !permissionCenter.audit) throw new Error(`Permission center did not disclose scopes, sandbox, untrusted-content boundaries, and audit history: ${JSON.stringify(permissionCenter)}`);
+              console.log(`[permission-center] ${JSON.stringify(permissionCenter)}`);
+            }
           }
           if (route === "settings" && category === "General" && process.env.UI_MATRIX_EXERCISE_TASK_NOTIFICATION_SETTINGS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
             const preferences = await cdp.evaluate(`(() => {

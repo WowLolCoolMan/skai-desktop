@@ -332,6 +332,20 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Unverified: first-run acceptance on native Linux/macOS and manual
   assistive-technology review.
 
+### Slice 25 — safety and permission policy
+
+- Outcome: make local permissions, sandbox boundaries, and untrusted-content
+  handling inspectable from one settings surface.
+- Success check: packaged Settings-route matrix verifies the Permission Center
+  renders selected project roots, revoke-all controls, exact grant scope and
+  duration, platform sandbox disclosure, enforced task bounds, local audit
+  history, and the “Prompts do not grant access” boundary.
+- Safety boundary: the UI states that files, webpages, model output, MCP
+  metadata, and imported transcripts cannot widen grants or disable sandboxing;
+  project revocation remains the explicit cancellation/recovery action.
+- Unverified: real OS prompt-injection fixtures, disk-growth enforcement, and
+  a second-review gate for future unattended high-risk actions.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record
