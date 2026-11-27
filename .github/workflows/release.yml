@@ -291,7 +291,7 @@ jobs:
             printf 'signature=Skai-Desktop-electron-linux-x64.tar.gz.asc\n' >> "$root/SIGNATURES-electron-linux-x64.txt"
             printf 'signature=Skai-Desktop-0.1.4-x64.AppImage.asc\n' >> "$root/SIGNATURES-electron-linux-x64.txt"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Skai-Desktop-electron-${{ matrix.rid }}-${{ github.sha }}
           path: |
