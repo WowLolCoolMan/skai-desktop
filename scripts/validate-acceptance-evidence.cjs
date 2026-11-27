@@ -27,6 +27,12 @@ for (const line of lines) {
 if (missing.length) throw new Error(`Capability matrix evidence is incomplete:\n- ${missing.join("\n- ")}`);
 
 const acceptance = fs.readFileSync(path.join(root, "docs", "operations", "ACCEPTANCE_EVIDENCE.md"), "utf8");
+const roadmap = fs.readFileSync(path.join(root, "docs", "planning", "SKAI_OVERHAUL_OPPORTUNITIES.md"), "utf8");
+const implementedSlices = [...roadmap.matchAll(/^## Slice (\d+) —[^\r\n]*\r?\n([\s\S]*?)(?=^## Slice |\r?\n---\s*$)/gm)]
+  .filter((match) => match[2].includes("**Implementation status"))
+  .map((match) => match[1]);
+const missingSliceRecords = implementedSlices.filter((slice) => !new RegExp(`^### Slice ${slice}(?:\\D|$)`, "m").test(acceptance));
+if (missingSliceRecords.length) throw new Error(`Implemented roadmap slices are missing acceptance records: ${missingSliceRecords.join(", ")}`);
 for (const required of ["Success check", "Failure check", "Disposable profile", "Before screenshot", "Network and privacy boundary", "Unverified platforms"]) {
   if (!acceptance.includes(required)) throw new Error(`Acceptance evidence contract is missing ${required}.`);
 }
@@ -58,4 +64,4 @@ if (process.argv[2]) {
   if (sidecar.schema !== "skai-ui-evidence/v1" || !fs.existsSync(screenshotPath)) throw new Error("Screenshot evidence sidecar is invalid or its PNG is missing.");
 }
 
-console.log(`Acceptance evidence contract passed: ${lines.length} capability rows link to existing evidence; UI metadata and release limitations are documented${process.argv[2] ? "; screenshot sidecar validated" : ""}.`);
+console.log(`Acceptance evidence contract passed: ${lines.length} capability rows link to existing evidence; ${implementedSlices.length} implemented roadmap slices have acceptance records; UI metadata and release limitations are documented${process.argv[2] ? "; screenshot sidecar validated" : ""}.`);

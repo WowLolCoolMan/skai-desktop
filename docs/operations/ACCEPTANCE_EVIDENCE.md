@@ -332,6 +332,42 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Unverified: first-run acceptance on native Linux/macOS and manual
   assistive-technology review.
 
+### Slice 24 — activity and search across the workspace
+
+- Outcome: make prior work and current activity discoverable from one local
+  surface. Search covers conversations, messages, projects, files, skills,
+  documents, tasks, schedules, personas, memories, models, and saved media;
+  Activity groups task state and records local project operation events.
+- Success check: packaged UI matrix with chat search/activity exercises verifies
+  type and project filters, saved-query restoration, opening a project file and
+  returning to the result, task grouping/decision filters, and responsive
+  layouts; `npm run smoke:agent-host` verifies task-linked commit and push
+  journal events.
+- Failure check: project files remain unopened until selected; unavailable
+  usage values stay labeled “Not measured”; filters and query text survive a
+  result round trip without leaking unrelated project or task records.
+- Disposable profile / cleanup: the packaged matrix uses a throwaway Electron
+  profile and bounded local fixtures; Agent Host uses its isolated loopback
+  profile. No user history, project, or remote service is modified.
+- Platform / OS: Windows x64 packaged Electron and local Agent Host; native
+  Linux/macOS and authenticated provider event correlation remain unverified.
+- Viewport / theme / sidebar: chat and Usage-focused 1440×900 dark expanded
+  state plus the shared responsive matrix.
+- Runtime / app revision: packaged Electron production build and local Agent
+  Host for the Slice 24 commit.
+- Network and privacy boundary: search, activity, and operation journals use
+  local stores; remote PR/CI updates are not inferred without an explicit
+  authenticated GitHub integration.
+- Before screenshot: Usage/activity surface before query and decision filters.
+- After screenshot: filtered activity with grouped tasks, restored query, and a
+  selected project-file result; screenshots document layout only, not provider
+  freshness.
+- Comparison: closes the cross-workspace search and activity discoverability
+  gap while keeping project files and remote status behind explicit selection
+  and integration boundaries.
+- Unverified platforms, integrations, or hardware: native Linux/macOS UI,
+  provider-sourced live PR/CI events, and user-specific project volumes.
+
 ### Slice 25 — safety and permission policy
 
 - Outcome: make local permissions, sandbox boundaries, and untrusted-content
