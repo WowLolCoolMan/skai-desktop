@@ -392,6 +392,24 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Unverified: native Linux/macOS startup and input capture, manual screen-reader
   review, high-DPI/fractional scaling, and long-translation layout acceptance.
 
+### Slice 28 — capacity-aware scheduling and performance
+
+- Outcome: distinguish facts from estimates in the local capacity surface. Usage
+  now labels OS measurements as measured locally, runtime/GPU details as
+  provider-reported, and admission/slot/headroom values as estimated; the host
+  continues to keep admission conservative when telemetry is unavailable.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run package:electron`; packaged Usage-route smoke with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=usage UI_MATRIX_EXERCISE_CAPACITY=1`
+  opens the capacity details and verifies measured/provider/estimated labels.
+- Failure check: capacity labels cannot imply measured precision for estimates;
+  the scheduler remains FIFO and does not unload models automatically.
+- Disposable profile / cleanup: the packaged matrix uses a throwaway Electron
+  profile and only reads local capacity; no model is unloaded or task started.
+- Unverified: user-selected priority policies, runtime-observed parallelism,
+  separate first-token/stream/completion timing samples, and hardware-class
+  acceptance beyond the current host.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record

@@ -37,6 +37,7 @@ const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYO
 const exerciseRetention = process.env.UI_MATRIX_EXERCISE_RETENTION === "1";
 const exerciseBackup = process.env.UI_MATRIX_EXERCISE_BACKUP === "1";
 const exerciseAccessibility = process.env.UI_MATRIX_EXERCISE_ACCESSIBILITY === "1";
+const exerciseCapacity = process.env.UI_MATRIX_EXERCISE_CAPACITY === "1";
 const exercisePersona = process.env.UI_MATRIX_EXERCISE_PERSONA === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
@@ -1719,6 +1720,17 @@ async function main() {
           const usageRestored = await cdp.evaluate(`Boolean(document.querySelector('.usage-page') && !document.querySelector('.settings-overlay'))`);
           if (!usageRestored) throw new Error("Closing Settings did not return to the Usage page.");
           console.log(`[usage-settings-overlay] ${JSON.stringify({ modalOverUsage: true, returnToUsage: true })}`);
+        }
+        if (route === "usage" && exerciseCapacity && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          const capacityFlow = await cdp.evaluate(`(() => {
+            const card = document.querySelector('.usage-capacity');
+            card?.querySelector('details')?.setAttribute('open', '');
+            const text = card?.textContent ?? '';
+            const meters = [...(card?.querySelectorAll('[role="meter"]') ?? [])].map((meter) => meter.parentElement?.innerText ?? '');
+            return { ok: Boolean(card) && text.includes('Capacity estimates and queue behavior') && text.includes('Measured locally:') && text.includes('Estimated:') && meters.some((meter) => meter.includes('Measured locally')), measured: meters.filter((meter) => meter.includes('Measured locally')).length, providerReported: meters.filter((meter) => meter.includes('Provider-reported')).length, estimated: text.includes('Estimated:') };
+          })()`);
+          if (!capacityFlow?.ok) throw new Error(`Usage capacity provenance labels were missing: ${JSON.stringify(capacityFlow)}`);
+          console.log(`[capacity-provenance] ${JSON.stringify(capacityFlow)}`);
         }
         const states = route === "settings" ? settingsCategories : [null];
         for (const category of states) {
