@@ -702,6 +702,12 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
   .chat-page .composer-card .composer-actions { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .chat-page .composer-card .composer-actions > div { grid-column: 1 / -1; justify-content: space-between; padding-top: 4px; }
 }
+@media (max-width: 1100px) {
+  /* The app rail reduces usable width before the viewport itself is narrow. */
+  .chat-page .composer-card .composer-actions { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .chat-page .composer-card .composer-actions > .composer-action-right { grid-column: 1 / -1; justify-content: space-between; padding-top: 4px; }
+  .chat-page .composer-card .composer-action-right .model-picker { min-width: 0; flex: 1 1 auto; }
+}
 
 /* Coding uses two independently managed page groups in one split workspace. */
 .app-shell:has(.app-sidebar.is-coding-agent) > .workspace-tabs-hotkeys.is-coding-split {
