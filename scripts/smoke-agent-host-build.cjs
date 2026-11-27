@@ -8,7 +8,7 @@ function ensureSmokeAgentHostBuild(root) {
   const result = spawnSync("dotnet", [
     "build",
     path.join(root, "services", "agent-host", "SkaiDesktop.AgentHost.csproj"),
-    "--configuration", "Debug",
+    "--configuration", "Release",
     "--output", output,
   ], { cwd: root, stdio: "inherit", windowsHide: true });
   if (result.error) throw result.error;

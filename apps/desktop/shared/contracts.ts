@@ -23,6 +23,7 @@ export type RuntimeHealth = {
 };
 
 export type DesktopHarnessAdapter = {
+  contractVersion: number;
   id: string;
   name: string;
   description: string;
@@ -31,9 +32,12 @@ export type DesktopHarnessAdapter = {
   executionSupported: boolean;
   executablePath?: string | null;
   capabilities: string[];
+  nativeCapabilities: string[];
   prerequisites: string[];
   ownsSessionFormat: boolean;
   taskJournal: string;
+  healthNote: string;
+  authenticationStatus: "not-applicable" | "unknown";
 };
 
 export type LocalCapacitySnapshot = {

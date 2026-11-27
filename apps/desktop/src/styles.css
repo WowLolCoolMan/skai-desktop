@@ -3020,7 +3020,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .coding-context-strip strong { overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-xs); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .coding-harness-adapters { border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
 .coding-harness-adapters > summary { padding: 9px 12px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); cursor: pointer; }
-.coding-harness-adapters > ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin: 0; padding: 0 10px 10px; list-style: none; }
+.coding-harness-adapters > ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; margin: 0; padding: 0 10px 10px; list-style: none; }
 .coding-harness-adapters li { display: grid; gap: 5px; min-width: 0; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); }
 .coding-harness-adapters li > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .coding-harness-adapters li strong { color: var(--skai-color-text); font-size: var(--skai-text-xs); }
@@ -3029,6 +3029,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .coding-harness-adapters li .is-unavailable { color: var(--skai-color-warning); }
 .coding-harness-adapters li p { margin: 0; }
 .coding-harness-adapters li small { overflow-wrap: anywhere; }
+.coding-harness-adapters-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 10px 10px; }
+.coding-harness-adapters-actions > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.4; }
+.coding-harness-capability-groups { display: grid; gap: 7px; }
+.coding-harness-adapters li > .coding-harness-capability-groups { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; justify-content: stretch; }
+.coding-harness-adapters .coding-harness-capability-groups > div { display: grid; align-items: start; justify-content: stretch; gap: 4px; }
+.coding-harness-capability-groups > div > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.coding-harness-adapters .coding-harness-capability-groups > div > div { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
+.coding-harness-adapters li .coding-harness-capability { padding: 3px 6px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); background: var(--skai-color-surface-soft); }
+.coding-harness-adapters li .coding-harness-capability.is-native { opacity: .75; }
 @media (max-width: 760px) { .coding-context-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }.coding-context-strip > span { border-right: 0; }.coding-context-strip > span:last-child { grid-column: 1 / -1; } }
 .app-content-coding .coding-page-active .coding-project-context { min-height: 36px; gap: 10px; padding-block: 3px; }
 .app-content-coding .coding-page-active .coding-project-context-actions { gap: 4px; }

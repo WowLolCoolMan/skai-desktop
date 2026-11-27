@@ -19,6 +19,7 @@ type CodingPageProps = {
   projects: DesktopProject[];
   tasks: DesktopTask[];
   harnessAdapters: DesktopHarnessAdapter[];
+  onRefreshHarnessAdapters: () => Promise<DesktopHarnessAdapter[]>;
   models: Model[];
   selectedModel: string;
   selectedProject: DesktopProject | null;
@@ -72,12 +73,14 @@ type CodingPageProps = {
   onExecuteTask: (taskId: string) => void;
 };
 
-export function CodingPage({ conversation, messages, sideChatRequest, onNewWorkspaceTab, onNewProjectThread, onStartSubagent, projectDirectory = false, projects, tasks, harnessAdapters, models, selectedModel, selectedProject, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, onLoadProjectChecks, onRunProjectCheck, onCancelTask, onTransitionTask, onSteerTask, onDelegateTask, onOpenTaskWorktree, onPlanTask, onExecuteTask, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onSendReview, onPushGitChanges, onCreateGitPullRequest, onPickFolder, onSaveProject, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal, onRunProjectPreflight, onNavigate }: CodingPageProps) {
+export function CodingPage({ conversation, messages, sideChatRequest, onNewWorkspaceTab, onNewProjectThread, onStartSubagent, projectDirectory = false, projects, tasks, harnessAdapters, onRefreshHarnessAdapters, models, selectedModel, selectedProject, projectFiles, selectedFile, filePreview, filePreviewError, fileDraft, fileOriginal, fileSummary, fileBusy, fileUndoAvailable, terminalBusy, terminalOutput, terminalExitCode, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, onLoadProjectChecks, onRunProjectCheck, onCancelTask, onTransitionTask, onSteerTask, onDelegateTask, onOpenTaskWorktree, onPlanTask, onExecuteTask, onRefreshGitStatus, onLoadGitDiff, onCommitGitChanges, onSendReview, onPushGitChanges, onCreateGitPullRequest, onPickFolder, onSaveProject, onOpenProject, onOpenFile, onCloseFile, onDraftChange, onSaveFile, onUndoFile, onRunTerminal, onRunProjectPreflight, onNavigate }: CodingPageProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [instructions, setInstructions] = useState("");
   const [folders, setFolders] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [refreshingHarnesses, setRefreshingHarnesses] = useState(false);
+  const [harnessRefreshError, setHarnessRefreshError] = useState<string | null>(null);
   const [editingDetails, setEditingDetails] = useState(false);
   const [projectQuery, setProjectQuery] = useState("");
   const projectNameRef = useRef<HTMLInputElement>(null);
@@ -105,6 +108,15 @@ export function CodingPage({ conversation, messages, sideChatRequest, onNewWorks
     if (saved) onOpenProject(saved);
   };
 
+  const refreshHarnessCatalog = async () => {
+    if (refreshingHarnesses) return;
+    setRefreshingHarnesses(true);
+    setHarnessRefreshError(null);
+    try { await onRefreshHarnessAdapters(); }
+    catch (error) { setHarnessRefreshError(error instanceof Error ? error.message : "Harness availability could not be refreshed."); }
+    finally { setRefreshingHarnesses(false); }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const folder = params.get("createProjectFolder");
@@ -120,7 +132,7 @@ export function CodingPage({ conversation, messages, sideChatRequest, onNewWorks
   const visibleProjects = projects.filter((project) => `${project.name} ${project.folderPaths.join(" ")}`.toLowerCase().includes(projectQuery.trim().toLowerCase()));
   const projectTasks = selectedProject ? tasks.filter((task) => task.projectId === selectedProject.id) : [];
   const activeTask = projectTasks.find((task) => ["running", "verifying", "queued", "awaiting_approval"].includes(task.status));
-  const harnessCatalog = <details className="coding-harness-adapters"><summary>Execution harnesses · {harnessAdapters.filter((adapter) => adapter.available).length} ready · {harnessAdapters.filter((adapter) => adapter.status === "detected-not-connected").length} detected</summary><ul>{harnessAdapters.map((adapter) => <li key={adapter.id}><div><strong>{adapter.name}</strong><span className={adapter.available ? "is-ready" : "is-unavailable"}>{adapter.available ? "Ready" : adapter.status === "detected-not-connected" ? "Detected · not connected" : "Not installed"}</span></div><p>{adapter.description}</p><small>{adapter.executionSupported ? "Skai can execute this harness." : adapter.status === "detected-not-connected" ? "Authenticate in its own terminal. Skai execution is not enabled yet." : adapter.prerequisites.join(" · ")}</small></li>)}</ul></details>;
+  const harnessCatalog = <details className="coding-harness-adapters"><summary>Execution harnesses · {harnessAdapters.filter((adapter) => adapter.available).length} ready · {harnessAdapters.filter((adapter) => adapter.status === "detected-not-connected").length} detected · contract v{harnessAdapters[0]?.contractVersion ?? 2}</summary><div className="coding-harness-adapters-actions"><span>Refresh checks executable presence only; sign-in is shown as unknown until the harness provides a safe auth check.</span><Button variant="secondary" type="button" disabled={refreshingHarnesses} onClick={() => void refreshHarnessCatalog()}>{refreshingHarnesses ? "Refreshing…" : "Refresh detection"}</Button></div>{harnessRefreshError && <p className="form-error" role="alert">{harnessRefreshError}</p>}<ul>{harnessAdapters.map((adapter) => <li key={adapter.id}><div><strong>{adapter.name}</strong><span className={adapter.available ? "is-ready" : "is-unavailable"}>{adapter.available ? "Ready" : adapter.status === "detected-not-connected" ? "Detected · not connected" : "Not installed"}</span></div><p>{adapter.description}</p><small>{adapter.healthNote} {adapter.authenticationStatus === "unknown" ? "Sign-in status is unknown." : ""}</small>{adapter.prerequisites.length > 0 && <small>Requirements: {adapter.prerequisites.join(" · ")}</small>}<div className="coding-harness-capability-groups"><div><span>Skai integration</span>{adapter.capabilities.length ? <div>{adapter.capabilities.map((capability) => <small className="coding-harness-capability" key={capability}>{capability}</small>)}</div> : <small>Not integrated yet</small>}</div><div><span>Harness-reported features · not verified by Skai</span><div>{adapter.nativeCapabilities.map((capability) => <small className="coding-harness-capability is-native" key={capability}>{capability}</small>)}</div></div></div>{adapter.ownsSessionFormat && <small>Session format belongs to this harness. Skai keeps its task journal authoritative; import and resume are not connected.</small>}</li>)}</ul></details>;
   return <div className={`feature-page coding-page ${selectedProject && !projectDirectory ? "coding-page-active" : ""} ${projectDirectory ? "project-directory-page" : ""}`}>
     {projectDirectory ? <>
       <PageHeader eyebrow="WORKSPACES" title="Projects" description="Open a project to work with its files, tasks, terminal, and changes." actions={<><Button variant="secondary" onClick={() => void openFolderAsProject()}><NavIcon name="project" />Open folder</Button><Button variant="primary" onClick={() => setDialogOpen(true)}><NavIcon name="plus" />New project</Button></>} />

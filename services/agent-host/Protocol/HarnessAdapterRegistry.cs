@@ -5,14 +5,14 @@ namespace SkaiDesktop.AgentHost.Protocol;
 /// <summary>Versioned capability and health contract for local task execution harnesses.</summary>
 public static class HarnessAdapterRegistry
 {
-    public const int ContractVersion = 1;
+    public const int ContractVersion = 2;
 
     private sealed record AdapterDefinition(
         string Id,
         string Name,
         string Description,
         string[] Executables,
-        string[] Capabilities,
+        string[] NativeCapabilities,
         string[] Prerequisites,
         bool CanExecute,
         bool OwnsSessionFormat);
@@ -40,6 +40,7 @@ public static class HarnessAdapterRegistry
             var installed = isBuiltIn || executable is not null;
             return new
             {
+                contractVersion = ContractVersion,
                 id = definition.Id,
                 name = definition.Name,
                 description = definition.Description,
@@ -47,10 +48,17 @@ public static class HarnessAdapterRegistry
                 available = isBuiltIn,
                 executionSupported = definition.CanExecute,
                 executablePath = executable,
-                capabilities = definition.Capabilities,
+                capabilities = definition.CanExecute ? definition.NativeCapabilities : Array.Empty<string>(),
+                nativeCapabilities = definition.NativeCapabilities,
                 prerequisites = definition.Prerequisites,
                 ownsSessionFormat = definition.OwnsSessionFormat,
                 taskJournal = "Skai remains authoritative; external session import/resume is not enabled yet.",
+                healthNote = isBuiltIn
+                    ? "Skai's local task adapter is available. Model availability is checked when a task starts."
+                    : installed
+                        ? "Executable found on PATH. Authentication and runtime health have not been verified."
+                        : "Executable was not found on PATH.",
+                authenticationStatus = isBuiltIn ? "not-applicable" : "unknown",
             };
         }).ToArray(),
     };

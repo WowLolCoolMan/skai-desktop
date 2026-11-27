@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopGitDiff, DesktopGitStatus, DesktopHarnessAdapter, DesktopProject, DesktopProjectCheck, DesktopProjectFile, DesktopProjectPreview } from "../../../shared/contracts";
 import type { Route } from "../../app/types";
 import type { AgentRequest } from "../../services/agentClient";
@@ -88,15 +88,19 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     }).catch(() => onError("Projects could not be loaded."));
   }, [connection, onError, request]);
 
+  const refreshHarnessAdapters = useCallback(async (): Promise<DesktopHarnessAdapter[]> => {
+    const response = await request("harness.adapters.list");
+    if (!response.ok) throw new Error(response.error?.message ?? "Harness availability could not be refreshed.");
+    const result = response.result as { adapters?: DesktopHarnessAdapter[] } | undefined;
+    const adapters = result?.adapters ?? [];
+    setHarnessAdapters(adapters);
+    return adapters;
+  }, [request]);
+
   useEffect(() => {
     if (connection !== "ready") return;
-    void request("harness.adapters.list").then((response) => {
-      if (response.ok) {
-        const result = response.result as { adapters?: DesktopHarnessAdapter[] } | undefined;
-        setHarnessAdapters(result?.adapters ?? []);
-      }
-    }).catch(() => setHarnessAdapters([]));
-  }, [connection, request]);
+    void refreshHarnessAdapters().catch(() => setHarnessAdapters([]));
+  }, [connection, refreshHarnessAdapters]);
 
   const pickProjectFolder = async () => {
     const response = await request("workspace.pickFolder");
@@ -322,5 +326,5 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     setTerminalSessionId(null); setTerminalScreen(null); setTerminalExitCode(null); return true;
   };
 
-  return { projects, projectsLoaded, harnessAdapters, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest, loadProjectChecks, runProjectCheck };
+  return { projects, projectsLoaded, harnessAdapters, refreshHarnessAdapters, selectedProject, projectFiles, selectedFile, fileDraft, fileOriginal, filePreview, filePreviewError, fileSummary, fileBusy, fileUndoAvailable: Boolean(fileUndoId), terminalBusy, terminalOutput, terminalExitCode, terminalSessionId, terminalScreen, gitStatus, gitBusy, gitDiff, gitDiffBusy, gitCommitBusy, gitPushBusy, gitPullRequestBusy, projectChecks, projectChecksBusy, projectCheckBusy, pickProjectFolder, saveProject, selectProject, openProjectFile, closeProjectFile, setFileDraft: updateFileDraft, saveProjectFile, undoProjectFile, runTerminal, startTerminalSession, writeTerminalSession, refreshTerminalSession, closeTerminalSession, refreshGitStatus, loadGitDiff, commitGitChanges, pushGitChanges, createGitPullRequest, loadProjectChecks, runProjectCheck };
 }

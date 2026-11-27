@@ -141,10 +141,10 @@ async function run() {
   const harnesses = await request("harness.adapters.list");
   const harnessEntries = harnesses.result?.adapters;
   const nativeHarness = harnessEntries?.find(adapter => adapter.id === "skai-local");
-  if (!harnesses.ok || harnesses.result?.contractVersion !== 1 || !Array.isArray(harnessEntries) || !nativeHarness?.available || !nativeHarness.executionSupported || !nativeHarness.capabilities.includes("task-journal"))
+  if (!harnesses.ok || harnesses.result?.contractVersion !== 2 || !Array.isArray(harnessEntries) || !nativeHarness?.available || !nativeHarness.executionSupported || !nativeHarness.capabilities.includes("task-journal") || !nativeHarness.nativeCapabilities.includes("task-journal") || nativeHarness.authenticationStatus !== "not-applicable" || nativeHarness.contractVersion !== 2)
     throw new Error(`The versioned harness adapter contract did not advertise the native Skai executor: ${JSON.stringify(harnesses)}`);
   for (const adapter of harnessEntries.filter(entry => entry.id !== "skai-local")) {
-    if (adapter.executionSupported || adapter.available || !["not-installed", "detected-not-connected"].includes(adapter.status) || !adapter.prerequisites?.length || !adapter.taskJournal?.includes("not enabled"))
+    if (adapter.executionSupported || adapter.available || !["not-installed", "detected-not-connected"].includes(adapter.status) || !adapter.prerequisites?.length || !adapter.taskJournal?.includes("not enabled") || adapter.contractVersion !== 2 || adapter.capabilities.length !== 0 || !adapter.nativeCapabilities?.length || adapter.authenticationStatus !== "unknown" || !adapter.healthNote)
       throw new Error(`The harness catalog overstated an unintegrated external adapter: ${JSON.stringify(adapter)}`);
   }
   const queuedFirst = await request("chat.queue.enqueue", { text: "Review the first draft", attachments: [{ fileName: "brief.txt", content: "Keep this attachment with the queued turn." }] });
