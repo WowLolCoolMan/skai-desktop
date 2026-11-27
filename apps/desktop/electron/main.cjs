@@ -1139,6 +1139,7 @@ const allowedMethods = new Set([
     "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel", "workspace.pickFolder",
     "workspace.pickFolder",
   ]);
+allowedMethods.add("chat.cancel");
 
 // The client owns the local stdio process and request lifecycle; IPC continues
 // to expose only the explicitly allow-listed operations below.

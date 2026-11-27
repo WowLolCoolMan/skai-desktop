@@ -10,6 +10,20 @@ namespace SkaiDesktop.AgentHost.Protocol;
 
 public static partial class AgentHostLoop
 {
+    private static AgentResponse CancelChat(AgentRequest request)
+    {
+        var operationId = RequiredString(request, "operationId");
+        if (!Guid.TryParse(operationId, out var parsedOperationId)) throw new InvalidOperationException("The chat operation ID is invalid.");
+        var normalizedOperationId = parsedOperationId.ToString("D");
+        lock (ActiveChatCancellationsGate)
+        {
+            if (!ActiveChatCancellations.TryGetValue(normalizedOperationId, out var cancellation))
+                return new(ProtocolVersion, request.Id, true, new { cancelled = false, operationId = normalizedOperationId, reason = "not-running" });
+            cancellation.Cancel();
+            return new(ProtocolVersion, request.Id, true, new { cancelled = true, operationId = normalizedOperationId });
+        }
+    }
+
     private sealed class ChatProgressFilter
     {
         private string pending = string.Empty;
@@ -76,6 +90,36 @@ public static partial class AgentHostLoop
     }
 
     private static async Task<AgentResponse> CompleteChatAsync(AgentRequest request, CancellationToken cancellationToken = default)
+    {
+        var operationId = OptionalString(request, "operationId");
+        if (string.IsNullOrWhiteSpace(operationId)) return await CompleteChatCoreAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!Guid.TryParse(operationId, out var parsedOperationId)) throw new InvalidOperationException("The chat operation ID is invalid.");
+        var normalizedOperationId = parsedOperationId.ToString("D");
+        using var operationCancellation = new CancellationTokenSource();
+        lock (ActiveChatCancellationsGate)
+        {
+            if (!ActiveChatCancellations.TryAdd(normalizedOperationId, operationCancellation))
+                throw new InvalidOperationException("The chat operation ID is already active.");
+        }
+        try
+        {
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, operationCancellation.Token);
+            try
+            {
+                return await CompleteChatCoreAsync(request, linkedCancellation.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
+            {
+                return new(ProtocolVersion, request.Id, true, new { cancelled = true, operationId = normalizedOperationId });
+            }
+        }
+        finally
+        {
+            lock (ActiveChatCancellationsGate) ActiveChatCancellations.Remove(normalizedOperationId);
+        }
+    }
+
+    private static async Task<AgentResponse> CompleteChatCoreAsync(AgentRequest request, CancellationToken cancellationToken = default)
     {
         var endpoint = RequiredLocalEndpoint(request, "endpoint", 2_000);
         var model = RequiredString(request, "model");

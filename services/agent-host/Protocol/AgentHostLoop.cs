@@ -44,6 +44,8 @@ public static partial class AgentHostLoop
     private static readonly object TaskJournalGate = new();
     private static readonly Lazy<OperationJournal> TaskJournal = new(CreateTaskOperationJournal);
     private static readonly CloudVoiceCredentialStore VoiceCredentials = new();
+    private static readonly Dictionary<string, CancellationTokenSource> ActiveChatCancellations = new(StringComparer.Ordinal);
+    private static readonly object ActiveChatCancellationsGate = new();
 
     private static JsonSettingsStore CreateSettingsStore() =>
         new(Environment.GetEnvironmentVariable("SRAI_SETTINGS_PATH"));

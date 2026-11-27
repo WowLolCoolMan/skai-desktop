@@ -152,6 +152,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [queuedMessages, setQueuedMessages] = useState<DesktopQueuedMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const activeChatOperationId = useRef<string | null>(null);
   const [responseMode, setResponseModeState] = useState<ChatResponseMode>(() => normalizeResponseMode(localStorage.getItem("skai.chat.responseMode")));
 
   useEffect(() => {
@@ -264,6 +265,8 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     const hasImageAttachment = messageAttachments.some((attachment) => attachment.mediaType?.startsWith("image/"));
     const responseModel = hasImageAttachment ? readPreferredModel("vision", model) : model;
     const progressChannel = crypto.randomUUID();
+    const operationId = crypto.randomUUID();
+    activeChatOperationId.current = operationId;
     const voiceExpressiveness = speakReply ? selectedVoiceSettings().expressiveness : undefined;
     let streamedText = "";
     let speechBuffer = "";
@@ -298,7 +301,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     });
     let response: Awaited<ReturnType<typeof request>>;
     try {
-      response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), streamResponse: true, progressChannel, ...(speakReply ? { voiceMode: true, voiceExpressiveness } : {}), ...(documentsOnly ? { documentsOnly: true } : {}) });
+      response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), streamResponse: true, progressChannel, operationId, ...(speakReply ? { voiceMode: true, voiceExpressiveness } : {}), ...(documentsOnly ? { documentsOnly: true } : {}) });
     } catch (error) {
       setBusy(false);
       onError(error instanceof Error ? error.message : "The model request failed.");
@@ -306,8 +309,15 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       return;
     } finally {
       unsubscribe?.();
+      if (activeChatOperationId.current === operationId) activeChatOperationId.current = null;
     }
     if (!response.ok) { setBusy(false); onError(response.error?.message ?? "The model request failed."); if (speakReply) { stopNativeSpeech(); window.removeEventListener("skai:voice-playback-stopped", handleSpeechStopped); } return; }
+    if ((response.result as { cancelled?: boolean } | undefined)?.cancelled) {
+      setMessages(next);
+      if (!temporary) await saveConversation(next, savedId);
+      setBusy(false);
+      return;
+    }
     const completed = [...next, { role: "assistant" as const, content: (response.result as { content: string }).content }];
     setMessages(completed); if (!temporary) await saveConversation(completed, savedId);
     if (speakReply) {
@@ -318,6 +328,17 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       window.removeEventListener("skai:voice-playback-stopped", handleSpeechStopped);
     } else await speakNativeResponse(completed.at(-1)?.content ?? "", false);
     setBusy(false);
+  };
+
+  const cancelMessage = async () => {
+    const operationId = activeChatOperationId.current;
+    if (!operationId) return false;
+    stopNativeSpeech();
+    const response = await request("chat.cancel", { operationId });
+    if (!response.ok) { onError(response.error?.message ?? "The local reply could not be stopped."); return false; }
+    setBusy(false);
+    onError(null);
+    return Boolean((response.result as { cancelled?: boolean } | undefined)?.cancelled);
   };
 
   const rewritePrompt = async (draft: string): Promise<string | null> => {
@@ -573,5 +594,5 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, updateQueuedMessage, moveQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
+  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, cancelMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, updateQueuedMessage, moveQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
 }

@@ -21,6 +21,7 @@ type ChatComposerProps = {
   queuedMessages: DesktopQueuedMessage[];
   onDraftChange: (draft: string) => void;
   onSubmit: () => void;
+  onStop: () => Promise<boolean>;
   onQueueRemove: (index: number) => void;
   onUpdateQueued: (index: number, text: string) => Promise<boolean>;
   onMoveQueued: (fromIndex: number, toIndex: number) => Promise<boolean>;
@@ -82,7 +83,7 @@ function parsePlannedComputerAction(value: Record<string, unknown>): PlannedComp
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response" }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onStop, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response" }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
@@ -417,6 +418,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       </div>
       <div className="composer-action-right">
         {modelControl}
+        {busy && modeLabel !== "Coding" && <button className="composer-tool-button composer-stop-button" type="button" onClick={() => void onStop()} aria-label="Stop local response" title="Stop the active local response"><NavIcon name="stop" /><span className="composer-toolbar-label">Stop</span></button>}
         <button className={`composer-tool-button composer-microphone-button${voiceListening ? " is-active" : ""}`} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop dictation" : "Dictate a message"} title={voiceListening ? "Stop dictation" : "Dictate a message on this device"}><NavIcon name={voiceListening ? "stop" : "microphone"} /><span className="composer-toolbar-label">{voiceListening ? "Stop" : "Dictate"}</span></button>
         {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /><span className="composer-toolbar-label">{handsFreeActive ? "End voice" : "Voice"}</span></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={`${rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"} · ${workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"}`}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
       </div>
