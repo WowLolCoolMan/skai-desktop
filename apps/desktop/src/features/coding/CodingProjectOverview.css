@@ -10,6 +10,11 @@
 .coding-project-metrics strong { font-size:var(--skai-text-xl); }
 .coding-project-metrics span { font-size:var(--skai-text-sm); font-weight:650; }
 .coding-project-metrics small { overflow:hidden; color:var(--skai-color-text-muted); text-overflow:ellipsis; white-space:nowrap; }
+.coding-project-agent-roster { display:grid; gap:8px; }
+.coding-project-agent-roster > div { display:flex; flex-wrap:wrap; gap:8px; }
+.coding-project-agent-chip { display:grid; gap:2px; min-width:150px; padding:8px 10px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-md); background:color-mix(in srgb, var(--skai-color-surface-soft) 80%, transparent); }
+.coding-project-agent-chip b { color:var(--skai-color-text); font-size:var(--skai-text-xs); text-transform:capitalize; }
+.coding-project-agent-chip small,.coding-project-roster-more { overflow:hidden; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .coding-project-overview-footer { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:20px; padding-top:14px; border-top:1px solid var(--skai-color-border); }
 .coding-project-overview-label { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
 .coding-project-recent-activity ul { display:grid; gap:7px; margin:8px 0 0; padding:0; list-style:none; }
