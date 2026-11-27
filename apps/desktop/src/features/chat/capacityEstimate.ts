@@ -8,21 +8,27 @@ export type ModelCapacityEstimate = {
   state: "unknown" | "room" | "tight";
   contextLength: number | null;
   gpuAvailableBytes: number | null;
+  gpuBudgetBytes: number | null;
+  gpuProcessUsageBytes: number | null;
+  gpuAvailabilityScope: string | null;
+  gpuFitsWeights: boolean | null;
   note: string;
 };
 
 /** A deliberately rough local advisory; it is not a runtime allocation prediction. */
 export function estimateModelCapacity(model: Model | undefined, capacity: LocalCapacitySnapshot | null): ModelCapacityEstimate {
   const modelBytes = Number.isFinite(model?.sizeBytes) && (model?.sizeBytes ?? 0) > 0 ? model!.sizeBytes! : null;
-  const startupRamBytes = modelBytes === null ? null : Math.ceil(modelBytes * 1.25);
+  const startupRamBytes = modelBytes === null ? null : Math.ceil(modelBytes * 1.2);
   const measuredRamBytes = Number.isFinite(capacity?.ramAvailableBytes) ? capacity!.ramAvailableBytes : null;
   const loadedRamBytes = capacity?.runtime?.loadedModelsKnown ? capacity.runtime.loadedRamBytes : 0;
   // The OS free-memory reading already reflects resident loaded models. Keep
   // runtime-reported sizes visible, but do not subtract the same allocation twice.
   const availableRamBytes = measuredRamBytes;
-  const state = startupRamBytes === null || availableRamBytes === null
+  const gpuAvailableBytes = Number.isFinite(capacity?.gpu?.availableBytes) ? capacity!.gpu!.availableBytes : null;
+  const gpuFitsWeights = startupRamBytes === null || gpuAvailableBytes === null ? null : gpuAvailableBytes >= startupRamBytes;
+  const state = startupRamBytes === null || availableRamBytes === null && gpuAvailableBytes === null
     ? "unknown"
-    : availableRamBytes >= startupRamBytes ? "room" : "tight";
+    : (availableRamBytes !== null && availableRamBytes >= startupRamBytes) || gpuFitsWeights ? "room" : "tight";
 
   return {
     modelBytes,
@@ -30,10 +36,14 @@ export function estimateModelCapacity(model: Model | undefined, capacity: LocalC
     availableRamBytes,
     state,
     contextLength: Number.isFinite(model?.contextLength) && (model?.contextLength ?? 0) > 0 ? model!.contextLength! : null,
-    gpuAvailableBytes: Number.isFinite(capacity?.gpu?.availableBytes) ? capacity!.gpu!.availableBytes : null,
+    gpuAvailableBytes,
+    gpuBudgetBytes: Number.isFinite(capacity?.gpu?.budgetBytes) ? capacity!.gpu!.budgetBytes ?? null : null,
+    gpuProcessUsageBytes: Number.isFinite(capacity?.gpu?.processUsageBytes) ? capacity!.gpu!.processUsageBytes ?? null : null,
+    gpuAvailabilityScope: capacity?.gpu?.availabilityScope ?? null,
+    gpuFitsWeights,
     note: capacity?.runtime?.loadedModelsKnown
-      ? `Available RAM is measured by the OS; the runtime separately reports ${formatBytes(loadedRamBytes)} for loaded models, already reflected in that measurement. Startup RAM and context cache remain rough estimates.`
-      : "Available RAM is measured by the OS. Loaded-model sizes are unavailable from this runtime; startup RAM and context cache remain rough estimates.",
+      ? `Available RAM is measured by the OS; the runtime separately reports ${formatBytes(loadedRamBytes)} for loaded models, already reflected in that measurement. The weight estimate adds 20% overhead; context cache depends on model architecture and runtime settings.`
+      : "Available RAM is measured by the OS. Estimated weights plus 20% overhead exclude architecture-specific context cache and runtime allocations.",
   };
 }
 

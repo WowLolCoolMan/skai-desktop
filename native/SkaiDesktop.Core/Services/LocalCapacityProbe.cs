@@ -4,7 +4,15 @@ using System.Runtime.InteropServices;
 
 namespace SkaiDesktop.Core.Services;
 
-public sealed record LocalGpuCapacity(string Name, long? TotalBytes, long? AvailableBytes, double? UtilizationPercent);
+public sealed record LocalGpuCapacity(
+    string Name,
+    long? TotalBytes,
+    long? AvailableBytes,
+    double? UtilizationPercent,
+    long? BudgetBytes = null,
+    long? ProcessUsageBytes = null,
+    string? MeasurementSource = null,
+    string? AvailabilityScope = null);
 
 public sealed record LocalCapacitySnapshot(
     DateTimeOffset CapturedAtUtc,
@@ -34,7 +42,9 @@ public sealed class LocalCapacityProbe
         var memory = ReadMemory();
         var cpu = await ReadCpuUtilizationAsync(cancellationToken).ConfigureAwait(false);
         var gpu = await ReadNvidiaCapacityAsync(cancellationToken).ConfigureAwait(false);
-        var note = gpu is null ? "GPU memory is unavailable from a supported local telemetry provider." : null;
+        if (gpu is null && OperatingSystem.IsWindows())
+            gpu = WindowsDxgiGpuProbe.ReadAdapters().OrderByDescending(adapter => adapter.TotalBytes ?? 0).FirstOrDefault();
+        var note = gpu is null ? "GPU memory is unavailable from local telemetry. RAM and CPU remain measured by the operating system." : null;
         var snapshot = new LocalCapacitySnapshot(DateTimeOffset.UtcNow, memory.Total, memory.Available, cpu, gpu, note);
         lock (CacheGate)
         {
@@ -138,7 +148,7 @@ public sealed class LocalCapacityProbe
             var totalMb = ParseNumber(fields[1]);
             var freeMb = ParseNumber(fields[2]);
             var utilization = ParseNumber(fields[3]);
-            return new LocalGpuCapacity(fields[0], totalMb is null ? null : (long)(totalMb.Value * 1024 * 1024), freeMb is null ? null : (long)(freeMb.Value * 1024 * 1024), utilization);
+            return new LocalGpuCapacity(fields[0], totalMb is null ? null : (long)(totalMb.Value * 1024 * 1024), freeMb is null ? null : (long)(freeMb.Value * 1024 * 1024), utilization, MeasurementSource: "nvidia-smi", AvailabilityScope: "system-free");
         }
         catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or IOException or OperationCanceledException)
         {

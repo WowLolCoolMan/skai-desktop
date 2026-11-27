@@ -3,7 +3,7 @@ import type { AgentResponse } from "../../../shared/contracts";
 import type { Model } from "../../app/types";
 import { countActiveMarketplaceModelFilters, filterMarketplaceModels, isMarketplaceModelInstallRouteAvailable, marketplaceModelFilterOptions, type MarketplaceModel } from "./marketplaceModelFilters";
 
-type LocalCapacity = { ramTotalBytes?: number | null; ramAvailableBytes?: number | null; gpu?: { name?: string; totalBytes?: number | null; availableBytes?: number | null } | null; measurementNote?: string | null };
+type LocalCapacity = { ramTotalBytes?: number | null; ramAvailableBytes?: number | null; gpu?: { name?: string; totalBytes?: number | null; availableBytes?: number | null; budgetBytes?: number | null; processUsageBytes?: number | null; measurementSource?: string | null; availabilityScope?: string | null } | null; measurementNote?: string | null };
 type MarketplaceSection = "Discover" | "Models" | "Image models" | "Voices" | "Image workflows" | "Skills" | "Tools" | "Installed" | "Updates";
 type MarketplaceRequest = (method: string, params?: Record<string, unknown>) => Promise<AgentResponse>;
 type MarketplacePreference = <T>(key: string, fallback: T) => T;
@@ -88,7 +88,7 @@ export function useMarketplaceModelSearch({ section, query, setSection, setQuery
     }
     if (!initialModelSearchStartedRef.current) {
       initialModelSearchStartedRef.current = true;
-      void searchModels(query, uncensored, provider, !query.trim() && (provider === "All providers" || provider === "Ollama"));
+      void searchModels(query, uncensored, provider, provider === "Ollama" && !query.trim());
     } else if (lastProviderSearchRef.current !== null && lastProviderSearchRef.current !== provider) {
       void searchModels(query, uncensored, provider);
     }
@@ -102,7 +102,9 @@ export function useMarketplaceModelSearch({ section, query, setSection, setQuery
   const { tasks: taskOptions, libraries: libraryOptions, apps: appOptions } = useMemo(() => marketplaceModelFilterOptions(), []);
   const filteredModels = useMemo(() => filterMarketplaceModels(models, {
     provider, size, task: taskFilter, library: libraryFilter, app: appFilter, context: contextFilter, uncensored,
-  }), [appFilter, contextFilter, libraryFilter, models, provider, size, taskFilter, uncensored]);
+    availableRamBytes: localCapacity?.ramAvailableBytes,
+    availableGpuBytes: localCapacity?.gpu?.availableBytes,
+  }), [appFilter, contextFilter, libraryFilter, localCapacity?.gpu?.availableBytes, localCapacity?.ramAvailableBytes, models, provider, size, taskFilter, uncensored]);
   const activeModelFilterCount = countActiveMarketplaceModelFilters({ provider, size, task: taskFilter, library: libraryFilter, app: appFilter, context: contextFilter, uncensored });
   const activeLocalRuntime = localStorage.getItem("skai.provider") ?? "Ollama";
   const providerOptions = useMemo(() => ["All providers", "Hugging Face", "ModelScope", ...(activeRuntimeAvailable && activeLocalRuntime === "Ollama" ? ["Ollama"] : []), ...(airLlmReady ? ["AirLLM"] : [])], [activeLocalRuntime, activeRuntimeAvailable, airLlmReady]);
@@ -117,13 +119,15 @@ export function useMarketplaceModelSearch({ section, query, setSection, setQuery
   const modelFitSummary = (model: MarketplaceModel) => {
     if (!model.sizeBytes) return "No package size is published, so device fit cannot be estimated.";
     const freeRam = localCapacity?.ramAvailableBytes;
-    if (!freeRam) return `${formatSize(model.sizeBytes)} package; available RAM could not be measured. Model size is not a memory guarantee.`;
-    const ram = model.sizeBytes <= freeRam
-      ? `Package size is below current free RAM (${formatSize(freeRam)}), before runtime and context overhead.`
-      : `Package size exceeds current free RAM (${formatSize(freeRam)}); loading may be slow, use swap, or fail.`;
-    const gpu = localCapacity?.gpu?.availableBytes
-      ? ` GPU free: ${formatSize(localCapacity.gpu.availableBytes)}${localCapacity.gpu.name ? ` on ${localCapacity.gpu.name}` : ""}; CPU fallback depends on the selected runtime.`
-      : " GPU memory is not reported by a supported local telemetry provider.";
+    const estimatedWeights = Math.ceil(model.sizeBytes * 1.2);
+    const ram = freeRam == null
+      ? " Available RAM was not measured."
+      : estimatedWeights <= freeRam
+        ? `Estimated weights plus 20% overhead (${formatSize(estimatedWeights)}) fit current free RAM (${formatSize(freeRam)}), before context cache and runtime overhead.`
+        : `Estimated weights plus 20% overhead (${formatSize(estimatedWeights)}) exceed current free RAM (${formatSize(freeRam)}).`;
+    const gpu = localCapacity?.gpu?.availableBytes != null
+      ? ` ${localCapacity.gpu.availabilityScope === "application-budget" ? "Agent host GPU budget headroom" : "GPU system free"}: ${formatSize(localCapacity.gpu.availableBytes)}${localCapacity.gpu.name ? ` on ${localCapacity.gpu.name}` : ""}; CPU fallback depends on the selected runtime.`
+      : " GPU available memory is not reported by a supported local telemetry provider.";
     return `${formatSize(model.sizeBytes)} download. ${ram}${gpu}`;
   };
 

@@ -48,7 +48,7 @@ export type LocalCapacitySnapshot = {
   ramTotalBytes: number | null;
   ramAvailableBytes: number | null;
   cpuUtilizationPercent: number | null;
-  gpu: { name: string; totalBytes: number | null; availableBytes: number | null; utilizationPercent: number | null } | null;
+  gpu: { name: string; totalBytes: number | null; availableBytes: number | null; utilizationPercent: number | null; budgetBytes?: number | null; processUsageBytes?: number | null; measurementSource?: string | null; availabilityScope?: "system-free" | "application-budget" | "physical-total-only" | null } | null;
   measurementNote: string | null;
   scheduler?: {
     activeTaskCount: number;

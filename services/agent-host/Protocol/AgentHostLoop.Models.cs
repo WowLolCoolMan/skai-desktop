@@ -43,7 +43,7 @@ public static partial class AgentHostLoop
         var settings = CreateSettingsStore().Load();
         var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(settings.ModelProvider));
         var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes,
-            settings.CodingModelSizeBytes, settings.CodingModelContextLength,
+            settings.CodingModelSizeBytes, settings.OllamaContextWindowTokens > 0 ? settings.OllamaContextWindowTokens : null,
             string.Equals(settings.CodingModelProvider ?? settings.ModelProvider, "AirLLM", StringComparison.OrdinalIgnoreCase), runtime.AirLlmReady == true);
         int activeTaskCount;
         lock (LocalExecutionGate) activeTaskCount = LocalAdmittedTaskCount;

@@ -71,7 +71,11 @@ export function UsagePage({ conversations, projects, tasks, scheduledTasks, memo
   const topModels = [...modelCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   const providers = [...providerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   const ramUsed = capacity?.ramTotalBytes != null && capacity.ramAvailableBytes != null ? Math.max(0, capacity.ramTotalBytes - capacity.ramAvailableBytes) : null;
-  const gpuUsed = capacity?.gpu?.totalBytes != null && capacity.gpu.availableBytes != null ? Math.max(0, capacity.gpu.totalBytes - capacity.gpu.availableBytes) : null;
+  const gpuBudgetView = capacity?.gpu?.availabilityScope === "application-budget";
+  const gpuUsed = gpuBudgetView
+    ? capacity?.gpu?.processUsageBytes ?? null
+    : capacity?.gpu?.totalBytes != null && capacity.gpu.availableBytes != null ? Math.max(0, capacity.gpu.totalBytes - capacity.gpu.availableBytes) : null;
+  const gpuMeterTotal = gpuBudgetView ? capacity?.gpu?.budgetBytes ?? null : capacity?.gpu?.totalBytes ?? null;
   const cpuValue = percent(capacity?.cpuUtilizationPercent);
   const scheduledActive = scheduledTasks.filter((task) => task.status === "scheduled").length;
   const hasActivity = conversations.length + projects.length + tasks.length + memoryCount + corpusCount + savedImageCount > 0;
@@ -117,7 +121,7 @@ export function UsagePage({ conversations, projects, tasks, scheduledTasks, memo
         <div className="usage-card-heading"><div><p className="section-kicker">LIVE CAPACITY</p><h3>Local machine</h3></div><span className="usage-updated">{capacity ? `Updated ${formatDate(capacity.capturedAtUtc)}` : "Waiting for runtime"}</span></div>
         {capacity ? <>
           <UsageMeter label="System memory" detail={`${formatBytes(ramUsed)} / ${formatBytes(capacity.ramTotalBytes)}`} value={usagePercent(ramUsed, capacity.ramTotalBytes)} />
-          {capacity.gpu && <UsageMeter label={capacity.gpu.name || "GPU memory"} detail={`${formatBytes(gpuUsed)} / ${formatBytes(capacity.gpu.totalBytes)}`} value={usagePercent(gpuUsed, capacity.gpu.totalBytes)} source="Provider-reported" />}
+          {capacity.gpu && <UsageMeter label={gpuBudgetView ? `${capacity.gpu.name} · agent host` : capacity.gpu.name || "GPU memory"} detail={`${formatBytes(gpuUsed)} / ${formatBytes(gpuMeterTotal)}${gpuBudgetView ? " Windows app budget" : " dedicated"}`} value={usagePercent(gpuUsed, gpuMeterTotal)} source={capacity.gpu.measurementSource ?? "Provider-reported"} />}
           <UsageMeter label="CPU" detail={cpuValue == null ? "Usage unavailable" : `${Math.round(cpuValue)}% in use`} value={cpuValue} />
           {capacity.measurementNote && <p className="usage-note">{capacity.measurementNote}</p>}
           {capacity.runtime?.loadedModels?.length ? <div className="usage-loaded-models"><h4>Loaded models</h4>{capacity.runtime.loadedModels.map((loaded, index) => <div key={`${loaded.runtime}-${loaded.model}-${index}`}><strong>{loaded.model}</strong><span>{loaded.runtime} · RAM {formatBytes(loaded.ramBytes)} · GPU {formatBytes(loaded.gpuBytes)}</span></div>)}</div> : <p className="usage-note">{capacity.runtime?.loadedModelNote ?? "No loaded model details reported by the runtime."}</p>}
@@ -126,7 +130,7 @@ export function UsagePage({ conversations, projects, tasks, scheduledTasks, memo
             <details className="usage-capacity-details">
               <summary>Capacity estimates and queue behavior</summary>
               <div>
-                <p>Measured locally: system RAM and CPU. Provider-reported: GPU memory and loaded model sizes when the runtime exposes them. Estimated: per-task RAM, queue slots, and effective headroom.</p>
+                <p>Measured locally: system RAM and CPU. GPU values come from local GPU telemetry; loaded model sizes come from the runtime when it exposes them. Estimated: per-task RAM, queue slots, and effective headroom.</p>
                 <p>Effective available RAM: {formatBytes(capacity.scheduler.effectiveAvailableRamBytes ?? null)} · GPU: {formatBytes(capacity.scheduler.effectiveAvailableGpuBytes ?? null)}</p>
                 <p>{capacity.scheduler.estimatedRamPerTaskBytes ? `Estimated RAM per task: ${formatBytes(capacity.scheduler.estimatedRamPerTaskBytes)}. ` : "Per-task RAM estimate unavailable. "}{capacity.scheduler.estimateBasis}</p>
                 <p>Queue policy: {capacity.scheduler.queuePolicy === "fifo" ? "first in, first out" : "local FIFO"}. Work begins only after you explicitly start a task; Skai does not unload models automatically.</p>

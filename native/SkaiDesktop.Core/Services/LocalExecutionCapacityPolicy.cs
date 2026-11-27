@@ -23,7 +23,7 @@ public static class LocalExecutionCapacityPolicy
         if (snapshot.RamAvailableBytes is not > 0)
         {
             var gpuWithoutRam = snapshot.Gpu?.AvailableBytes is >= 0
-                ? ApplyBudget(snapshot.Gpu.AvailableBytes.Value, snapshot.Gpu.TotalBytes, gpuBudgetBytes)
+                ? GetEffectiveGpuBytes(snapshot.Gpu, gpuBudgetBytes)
                 : (long?)null;
             return gpuWithoutRam is <= 0
                 ? Decision(0, "GPU memory", null, null, gpuWithoutRam, modelSizeBytes, modelContextLength, airLlmCompatible && airLlmAvailable)
@@ -42,13 +42,13 @@ public static class LocalExecutionCapacityPolicy
 
         if (snapshot.Gpu?.AvailableBytes is >= 0)
         {
-            var availableGpu = ApplyBudget(snapshot.Gpu.AvailableBytes.Value, snapshot.Gpu.TotalBytes, gpuBudgetBytes);
+            var availableGpu = GetEffectiveGpuBytes(snapshot.Gpu, gpuBudgetBytes);
             var gpuSlots = Math.Max(0, (int)(availableGpu / (airLlmCompatible && airLlmAvailable ? 1L * 1024 * 1024 * 1024 : GpuPerTaskBytes)));
             if (gpuSlots < slotLimit) { slotLimit = gpuSlots; limitingResource = "GPU memory"; }
         }
 
         long? effectiveGpu = snapshot.Gpu?.AvailableBytes is >= 0
-            ? ApplyBudget(snapshot.Gpu.AvailableBytes.Value, snapshot.Gpu.TotalBytes, gpuBudgetBytes)
+            ? GetEffectiveGpuBytes(snapshot.Gpu, gpuBudgetBytes)
             : null;
         return Decision(Math.Clamp(slotLimit, 0, MaximumSlots), limitingResource, perTaskRam, availableRam, effectiveGpu, modelSizeBytes, modelContextLength, airLlmCompatible && airLlmAvailable);
     }
@@ -58,7 +58,7 @@ public static class LocalExecutionCapacityPolicy
         var modelBasis = modelSizeBytes is > 0
             ? "Model file size reported; it reflects the selected quantization."
             : "Conservative default estimate because model size is unavailable.";
-        var contextBasis = contextLength is > 0 ? " Context overhead is estimated from reported context length." : " Context overhead is unknown.";
+        var contextBasis = contextLength is > 0 ? " Context cache is conservatively estimated from the configured context window." : " Context cache is not estimated because the active context window is unknown; advertised maximum context is not treated as active.";
         var backendBasis = diskStreamed ? " Disk-streamed backend estimate is active." : " Standard runtime overhead estimate is active.";
         return new(slots, limiter, ramPerTask, availableRam, availableGpu, modelBasis + contextBasis + backendBasis);
     }
@@ -71,7 +71,14 @@ public static class LocalExecutionCapacityPolicy
                 ? long.MaxValue
                 : (long)(modelSizeBytes.Value * weightMultiplier)
             : RamPerTaskBytes;
-        var context = contextLength is > 0 ? Math.Clamp((long)contextLength.Value * 4, 256L * 1024 * 1024, 8L * 1024 * 1024 * 1024) : 0;
+        // Keep context overhead bounded and proportional to the active window;
+        // the runtime's loaded-weight telemetry is already represented by the
+        // model-size estimate above. AirLLM uses the same conservative cache
+        // bound because its disk-streamed weights do not imply zero KV cache.
+        const long cacheBytesPerToken = 4L;
+        var context = contextLength is > 0
+            ? Math.Clamp((long)contextLength.Value * cacheBytesPerToken, 256L * 1024 * 1024, 8L * 1024 * 1024 * 1024)
+            : 0;
         return Math.Max(1L * 1024 * 1024 * 1024, weights > long.MaxValue - context ? long.MaxValue : weights + context);
     }
 
@@ -81,5 +88,14 @@ public static class LocalExecutionCapacityPolicy
         if (totalBytes is not > 0) return Math.Min(availableBytes, budgetBytes.Value);
         var usedBytes = Math.Max(0, totalBytes.Value - availableBytes);
         return Math.Max(0, Math.Min(availableBytes, budgetBytes.Value - usedBytes));
+    }
+
+    private static long GetEffectiveGpuBytes(LocalGpuCapacity gpu, long? userBudgetBytes)
+    {
+        if (gpu.AvailabilityScope != "application-budget" || gpu.BudgetBytes is not > 0 || gpu.ProcessUsageBytes is not >= 0)
+            return ApplyBudget(gpu.AvailableBytes ?? 0, gpu.TotalBytes, userBudgetBytes);
+
+        var budget = userBudgetBytes is > 0 ? Math.Min(gpu.BudgetBytes.Value, userBudgetBytes.Value) : gpu.BudgetBytes.Value;
+        return Math.Max(0, budget - gpu.ProcessUsageBytes.Value);
     }
 }

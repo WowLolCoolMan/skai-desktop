@@ -26,6 +26,7 @@ export type MarketplaceModelFilters = {
   context: string;
   uncensored: boolean;
   availableRamBytes?: number | null;
+  availableGpuBytes?: number | null;
 };
 
 const normalizeTag = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -43,7 +44,11 @@ export function filterMarketplaceModels(models: MarketplaceModel[], filters: Mar
     if (filters.size === "Any size") return true;
     if (model.sizeBytes == null) return false;
     const size = model.sizeBytes / 1024 ** 3;
-    if (filters.size === "Fits my PC") return Boolean(filters.availableRamBytes && model.sizeBytes <= filters.availableRamBytes);
+    if (filters.size === "Fits my PC") {
+      const estimatedBytes = Math.ceil(model.sizeBytes * 1.2);
+      return Boolean((filters.availableRamBytes && estimatedBytes <= filters.availableRamBytes)
+        || (filters.availableGpuBytes && estimatedBytes <= filters.availableGpuBytes));
+    }
     if (filters.size === "Tiny") return size <= 4;
     if (filters.size === "Small") return size > 4 && size <= 10;
     if (filters.size === "Medium") return size > 10 && size <= 20;

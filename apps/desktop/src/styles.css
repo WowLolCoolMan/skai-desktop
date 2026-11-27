@@ -2865,6 +2865,20 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .app-content-coding .coding-page-active:has(.coding-session-grid.is-files) { height: auto; min-height: 100%; flex: 0 0 auto; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel { overflow: hidden; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .project-thread-panel > .chat-page { height: 100%; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser { display: flex; min-width: 0; min-height: 0; height: 100%; flex-direction: column; overflow: hidden; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .project-file-layout { min-width: 0; min-height: 0; flex: 1 1 0; overflow: hidden; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .file-editor-panel { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .monaco-editor-shell,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .monaco-diff-shell,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-diff-preview,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .project-file-preview,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .project-markdown-preview-scroll,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .project-html-preview-frame,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .project-svg-preview-frame,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .project-pdf-preview-frame { min-width: 0; min-height: 0; height: auto; flex: 1 1 0; overflow: auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-empty-editor .project-file-layout { min-height: 0; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .project-file-explorer,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .file-editor-panel > textarea { min-width: 0; min-height: 0; overflow: auto; }
 .app-content-coding .coding-page-active .coding-task-drawer {
   position: absolute;
   z-index: 20;
@@ -3430,6 +3444,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .marketplace-model-card-details dd { margin: 0; color: var(--skai-color-text); font-size: var(--skai-text-xs); overflow-wrap: anywhere; }
 .marketplace-model-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
 .marketplace-model-card > .ui-button { justify-self: start; }
+.marketplace-model-list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 10px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.marketplace-model-list-toolbar label { display: flex; align-items: center; gap: 8px; }
+.marketplace-model-list-toolbar select { min-height: 32px; padding: 4px 28px 4px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; }
+.marketplace-model-more { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 @media (max-width: 1120px) { .marketplace-model-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .marketplace-model-card-grid { grid-template-columns: minmax(0, 1fr); }.marketplace-model-size-filters { width: 100%; justify-content: flex-start; }.marketplace-model-size-filters button { flex: 0 0 auto; }.marketplace-model-filter-bar { align-items: flex-start; flex-direction: column; } }
 
@@ -4508,6 +4526,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 1100px) and (min-width: 761px) {
   .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-file-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(160px, .9fr) minmax(150px, .7fr); grid-template-areas: "editor" "explorer"; }
   .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-file-explorer { min-height: 150px; }
+  /* Keep the editor heading to one compact row so the actual editor retains
+     usable height at the supported tablet/compact desktop width. The action
+     strip scrolls horizontally instead of wrapping into the editor canvas. */
+  .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading { flex-direction: row; align-items: center; }
+  .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading > .file-editor-heading-copy { width: auto; max-width: 42%; }
+  .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading > div:not(.file-editor-heading-copy) { width: auto; max-width: 58%; flex-wrap: nowrap; overflow-x: auto; justify-content: flex-end; }
+  .app-content-coding .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading .ui-button { min-height: 28px; white-space: nowrap; }
 }
 
 /* In Coding Agent mode, keep the chat and tab bar on the same track when the
@@ -5064,6 +5089,148 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .coding-browser-preview-hint { display: none; }
   .app-content-coding .coding-page-active .coding-browser-preview-drawer[open] > .skai-browser-preview { height: min(42vh, 300px); }
   .app-content-coding .coding-page-active .coding-session-grid.is-chat { min-height: 360px; }
+}
+
+/* Coding workspace fit: make optional project utilities consume no space until
+   opened, and keep all overflow inside the panel that owns it. */
+.app-shell:has(.app-sidebar.is-coding-agent),
+.app-shell:has(.app-sidebar.is-coding-agent) > .app-main,
+.app-content-coding:has(.coding-page-active),
+.app-content-coding .coding-page-active,
+.app-content-coding .coding-page-active > * { min-width: 0; }
+.app-content-coding:has(.coding-page-active) { overflow: hidden; }
+.app-content-coding .coding-page-active {
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+}
+.app-content-coding .coding-page-active .coding-context-strip { flex: 0 0 auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat {
+  min-height: 0;
+  flex: 1 1 0;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .92fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel > .chat-page,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel .chat-layout,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel .chat-column,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel .conversation-surface {
+  min-width: 0;
+  min-height: 0;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .project-thread-panel .conversation-surface {
+  overflow: hidden;
+}
+.coding-project-browser.is-empty-editor .project-file-layout { min-height: 0; }
+.coding-project-browser.is-empty-editor .file-editor-panel { min-height: 0; }
+.coding-editor-empty-state {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: clamp(18px, 4vh, 36px);
+  color: var(--skai-color-text-muted);
+  text-align: center;
+}
+.coding-editor-empty-state strong { color: var(--skai-color-text); font-size: var(--skai-text-md); }
+.coding-editor-empty-state span { max-width: 320px; font-size: var(--skai-text-xs); line-height: 1.5; }
+.project-browser-actions { flex-wrap: wrap; }
+.coding-project-scratchpad,
+.coding-local-preview {
+  display: grid;
+  min-width: 0;
+  flex: 0 0 auto;
+  gap: 7px;
+  margin: 0 0 7px;
+  padding: 8px;
+  border: 1px solid var(--skai-color-border);
+  border-radius: var(--skai-radius-md);
+  background: var(--skai-color-surface-soft);
+}
+.coding-project-scratchpad-heading,
+.coding-local-preview-heading,
+.coding-local-preview-heading > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.coding-project-scratchpad-heading > span,
+.coding-local-preview-heading > div > span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--skai-color-text-muted);
+  font-size: var(--skai-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coding-project-scratchpad-heading > span { margin-left: auto; }
+.coding-project-scratchpad textarea { width: 100%; min-height: 58px; max-height: 25vh; margin: 0; resize: vertical; }
+.coding-local-preview-heading { justify-content: space-between; }
+.coding-local-preview > .skai-browser-preview {
+  min-height: 0;
+  height: min(30vh, 280px);
+  max-height: 280px;
+  grid-template-rows: auto auto minmax(100px, 1fr) auto;
+  padding: 8px;
+  border: 0;
+  border-top: 1px solid var(--skai-color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.coding-local-preview .skai-browser-viewport,
+.coding-local-preview .skai-browser-guest { min-height: 100px; }
+.message-content-region.is-collapsed { max-height: min(440px, 52vh); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 88%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0%, #000 88%, transparent 100%); }
+.message-content-toggle { min-height: 28px; margin-top: 6px; padding-inline: 8px; font-size: var(--skai-text-xs); }
+.workspace-tab { position: relative; }
+.workspace-tab-select { width: 100%; padding-right: 30px; }
+.workspace-tab-close { position: absolute; z-index: 2; top: 1px; right: 3px; width: 23px; height: 23px; margin: 4px 0 0; opacity: 0; pointer-events: none; transition: opacity var(--skai-duration-fast) var(--skai-ease-standard); }
+.workspace-tab:hover .workspace-tab-close,
+.workspace-tab:focus-within .workspace-tab-close,
+.workspace-tab-close:focus-visible { opacity: 1; pointer-events: auto; }
+.workspace-tab.is-drop-target { box-shadow: inset 2px 0 0 var(--skai-color-accent); }
+.workspace-tab.is-drop-target .workspace-tab-select { background: color-mix(in srgb, var(--skai-color-accent) 8%, var(--skai-color-surface)); }
+.chat-page .composer-card > textarea { max-height: 32vh; resize: none; }
+.sidebar-project-item { min-height: 42px; align-items: center; }
+.sidebar-project-item small { display: block; min-width: 0; overflow: hidden; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-history-row,
+.sidebar-project-tree-row { min-width: 0; }
+.sidebar-history-row.is-active,
+.sidebar-project-tree-row.is-active { outline: 1px solid color-mix(in srgb, var(--skai-color-accent) 34%, transparent); outline-offset: -1px; }
+.sidebar-history-menu-trigger:focus-visible,
+.sidebar-project-menu-trigger:focus-visible,
+.sidebar-project-new-thread:focus-visible { opacity: 1; }
+.coding-unsaved-close-dialog .dialog-actions { position: sticky; bottom: 0; justify-content: flex-end; padding-top: 10px; background: var(--skai-color-surface); }
+@media (max-width: 1100px) and (min-width: 761px) {
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat { grid-template-columns: minmax(0, 1fr) minmax(280px, .88fr); }
+}
+@media (max-width: 760px) {
+  .app-content-coding:has(.coding-page-active) { overflow: auto; }
+  .app-content-coding .coding-page-active { height: auto; min-height: 100%; overflow: visible; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat { min-height: 0; flex: 0 0 auto; overflow: visible; }
+}
+
+/* Keep the active coding workspace from collapsing when the surrounding route
+   has more optional content than the viewport. The grid owns the scroll and
+   must retain enough height for both the thread composer and editor controls. */
+.app-content-coding .coding-page-active .coding-session-grid.is-chat {
+  min-height: min(590px, calc(100vh - 286px));
+}
+@media (max-width: 1100px) and (min-width: 761px) {
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat {
+    min-height: 360px;
+    flex: 0 0 auto;
+  }
 }
 .toolbar-route-context { display: inline-flex; align-items: center; gap: 7px; min-width: 0; margin-left: 4px; padding: 5px 10px; border-left: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 600; letter-spacing: .02em; }
 .toolbar-route-context svg { width: 14px; height: 14px; color: var(--skai-color-accent); }

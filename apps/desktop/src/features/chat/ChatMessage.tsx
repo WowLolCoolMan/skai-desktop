@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { Message } from "../../app/types";
 import { Button } from "../../components/ui/Primitives";
 import { AttachmentList } from "./AttachmentList";
@@ -21,6 +21,9 @@ export function ChatMessage({ message, index, model, busy, conversationId, copie
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const contentId = `chat-message-content-${useId().replaceAll(":", "")}`;
+  const hasLongContent = message.content.length > 6000;
 
   useEffect(() => {
     if (!editing) setDraft(message.content);
@@ -42,7 +45,7 @@ export function ChatMessage({ message, index, model, busy, conversationId, copie
       {message.role === "assistant" && <Button variant="ghost" disabled={busy} onClick={() => onRetry(index)}>Retry</Button>}
       <Button variant="ghost" onClick={() => onFork(index)} disabled={!conversationId}>Fork from here</Button>
     </div></div>
-    {editing ? <div className="message-edit-form"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} aria-label="Edit user message" autoFocus /><div className="message-edit-actions"><Button variant="ghost" type="button" disabled={saving} onClick={() => { setDraft(message.content); setEditing(false); }}>Cancel</Button><Button variant="primary" type="button" disabled={saving || !draft.trim()} onClick={() => void saveEdit()}>{saving ? "Regenerating…" : "Save & regenerate"}</Button></div></div> : <MessageContent content={message.content} />}
+    {editing ? <div className="message-edit-form"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} aria-label="Edit user message" autoFocus /><div className="message-edit-actions"><Button variant="ghost" type="button" disabled={saving} onClick={() => { setDraft(message.content); setEditing(false); }}>Cancel</Button><Button variant="primary" type="button" disabled={saving || !draft.trim()} onClick={() => void saveEdit()}>{saving ? "Regenerating…" : "Save & regenerate"}</Button></div></div> : <><div id={contentId} className={`message-content-region${hasLongContent && !expanded ? " is-collapsed" : ""}`}><MessageContent content={message.content} /></div>{hasLongContent && <Button className="message-content-toggle" variant="ghost" type="button" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded((value) => !value)}>{expanded ? "Collapse response" : "Show full response"}</Button>}</>}
     <AttachmentList attachments={message.attachments ?? []} trustLabel="Conversation content · retained locally" />
   </article>;
 }

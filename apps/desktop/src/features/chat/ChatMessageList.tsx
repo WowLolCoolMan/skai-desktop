@@ -20,10 +20,14 @@ type ChatMessageListProps = {
 
 export function ChatMessageList({ conversationId, messages, busy, model, copiedMessage, onCopy, onRetry, onFork, onEdit }: ChatMessageListProps) {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [newOutputCount, setNewOutputCount] = useState(0);
   const messageListRef = useRef<HTMLDivElement>(null);
   const previousConversationIdRef = useRef(conversationId);
+  const previousMessageCountRef = useRef(messages.length);
+  const previousLatestContentRef = useRef(messages.at(-1)?.content ?? "");
   const restoreScrollPendingRef = useRef(false);
   const stickToLatestRef = useRef(true);
+  const latestContent = messages.at(-1)?.content ?? "";
 
   useEffect(() => {
     const key = chatScrollKey(conversationId);
@@ -38,6 +42,7 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
       const atLatest = distanceFromLatest < 56;
       stickToLatestRef.current = atLatest;
       setShowJumpToLatest(!atLatest && node.scrollHeight > node.clientHeight + 12);
+      if (atLatest) setNewOutputCount(0);
     };
     node.addEventListener("scroll", updateScrollState, { passive: true });
     updateScrollState();
@@ -49,6 +54,17 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
     if (conversationChanged) {
       previousConversationIdRef.current = conversationId;
       restoreScrollPendingRef.current = true;
+      previousMessageCountRef.current = messages.length;
+      previousLatestContentRef.current = latestContent;
+      setNewOutputCount(0);
+    } else {
+      const addedMessages = Math.max(0, messages.length - previousMessageCountRef.current);
+      const contentChanged = latestContent !== previousLatestContentRef.current;
+      if (!stickToLatestRef.current && (addedMessages > 0 || contentChanged)) {
+        setNewOutputCount((current) => current + Math.max(addedMessages, contentChanged ? 1 : 0));
+      }
+      previousMessageCountRef.current = messages.length;
+      previousLatestContentRef.current = latestContent;
     }
     if (conversationChanged || restoreScrollPendingRef.current) {
       restoreScrollPendingRef.current = false;
@@ -59,16 +75,17 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
     }
     if (!stickToLatestRef.current) return;
     window.requestAnimationFrame(() => { if (messageListRef.current) messageListRef.current.scrollTo({ top: messageListRef.current.scrollHeight, behavior: "smooth" }); });
-  }, [conversationId, messages.length, busy]);
+  }, [conversationId, latestContent, messages.length, busy]);
 
   const jumpToLatest = () => {
     stickToLatestRef.current = true;
     setShowJumpToLatest(false);
+    setNewOutputCount(0);
     messageListRef.current?.scrollTo({ top: messageListRef.current.scrollHeight, behavior: "smooth" });
   };
 
   return <>
     <div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={index} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={onCopy} onRetry={onRetry} onFork={onFork} onEdit={onEdit} />)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>
-    {showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>Jump to latest ↓</Button></div>}
+    {showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>{newOutputCount ? `${newOutputCount} new ${newOutputCount === 1 ? "message" : "messages"} · ` : ""}Jump to latest ↓</Button></div>}
   </>;
 }

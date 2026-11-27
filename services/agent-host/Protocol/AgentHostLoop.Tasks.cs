@@ -356,7 +356,7 @@ public static partial class AgentHostLoop
             var runtime = ReadRuntimeCapacity(settings, AirLlmProvider.IsAirLlmProvider(effectiveProvider), cancellationToken);
             var decision = LocalExecutionCapacityPolicy.Decide(snapshot, settings.LocalRamBudgetBytes, settings.LocalGpuBudgetBytes,
                 task.ModelSizeBytes ?? (usesCodingModel ? settings.CodingModelSizeBytes : null),
-                task.ModelContextLength ?? (usesCodingModel ? settings.CodingModelContextLength : null),
+                settings.OllamaContextWindowTokens > 0 ? settings.OllamaContextWindowTokens : null,
                 task.AirLlmCompatible || usesCodingModel && effectiveProvider.Equals("AirLLM", StringComparison.OrdinalIgnoreCase), runtime.AirLlmReady == true);
             var acquired = false;
             int queuePosition;
