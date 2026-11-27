@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -23,7 +24,8 @@ internal sealed record WorkspaceBackupEnvelope(
     string Data,
     string? Salt = null,
     string? Nonce = null,
-    string? Tag = null);
+    string? Tag = null,
+    string? SourcePlatform = null);
 
 internal sealed record OpenedWorkspaceBackup(WorkspaceBackupPayload Payload, WorkspaceBackupEnvelope Envelope, string Digest);
 
@@ -35,6 +37,12 @@ internal static class WorkspaceBackupArchive
     private const string FormatName = "skai.workspace.backup";
     private static readonly byte[] AssociatedData = Encoding.UTF8.GetBytes("Skai Workspace Backup v1");
     private static readonly Regex SecretToken = new(@"\b(?:sk-[A-Za-z0-9_-]{12,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{12,})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    public static string CurrentPlatform => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? "windows"
+        : RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            ? "linux"
+            : RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "macos" : "other";
     private static readonly Regex SecretAssignment = new(@"\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd)\b(\s*[:=]\s*)(['""]?)[^\s,'"";]{8,}", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static string Create(WorkspaceBackupPayload payload, string? passphrase, JsonSerializerOptions options, out bool encrypted, out int redactions)
@@ -46,7 +54,7 @@ internal static class WorkspaceBackupArchive
         var digest = Convert.ToHexString(SHA256.HashData(plaintext)).ToLowerInvariant();
         encrypted = !string.IsNullOrWhiteSpace(passphrase);
         if (!encrypted)
-            return JsonSerializer.Serialize(new WorkspaceBackupEnvelope(FormatName, 1, DateTimeOffset.UtcNow, false, digest, Convert.ToBase64String(plaintext)), options);
+            return JsonSerializer.Serialize(new WorkspaceBackupEnvelope(FormatName, 1, DateTimeOffset.UtcNow, false, digest, Convert.ToBase64String(plaintext), SourcePlatform: CurrentPlatform), options);
 
         ValidatePassphrase(passphrase!);
         var salt = RandomNumberGenerator.GetBytes(16);
@@ -62,7 +70,7 @@ internal static class WorkspaceBackupArchive
         finally { CryptographicOperations.ZeroMemory(key); }
         return JsonSerializer.Serialize(new WorkspaceBackupEnvelope(
             FormatName, 1, DateTimeOffset.UtcNow, true, digest,
-            Convert.ToBase64String(ciphertext), Convert.ToBase64String(salt), Convert.ToBase64String(nonce), Convert.ToBase64String(tag)), options);
+            Convert.ToBase64String(ciphertext), Convert.ToBase64String(salt), Convert.ToBase64String(nonce), Convert.ToBase64String(tag), CurrentPlatform), options);
     }
 
     public static OpenedWorkspaceBackup Open(string archive, string? passphrase, JsonSerializerOptions options)

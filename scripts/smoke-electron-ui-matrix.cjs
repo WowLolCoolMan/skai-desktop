@@ -35,6 +35,7 @@ const exerciseOnboarding = process.env.UI_MATRIX_EXERCISE_ONBOARDING === "1";
 const exerciseWorkspaceSearch = process.env.UI_MATRIX_EXERCISE_WORKSPACE_SEARCH === "1";
 const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
 const exerciseRetention = process.env.UI_MATRIX_EXERCISE_RETENTION === "1";
+const exerciseBackup = process.env.UI_MATRIX_EXERCISE_BACKUP === "1";
 const exercisePersona = process.env.UI_MATRIX_EXERCISE_PERSONA === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
@@ -1815,6 +1816,25 @@ async function main() {
             })()`);
             if (!retentionFlow?.ok) throw new Error(`Storage retention save/prune workflow failed: ${JSON.stringify(retentionFlow)}`);
             console.log(`[retention-workflow] ${JSON.stringify(retentionFlow)}`);
+          }
+          if (route === "settings" && category === "Storage" && exerciseBackup && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            const backupFlow = await cdp.evaluate(`(async () => {
+              const root = document.querySelector('.workspace-backup-manager');
+              if (!root) return { ok: false, reason: 'backup manager is missing' };
+              const previewButton = [...root.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Preview export');
+              const categories = root.querySelectorAll('.workspace-backup-categories input[type="checkbox"]');
+              const restoreInput = root.querySelector('input[type="file"]');
+              if (!previewButton || categories.length !== 4 || !restoreInput) return { ok: false, reason: 'backup controls are missing', categoryCount: categories.length };
+              previewButton.click();
+              let preview = null;
+              for (let i = 0; i < 60; i++) { preview = root.querySelector('.workspace-backup-preview'); if (preview?.innerText.includes('Portable source:')) break; await new Promise((resolve) => setTimeout(resolve, 50)); }
+              const text = preview?.innerText ?? '';
+              const storage = root.querySelector('.workspace-storage-card')?.innerText ?? '';
+              const retention = root.querySelector('.workspace-retention-card')?.innerText ?? '';
+              return { ok: text.includes('Portable source:') && text.includes('Portable across Windows and Linux') && text.includes('Secret-like tokens are redacted') && storage.includes('Where Skai keeps data') && retention.includes('Automatic retention'), portable: text.includes('Portable across Windows and Linux'), redaction: text.includes('Secret-like tokens are redacted'), restore: Boolean(restoreInput), storage: storage.includes('What leaves this device'), retention: retention.includes('Automatic retention') };
+            })()`);
+            if (!backupFlow?.ok) throw new Error(`Workspace backup portability workflow failed: ${JSON.stringify(backupFlow)}`);
+            console.log(`[workspace-backup-workflow] ${JSON.stringify(backupFlow)}`);
           }
           if (route === "settings" && category === "Voice & Audio" && process.env.UI_MATRIX_EXERCISE_VOICE_PRESETS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
             const presetWorkflow = await cdp.evaluate(`(async () => {

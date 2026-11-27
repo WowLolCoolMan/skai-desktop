@@ -18,6 +18,8 @@ public static partial class AgentHostLoop
         return new(ProtocolVersion, request.Id, true, new
         {
             categories = selected.Select(category => new { id = category, label = BackupCategoryLabel(category), count = counts[category], description = BackupCategoryDescription(category) }).ToArray(),
+            sourcePlatform = WorkspaceBackupArchive.CurrentPlatform,
+            portability = "Portable across Windows and Linux. Machine-specific endpoints, paths, runtimes, and credentials stay local and are not imported.",
             redaction = "Secret-like tokens are redacted. Credential stores, MCP connections, project folder roots, project instructions, runtime cache paths, executable paths, and platform-local endpoints are excluded or kept local.",
             privacyNote = "Conversation messages, persona notes, project names, and optional profile fields may contain personal text. Review the selected categories before saving the file.",
             maxArchiveBytes = WorkspaceBackupArchive.MaxArchiveCharacters,
@@ -60,13 +62,15 @@ public static partial class AgentHostLoop
             format = opened.Envelope.Format,
             version = opened.Envelope.Version,
             encrypted = opened.Envelope.Encrypted,
+            sourcePlatform = opened.Envelope.SourcePlatform ?? "unknown",
+            targetPlatform = WorkspaceBackupArchive.CurrentPlatform,
             integrity = "verified",
             createdAtUtc = opened.Envelope.CreatedAtUtc,
             archiveDigest = opened.Digest,
             stateFingerprint = GetWorkspaceStateFingerprint(categories),
             categories = details,
             excluded = new[] { "Credentials and API tokens", "MCP connections", "project folder permissions", "project instructions", "task and tool operation logs", "runtime/model caches" },
-            portability = "Project folder roots and machine-specific paths are not imported. Existing local roots are retained when project metadata is replaced; new projects require folder access to be selected again.",
+            portability = $"Source platform: {opened.Envelope.SourcePlatform ?? "unknown"}; target platform: {WorkspaceBackupArchive.CurrentPlatform}. Project folder roots and machine-specific paths are not imported. Existing local roots are retained when project metadata is replaced; new projects require folder access to be selected again.",
         });
     }
 

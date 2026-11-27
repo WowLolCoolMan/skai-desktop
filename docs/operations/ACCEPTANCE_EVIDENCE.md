@@ -346,6 +346,32 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Unverified: real OS prompt-injection fixtures, disk-growth enforcement, and
   a second-review gate for future unattended high-risk actions.
 
+### Slice 26 — backup, migration, and data ownership
+
+- Outcome: make selected workspace data portable without exporting credentials,
+  machine paths, runtime caches, or project access grants. Backup previews now
+  identify the source platform; restore previews identify source and target
+  platforms and keep machine-specific settings local.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run package:electron`; packaged Settings-route smoke with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=settings UI_MATRIX_EXERCISE_BACKUP=1`
+  verifies the export preview, Windows/Linux portability disclosure, redaction
+  disclosure, restore file affordance, storage ownership panel, and retention
+  controls.
+- Failure check: the host continues to verify archive digest and payload before
+  restore; no backup preview or portability label grants access to project
+  folders or credentials.
+- Disposable profile / cleanup: the packaged matrix uses a throwaway Electron
+  profile and only opens the local export preview; it does not write a backup,
+  restore user data, or touch installed runtime caches.
+- Platform / OS: Windows x64 packaged Electron; cross-OS restore remains
+  unverified and is represented as a portability disclosure rather than a claim
+  of native Linux/macOS acceptance.
+- Network and privacy boundary: all backup operations use the local Agent Host;
+  the data-flow panel names the integrations that can leave the device.
+- Remaining: live Windows-to-Linux restore, disk quota enforcement, and runtime
+  provider cache cleanup remain open follow-up work.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record
