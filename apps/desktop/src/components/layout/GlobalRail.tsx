@@ -8,8 +8,10 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
   { route: "chat", icon: "home", label: "Home" },
   { route: "projects", icon: "project", label: "Projects" },
   { route: "scheduled", icon: "clock", label: "Scheduled" },
-  { route: "coding", icon: "code", label: "Coding" },
+  { route: "coding", icon: "code", label: "Files & Coding" },
   { route: "images", icon: "image", label: "Visuals" },
+  { route: "models", icon: "model", label: "Models" },
+  { route: "usage", icon: "activity", label: "Usage" },
 ];
 
 const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];
