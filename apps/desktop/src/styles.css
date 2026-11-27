@@ -715,8 +715,10 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .voice-mode-transcript > strong, .voice-mode-transcript-review > strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
 .voice-mode-transcript p, .voice-mode-transcript-review p { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 8px; overflow-wrap: anywhere; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); line-height: 1.45; }
 .voice-mode-transcript p b { color: var(--skai-color-text); }
+.voice-mode-transcript .voice-mode-detail { display: block; grid-column: 1 / -1; max-width: none; }
 .voice-mode-transcript-review > div { display: flex; gap: 8px; }
 .voice-mode-transcript-preview { border-top: 1px solid var(--skai-color-border); padding-top: 8px; }
+.ui-dialog .voice-mode-review { display: flex; align-items: center; gap: 8px; }
 .voice-mode-detail { max-width: 320px; color: var(--skai-color-text-muted); line-height: 1.5; }
 .voice-mode-session-actions { position: sticky; bottom: 0; z-index: 1; display: flex; justify-content: center; gap: 8px; width: 100%; padding: 8px 0; background: var(--skai-color-surface); }
 .voice-mode-expressiveness { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 16px; width: min(100%, 340px); padding: 12px 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); text-align: left; color: var(--skai-color-text); }

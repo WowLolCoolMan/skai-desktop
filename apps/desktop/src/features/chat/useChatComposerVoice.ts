@@ -475,6 +475,9 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const endVoiceMode = () => {
     handsFreeRef.current = false;
     pushToTalkRef.current = false;
+    setPushToTalkHeld(false);
+    setVoicePaused(false);
+    setPendingVoiceTranscript(null);
     awaitingResponseRef.current = false;
     sawBusyRef.current = false;
     pendingBargeInTranscriptRef.current = null;
