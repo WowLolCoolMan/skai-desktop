@@ -318,6 +318,20 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Unverified: external login state, session import/resume, native terminal
   sessions, and compatibility execution fixtures remain intentionally open.
 
+### Slice 23 — first-run onboarding and capability discovery
+
+- Outcome: guide a new local profile to a useful first chat without making
+  external setup or demo content look real.
+- Success check: packaged route smoke with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=onboarding UI_MATRIX_EXERCISE_ONBOARDING=1`
+  passed the isolated task/Git/Visuals previews, model readiness advisory,
+  navigation-guide dismissal, checklist reset, optional skip, and re-entry.
+- Safety boundary: the demo remains page-local state; it makes no provider,
+  tool, project, file, or media-generation call. Checklist reset only clears
+  device-local onboarding keys and preserves chats, projects, and models.
+- Unverified: first-run acceptance on native Linux/macOS and manual
+  assistive-technology review.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record
