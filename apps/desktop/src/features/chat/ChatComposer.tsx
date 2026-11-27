@@ -114,8 +114,22 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const accessTriggerRef = useRef<HTMLButtonElement>(null);
   const voiceDialogTitleRef = useRef<HTMLHeadingElement>(null);
   const commandQuery = draft.match(/^\/([^\s]*)$/)?.[1] ?? null;
+  const contextQuery = draft.match(/(?:^|\s)@([^\s]*)$/)?.[1] ?? null;
   const commandMatches = useMemo(() => commandQuery === null ? [] : [...composerCommands, ...workflowPreferences.savedPrompts.map((prompt) => ({ id: prompt.id, label: prompt.name, detail: prompt.prompt.slice(0, 100) || "Saved prompt template", shortcut: `/${prompt.alias}`, prompt: prompt.prompt }))].filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery, workflowPreferences.savedPrompts]);
+  const contextMatches = useMemo(() => {
+    if (contextQuery === null) return [];
+    const candidates: ComposerCommand[] = [
+      ...projects.slice(0, 8).map((project) => ({ id: `project:${project.id}`, label: project.name, detail: project.folderPaths.join(" · ") || "Project workspace", shortcut: `@project:${project.name}`, prompt: `@project:${project.name}` })),
+      ...attachments.slice(0, 8).map((attachment) => ({ id: `file:${attachment.fileName}`, label: attachment.fileName, detail: "Attached file in this turn", shortcut: `@file:${attachment.fileName}`, prompt: `@file:${attachment.fileName}` })),
+      { id: "skills", label: "Skills", detail: "Reference an installed skill by id", shortcut: "@skills", prompt: "@skills" },
+      { id: "tools", label: "Tools", detail: "Reference enabled local tools", shortcut: "@tools", prompt: "@tools" },
+      { id: "memory", label: "Memory", detail: "Reference approved local memory", shortcut: "@memory", prompt: "@memory" },
+    ];
+    const query = contextQuery.toLowerCase();
+    return candidates.filter((candidate) => `${candidate.label} ${candidate.detail} ${candidate.shortcut}`.toLowerCase().includes(query)).slice(0, 12);
+  }, [attachments, contextQuery, projects]);
   const activeCommandId = commandMatches[commandIndex] ? `composer-command-${commandMatches[commandIndex].id}` : undefined;
+  const activeContextId = contextMatches[commandIndex] ? `composer-command-${contextMatches[commandIndex].id}` : undefined;
   const computerVisionModel = useMemo(() => {
     const fallback: Model = { model, provider, endpoint, vision: "unknown", capabilities: [] };
     let preferred: { model?: unknown; provider?: unknown; endpoint?: unknown } = {};
@@ -140,7 +154,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     return preferredInventory ?? fallback;
   }, [endpoint, model, models, provider]);
 
-  useEffect(() => { setCommandIndex(0); }, [commandQuery]);
+  useEffect(() => { setCommandIndex(0); }, [commandQuery, contextQuery]);
   useEffect(() => { const refresh = () => setWorkflowPreferences(readCommandPreferences()); window.addEventListener(commandPreferencesEvent, refresh); return () => window.removeEventListener(commandPreferencesEvent, refresh); }, []);
   useEffect(() => {
     if (!omniOpen && !accessOpen) return;
@@ -160,9 +174,10 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeOnEscape); };
   }, [accessOpen, omniOpen]);
   useEffect(() => {
-    if (commandQuery === null || commandMatches.length === 0) return;
-    window.requestAnimationFrame(() => document.getElementById(activeCommandId ?? "")?.scrollIntoView({ block: "nearest" }));
-  }, [activeCommandId, commandMatches.length, commandQuery]);
+    if (commandQuery === null && contextQuery === null) return;
+    const activeId = commandQuery !== null ? activeCommandId : activeContextId;
+    window.requestAnimationFrame(() => document.getElementById(activeId ?? "")?.scrollIntoView({ block: "nearest" }));
+  }, [activeCommandId, activeContextId, commandMatches.length, commandQuery, contextMatches.length, contextQuery]);
 
 
 
@@ -189,6 +204,12 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const selectComposerCommand = (command: ComposerCommand) => {
     onDraftChange(command.prompt ?? "");
     if (command.route) onNavigate(command.route);
+  };
+
+  const selectContextCommand = (command: ComposerCommand) => {
+    const match = draft.match(/(?:^|\s)@([^\s]*)$/);
+    if (!match) return;
+    onDraftChange(`${draft.slice(0, draft.length - match[0].length)}${command.prompt ?? command.shortcut} `);
   };
 
   const captureComputerScreens = async () => {
@@ -281,6 +302,11 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (contextQuery !== null && contextMatches.length > 0) {
+      if (event.key === "ArrowDown") { event.preventDefault(); setCommandIndex((index) => (index + 1) % contextMatches.length); return; }
+      if (event.key === "ArrowUp") { event.preventDefault(); setCommandIndex((index) => (index - 1 + contextMatches.length) % contextMatches.length); return; }
+      if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); selectContextCommand(contextMatches[commandIndex]); return; }
+    }
     if (commandQuery !== null && commandMatches.length > 0) {
       if (event.key === "ArrowDown") { event.preventDefault(); setCommandIndex((index) => (index + 1) % commandMatches.length); return; }
       if (event.key === "ArrowUp") { event.preventDefault(); setCommandIndex((index) => (index - 1 + commandMatches.length) % commandMatches.length); return; }
@@ -288,7 +314,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       if (event.key === "End") { event.preventDefault(); setCommandIndex(commandMatches.length - 1); return; }
       if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); selectComposerCommand(commandMatches[commandIndex]); return; }
     }
-    if (event.key === "Escape" && commandQuery !== null) { event.preventDefault(); onDraftChange(""); return; }
+    if (event.key === "Escape" && (commandQuery !== null || contextQuery !== null)) { event.preventDefault(); onDraftChange(""); return; }
     if (workflowPreferences.sendBehavior === "enter-sends" && event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSubmit(); }
     else if (workflowPreferences.sendBehavior === "shift-enter-sends" && event.key === "Enter" && event.shiftKey) { event.preventDefault(); onSubmit(); }
   };
@@ -328,11 +354,11 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
 
   return <section className={`composer-card${dragActive ? " is-drag-active" : ""}${workflowPreferences.toolbarLayout === "compact" ? " is-compact-toolbar" : ""}`} aria-busy={rewriteBusy} data-send-behavior={workflowPreferences.sendBehavior} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
-    {commandQuery !== null && <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} />}
+    {commandQuery !== null ? <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} /> : contextQuery !== null && <ComposerCommandMenu commands={contextMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectContextCommand} />}
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}>{editingQueueIndex === queued.index ? <div className="queued-message-edit"><textarea autoFocus value={queueEditDraft} maxLength={50_000} aria-label={`Edit queued message ${queued.index + 1}`} onChange={(event) => setQueueEditDraft(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void saveQueuedEdit(queued.index); } if (event.key === "Escape") { setEditingQueueIndex(null); setQueueEditDraft(""); } }} /><div><button type="button" disabled={queueUpdateBusy || !queueEditDraft.trim()} onClick={() => void saveQueuedEdit(queued.index)}>Save</button><button type="button" disabled={queueUpdateBusy} onClick={() => { setEditingQueueIndex(null); setQueueEditDraft(""); }}>Cancel</button></div><small>Ctrl+Enter saves · Esc cancels</small></div> : <span>{queued.text}</span>}{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<div className="queued-message-actions"><button type="button" disabled={queueUpdateBusy} title="Edit this queued prompt" onClick={() => { if (editingQueueIndex !== queued.index) { setEditingQueueIndex(queued.index); setQueueEditDraft(queued.text); } }} aria-label={`Edit queued message ${queued.index + 1}`}>Edit</button><button type="button" disabled={queued.index === 0} onClick={() => void onMoveQueued(queued.index, queued.index - 1)} aria-label={`Move queued message ${queued.index + 1} up`} title="Move up">↑</button><button type="button" disabled={queued.index === queuedMessages.length - 1} onClick={() => void onMoveQueued(queued.index, queued.index + 1)} aria-label={`Move queued message ${queued.index + 1} down`} title="Move down">↓</button><button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`} title="Remove queued message">×</button></div></div>)}</div>}
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
     <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
-    <textarea value={draft} disabled={rewriteBusy} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : placeholder} aria-label={placeholder.replace(/…$/, "")} aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />
+    <textarea value={draft} disabled={rewriteBusy} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : placeholder} aria-label={placeholder.replace(/…$/, "")} aria-controls={commandQuery !== null || contextQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : contextQuery !== null ? activeContextId : undefined} aria-autocomplete={commandQuery !== null || contextQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : contextQuery !== null ? contextMatches.length > 0 : undefined} rows={3} />
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
     {voiceListening && whisperRecorderRef.current && <p className="composer-hint" role="status">Recording locally. Select the microphone again to transcribe, or leave it to stop automatically after five minutes.</p>}
     {audioTranscribing && <p className="composer-hint" role="status">Transcribing audio with local Whisper on this device…</p>}
