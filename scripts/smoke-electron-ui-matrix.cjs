@@ -315,6 +315,28 @@ const settingsCategorySource = settingsSource.match(/const categories = \[([^\]]
 const settingsCategories = [...settingsCategorySource.matchAll(/"([^\"]+)"/g)].map((match) => match[1]);
 if (settingsCategories.length < 5) throw new Error("Could not read the settings categories from SettingsPage.tsx.");
 const captureDirectory = path.join(__dirname, "..", ".tmp", "ui-matrix-review");
+let uiEvidenceContext = null;
+const originalWriteFileSync = fs.writeFileSync.bind(fs);
+fs.writeFileSync = (target, data, options) => {
+  originalWriteFileSync(target, data, options);
+  if (!uiEvidenceContext || typeof target !== "string" || !target.toLowerCase().endsWith(".png")) return;
+  const revision = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: path.join(__dirname, ".."), encoding: "utf8", windowsHide: true }).stdout?.trim();
+  const evidence = {
+    schema: "skai-ui-evidence/v1",
+    file: path.basename(target),
+    platform: process.platform,
+    osRelease: os.release(),
+    architecture: process.arch,
+    viewport: uiEvidenceContext.viewport,
+    theme: uiEvidenceContext.theme,
+    sidebar: uiEvidenceContext.sidebar,
+    runtime: "packaged-electron",
+    route: uiEvidenceContext.route,
+    appRevision: revision || process.env.GITHUB_SHA || "unknown",
+    capturedAt: new Date().toISOString(),
+  };
+  originalWriteFileSync(`${target}.evidence.json`, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
+};
 // The five native desktop sizes plus the requested 390 px renderer emulation.
 const viewports = [[1920, 1080], [1440, 900], [1280, 720], [1100, 800], [960, 640]];
 const testedRoutes = process.env.UI_MATRIX_ROUTE ? routes.filter((route) => process.env.UI_MATRIX_ROUTE.split(",").includes(route)) : routes;
@@ -440,6 +462,12 @@ async function main() {
       await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 960 });
       if (exerciseMcpReview) await mcpReviewServerReady;
       for (const route of testedRoutes) {
+        uiEvidenceContext = {
+          viewport: { width, height },
+          theme,
+          sidebar: collapsed === "true" ? "collapsed" : "expanded",
+          route,
+        };
         phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/${route}`;
         const renderedRoute = route === "personas" || route === "persona-groups" ? "persona-workshop" : route === "plugins" ? "marketplace" : route === "workbench" ? "chat" : route;
         await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);

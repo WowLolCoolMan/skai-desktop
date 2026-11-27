@@ -152,6 +152,22 @@ internal static class GitHubTests
             Check(exception.Message.Contains("HTTP 403", StringComparison.Ordinal)
                 && exception.Message.Contains("Resource not accessible", StringComparison.Ordinal), "GitHub API reports denied repository permissions with the server's actionable error");
         }
+        var expiredTokenApi = new GitHubApiClient(new HttpClient(new StubHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StringContent("{\"message\":\"Bad credentials\"}", Encoding.UTF8, "application/json")
+            }))));
+        try
+        {
+            await expiredTokenApi.ListRepositoriesAsync("expired-fixture-token");
+            throw new Exception("Expected an expired GitHub token to be reported.");
+        }
+        catch (InvalidOperationException exception)
+        {
+            Check(exception.Message.Contains("HTTP 401", StringComparison.Ordinal)
+                && exception.Message.Contains("Bad credentials", StringComparison.Ordinal)
+                && !exception.Message.Contains("expired-fixture-token", StringComparison.Ordinal), "GitHub API reports expired authentication without leaking the bearer token");
+        }
         var offlineApi = new GitHubApiClient(new HttpClient(new StubHandler((_, _) => throw new HttpRequestException("simulated network outage"))));
         try
         {

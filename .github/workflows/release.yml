@@ -40,6 +40,7 @@ jobs:
       - run: npm run audit:electron-tray
       - run: npm run audit:local-only
       - run: npm run check:release-readiness
+      - run: npm run check:acceptance-evidence
       - run: npm test
       - run: npm run agent-host:build
 
@@ -97,6 +98,19 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: npm run smoke:electron:accessibility
+      - name: Verify isolated missing-runtime recovery
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: npm run smoke:image:runtime-unavailable
+      - name: Verify page context and Settings return behavior
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:UI_MATRIX_QUICK = '1'
+          $env:UI_MATRIX_ROUTE = 'usage'
+          $env:UI_MATRIX_VIEWPORT = '1440x900'
+          $env:UI_MATRIX_EXERCISE_SETTINGS_OVERLAY = '1'
+          npm run smoke:electron:ui-matrix
       - name: Run local voice acceptance contract
         run: npm run smoke:voice:acceptance
       - name: Smoke-test exact packaged Electron artifact on Linux

@@ -73,6 +73,7 @@ McpToolPermissionGateTests.Run();
 await McpStdioClientTests.RunAsync();
 McpConnectionRegistryTests.Run();
 await McpStreamableHttpClientTests.RunAsync();
+AtomicFileWriterTests.Run();
 await ReleaseManifestVerifierTests.RunAsync();
 ConversationContextPlannerTests.Run();
 await SemanticConversationCompactorTests.RunAsync();

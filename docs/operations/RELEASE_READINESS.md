@@ -1,6 +1,6 @@
 # Skai Desktop first-release readiness
 
-Last audited: 2026-11-22
+Last audited: 2026-11-27
 
 Target release: **0.1.4**. Status: **published as an unsigned testing release; not ready for a broad production rollout**.
 
@@ -47,3 +47,26 @@ documentation link after commit `21cb70f8` was pushed to `main`. See
 4. Complete exact-artifact keyboard, accessibility, contrast, Linux compositor, and platform acceptance. Cloud model routing is deliberately outside the product boundary and is not a release blocker.
 
 The Windows smoke suite, pet-focused checks, packaged UI matrix, unsigned installer lifecycle, local-feed Windows and Linux update/install/rollback smokes, published Linux feed update/install/reopen smoke, and headless Linux AppImage smoke pass. Release 0.1.4 is published as an unsigned testing build. Native Linux desktop/updater acceptance and remaining live platform/accessibility review are open. Production signing and signed updater metadata are deferred hardening work. The packaged Linux voice smoke also found no installed on-device `en-US` speech pack; recognition correctly stayed local and reported unavailable.
+
+## Unverified platforms and integrations
+
+- **Windows 11 x64:** packaged UI, accessibility, installer lifecycle, and
+  selected workflows are exercised in isolated profiles. Real user hardware,
+  GPU/model combinations, screen-reader review, and the complete GitHub API
+  authorization/refresh failure matrix are not fully verified.
+- **Ubuntu 24.04 x64:** packaged and AppImage paths pass in headless WSL2/Xvfb
+  and CI. Native desktop/compositor and input-device acceptance remains open.
+- **Native macOS:** not a supported or verified release platform; there is no
+  native packaged acceptance, signing, updater, or sandbox adapter.
+- **Integrations:** Skai does not currently provide hosted model inference.
+  GitHub is a user-authorized project integration, not a model provider.
+  Hosted MCP endpoints and hosted model removal are rejected by the local-only
+  contract. The MCP request deadline and atomic file writer's ENOSPC failure
+  are covered by deterministic core fixtures, but packaged MCP timeout display
+  and app-level disk-exhaustion recovery remain unverified. The Agent Host
+  reports that disk-growth quota is not enforced.
+
+The [acceptance evidence contract](ACCEPTANCE_EVIDENCE.md) tracks these limits,
+the disposable-profile rule, UI screenshot metadata, and the current failure
+injection coverage. The capability matrix links each status claim to a focused
+smoke or workflow record.

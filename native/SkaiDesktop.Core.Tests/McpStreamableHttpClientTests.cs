@@ -52,5 +52,16 @@ internal static class McpStreamableHttpClientTests
         catch (HttpRequestException) { redirectRefused = true; }
         await redirectClient.DisposeAsync();
         Check(redirectRefused, "MCP Streamable HTTP refuses endpoint redirects");
+
+        using var timeoutHttp = new HttpClient(new StubHandler(async (_, cancellationToken) =>
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        })) { Timeout = Timeout.InfiniteTimeSpan };
+        await using var timeoutClient = new McpStreamableHttpClient("delayed-server", "https://example.com/mcp", timeoutHttp, TimeSpan.FromSeconds(1));
+        var timeoutObserved = false;
+        try { await timeoutClient.InitializeAsync(); }
+        catch (OperationCanceledException) { timeoutObserved = true; }
+        Check(timeoutObserved, "MCP Streamable HTTP cancels a delayed response at its request deadline");
     }
 }

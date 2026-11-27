@@ -16,6 +16,14 @@ These are established patterns in other AI desktop apps, not one-off interaction
 
 The designs apply those familiar navigation and review patterns to Skai's documented, local-first capabilities. Fine sample names, copy, statuses, dates, and model metadata inside generated images are illustrative; confirm them against the current app and runtime before implementation.
 
+Each newly captured packaged UI screenshot has a sibling `.png.evidence.json`
+file recording platform/OS, architecture, viewport, theme, sidebar state,
+route, packaged runtime, app revision, and capture time. Existing captures
+without sidecars are historical; their precise environment is not inferred.
+For a redesign, compare the approved reference and the before/after captures,
+then record what matches and the remaining visual or workflow differences in
+the relevant section below. The matrix uses an isolated disposable profile.
+
 ## Continuity decisions
 
 - The app title is always **Skai Desktop**. Chat, Coding Agent, Images, Model Library, and other names are page or mode labels.
