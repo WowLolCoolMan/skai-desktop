@@ -5,12 +5,13 @@ import { NavIcon, type NavIconName } from "../ui/NavIcon";
 import { installedVoiceModels } from "../../services/nativeTts";
 
 const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = [
-  { route: "chat", icon: "home", label: "Home" },
+  { route: "chat", icon: "chat", label: "Chat" },
   { route: "projects", icon: "project", label: "Projects" },
-  { route: "scheduled", icon: "clock", label: "Scheduled" },
-  { route: "coding", icon: "code", label: "Files & Coding" },
-  { route: "images", icon: "image", label: "Visuals" },
+  { route: "scheduled", icon: "clock", label: "Tasks" },
+  { route: "coding", icon: "code", label: "Files" },
+  { route: "marketplace", icon: "marketplace", label: "Tools" },
   { route: "models", icon: "model", label: "Models" },
+  { route: "images", icon: "image", label: "Media" },
   { route: "usage", icon: "activity", label: "Usage" },
 ];
 
