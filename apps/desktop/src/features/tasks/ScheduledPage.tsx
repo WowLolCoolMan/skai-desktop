@@ -43,6 +43,10 @@ function dueLabel(value: string) {
   return Number.isNaN(date.getTime()) ? "Time unavailable" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+function localTimeZoneLabel() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "this device's local time zone";
+}
+
 function repeatLabel(minutes?: number | null) {
   if (!minutes) return "Once";
   if (minutes === 60) return "Hourly";
@@ -101,6 +105,16 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, on
     setCreating(true);
   };
 
+  const duplicateTask = (task: DesktopScheduledTask) => {
+    setPrompt(task.prompt);
+    setWorkspaceMode(task.workspaceMode === "Coding Agent" ? "Coding Agent" : "ChatBot");
+    setDueAt(localDateTimeValue(new Date(Date.now() + 60 * 60 * 1000)));
+    setRepeat(task.repeatEveryMinutes?.toString() ?? "");
+    setFormError(null);
+    setTransitionError(null);
+    setCreating(true);
+  };
+
   const submitSchedule = async () => {
     const due = new Date(dueAt);
     if (!prompt.trim()) { setFormError("Add a prompt for the local model to run."); return; }
@@ -139,13 +153,13 @@ export function ScheduledPage({ scheduledTasks, busyTask, loading, loadError, on
     <main className="scheduled-content" aria-label="Scheduled task details">
       {creating ? <section className="scheduled-form-panel"><div className="scheduled-form-heading"><div><p className="section-kicker">NEW AUTOMATION</p><h2>Schedule a task</h2><p>Skai will run this prompt with your configured local model.</p></div><Button variant="ghost" type="button" onClick={() => setCreating(false)}>Close</Button></div>
         <label className="scheduled-prompt-field">Prompt<textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} maxLength={6000} rows={7} placeholder="What should the local model do when this runs?" autoFocus /></label>
-        <div className="scheduled-form-grid"><label>Run at<input type="datetime-local" value={dueAt} min={localDateTimeValue(new Date())} onChange={(event) => setDueAt(event.target.value)} /></label><label>Repeat<select value={repeat} onChange={(event) => setRepeat(event.target.value)}><option value="">Once</option><option value="60">Hourly</option><option value="1440">Daily</option><option value="10080">Weekly</option></select></label><label>Workspace mode<select value={workspaceMode} onChange={(event) => setWorkspaceMode(event.target.value as ScheduledWorkspace)}><option value="ChatBot">Chat</option><option value="Coding Agent">Coding agent</option></select></label></div>
-        <p className="scheduled-form-note"><NavIcon name="activity" /> The task runs as a standalone prompt. It won’t access external services or automatically include a project’s files.</p>
+        <div className="scheduled-form-grid"><label>Run at<input type="datetime-local" value={dueAt} min={localDateTimeValue(new Date())} onChange={(event) => setDueAt(event.target.value)} /></label><label>Repeat<select value={repeat} onChange={(event) => setRepeat(event.target.value)}><option value="">Once</option><option value="60">Hourly</option><option value="1440">Daily</option><option value="10080">Weekly</option>{repeat && !["60", "1440", "10080"].includes(repeat) && <option value={repeat}>{repeatLabel(Number(repeat))}</option>}</select></label><label>Workspace mode<select value={workspaceMode} onChange={(event) => setWorkspaceMode(event.target.value as ScheduledWorkspace)}><option value="ChatBot">Chat</option><option value="Coding Agent">Coding agent</option></select></label></div>
+        <p className="scheduled-form-note"><NavIcon name="activity" /> Runs on this device in {localTimeZoneLabel()}. Skai must be open and the device awake. The task runs as a standalone prompt without external services or automatic project-file access.</p>
         {formError && <p className="form-error" role="alert">{formError}</p>}
         <div className="scheduled-form-actions"><Button variant="ghost" type="button" onClick={() => setCreating(false)}>Cancel</Button><Button variant="primary" type="button" disabled={busyTask === "schedule" || !prompt.trim()} onClick={() => void submitSchedule()}>{busyTask === "schedule" ? "Saving…" : "Save schedule"}</Button></div>
-      </section> : selectedTask ? <section className="scheduled-detail-panel"><div className="scheduled-detail-topline"><p className="section-kicker">SCHEDULE DETAILS</p><StatusBadge tone={statusTone(selectedTask.status)}>{selectedTask.status}</StatusBadge></div><h2>{selectedTask.prompt}</h2><dl className="scheduled-detail-grid"><div><dt>Next run</dt><dd>{selectedTask.status === "completed" || selectedTask.status === "cancelled" || selectedTask.status === "failed" ? "No upcoming run" : dueLabel(selectedTask.dueAt)}</dd></div><div><dt>Repeat</dt><dd>{repeatLabel(selectedTask.repeatEveryMinutes)}</dd></div><div><dt>Workspace mode</dt><dd>{selectedTask.workspaceMode === "Coding Agent" ? "Coding agent" : "Chat"}</dd></div><div><dt>Saved result</dt><dd>{selectedTask.outcome || "No result yet"}</dd></div></dl>
+      </section> : selectedTask ? <section className="scheduled-detail-panel"><div className="scheduled-detail-topline"><p className="section-kicker">SCHEDULE DETAILS</p><StatusBadge tone={statusTone(selectedTask.status)}>{selectedTask.status}</StatusBadge></div><h2>{selectedTask.prompt}</h2><dl className="scheduled-detail-grid"><div><dt>Next run</dt><dd>{selectedTask.status === "completed" || selectedTask.status === "cancelled" || selectedTask.status === "failed" ? "No upcoming run" : dueLabel(selectedTask.dueAt)}</dd></div><div><dt>Time zone</dt><dd>{localTimeZoneLabel()}</dd></div><div><dt>Device requirement</dt><dd>Skai open · device awake</dd></div><div><dt>Repeat</dt><dd>{repeatLabel(selectedTask.repeatEveryMinutes)}</dd></div><div><dt>Workspace mode</dt><dd>{selectedTask.workspaceMode === "Coding Agent" ? "Coding agent" : "Chat"}</dd></div><div><dt>Saved result</dt><dd>{selectedTask.outcome || "No result yet"}</dd></div></dl>
         {transitionError && <p className="form-error" role="alert">{transitionError}</p>}
-        <div className="scheduled-detail-actions">{selectedTask.status === "scheduled" && <><Button variant="secondary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "runNow")}>Run now</Button><Button variant="ghost" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "pause")}>Pause</Button></>}{selectedTask.status === "paused" && <Button variant="secondary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "resume")}>Resume</Button>}{(selectedTask.status === "scheduled" || selectedTask.status === "paused") && <Button variant="ghost" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "cancel")}>Cancel schedule</Button>}</div>
+        <div className="scheduled-detail-actions"><Button variant="secondary" type="button" onClick={() => duplicateTask(selectedTask)}>Duplicate</Button>{selectedTask.status === "scheduled" && <><Button variant="secondary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "runNow")}>Run now</Button><Button variant="ghost" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "pause")}>Pause</Button></>}{selectedTask.status === "paused" && <Button variant="secondary" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "resume")}>Resume</Button>}{(selectedTask.status === "scheduled" || selectedTask.status === "paused") && <Button variant="ghost" type="button" disabled={busyTask === selectedTask.id} onClick={() => void transition(selectedTask, "cancel")}>Cancel schedule</Button>}</div>
       </section> : loading ? <div className="scheduled-loading-state"><span className="scheduled-spinner" /><p>Loading your schedules…</p></div> : scheduledTasks.length ? <EmptyState title="No schedules match" description="Change the status filters or search for a different task." /> : <section className="scheduled-start"><span className="scheduled-hero-icon"><NavIcon name="clock" /></span><p className="section-kicker">LOCAL AUTOMATIONS</p><h2>Schedule a task</h2><p>Set a prompt to run later with the local model on this device.</p><div className="scheduled-template-grid">{templates.map((template) => <button className="scheduled-template-card" type="button" key={template.title} onClick={() => startFromTemplate(template)}><span className="scheduled-template-icon"><NavIcon name={template.icon} /></span><span><strong>{template.title}</strong><small>{template.description}</small></span><NavIcon name="arrow-right" /></button>)}</div></section>}
     </main>
   </div>;

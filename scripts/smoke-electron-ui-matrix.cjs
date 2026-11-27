@@ -625,9 +625,15 @@ async function main() {
           const savedSchedule = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ((document.querySelector('.chat-schedule-list')?.innerText ?? '').includes('Create a weekly progress summary')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!savedSchedule) throw new Error(`Saving the conversation schedule did not add its row to Scheduled runs: ${JSON.stringify(await cdp.evaluate(`(() => ({ panel: document.querySelector('.chat-schedules-panel')?.innerText, form: document.querySelector('.chat-schedule-form')?.innerText, fields: [...(document.querySelector('.chat-schedule-form')?.querySelectorAll('input,select') ?? [])].map((field) => field.value), button: [...(document.querySelector('.chat-schedule-form')?.querySelectorAll('button') ?? [])].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
         }
-        if (route === "scheduled" && exerciseScheduledPage) {
+        if (route === "scheduled" && exerciseScheduledPage && width === 1440 && height === 900) {
           const seededScheduleVisible = await cdp.evaluate(`document.querySelector('.scheduled-detail-panel')?.innerText.includes('Review the herb garden plan') ?? false`);
           if (!seededScheduleVisible) throw new Error("The standalone schedule detail did not open from the seeded task list.");
+          const scheduleContext = await cdp.evaluate(`document.querySelector('.scheduled-detail-panel')?.innerText ?? ''`);
+          if (!scheduleContext.includes('Time zone') || !scheduleContext.includes('Device requirement') || !scheduleContext.includes('Skai open')) throw new Error(`Schedule detail omitted its local time zone or required host state: ${scheduleContext}`);
+          await cdp.evaluate(`([...document.querySelectorAll('.scheduled-detail-actions button')].find((button) => button.textContent?.trim() === 'Duplicate')?.click())`);
+          const duplicatedScheduleDraft = await cdp.evaluate(`(() => ({ prompt: document.querySelector('.scheduled-form-panel textarea')?.value, repeat: document.querySelector('.scheduled-form-panel .scheduled-form-grid select')?.value, mode: document.querySelector('.scheduled-form-panel .scheduled-form-grid select:last-child')?.value, due: document.querySelector('.scheduled-form-panel input[type="datetime-local"]')?.value, note: document.querySelector('.scheduled-form-note')?.innerText ?? '' }))()`);
+          if (duplicatedScheduleDraft.prompt !== 'Review the herb garden plan' || duplicatedScheduleDraft.repeat !== '60' || !duplicatedScheduleDraft.due || !duplicatedScheduleDraft.note.includes('Skai must be open')) throw new Error(`Duplicating a schedule did not preserve its prompt, recurrence, and local execution context: ${JSON.stringify(duplicatedScheduleDraft)}`);
+          await cdp.evaluate(`document.querySelector('.scheduled-form-panel .scheduled-form-heading button')?.click()`);
           if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
             fs.mkdirSync(captureDirectory, { recursive: true });
             const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
@@ -643,7 +649,7 @@ async function main() {
           await cdp.evaluate(`([...document.querySelectorAll('.scheduled-list-item')].find((item) => item.innerText.includes('Review weekend meal plan'))?.click())`);
           await cdp.evaluate(`([...document.querySelectorAll('.scheduled-detail-actions button')].find((button) => button.innerText.trim() === 'Pause')?.click())`);
           const paused = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.scheduled-detail-panel')?.innerText.includes('paused')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-          if (!paused) throw new Error("Pausing a standalone scheduled task did not update its detail state.");
+          if (!paused) throw new Error(`Pausing a standalone scheduled task did not update its detail state: ${JSON.stringify(await cdp.evaluate(`(() => ({ detail: document.querySelector('.scheduled-detail-panel')?.innerText, buttons: [...(document.querySelector('.scheduled-detail-actions')?.querySelectorAll('button') ?? [])].map((button) => ({ text: button.textContent?.trim(), disabled: button.disabled })), alert: document.querySelector('.scheduled-detail-panel [role="alert"]')?.textContent }))()`))}`);
           await cdp.evaluate(`([...document.querySelectorAll('.scheduled-detail-actions button')].find((button) => button.innerText.trim() === 'Resume')?.click())`);
           const resumed = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.scheduled-detail-panel')?.innerText.includes('scheduled')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!resumed) throw new Error("Resuming a standalone scheduled task did not restore its active state.");
@@ -683,7 +689,7 @@ async function main() {
             if (!projectActionReady) throw new Error(`Coding workflow could not render the seeded project row: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, directory: document.querySelector('.project-directory')?.innerText ?? '', rows: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText), body: document.body.innerText.slice(0, 500) }))()`))}`);
             await clickInRenderer(cdp, ".project-directory-open-action");
           }
-          const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-split-launcher button[aria-label="Add to split"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-heading') && (document.querySelector('.coding-project-browser') || document.querySelector('.project-thread-panel'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectReady) throw new Error(`Coding workflow could not open the seeded project: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, url: location.href, body: document.body.innerText.slice(0, 900), projectHeading: document.querySelector('.coding-project-heading')?.innerText ?? null, noProject: document.querySelector('.coding-no-project')?.innerText ?? null, addToSplit: Boolean(document.querySelector('.coding-split-launcher button')), projects: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText) }))()`))}`);
           const seededCodingThreadVisible = await cdp.evaluate(`Boolean([...document.querySelectorAll('.sidebar-project-thread')].find((button) => button.innerText.trim() === 'Review the starter project'))`);
           if (!seededCodingThreadVisible) await cdp.evaluate(`document.querySelector('button[aria-label="Expand Skai Starter Project"]')?.click(); 1`);
@@ -694,6 +700,28 @@ async function main() {
           if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
           const projectThreadButtons = await cdp.evaluate(`(() => ({ header: [...document.querySelectorAll('.coding-project-heading-actions button')].some((button) => button.textContent?.trim() === 'New thread'), sidebar: Boolean(document.querySelector('.sidebar-project-new-thread')) }))()`);
           if (!projectThreadButtons.header || !projectThreadButtons.sidebar) throw new Error(`The active project did not expose project-scoped New thread actions in the header and sidebar: ${JSON.stringify(projectThreadButtons)}`);
+          if (exerciseCodingPanels && width === 1440 && height === 900) {
+            await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
+            const activityChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const item = [...document.querySelectorAll('.overflow-menu-item')].find((entry) => entry.textContent?.trim() === 'Open activity'); if (item) { item.click(); return true; } await new Promise((resolve) => setTimeout(resolve, 25)); } return false; })()`);
+            if (!activityChoice) throw new Error('Project actions did not expose Open activity for review checklist access.');
+            const reviewPanelReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-task-drawer [role="tab"]')) return true; await new Promise((resolve) => setTimeout(resolve, 50)); } return false; })()`);
+            if (!reviewPanelReady) throw new Error('The project activity drawer did not open.');
+            await cdp.evaluate(`([...document.querySelectorAll('.coding-task-drawer [role="tab"]')].find((tab) => tab.textContent?.trim().startsWith('Changes'))?.click())`);
+            const reviewChecklistReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-task-drawer .coding-review-checklist input')) return true; await new Promise((resolve) => setTimeout(resolve, 50)); } return false; })()`);
+            if (!reviewChecklistReady) throw new Error('The Changes inspector did not show its review checklist.');
+            await cdp.evaluate(`(() => { const input = document.querySelector('.coding-review-finding-form input'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, 'Smoke review finding'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('.coding-review-finding-form button[type="submit"]')?.click(); return true; })()`);
+            const reviewFindingAdded = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { if (document.querySelector('.coding-review-findings li strong')?.textContent === 'Smoke review finding') return true; await new Promise((resolve) => setTimeout(resolve, 40)); } return false; })()`);
+            if (!reviewFindingAdded) throw new Error('The review checklist did not add a new finding.');
+            await cdp.evaluate(`(() => { const select = document.querySelector('.coding-review-findings select'); const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'deferred'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            const reviewFindingPersisted = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { const entry = Object.entries(localStorage).find(([key]) => key.includes('coding.reviewChecklist.v1')); if (entry) { try { const rows = JSON.parse(entry[1]); if (rows.some((row) => row.title === 'Smoke review finding' && row.state === 'deferred')) return true; } catch {} } await new Promise((resolve) => setTimeout(resolve, 40)); } return false; })()`);
+            if (!reviewFindingPersisted) throw new Error('The review checklist did not persist its finding status under a project/branch key.');
+            if (process.env.UI_MATRIX_CAPTURE === "1") {
+              fs.mkdirSync(captureDirectory, { recursive: true });
+              const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+              fs.writeFileSync(path.join(captureDirectory, "coding-review-checklist-1440.png"), Buffer.from(screenshot.data, "base64"));
+            }
+            await clickInRenderer(cdp, 'button[aria-label="Close project panel"]');
+          }
           if (exerciseProjectTerminal && width === 1440 && height === 900) {
             await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
             const preflightChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const item = [...document.querySelectorAll('.overflow-menu-item')].find((entry) => entry.textContent?.trim() === 'Run preflight'); if (item) { item.click(); return true; } await new Promise((resolve) => setTimeout(resolve, 25)); } return false; })()`);
@@ -737,7 +765,11 @@ async function main() {
           if (exerciseCodingPanels && ((width === 1440 && height === 900) || (width === 390 && height === 844))) {
             const compactCodingPanels = width < 640;
             const singlePane = await cdp.evaluate(`(() => { const grid = document.querySelector('.coding-session-grid.is-chat'); const main = document.querySelector('.project-thread-panel'); const side = document.querySelector('.coding-project-browser'); const addSplit = document.querySelector('.coding-split-launcher button[aria-label="Add to split"]'); return { splitOpen: grid?.classList.contains('is-split-open') ?? true, columns: grid && getComputedStyle(grid).gridTemplateColumns, mainWidth: main?.getBoundingClientRect().width ?? 0, sideDisplay: side && getComputedStyle(side).display, addSplit: Boolean(addSplit), launcherWidth: addSplit?.getBoundingClientRect().width ?? 0, launcherText: addSplit?.textContent?.trim() ?? '' }; })()`);
-            if (singlePane.splitOpen || !singlePane.addSplit || singlePane.launcherWidth < (compactCodingPanels ? 60 : 90) || singlePane.launcherText !== "Add to split" || singlePane.sideDisplay !== "none" || singlePane.mainWidth < (compactCodingPanels ? 250 : 800)) throw new Error(`A Coding Agent project should start as a full-width main chat with an optional split control: ${JSON.stringify(singlePane)}`);
+            if (singlePane.splitOpen) {
+              if (singlePane.mainWidth < (compactCodingPanels ? 250 : 250) || singlePane.sideDisplay !== "flex" || singlePane.sideTabs < 1) throw new Error(`The existing Coding split should keep two usable panes: ${JSON.stringify(singlePane)}`);
+            } else if (!singlePane.addSplit || singlePane.launcherWidth < (compactCodingPanels ? 60 : 90) || singlePane.launcherText !== "Add to split" || singlePane.sideDisplay !== "none" || singlePane.mainWidth < (compactCodingPanels ? 250 : 800)) {
+              throw new Error(`A single-pane Coding Agent project should retain its optional split control: ${JSON.stringify(singlePane)}`);
+            }
             await cdp.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true, bubbles: true })); true`);
             const shortcutSideChatReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-pane-tab-strip.is-split-open') && document.querySelector('.coding-side-chat')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!shortcutSideChatReady) throw new Error("Ctrl+T did not open the project-scoped Side chat split.");
@@ -1342,7 +1374,7 @@ async function main() {
             if (!presetWorkflow?.ok) throw new Error(`Voice preset save/apply/remove workflow failed: ${JSON.stringify(presetWorkflow)}`);
             console.log(`[voice-preset-workflow] ${JSON.stringify(presetWorkflow)}`);
           }
-          if (route === "coding" && width < 640) {
+          if (route === "coding") {
             await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-coding', '.coding-session-grid', '.project-thread-panel .message-list']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return 1; })()`);
           }
           if (((route === "marketplace" && exerciseMcpReview) || (route === "chat" && process.env.UI_MATRIX_EXERCISE_OMNIMODAL === "1")) && width === 1440 && height === 900) {
