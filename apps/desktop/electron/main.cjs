@@ -1128,7 +1128,7 @@ const allowedMethods = new Set([
     "persona.draft", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add",
     "persona.source.remove", "settings.save", "profile.get", "profile.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start",
     "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "project.ssh.run", "chat.queue.list",
-    "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect",
+    "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "skills.remove", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect",
     "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "workspace.attachment.extractSpreadsheet", "voice.models",
     "voice.speak", "voice.credentials.save", "voice.credentials.status", "voice.credentials.remove", "voice.stop", "voice.status", "marketplace.catalog",
     "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search",

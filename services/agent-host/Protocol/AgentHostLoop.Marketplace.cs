@@ -28,10 +28,12 @@ public static partial class AgentHostLoop
         {
             id = skill.Id, name = skill.Name, description = skill.Description, category = skill.Category,
             permissions = skill.RequiredPermissions, source = "built-in", enabled = true,
+            version = "Bundled with Skai", packageSha256 = string.Empty, installedAtUtc = (DateTimeOffset?)null, updatedAtUtc = (DateTimeOffset?)null, sizeBytes = 0L,
         }).Concat(installed.Select(skill => new
         {
             id = skill.Id, name = skill.Name, description = $"Local Markdown skill by {skill.Publisher}.", category = "Installed",
             permissions = skill.RequiredPermissions, source = skill.SourceRef, enabled = skill.Enabled,
+            version = skill.Version, packageSha256 = skill.PackageSha256, installedAtUtc = skill.InstalledAtUtc, updatedAtUtc = skill.UpdatedAtUtc, sizeBytes = skill.SizeBytes,
         })).ToArray();
         return new(ProtocolVersion, request.Id, true, skills);
     }
@@ -45,6 +47,12 @@ public static partial class AgentHostLoop
         var installed = installer.ListInstalled().SingleOrDefault(skill => skill.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
         if (installed is null || !installed.Enabled) throw new InvalidOperationException("That skill is not installed or enabled.");
         return new(ProtocolVersion, request.Id, true, new { id = installed.Id, content = installer.ReadInstructions(installed.Id) });
+    }
+
+    private static AgentResponse RemoveSkill(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 80);
+        return new(ProtocolVersion, request.Id, true, new { removed = new SkillPackageInstaller().Remove(id) });
     }
 
     private static AgentResponse ListMcpConnections(AgentRequest request) =>

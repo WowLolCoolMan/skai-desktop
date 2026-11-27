@@ -72,8 +72,11 @@ public sealed class SkillPackageInstaller
         var digest = ComputePackageDigest(files);
         if (!string.IsNullOrWhiteSpace(expectedPackageSha256) && !digest.Equals(expectedPackageSha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("The downloaded skill package checksum does not match its pinned digest.");
+        var existing = ListInstalled().SingleOrDefault(item => item.Id.Equals(manifest.Id, StringComparison.Ordinal));
         manifest.SourceRef = sourceRef;
         manifest.PackageSha256 = digest;
+        manifest.InstalledAtUtc ??= existing?.InstalledAtUtc ?? DateTimeOffset.UtcNow;
+        manifest.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         var activeRoot = Path.Combine(_root, "active");
         var backupRoot = Path.Combine(_root, "backups", manifest.Id);
@@ -115,6 +118,26 @@ public sealed class SkillPackageInstaller
         manifest.Enabled = enabled;
         AtomicFileWriter.WriteText(manifestPath, JsonSerializer.Serialize(manifest, JsonOptions));
         return ToInstalled(manifest, active);
+    }
+
+    public bool Remove(string id)
+    {
+        ValidateId(id);
+        var activeRoot = Path.GetFullPath(Path.Combine(_root, "active"));
+        var active = Path.GetFullPath(Path.Combine(activeRoot, id));
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!string.Equals(Path.GetDirectoryName(active), activeRoot, comparison)) throw new InvalidDataException("The installed skill path is invalid.");
+        if (!Directory.Exists(active) || IsLink(active) || !File.Exists(Path.Combine(active, ManifestFileName)))
+            throw new InvalidOperationException("The installed skill is no longer available.");
+
+        var backupsRoot = Path.GetFullPath(Path.Combine(_root, "backups"));
+        var backupRoot = Path.GetFullPath(Path.Combine(backupsRoot, id));
+        if (!string.Equals(Path.GetDirectoryName(backupRoot), backupsRoot, comparison)) throw new InvalidDataException("The installed skill backup path is invalid.");
+        if (Directory.Exists(backupRoot) && IsLink(backupRoot)) throw new InvalidDataException("The installed skill backup path is linked.");
+
+        Directory.Delete(active, recursive: true);
+        if (Directory.Exists(backupRoot)) Directory.Delete(backupRoot, recursive: true);
+        return true;
     }
 
     public InstalledSkill Rollback(string id)
@@ -208,7 +231,7 @@ public sealed class SkillPackageInstaller
     private static string DecodeUtf8(byte[] content) => new UTF8Encoding(false, true).GetString(content);
 
     private static InstalledSkill ToInstalled(SkillPackageManifest manifest, string path) =>
-        new(manifest.Id, manifest.Name, manifest.Version, manifest.Publisher, manifest.SourceRef, manifest.PackageSha256, path, manifest.RequiredPermissions.ToArray(), manifest.Enabled);
+        new(manifest.Id, manifest.Name, manifest.Version, manifest.Publisher, manifest.SourceRef, manifest.PackageSha256, path, manifest.RequiredPermissions.ToArray(), manifest.Enabled, manifest.InstalledAtUtc, manifest.UpdatedAtUtc, Directory.EnumerateFiles(path, "*.md", SearchOption.AllDirectories).Select(file => new FileInfo(file).Length).Sum());
 
     private static bool IsLink(string path)
     {

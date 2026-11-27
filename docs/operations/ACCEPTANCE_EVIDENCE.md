@@ -73,6 +73,53 @@ platform or theme that was not recorded.
 | Disk full / storage exhaustion | [`Atomic file writer fault-injection test`](../../native/SkaiDesktop.Core.Tests/AtomicFileWriterTests.cs), [`Agent Host smoke`](../../scripts/smoke-agent-host.cjs) | A deterministic injected ENOSPC write failure verifies that the last complete file is preserved and the partial temp file is cleaned up. It does not fill a real disk or verify the packaged UI recovery message; disk-growth quota remains unenforced. |
 | Privacy / explicit network boundary | [`Local-only audit`](../../package.json), [`Marketplace host smoke`](../../package.json) | Release audit rejects unapproved hosted inference and host smoke rejects hosted MCP/model removal paths. Provider-specific outbound request inspection remains scoped to the relevant integration smoke. |
 
+### Slice 33 — safer Marketplace and installed inventory
+
+- Outcome: one category-filtered installed inventory feeds a shared inspector
+  with source, version, update date, disk use, compatibility, known dependents,
+  and removal impact; supported local removals are confirmed and guard active
+  model, voice, and image-workflow dependencies.
+- Reference / workflow: compare the [previous installed inventory](../design-review/workflow-collection/revision-4/evidence-marketplace-installed-voices-1440.png)
+  with the [updated inventory and inspector](../design-review/workflow-collection/revision-4/evidence-marketplace-installed-inventory-1440.png).
+- Success check: `npm test`; `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run package:electron`; `npm run smoke:marketplace-host`; focused packaged
+  UI matrix with `UI_MATRIX_ROUTE=marketplace`, `UI_MATRIX_VIEWPORT=1440x900`,
+  `UI_MATRIX_QUICK=1`, `UI_MATRIX_CAPTURE=1`, and
+  `UI_MATRIX_EXERCISE_INSTALLED_VOICE=1`. Skill installer tests verify
+  provenance, digest, install/update timestamps, size, and removal of only the
+  selected package and its rollback copies. The packaged route verifies category
+  filtering, the common inspector metadata, voice availability, and sticky
+  action reachability.
+- Failure check: the UI matrix rejects missing inspector details or unreachable
+  actions; installer tests reject missing packages and unsafe package content;
+  removal handlers refuse selected chat/subagent models, assigned Qwen voices,
+  and LoRAs referenced by saved or active image workflows.
+- Disposable profile / cleanup: packaged UI matrix uses a throwaway Electron
+  profile; marketplace host smoke uses isolated loopback fixtures; native skill
+  tests use temporary source and install directories. No user-installed model,
+  voice, skill, or project data is changed.
+- Platform / OS: Windows x64; packaged UI smoke reports Windows build 26200.
+- Viewport / theme / sidebar: 1440×900, dark theme, expanded sidebar; screenshot
+  sidecar records the test context and marks its source revision as dirty because
+  it captures this slice before commit.
+- Runtime / app revision: packaged Electron; frontend production build and
+  Windows Electron packaging completed successfully.
+- Network and privacy boundary: Marketplace host smoke uses a local fixture;
+  packaged UI uses the local Agent Host. No hosted inference or remote model
+  download was performed by the acceptance run.
+- Before screenshot: earlier installed-voice inspector showing Source,
+  Requirements, and Next step only.
+- After screenshot: shared installed-item inspector with provenance, size,
+  compatibility, dependency, removal-impact, and workflow guidance fields.
+- Comparison: the voice list/detail split and category controls remain in place;
+  the inspector now carries the same operational context for every inventory
+  category. The primary action row remains reachable while the inspector scrolls.
+  List rows avoid repeating version and size already available in the inspector.
+- Unverified platforms, integrations, or hardware: native Linux/macOS UI; live
+  deletion/update against the user's installed runtimes; install/update/remove
+  recovery for every Marketplace category; third-party item dependency metadata
+  not reported by its owning runtime.
+
 Known gaps in this table are intentionally explicit release limitations. A
 future slice may close them with bounded deterministic fixtures; do not simulate
 an OS-level disk-full condition by filling a developer or CI volume.

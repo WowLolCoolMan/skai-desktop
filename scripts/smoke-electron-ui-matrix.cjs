@@ -320,7 +320,9 @@ const originalWriteFileSync = fs.writeFileSync.bind(fs);
 fs.writeFileSync = (target, data, options) => {
   originalWriteFileSync(target, data, options);
   if (!uiEvidenceContext || typeof target !== "string" || !target.toLowerCase().endsWith(".png")) return;
-  const revision = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: path.join(__dirname, ".."), encoding: "utf8", windowsHide: true }).stdout?.trim();
+  const repoRoot = path.join(__dirname, "..");
+  const revision = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: repoRoot, encoding: "utf8", windowsHide: true }).stdout?.trim();
+  const worktreeDirty = spawnSync("git", ["status", "--porcelain"], { cwd: repoRoot, encoding: "utf8", windowsHide: true }).stdout?.trim().length > 0;
   const evidence = {
     schema: "skai-ui-evidence/v1",
     file: path.basename(target),
@@ -332,7 +334,7 @@ fs.writeFileSync = (target, data, options) => {
     sidebar: uiEvidenceContext.sidebar,
     runtime: "packaged-electron",
     route: uiEvidenceContext.route,
-    appRevision: revision || process.env.GITHUB_SHA || "unknown",
+    appRevision: `${revision || process.env.GITHUB_SHA || "unknown"}${worktreeDirty ? "-dirty" : ""}`,
     capturedAt: new Date().toISOString(),
   };
   originalWriteFileSync(`${target}.evidence.json`, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
@@ -721,14 +723,17 @@ async function main() {
             const name = /Piper/i.test(voiceRows) ? "Piper" : "Kokoro";
             await cdp.evaluateWith(function (value) { const row = [...document.querySelectorAll('.marketplace-installed-model')].find((item) => item.querySelector('strong')?.textContent?.includes(value)); row?.click(); return Boolean(row); }, name);
             const inspector = await cdp.evaluate(`document.querySelector('.marketplace-installed-inspector')?.innerText ?? ''`);
-            const layout = await cdp.evaluate(`(() => { const list = document.querySelector('.marketplace-installed-pane')?.getBoundingClientRect(); const detail = document.querySelector('.marketplace-installed-inspector')?.getBoundingClientRect(); const preview = document.querySelector('.marketplace-installed-inspector button[aria-label^="Preview "]'); const availability = document.querySelector('.marketplace-installed-voice-status')?.innerText ?? ''; return list && detail ? { list: { left: list.left, right: list.right, width: list.width }, detail: { left: detail.left, right: detail.right, width: detail.width }, previewEnabled: Boolean(preview && !preview.disabled), availability } : null; })()`);
-            if (!inspector.toLowerCase().includes(name.toLowerCase()) || !inspector.toLowerCase().includes("next step")) throw new Error(`Installed voice ${name} did not show its local details: ${JSON.stringify(inspector)}`);
-            if (!layout || layout.list.left >= layout.detail.left || layout.list.width <= layout.detail.width || !layout.previewEnabled || !layout.availability.includes('Local runtime') || !layout.availability.includes('Local playback')) throw new Error(`Installed voice list/detail workflow did not match the expected list-left, detail-right layout or provide an enabled preview: ${JSON.stringify(layout)}`);
+            const layout = await cdp.evaluate(`(() => { const list = document.querySelector('.marketplace-installed-pane')?.getBoundingClientRect(); const inspector = document.querySelector('.marketplace-installed-inspector'); const detail = inspector?.getBoundingClientRect(); const preview = inspector?.querySelector('button[aria-label^="Preview "]'); const actions = inspector?.querySelector(':scope > .marketplace-model-actions'); const actionRect = actions?.getBoundingClientRect(); const availability = document.querySelector('.marketplace-installed-voice-status')?.innerText ?? ''; return list && detail ? { list: { left: list.left, right: list.right, width: list.width }, detail: { left: detail.left, right: detail.right, width: detail.width }, previewEnabled: Boolean(preview && !preview.disabled), actionPosition: actions ? getComputedStyle(actions).position : null, actionsVisible: Boolean(actionRect && actionRect.bottom <= window.innerHeight && actionRect.top >= detail.top), availability } : null; })()`);
+            const inspectorText = inspector.toLowerCase();
+            const expectedDetails = ["source", "version", "last updated", "disk use", "compatibility", "dependent workflows", "removal impact", "next step"];
+            const missingDetails = expectedDetails.filter((label) => !inspectorText.includes(label));
+            if (!inspectorText.includes(name.toLowerCase()) || missingDetails.length) throw new Error(`Installed voice ${name} did not show the shared inventory details ${missingDetails.join(", ")}: ${JSON.stringify(inspector)}`);
+            if (!layout || layout.list.left >= layout.detail.left || layout.list.width <= layout.detail.width || !layout.previewEnabled || !layout.actionsVisible || !layout.availability.includes('Local runtime') || !layout.availability.includes('Local playback')) throw new Error(`Installed voice list/detail workflow did not match the expected list-left, detail-right layout or provide enabled, reachable actions: ${JSON.stringify(layout)}`);
           }
           if (process.env.UI_MATRIX_CAPTURE === "1") {
             fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
             const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
-            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-marketplace-installed-voices-1440.png"), Buffer.from(screenshot.data, "base64"));
+            fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-marketplace-installed-inventory-1440.png"), Buffer.from(screenshot.data, "base64"));
           }
           console.log(`[marketplace-installed-voice] ${JSON.stringify({ voiceRows: voiceRows.trim() || (inventoryStatus.status.includes('Refreshing') ? "Not loaded yet" : "No installed voice profiles returned by the local host"), inventoryStatus })}`);
         }

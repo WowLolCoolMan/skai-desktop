@@ -15,6 +15,8 @@ internal static class SkillPackageInstallerTests
         TestSupport.Check(!preview.IsUpdate && preview.PackageSha256.Length == 64 && preview.RequiredPermissions.Contains("project.read"), "skill preview reports digest and permissions before install");
         var installed = installer.Install(source, "https://github.com/example/review-skill@abc123", expectedPackageSha256: null);
         TestSupport.Check(installed.SourceRef.Contains("@abc123", StringComparison.Ordinal), "skill installation records pinned provenance");
+        var installedAtUtc = installed.InstalledAtUtc;
+        TestSupport.Check(installedAtUtc.HasValue && installed.UpdatedAtUtc.HasValue && installed.SizeBytes > 0, "skill inventory exposes install/update dates and local package size");
         TestSupport.Check(!installed.Enabled, "new skill packages require explicit enablement");
         installed = installer.SetEnabled(installed.Id, true);
         TestSupport.Check(installed.Enabled, "skill enablement is explicit and durable");
@@ -24,6 +26,7 @@ internal static class SkillPackageInstallerTests
         TestSupport.Check(preview.IsUpdate && preview.ExistingVersion == "1.0.0", "skill preview identifies an update before activation");
         installer.Install(source, "https://github.com/example/review-skill@def456");
         TestSupport.Check(installer.ListInstalled().Single().Version == "1.0.0", "skill update atomically activates the replacement");
+        TestSupport.Check(installer.ListInstalled().Single().InstalledAtUtc == installedAtUtc, "skill update preserves its original installation date");
         var rolledBack = installer.Rollback("review-skill");
         TestSupport.Check(rolledBack.SourceRef.Contains("@abc123", StringComparison.Ordinal) && rolledBack.Enabled, "skill rollback restores the previous pinned package and grant");
         File.WriteAllText(Path.Combine(source, "run.ps1"), "Write-Output unsafe");
@@ -31,5 +34,8 @@ internal static class SkillPackageInstallerTests
         catch (InvalidDataException) { TestSupport.Check(true, "skill installer rejects executable package content"); }
         try { installer.Install(source, "https://github.com/example/review-skill@main"); throw new Exception("Expected floating skill ref to be rejected."); }
         catch (ArgumentException) { TestSupport.Check(true, "skill installer rejects floating GitHub refs"); }
+        TestSupport.Check(installer.Remove("review-skill") && installer.ListInstalled().Count == 0, "skill removal deletes the active package and rollback copies");
+        try { installer.Remove("review-skill"); throw new Exception("Expected removal of a missing skill to be rejected."); }
+        catch (InvalidOperationException) { TestSupport.Check(true, "skill removal reports missing packages without touching other items"); }
     }
 }

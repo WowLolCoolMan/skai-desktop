@@ -2461,7 +2461,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .marketplace-installed-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr); gap: 14px; align-items: stretch; min-width: 0; }
 .marketplace-installed-layout > * { min-width: 0; }
 .marketplace-installed-layout .marketplace-installed-pane { min-height: 0; }
-.marketplace-installed-inspector { position: sticky; top: 12px; align-self: start; max-height: calc(100vh - 190px); overflow: auto; }
+.marketplace-installed-inspector { position: sticky; top: 12px; align-self: start; display: flex; height: min(700px, calc(100vh - 300px)); flex-direction: column; overflow: hidden; }
+.marketplace-installed-inspector-content { min-height: 0; flex: 1 1 auto; overflow: auto; }
+.marketplace-installed-inspector > .marketplace-model-actions { flex: 0 0 auto; padding: 10px 0 0; border-top: 1px solid var(--skai-color-border); background: var(--skai-color-surface-raised); }
 .marketplace-installed-model { cursor: pointer; }
 .marketplace-installed-model.is-selected { border-color: color-mix(in srgb, var(--skai-color-accent) 58%, var(--skai-color-border)); background: color-mix(in srgb, var(--skai-color-accent) 7%, var(--skai-color-surface-raised)); }
 .marketplace-installed-model:focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: 2px; }
@@ -2478,7 +2480,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 }
 @media (max-width: 900px) {
   .marketplace-installed-layout { grid-template-columns: minmax(0, 1fr); }
-  .marketplace-installed-inspector { position: static; max-height: none; }
+  .marketplace-installed-inspector { position: static; height: auto; max-height: none; }
 }
 @media (max-width: 760px) { .app-shell { height: 100vh; min-height: 100vh; overflow: hidden; }.app-main { height: auto; min-height: 0; } }
 @media (max-width: 640px) { .app-shell { grid-template-columns: 52px minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr); }.app-shell > .global-rail { grid-column: 1; grid-row: 2; }.app-shell > .app-sidebar { display: none; }.app-shell > .app-main, .app-shell.thread-sidebar-hidden > .app-main { grid-column: 2; grid-row: 2; } }

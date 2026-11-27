@@ -13,8 +13,8 @@ export type MarketplaceSection = Section;
 type Section = "Discover" | "Models" | "Image models" | "Voices" | "Image workflows" | "Skills" | "Tools" | "Installed" | "Updates";
 type Filter = "All" | "Local models" | "Voices" | "Image workflows" | "Skills" | "Tools";
 type CatalogItem = { id: string; title: string; filter: Filter; description: string; detail: string; icon: NavIconName; status: string; tone: "neutral" | "success" | "warning"; publisher: string; version: string; compatibility: string; nextStep: string; installable: boolean };
-type InstalledRecord = { id: string; name: string; detail: string; state: string; icon: NavIconName; source: string; requirements: string; nextStep: string; update?: () => void; remove?: () => void; health?: () => void };
-type MarketplaceCatalog = { providers: Array<{ id: string; name: string; kinds: string[]; remote: boolean }>; voiceProviders?: Array<{ id: string; name: string; kind: string; requiresUserKey: boolean; status: string }>; voices: Array<{ id: string; name: string; description: string; runtime: string; license: string; size: string; installed: boolean; lowResource: boolean; sourceUrl: string; adapterAvailable: boolean; supportsStreaming: boolean; supportsVoiceCloning: boolean; supportsEmotion: boolean; supportsAudioEffects: boolean; availabilityNote: string; installable: boolean }>; skills: Array<{ id: string; name: string; description: string; category: string; permissions: string[]; source: string; installed: boolean; enabled: boolean; installable: boolean }>; tools: Array<{ id: string; name: string; description: string; category: string; access: string; builtIn: boolean; status: string; source?: string | null; installable: boolean }> };
+type InstalledRecord = { id: string; category: string; name: string; detail: string; state: string; icon: NavIconName; source: string; version: string; lastUpdated: string; diskUse: string; compatibility: string; dependents: string[]; removalImpact: string; integrity?: string; removeBlockedReason?: string; nextStep: string; update?: () => void; remove?: () => void; health?: () => void };
+type MarketplaceCatalog = { providers: Array<{ id: string; name: string; kinds: string[]; remote: boolean }>; voiceProviders?: Array<{ id: string; name: string; kind: string; requiresUserKey: boolean; status: string }>; voices: Array<{ id: string; name: string; description: string; runtime: string; license: string; size: string; installed: boolean; lowResource: boolean; sourceUrl: string; adapterAvailable: boolean; supportsStreaming: boolean; supportsVoiceCloning: boolean; supportsEmotion: boolean; supportsAudioEffects: boolean; availabilityNote: string; installable: boolean }>; skills: Array<{ id: string; name: string; description: string; category: string; permissions: string[]; source: string; version?: string; packageSha256?: string; installedAtUtc?: string | null; updatedAtUtc?: string | null; sizeBytes?: number; installed: boolean; enabled: boolean; installable: boolean }>; tools: Array<{ id: string; name: string; description: string; category: string; access: string; builtIn: boolean; status: string; source?: string | null; installable: boolean }> };
 
 const items: CatalogItem[] = [
   { id: "local-models", title: "Local models", filter: "Local models", description: "Search Hugging Face and ModelScope for local GGUF models.", detail: "Remote catalog discovery is separated from inference. Every result shows its provider, provenance, safety label, size when available, and the verified local install route.", icon: "model", status: "ready", tone: "success", publisher: "Hugging Face · ModelScope", version: "Catalog search", compatibility: "Local runtime required", nextStep: "Search, filter, inspect the source, then start a verified local download.", installable: false },
@@ -205,6 +205,14 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     setImageAssetStatus(`${file} installed locally. Restart image generation to load it.`);
   };
   const removeImageAsset = async (id: string) => {
+    const workflowDependents = savedImageWorkflows.filter((workflow) => workflow.workflow.includes(id)).map((workflow) => workflow.name);
+    const activeWorkflowUsesAsset = activeImageWorkflow.includes(id);
+    if (workflowDependents.length || activeWorkflowUsesAsset) {
+      const names = [...workflowDependents, ...(activeWorkflowUsesAsset && !workflowDependents.includes("Active image workflow") ? ["Active image workflow"] : [])];
+      setImageAssetStatus(`Cannot remove ${id}: it is referenced by ${names.join(", ")}. Update those workflows first.`);
+      return;
+    }
+    if (!window.confirm(`Remove ${id} from Skai's local image asset folder? This deletes the downloaded LoRA file. Saved workflows, generated images, and source repository files are retained.`)) return;
     const response = await request("marketplace.image-assets.remove", { id });
     if (!response.ok) { setImageAssetStatus(response.error?.message ?? "LoRA removal failed."); return; }
     setInstalledImageAssets((current) => current.filter((asset) => asset.id !== id));
@@ -217,6 +225,8 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
     if (result.connection) setInstalledConnections((current) => current.map((item) => item.connectionId === connectionId ? result.connection! : item));
   };
   const removeMcpConnection = async (connectionId: string) => {
+    const connection = installedConnections.find((item) => item.connectionId === connectionId);
+    if (!window.confirm(`Revoke the local ${connection?.serverId ?? "MCP"} connection? This stops its local server and removes Skai's connection and approval state. The downloaded package, server-side data, credentials held by the server, chats, and projects are retained.`)) return;
     const response = await request("mcp.connection.revoke", { connectionId });
     if (!response.ok) { setInstalledInventoryError(response.error?.message ?? "MCP server could not be removed."); return; }
     setInstalledConnections((current) => current.filter((item) => item.connectionId !== connectionId));
@@ -236,7 +246,12 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
         if (!status.ok) throw new Error(status.error?.message ?? "The model update status could not be read.");
         const result = status.result as { status: string; progress?: string[]; error?: string };
         setInstalledActionStatus(result.progress?.at(-1) ?? `Model update · ${result.status}`);
-        if (result.status === "completed") { setInstalledActionStatus(`${model} is up to date.`); await loadInstalledModels(); return; }
+        if (result.status === "completed") {
+          const changeSummary = result.progress?.slice(-3).join(" · ");
+          setInstalledActionStatus(changeSummary ? `Update finished for ${model}. Runtime summary: ${changeSummary}` : `Update finished for ${model}. The local runtime does not report a file-level change summary.`);
+          await loadInstalledModels();
+          return;
+        }
         if (result.status === "failed" || result.status === "cancelled") throw new Error(result.error ?? `Model update ${result.status}.`);
       }
       throw new Error("The model update timed out; its local operation may still be running.");
@@ -245,6 +260,12 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
   };
   const removeOllamaModel = async (model: string, endpoint?: string | null) => {
     if (!endpoint || installedActionBusy) return;
+    const activeModel = localStorage.getItem("skai.model") ?? "";
+    const activeSubagentModel = localStorage.getItem("skai.subagentModel") ?? "";
+    if (activeModel === model || activeSubagentModel === model) {
+      setInstalledActionStatus(`${model} is selected for chat or subagent work. Select another model in Settings before removing it.`);
+      return;
+    }
     if (!window.confirm(`Remove ${model} from the local Ollama library? This deletes the model files from Ollama.`)) return;
     setInstalledActionBusy(true);
     setInstalledActionStatus(`Removing ${model} from Ollama…`);
@@ -258,16 +279,101 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
       setInstalledActionStatus(error instanceof Error ? error.message : "The model could not be removed.");
     } finally { setInstalledActionBusy(false); }
   };
+  const removeInstalledSkill = async (id: string) => {
+    const skill = catalog?.skills.find((item) => item.id === id);
+    if (!skill || installedActionBusy) return;
+    if (!window.confirm(`Remove ${skill.name}? This deletes its installed Markdown instructions and rollback copies. Built-in skills, chats, settings, and unrelated files are retained.`)) return;
+    setInstalledActionBusy(true); setInstalledActionStatus(`Removing ${skill.name}…`);
+    try {
+      const response = await request("skills.remove", { id });
+      if (!response.ok) throw new Error(response.error?.message ?? "The skill could not be removed.");
+      const refreshed = await request("marketplace.catalog");
+      if (refreshed.ok) setCatalog(refreshed.result as MarketplaceCatalog);
+      setSelectedInstalledId(null);
+      setInstalledActionStatus(`${skill.name} and its local rollback copies were removed. Built-in skills and workspace data were retained.`);
+    } catch (error) {
+      setInstalledActionStatus(error instanceof Error ? error.message : "The skill could not be removed.");
+    } finally { setInstalledActionBusy(false); }
+  };
+  const removeQwenVoice = async () => {
+    if (installedActionBusy) return;
+    const current = selectedVoiceSettings();
+    if (current.primaryModelId === "qwen3-tts" || current.lowResourceModelId === "qwen3-tts") {
+      setInstalledActionStatus("Qwen3-TTS is assigned to a voice setting. Choose another installed voice in Settings before removing it.");
+      return;
+    }
+    if (!window.confirm("Remove Qwen3-TTS's local runtime and model files? Your voice presets and unrelated voice runtimes will be retained.")) return;
+    setInstalledActionBusy(true); setInstalledActionStatus("Removing Qwen3-TTS local files…");
+    try {
+      const response = await request("voice.qwen3.remove");
+      const result = response.result as { removed?: boolean; error?: string } | undefined;
+      if (!response.ok || !result?.removed) throw new Error(result?.error ?? response.error?.message ?? "Qwen3-TTS could not be removed.");
+      await refreshInstalledVoiceModels();
+      const refreshed = await request("marketplace.catalog");
+      if (refreshed.ok) setCatalog(refreshed.result as MarketplaceCatalog);
+      setInstalledActionStatus("Qwen3-TTS runtime and model files were removed. Voice presets and other runtimes were retained.");
+    } catch (error) { setInstalledActionStatus(error instanceof Error ? error.message : "Qwen3-TTS could not be removed."); }
+    finally { setInstalledActionBusy(false); }
+  };
+  const activeChatModel = localStorage.getItem("skai.model") ?? "";
+  const activeSubagentModel = localStorage.getItem("skai.subagentModel") ?? "";
   const installedRecords: InstalledRecord[] = [
-    ...installedModels.map((item) => ({ id: `model:${item.provider}:${item.model}`, name: item.model, detail: `${item.provider ?? "Local runtime"} · ${item.capabilities.join(" · ") || "Text generation"}`, state: "installed", icon: "model" as NavIconName, source: item.provider ?? "Configured local runtime", requirements: item.capabilities.join(" · ") || "Text generation", nextStep: item.provider === "Ollama" ? "Update or remove this model through its local Ollama runtime." : "This model is managed by its local provider; Skai cannot update or remove it here.", update: item.provider === "Ollama" ? () => void updateOllamaModel(item.model, item.endpoint) : undefined, remove: item.provider === "Ollama" ? () => void removeOllamaModel(item.model, item.endpoint) : undefined })),
-    ...installedConnections.map((item) => ({ id: `mcp:${item.connectionId}`, name: item.serverId, detail: `${item.transport} · ${item.connectionId}`, state: item.state === "healthy" ? "installed" : "limited", icon: "terminal" as NavIconName, source: item.connectionId, requirements: item.transport, nextStep: item.state === "healthy" ? "Connection responds to the host health check." : "Check health or remove this MCP connection.", health: () => void checkMcpHealth(item.connectionId), remove: () => void removeMcpConnection(item.connectionId) })),
-    ...(catalog?.tools ?? []).filter((item) => item.builtIn).map((item) => ({ id: `tool:${item.id}`, name: item.name, detail: item.description, state: "installed", icon: "terminal" as NavIconName, source: "Skai", requirements: item.access, nextStep: "Open the related local workflow to use this capability." })),
-    ...(catalog?.skills ?? []).filter((item) => item.installed).map((item) => ({ id: `skill:${item.id}`, name: item.name, detail: `${item.source} · ${item.enabled ? "Enabled" : "Disabled"}`, state: "installed", icon: "sparkle" as NavIconName, source: item.source, requirements: item.permissions.join(" · ") || "No extra permissions", nextStep: item.enabled ? "This skill is available to the local agent." : "Enable the skill in its local settings before use." })),
-    ...(catalog?.voices ?? []).filter((item) => item.installed).map((item) => ({ id: `voice:${item.id}`, name: item.name, detail: `${item.runtime} · ${item.size}`, state: "installed", icon: "activity" as NavIconName, source: item.sourceUrl || item.runtime, requirements: item.license, nextStep: "Select this voice in the voice controls and preview it." })),
-    ...installedPersonas.map((item) => ({ id: `persona:${item.id}`, name: item.name, detail: `${item.sourceMode === "public-research" ? "Public research" : "Own material"} · ${item.roles}`, state: "installed", icon: "sparkle" as NavIconName, source: item.sourceMode, requirements: item.roles, nextStep: "Available in the local persona workspace." })),
-    ...installedImageAssets.map((item) => ({ id: `asset:${item.id}`, name: item.id, detail: `${item.repository} · ${formatSize(item.sizeBytes)}`, state: "installed", icon: "image" as NavIconName, source: item.repository, requirements: formatSize(item.sizeBytes), nextStep: "Remove this local image asset or restart image generation to use it.", remove: () => void removeImageAsset(item.id) })),
+    ...installedModels.map((item) => {
+      const dependents = [
+        ...(activeChatModel === item.model ? ["Current chat model selection"] : []),
+        ...(activeSubagentModel === item.model ? ["Subagent model selection"] : []),
+      ];
+      return { id: `model:${item.provider}:${item.model}`, category: "Models", name: item.model, detail: `${item.provider ?? "Local runtime"} · ${item.capabilities.join(" · ") || "Text generation"}`, state: "installed", icon: "model" as NavIconName,
+        source: item.provider ?? "Configured local runtime", version: item.model.includes(":") ? item.model.slice(item.model.lastIndexOf(":") + 1) : "Provider-managed version", lastUpdated: "Not reported by the local runtime",
+        diskUse: "Stored size is not reported by the local API", compatibility: `${item.vision.toLowerCase() === "supported" ? "Vision" : "Text"} · context length not reported`,
+        dependents, removalImpact: "Removing deletes the local runtime's model files. Skai chats, settings, and downloaded source files remain.",
+        removeBlockedReason: dependents.length ? "Selected by an active chat or subagent setting; choose another model in Settings first." : undefined,
+        nextStep: item.provider === "Ollama" ? "Update or remove this model through its local Ollama runtime." : "This model is managed by its local provider; Skai cannot update or remove it here.",
+        update: item.provider === "Ollama" ? () => void updateOllamaModel(item.model, item.endpoint) : undefined,
+        remove: item.provider === "Ollama" ? () => void removeOllamaModel(item.model, item.endpoint) : undefined };
+    }),
+    ...installedConnections.map((item) => ({ id: `mcp:${item.connectionId}`, category: "MCP servers", name: item.serverId, detail: `${item.transport} · ${item.connectionId}`, state: item.state === "healthy" ? "installed" : "limited", icon: "terminal" as NavIconName,
+      source: item.serverId, version: "Runtime-managed connection", lastUpdated: "Connection date not recorded", diskUse: "Package storage is runtime-managed",
+      compatibility: item.transport === "stdio" ? "Local reviewed process" : "Loopback HTTP transport", dependents: item.state === "healthy" ? ["Tools exposed to the local agent"] : [],
+      removalImpact: "Revoking stops the local server and removes Skai's connection and approval state; it does not delete the package or remote server data.",
+      nextStep: item.state === "healthy" ? "Connection responds to the host health check." : "Check health or remove this MCP connection.", health: () => void checkMcpHealth(item.connectionId), remove: () => void removeMcpConnection(item.connectionId) })),
+    ...(catalog?.tools ?? []).filter((item) => item.builtIn).map((item) => ({ id: `tool:${item.id}`, category: "Skai built-ins", name: item.name, detail: item.description, state: "installed", icon: "terminal" as NavIconName,
+      source: item.source || "Skai Desktop", version: "Bundled with Skai", lastUpdated: "Updated with Skai Desktop", diskUse: "Included in the application", compatibility: item.access, dependents: ["Available to local agent workflows"], removalImpact: "Built-in capability. It is retained when optional Marketplace items are removed.", nextStep: "Open the related local workflow to use this capability." })),
+    ...(catalog?.skills ?? []).filter((item) => item.installed && item.source !== "built-in" && item.source !== "Skai built-in").map((item) => ({ id: `skill:${item.id}`, category: "Skills", name: item.name, detail: `${item.source} · ${item.enabled ? "Enabled" : "Disabled"}`, state: "installed", icon: "sparkle" as NavIconName,
+      source: item.source, version: item.version ?? "Version not reported", lastUpdated: item.updatedAtUtc ? new Date(item.updatedAtUtc).toLocaleString() : "Update date not recorded", diskUse: item.sizeBytes ? formatSize(item.sizeBytes) : "Size not reported", integrity: item.packageSha256 ? `SHA-256 ${item.packageSha256}` : undefined,
+      compatibility: item.permissions.join(" · ") || "No extra permissions", dependents: item.enabled ? ["Available to the local agent when a task requests it"] : [],
+      removalImpact: "Removes this local Markdown package and its rollback copies. Built-in skills and workspace data remain.", nextStep: item.enabled ? "This skill is available to the local agent." : "This skill is disabled and is not added to agent context.", remove: () => void removeInstalledSkill(item.id) })),
+    ...(catalog?.voices ?? []).filter((item) => item.installed).map((item) => {
+      const settings = selectedVoiceSettings();
+      const dependents = [
+        ...(settings.primaryModelId === item.id ? ["Primary voice setting"] : []),
+        ...(settings.lowResourceModelId === item.id ? ["Low-resource voice setting"] : []),
+      ];
+      const removable = item.id === "qwen3-tts";
+      return { id: `voice:${item.id}`, category: "Voice profiles", name: item.name, detail: `${item.runtime} · ${item.size}`, state: "installed", icon: "activity" as NavIconName,
+        source: item.sourceUrl || item.runtime, version: item.runtime, lastUpdated: "Pinned runtime metadata; install date not recorded", diskUse: item.size,
+        compatibility: `${item.license} · ${item.availabilityNote}`, dependents, removalImpact: "Removes the supported local runtime and model files. Saved voice presets are retained.",
+        removeBlockedReason: dependents.length ? "This runtime is assigned in Voice settings. Choose another installed voice first." : undefined,
+        nextStep: "Select this voice in the voice controls and preview it.", remove: removable ? () => void removeQwenVoice() : undefined };
+    }),
+    ...installedPersonas.map((item) => ({ id: `persona:${item.id}`, category: "Personas", name: item.name, detail: `${item.sourceMode === "public-research" ? "Public research" : "Own material"} · ${item.roles}`, state: "installed", icon: "sparkle" as NavIconName,
+      source: item.sourceMode, version: "Local profile", lastUpdated: "Profile date not reported", diskUse: "Size not reported", compatibility: item.roles,
+      dependents: ["Persona workspace"], removalImpact: "Manage the persona and supplied material in Persona Workshop; no Marketplace removal is exposed.", nextStep: "Available in the local persona workspace." })),
+    ...installedImageAssets.map((item) => {
+      const dependents = savedImageWorkflows.filter((workflow) => workflow.workflow.includes(item.id)).map((workflow) => workflow.name);
+      if (activeImageWorkflow.includes(item.id) && !dependents.includes("Active image workflow")) dependents.push("Active image workflow");
+      return { id: `asset:${item.id}`, category: "Image assets", name: item.id, detail: `${item.repository} · ${formatSize(item.sizeBytes)}`, state: "installed", icon: "image" as NavIconName,
+        source: item.repository, version: "Repository file; revision not recorded", lastUpdated: "Update date not reported", diskUse: formatSize(item.sizeBytes), compatibility: "Diffusers image runtime",
+        dependents, removalImpact: "Deletes the downloaded local LoRA file. Saved workflows, generated images, and source repository files remain.",
+        removeBlockedReason: dependents.length ? `Referenced by ${dependents.join(", ")}; update those workflows first.` : undefined,
+        nextStep: "Remove this local image asset or restart image generation to use it.", remove: () => void removeImageAsset(item.id) };
+    }),
   ];
   const selectedInstalled = installedRecords.find((item) => item.id === selectedInstalledId) ?? installedRecords[0] ?? null;
+  const selectInstalledItem = (id: string) => {
+    if (id !== selectedInstalledId) setInstalledActionStatus(null);
+    setSelectedInstalledId(id);
+  };
   const selectedInstalledVoiceId = selectedInstalled?.id.startsWith("voice:") ? selectedInstalled.id.slice("voice:".length) : null;
   const selectedInstalledVoice = selectedInstalledVoiceId ? installedVoiceModels.find((voice) => voice.id === selectedInstalledVoiceId) ?? null : null;
   const previewInstalledVoice = async () => {
@@ -425,31 +531,28 @@ export function MarketplacePage({ onSelectAirLlmModel, onNavigate, onImageChange
             {installedLoading ? <EmptyState title="Checking installed items" description="Reading models and local marketplace inventory from this computer…" /> : (() => {
               const term = query.trim().toLowerCase();
               const matches = (...values: Array<string | undefined>) => values.join(" ").toLowerCase().includes(term);
-              const group = (title: string, rows: Array<{ id: string; name: string; detail: string; state: string; icon: NavIconName; remove?: () => void; health?: () => void }>) => {
+              const group = (title: string, rows: InstalledRecord[]) => {
                 if (installedCategory !== "All" && installedCategory !== title) return null;
-                const filtered = rows.filter((row) => matches(row.name, row.detail, row.state));
+                const filtered = rows.filter((row) => matches(row.name, row.detail, row.state, row.source, row.version, row.compatibility, ...row.dependents));
                 if (!filtered.length) return null;
-                return <section className="marketplace-installed-group" key={title}><h4>{title} <span>{filtered.length}</span></h4>{filtered.map((row) => <article className={`marketplace-installed-model${selectedInstalled?.id === row.id ? " is-selected" : ""}`} key={row.id} role="button" tabIndex={0} aria-pressed={selectedInstalled?.id === row.id} onClick={() => setSelectedInstalledId(row.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedInstalledId(row.id); } }}><span className="marketplace-installed-model-icon"><NavIcon name={row.icon} /></span><div className="marketplace-installed-model-copy"><strong>{row.name}</strong><small>{row.detail}</small></div><StatusBadge tone={row.state === "limited" ? "warning" : "success"}>{row.state}</StatusBadge></article>)}</section>;
+                return <section className="marketplace-installed-group" key={title}><h4>{title} <span>{filtered.length}</span></h4>{filtered.map((row) => <article className={`marketplace-installed-model${selectedInstalled?.id === row.id ? " is-selected" : ""}`} key={row.id} role="button" tabIndex={0} aria-pressed={selectedInstalled?.id === row.id} onClick={() => selectInstalledItem(row.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectInstalledItem(row.id); } }}><span className="marketplace-installed-model-icon"><NavIcon name={row.icon} /></span><div className="marketplace-installed-model-copy"><strong>{row.name}</strong><small>{row.detail}</small></div><StatusBadge tone={row.state === "limited" ? "warning" : "success"}>{row.state}</StatusBadge></article>)}</section>;
               };
               const rows = [
-                group("Models", installedModels.map((item) => ({ id: `model:${item.provider}:${item.model}`, name: item.model, detail: `${item.provider ?? "Local runtime"} · ${item.vision.toLowerCase() === "supported" ? "Vision" : "Text"} · ${item.capabilities.join(" · ") || "Text generation"}`, state: "installed", icon: "model" as NavIconName }))),
-                group("MCP servers", installedConnections.map((item) => ({ id: `mcp:${item.connectionId}`, name: item.serverId, detail: `${item.transport} · ${item.connectionId}`, state: item.state === "healthy" ? "installed" : "limited", icon: "terminal" as NavIconName, health: () => void checkMcpHealth(item.connectionId), remove: () => void removeMcpConnection(item.connectionId) }))),
-                group("Skai built-ins", (catalog?.tools ?? []).filter((item) => item.builtIn).map((item) => ({ id: `tool:${item.id}`, name: item.name, detail: item.description, state: "installed", icon: "terminal" as NavIconName }))),
-                group("Skills", (catalog?.skills ?? []).filter((item) => item.installed).map((item) => ({ id: `skill:${item.id}`, name: item.name, detail: `${item.source} · ${item.enabled ? "Enabled" : "Disabled"}`, state: "installed", icon: "sparkle" as NavIconName }))),
-                group("Voice profiles", (catalog?.voices ?? []).filter((item) => item.installed).map((item) => ({ id: `voice:${item.id}`, name: item.name, detail: `${item.runtime} · ${item.size}`, state: "installed", icon: "activity" as NavIconName }))),
-                group("Personas", installedPersonas.map((item) => ({ id: `persona:${item.id}`, name: item.name, detail: `${item.sourceMode === "public-research" ? "Public research" : "Own material"} · ${item.roles}`, state: "installed", icon: "sparkle" as NavIconName }))),
-                group("Image assets", installedImageAssets.map((item) => ({ id: `asset:${item.id}`, name: item.id, detail: `${item.repository} · ${formatSize(item.sizeBytes)}`, state: "installed", icon: "image" as NavIconName, remove: () => void removeImageAsset(item.id) }))),
+                ...["Models", "MCP servers", "Skai built-ins", "Skills", "Voice profiles", "Personas", "Image assets"].map((title) => group(title, installedRecords.filter((item) => item.category === title))),
               ];
               return rows.some(Boolean) ? rows : <EmptyState title={query ? "No matching installed items" : "No installed items discovered"} description={query ? "Try another search term." : "Connect a local model runtime or install a compatible tool to see it here."} action={query ? <Button variant="ghost" onClick={() => setQuery("")}>Clear search</Button> : undefined} />;
             })()}
           </div>
           {selectedInstalled ? <aside className="marketplace-detail marketplace-installed-inspector" aria-label="Installed item details">
+            <div className="marketplace-installed-inspector-content">
             <div className="marketplace-detail-heading"><div><p className="section-kicker">INSTALLED ITEM</p><h3>{selectedInstalled.name}</h3></div><StatusBadge tone={selectedInstalled.state === "limited" ? "warning" : "success"}>{selectedInstalled.state}</StatusBadge></div>
             <p>{selectedInstalled.detail}</p>
-            <dl className="marketplace-detail-list"><div><dt>Source</dt><dd>{selectedInstalled.source}</dd></div><div><dt>Requirements</dt><dd>{selectedInstalled.requirements}</dd></div><div><dt>Next step</dt><dd>{selectedInstalled.nextStep}</dd></div></dl>
+            <dl className="marketplace-detail-list"><div><dt>Source</dt><dd>{selectedInstalled.source}</dd></div><div><dt>Version</dt><dd>{selectedInstalled.version}</dd></div>{selectedInstalled.integrity && <div><dt>Integrity</dt><dd>{selectedInstalled.integrity}</dd></div>}<div><dt>Last updated</dt><dd>{selectedInstalled.lastUpdated}</dd></div><div><dt>Disk use</dt><dd>{selectedInstalled.diskUse}</dd></div><div><dt>Compatibility</dt><dd>{selectedInstalled.compatibility}</dd></div><div><dt>Dependent workflows</dt><dd>{selectedInstalled.dependents.length ? selectedInstalled.dependents.join(" · ") : "No known active dependencies"}</dd></div><div><dt>Removal impact</dt><dd>{selectedInstalled.removalImpact}</dd></div><div><dt>Next step</dt><dd>{selectedInstalled.nextStep}</dd></div></dl>
             {selectedInstalled.id.startsWith("voice:") && <div className="marketplace-installed-voice-status" aria-label={`${selectedInstalled.name} availability`}><div><strong>Local runtime</strong><span>{selectedInstalledVoice ? "Available" : "Unavailable"}</span></div><div><strong>Local voice/model data</strong><span>{selectedInstalledVoice?.installed ? "Available" : "Unavailable"}</span></div><div><strong>Local playback</strong><span>{selectedInstalledVoice ? "Available" : "Unavailable"}</span></div><div className="marketplace-voice-actions"><Button variant="primary" disabled={!selectedInstalledVoice} onClick={() => void previewInstalledVoice()} aria-label={`Preview ${selectedInstalled.name} voice`}>Preview voice</Button><Button variant="ghost" onClick={stopNativeSpeech}>Stop</Button></div>{installedVoicePreviewStatus && <p role="status">{installedVoicePreviewStatus}</p>}</div>}
-            {installedActionStatus && selectedInstalled.id.startsWith("model:") && <p className="marketplace-honesty" role="status">{installedActionStatus}</p>}
-            <div className="marketplace-model-actions">{selectedInstalled.health && <Button variant="secondary" onClick={selectedInstalled.health}>Check health</Button>}{selectedInstalled.update && <Button variant="secondary" disabled={installedActionBusy} onClick={selectedInstalled.update}>{installedActionBusy ? "Updating…" : "Update"}</Button>}{selectedInstalled.remove && <Button variant="danger" disabled={installedActionBusy} onClick={selectedInstalled.remove}>{installedActionBusy ? "Working…" : "Remove"}</Button>}<Button variant="ghost" aria-pressed={pinnedItems.includes(selectedInstalled.id)} onClick={() => setPinnedItems((current) => current.includes(selectedInstalled.id) ? current.filter((id) => id !== selectedInstalled.id) : [...current, selectedInstalled.id])}>{pinnedItems.includes(selectedInstalled.id) ? "Unpin" : "Pin"}</Button></div>
+            {selectedInstalled.removeBlockedReason && <p className="marketplace-honesty" role="status">{selectedInstalled.removeBlockedReason}</p>}
+            {installedActionStatus && <p className="marketplace-honesty" role="status">{installedActionStatus}</p>}
+            </div>
+            <div className="marketplace-model-actions">{selectedInstalled.health && <Button variant="secondary" onClick={selectedInstalled.health}>Check health</Button>}{selectedInstalled.update && <Button variant="secondary" disabled={installedActionBusy} onClick={selectedInstalled.update}>{installedActionBusy ? "Updating…" : "Update"}</Button>}{selectedInstalled.remove && <Button variant="danger" disabled={installedActionBusy || Boolean(selectedInstalled.removeBlockedReason)} onClick={selectedInstalled.remove}>{installedActionBusy ? "Working…" : "Remove"}</Button>}<Button variant="ghost" aria-pressed={pinnedItems.includes(selectedInstalled.id)} onClick={() => setPinnedItems((current) => current.includes(selectedInstalled.id) ? current.filter((id) => id !== selectedInstalled.id) : [...current, selectedInstalled.id])}>{pinnedItems.includes(selectedInstalled.id) ? "Unpin" : "Pin"}</Button></div>
           </aside> : <aside className="marketplace-detail marketplace-installed-inspector"><EmptyState title={installedLoading ? "Checking installed items" : "No installed items"} description={installedLoading ? "The inventory is still being read from this computer." : installedRecords.length ? "Select an installed item to review its local details and available actions." : "Installed inventory details will appear here when a local runtime or catalog item is available."} /></aside>}
           </div>
         ) : (

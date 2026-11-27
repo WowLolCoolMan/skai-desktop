@@ -350,6 +350,19 @@ those voice profiles for inspection, so #22's selected installed-voice UI
 state remains blocked on the local inventory bridge settling and surfacing
 those runtimes.
 
+### Installed item inspector — Slice 33
+
+Compared with the older capture above, the installed list keeps the same
+category/search workflow and the inspector now shows source, version, update
+date, disk use, compatibility, dependent workflows, removal impact, and next
+step. The [new packaged capture](evidence-marketplace-installed-inventory-1440.png)
+shows a 1440×900 inventory with Piper selected. The inspector has its own
+scrollable details area and a fixed action strip at the bottom; the focused UI
+smoke verifies that the action strip remains inside the viewport. Duplicate
+version and size text was removed from list rows because those details are
+available in the inspector. The screenshot sidecar records Windows x64, dark
+theme, expanded sidebar, and the pre-commit dirty revision.
+
 ### MCP tool review — reference #23
 
 The packaged review flow connected an isolated loopback Streamable HTTP server,

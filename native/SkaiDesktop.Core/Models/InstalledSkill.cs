@@ -10,6 +10,8 @@ public sealed class SkillPackageManifest
     public string PackageSha256 { get; set; } = string.Empty;
     public bool Enabled { get; set; }
     public List<string> RequiredPermissions { get; set; } = [];
+    public DateTimeOffset? InstalledAtUtc { get; set; }
+    public DateTimeOffset? UpdatedAtUtc { get; set; }
 }
 
 public sealed record InstalledSkill(
@@ -21,7 +23,10 @@ public sealed record InstalledSkill(
     string PackageSha256,
     string ActivePath,
     IReadOnlyList<string> RequiredPermissions,
-    bool Enabled);
+    bool Enabled,
+    DateTimeOffset? InstalledAtUtc,
+    DateTimeOffset? UpdatedAtUtc,
+    long SizeBytes);
 
 public sealed record SkillPackagePreview(
     string Id,

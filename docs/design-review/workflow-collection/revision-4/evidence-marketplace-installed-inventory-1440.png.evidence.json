@@ -1,0 +1,17 @@
+{
+  "schema": "skai-ui-evidence/v1",
+  "file": "evidence-marketplace-installed-inventory-1440.png",
+  "platform": "win32",
+  "osRelease": "10.0.26200",
+  "architecture": "x64",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "theme": "dark",
+  "sidebar": "expanded",
+  "runtime": "packaged-electron",
+  "route": "marketplace",
+  "appRevision": "6f7a49d9-dirty",
+  "capturedAt": "2026-11-27T12:49:31.335Z"
+}
