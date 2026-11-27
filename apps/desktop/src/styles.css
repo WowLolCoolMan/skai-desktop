@@ -5052,3 +5052,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .app-content-coding .coding-page-active .coding-browser-preview-drawer[open] > .skai-browser-preview { height: min(42vh, 300px); }
   .app-content-coding .coding-page-active .coding-session-grid.is-chat { min-height: 360px; }
 }
+.toolbar-route-context { display: inline-flex; align-items: center; gap: 7px; min-width: 0; margin-left: 4px; padding: 5px 10px; border-left: 1px solid var(--skai-color-border); color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 600; letter-spacing: .02em; }
+.toolbar-route-context svg { width: 14px; height: 14px; color: var(--skai-color-accent); }
+@media (max-width: 640px) { .toolbar-route-context { max-width: 100px; margin-left: 0; padding-inline: 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } }
