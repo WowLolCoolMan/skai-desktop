@@ -291,6 +291,18 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
     openCodingPanePanel("editor", path);
   };
 
+  const addFileToComposerContext = (path: string) => {
+    window.dispatchEvent(new CustomEvent("skai:composer-file-context", { detail: { projectId: selectedProject.id, path, mode: "context" } }));
+  };
+
+  const compareFileWithChat = (path: string) => {
+    window.dispatchEvent(new CustomEvent("skai:composer-file-context", { detail: { projectId: selectedProject.id, path, mode: "compare" } }));
+  };
+
+  const startFileReview = (path: string) => {
+    onSendReview(`Review project file ${path}. Summarize its role, identify risks or regressions, and propose focused next steps. Keep the review read-only until I approve changes.`);
+  };
+
   const openChangedFile = (path: string) => {
     if (projectFiles.some((file) => file.relativePath === path)) openFile(path);
     else {
@@ -342,7 +354,7 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
       </ul>
     </details> : <div className="coding-explorer-changes is-clean"><strong>Changed files</strong><span>{gitStatus ? "No local changes" : "Git status unavailable"}</span></div>}
     <section className="coding-explorer-project-files" aria-label="Project file tree"><div className="coding-explorer-section-heading"><strong>Project files</strong><span>{filteredFiles.length}</span></div>
-      {projectFiles.length === 0 ? <EmptyState title="No readable files" description="Protected names and unsupported files are hidden." /> : filteredFiles.length === 0 ? <EmptyState title="No matching files" description="Try a shorter path or filename." /> : <ProjectFileTree key={selectedProject.id} files={filteredFiles} query={fileQuery} selectedFile={selectedFile} onOpenFile={onSelectFile} />}
+      {projectFiles.length === 0 ? <EmptyState title="No readable files" description="Protected names and unsupported files are hidden." /> : filteredFiles.length === 0 ? <EmptyState title="No matching files" description="Try a shorter path or filename." /> : <ProjectFileTree key={selectedProject.id} files={filteredFiles} query={fileQuery} selectedFile={selectedFile} onOpenFile={onSelectFile} onAddToContext={addFileToComposerContext} onCompareWithChat={compareFileWithChat} onStartReview={startFileReview} />}
     </section>
   </aside>;
 

@@ -517,6 +517,15 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .project-file-tree-row small { flex: 0 0 auto; margin-left: auto; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
 .project-file-folder .project-file-tree-name { font-weight: 600; }
 .project-file-tree-spacer { visibility: hidden; }
+.project-file-tree-entry { position: relative; display: flex; align-items: stretch; min-width: 0; }
+.project-file-tree-entry > .project-file-tree-row { min-width: 0; flex: 1 1 auto; }
+.project-file-row-actions { position: relative; flex: 0 0 auto; }
+.project-file-row-actions > summary { display: grid; width: 26px; height: 29px; place-items: center; border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); cursor: pointer; font-size: var(--skai-text-xs); list-style: none; }
+.project-file-row-actions > summary::-webkit-details-marker { display: none; }
+.project-file-row-actions > summary:hover, .project-file-row-actions[open] > summary { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
+.project-file-row-menu { position: absolute; z-index: 20; top: 26px; right: 0; display: grid; min-width: 160px; padding: 4px; border: 1px solid var(--skai-color-border-strong); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-raised); box-shadow: var(--skai-shadow-lg); }
+.project-file-row-menu button { width: 100%; padding: 7px 9px; border: 0; border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: transparent; text-align: left; font-size: var(--skai-text-xs); }
+.project-file-row-menu button:hover, .project-file-row-menu button:focus-visible { background: color-mix(in srgb, var(--skai-color-accent) 12%, transparent); outline: none; }
 .project-file-directory-children { display: grid; }
 .project-file-preview { display: grid; align-content: start; justify-items: center; gap: 10px; min-height: 330px; height: 100%; overflow: auto; padding: 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-code-surface); }
 .project-file-preview > img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }

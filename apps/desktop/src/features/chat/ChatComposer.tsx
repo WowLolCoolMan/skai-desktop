@@ -173,6 +173,20 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   useEffect(() => { setCommandIndex(0); }, [commandQuery, contextQuery]);
   useEffect(() => { const refresh = () => setWorkflowPreferences(readCommandPreferences()); window.addEventListener(commandPreferencesEvent, refresh); return () => window.removeEventListener(commandPreferencesEvent, refresh); }, []);
   useEffect(() => {
+    const addProjectFileContext = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectId?: string; path?: string; mode?: "context" | "compare" }>).detail;
+      if (!detail?.path || (detail.projectId && projectId && detail.projectId !== projectId)) return;
+      const token = `@file:${detail.path}`;
+      const next = detail.mode === "compare"
+        ? `${draft.trim() ? `${draft.trim()}\n\n` : ""}Compare ${token} with the current conversation. `
+        : `${draft.trimEnd()}${draft.trim() ? " " : ""}${token} `;
+      onDraftChange(next);
+      window.requestAnimationFrame(() => draftTextareaRef.current?.focus());
+    };
+    window.addEventListener("skai:composer-file-context", addProjectFileContext);
+    return () => window.removeEventListener("skai:composer-file-context", addProjectFileContext);
+  }, [draft, onDraftChange, projectId]);
+  useEffect(() => {
     if (!omniOpen && !accessOpen) return;
     const closeOutside = (event: PointerEvent) => {
       const target = event.target;

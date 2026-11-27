@@ -46,9 +46,12 @@ type ProjectFileTreeProps = {
   selectedFile: string | null;
   query: string;
   onOpenFile: (relativePath: string) => void;
+  onAddToContext?: (relativePath: string) => void;
+  onCompareWithChat?: (relativePath: string) => void;
+  onStartReview?: (relativePath: string) => void;
 };
 
-export function ProjectFileTree({ files, selectedFile, query, onOpenFile }: ProjectFileTreeProps) {
+export function ProjectFileTree({ files, selectedFile, query, onOpenFile, onAddToContext, onCompareWithChat, onStartReview }: ProjectFileTreeProps) {
   const tree = useMemo(() => buildTree(files), [files]);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
   const [collapsedSearchPaths, setCollapsedSearchPaths] = useState<Set<string>>(() => new Set());
@@ -93,20 +96,30 @@ export function ProjectFileTree({ files, selectedFile, query, onOpenFile }: Proj
     }
     const file = node.file;
     const filename = file.relativePath.replaceAll("\\", "/").split("/").at(-1) ?? file.relativePath;
-    return <button
-      aria-current={selectedFile === file.relativePath ? "page" : undefined}
-      className={`project-file-tree-row project-file-item${selectedFile === file.relativePath ? " is-selected" : ""}`}
-      key={file.relativePath}
-      onClick={() => onOpenFile(file.relativePath)}
-      style={{ "--tree-depth": depth } as React.CSSProperties}
-      title={file.relativePath}
-      type="button"
-    >
-      <span className="project-file-tree-chevron project-file-tree-spacer" aria-hidden="true" />
-      <span className="project-file-tree-icon project-file-document-icon" aria-hidden="true">{file.kind === "image" ? "▧" : file.kind === "pdf" ? "PDF" : file.kind === "svg" ? "SVG" : "·"}</span>
-      <span className="project-file-tree-name">{filename}</span>
-      <small>{file.bytes.toLocaleString()} B</small>
-    </button>;
+    const hasActions = Boolean(onAddToContext || onCompareWithChat || onStartReview);
+    return <div className={`project-file-tree-entry${selectedFile === file.relativePath ? " is-selected" : ""}`} key={file.relativePath} style={{ "--tree-depth": depth } as React.CSSProperties}>
+      <button
+        aria-current={selectedFile === file.relativePath ? "page" : undefined}
+        className="project-file-tree-row project-file-item"
+        onClick={() => onOpenFile(file.relativePath)}
+        title={file.relativePath}
+        type="button"
+      >
+        <span className="project-file-tree-chevron project-file-tree-spacer" aria-hidden="true" />
+        <span className="project-file-tree-icon project-file-document-icon" aria-hidden="true">{file.kind === "image" ? "▧" : file.kind === "pdf" ? "PDF" : file.kind === "svg" ? "SVG" : "·"}</span>
+        <span className="project-file-tree-name">{filename}</span>
+        <small>{file.bytes.toLocaleString()} B</small>
+      </button>
+      {hasActions && <details className="project-file-row-actions">
+        <summary aria-label={`Actions for ${file.relativePath}`} title="File actions">•••</summary>
+        <div className="project-file-row-menu" role="menu" aria-label={`Actions for ${file.relativePath}`}>
+          <button type="button" role="menuitem" onClick={() => onOpenFile(file.relativePath)}>Open in editor</button>
+          {onAddToContext && <button type="button" role="menuitem" onClick={() => onAddToContext(file.relativePath)}>Add to context</button>}
+          {onCompareWithChat && <button type="button" role="menuitem" onClick={() => onCompareWithChat(file.relativePath)}>Compare with chat</button>}
+          {onStartReview && <button type="button" role="menuitem" onClick={() => onStartReview(file.relativePath)}>Start review</button>}
+        </div>
+      </details>}
+    </div>;
   });
 
   return <div className="project-file-list" aria-label="Project files">
