@@ -467,6 +467,22 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     setQueuedMessages((response.result as DesktopQueuedMessage[]) ?? []);
   };
 
+  const updateQueuedMessage = async (index: number, text: string) => {
+    const response = await request("chat.queue.update", { index, text });
+    if (!response.ok) { onError(response.error?.message ?? "Queued message could not be updated."); return false; }
+    setQueuedMessages((response.result as DesktopQueuedMessage[]) ?? []);
+    onError(null);
+    return true;
+  };
+
+  const moveQueuedMessage = async (fromIndex: number, toIndex: number) => {
+    const response = await request("chat.queue.move", { fromIndex, toIndex });
+    if (!response.ok) { onError(response.error?.message ?? "Queued message could not be reordered."); return false; }
+    setQueuedMessages((response.result as DesktopQueuedMessage[]) ?? []);
+    onError(null);
+    return true;
+  };
+
   const exportConversations = async () => {
     const response = await request("conversations.export", { includeArchived: true });
     if (!response.ok) { onError(response.error?.message ?? "Conversation export failed."); return; }
@@ -557,5 +573,5 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
+  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, updateQueuedMessage, moveQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
 }

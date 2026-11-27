@@ -21,6 +21,8 @@ type ChatComposerProps = {
   onDraftChange: (draft: string) => void;
   onSubmit: () => void;
   onQueueRemove: (index: number) => void;
+  onUpdateQueued: (index: number, text: string) => Promise<boolean>;
+  onMoveQueued: (fromIndex: number, toIndex: number) => Promise<boolean>;
   onAttach: () => void;
   onFilesDropped: (files: File[]) => void;
   onRemoveAttachment: (index: number) => void;
@@ -35,7 +37,6 @@ type ChatComposerProps = {
   models: Model[];
   placeholder?: string;
   modelControl?: ReactNode;
-  onEditQueued?: (index: number) => void;
   onOpenTaskPlanner?: () => void;
   accessLabel?: string;
   projects?: DesktopProject[];
@@ -78,9 +79,12 @@ function parsePlannedComputerAction(value: Record<string, unknown>): PlannedComp
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onEditQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
+  const [queueEditDraft, setQueueEditDraft] = useState("");
+  const [queueUpdateBusy, setQueueUpdateBusy] = useState(false);
 
   const [omniOpen, setOmniOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
@@ -301,11 +305,19 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   };
 
   const hasMessageContent = draft.trim().length > 0 || attachments.length > 0;
+  const saveQueuedEdit = async (index: number) => {
+    setQueueUpdateBusy(true);
+    try {
+      if (await onUpdateQueued(index, queueEditDraft)) setEditingQueueIndex(null);
+    } finally {
+      setQueueUpdateBusy(false);
+    }
+  };
 
   return <section className={`composer-card ${dragActive ? "is-drag-active" : ""}`} aria-busy={rewriteBusy} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
     {commandQuery !== null && <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} />}
-    {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}><span>{queued.text}</span>{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<div className="queued-message-actions">{onEditQueued && <button type="button" disabled={Boolean(queued.attachments?.length)} title={queued.attachments?.length ? "Queued file contents cannot be restored for editing" : "Edit this queued prompt"} onClick={() => onEditQueued(queued.index)} aria-label={`Edit queued message ${queued.index + 1}`}>Edit</button>}<button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`} title="Remove queued message">×</button></div></div>)}</div>}
+    {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}>{editingQueueIndex === queued.index ? <div className="queued-message-edit"><textarea autoFocus value={queueEditDraft} maxLength={50_000} aria-label={`Edit queued message ${queued.index + 1}`} onChange={(event) => setQueueEditDraft(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void saveQueuedEdit(queued.index); } if (event.key === "Escape") { setEditingQueueIndex(null); setQueueEditDraft(""); } }} /><div><button type="button" disabled={queueUpdateBusy || !queueEditDraft.trim()} onClick={() => void saveQueuedEdit(queued.index)}>Save</button><button type="button" disabled={queueUpdateBusy} onClick={() => { setEditingQueueIndex(null); setQueueEditDraft(""); }}>Cancel</button></div><small>Ctrl+Enter saves · Esc cancels</small></div> : <span>{queued.text}</span>}{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<div className="queued-message-actions"><button type="button" disabled={queueUpdateBusy} title="Edit this queued prompt" onClick={() => { if (editingQueueIndex !== queued.index) { setEditingQueueIndex(queued.index); setQueueEditDraft(queued.text); } }} aria-label={`Edit queued message ${queued.index + 1}`}>Edit</button><button type="button" disabled={queued.index === 0} onClick={() => void onMoveQueued(queued.index, queued.index - 1)} aria-label={`Move queued message ${queued.index + 1} up`} title="Move up">↑</button><button type="button" disabled={queued.index === queuedMessages.length - 1} onClick={() => void onMoveQueued(queued.index, queued.index + 1)} aria-label={`Move queued message ${queued.index + 1} down`} title="Move down">↓</button><button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`} title="Remove queued message">×</button></div></div>)}</div>}
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
     <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
     <textarea value={draft} disabled={rewriteBusy} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : placeholder} aria-label={placeholder.replace(/…$/, "")} aria-controls={commandQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : undefined} aria-autocomplete={commandQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : undefined} rows={3} />

@@ -386,7 +386,50 @@ public static partial class AgentHostLoop
         foreach (var item in store.Load()) queue.Enqueue(item.Text, item.Attachments);
         queue.RemoveAt(index);
         store.Save(queue.Snapshot());
-        return new(ProtocolVersion, request.Id, true, queue.Snapshot().Select((item, position) => new { index = position, text = item.Text }).ToArray());
+        return new(ProtocolVersion, request.Id, true, queue.Snapshot().Select((item, position) => new
+        {
+            index = position,
+            text = item.Text,
+            attachments = item.Attachments?.Select(attachment => new { fileName = attachment.FileName, mediaType = attachment.MediaType }).ToArray(),
+        }).ToArray());
+    }
+
+    private static AgentResponse UpdateQueuedMessage(AgentRequest request)
+    {
+        var index = request.Params is { } parameters && parameters.TryGetProperty("index", out var value) && value.TryGetInt32(out var parsed)
+            ? parsed
+            : throw new InvalidOperationException("chat.queue.update requires an index.");
+        var text = RequiredBoundedString(request, "text", 50_000);
+        var store = CreateChatQueueStore();
+        var queue = new ChatMessageQueue();
+        foreach (var item in store.Load()) queue.Enqueue(item.Text, item.Attachments);
+        if (!queue.UpdateTextAt(index, text)) throw new InvalidOperationException("The queued message no longer exists. Refresh the queue and try again.");
+        store.Save(queue.Snapshot());
+        return new(ProtocolVersion, request.Id, true, queue.Snapshot().Select((item, position) => new
+        {
+            index = position,
+            text = item.Text,
+            attachments = item.Attachments?.Select(attachment => new { fileName = attachment.FileName, mediaType = attachment.MediaType }).ToArray(),
+        }).ToArray());
+    }
+
+    private static AgentResponse MoveQueuedMessage(AgentRequest request)
+    {
+        var parameters = request.Params ?? throw new InvalidOperationException("chat.queue.move requires source and destination indices.");
+        if (!parameters.TryGetProperty("fromIndex", out var fromValue) || !fromValue.TryGetInt32(out var fromIndex)
+            || !parameters.TryGetProperty("toIndex", out var toValue) || !toValue.TryGetInt32(out var toIndex))
+            throw new InvalidOperationException("chat.queue.move requires valid source and destination indices.");
+        var store = CreateChatQueueStore();
+        var queue = new ChatMessageQueue();
+        foreach (var item in store.Load()) queue.Enqueue(item.Text, item.Attachments);
+        if (!queue.Move(fromIndex, toIndex)) throw new InvalidOperationException("The queued message could not be moved. Refresh the queue and try again.");
+        store.Save(queue.Snapshot());
+        return new(ProtocolVersion, request.Id, true, queue.Snapshot().Select((item, index) => new
+        {
+            index,
+            text = item.Text,
+            attachments = item.Attachments?.Select(attachment => new { fileName = attachment.FileName, mediaType = attachment.MediaType }).ToArray(),
+        }).ToArray());
     }
 
     private static ConversationStore CreateConversationStore() =>

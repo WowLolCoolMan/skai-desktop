@@ -50,5 +50,17 @@ public sealed class ChatMessageQueue(int capacity = 8)
         return true;
     }
 
+    public bool UpdateTextAt(int index, string text)
+    {
+        if (index < 0 || index >= _items.Count) return false;
+        if (string.IsNullOrWhiteSpace(text) || text.Length > 50_000 || text.Any(char.IsControl)) throw new ArgumentException("Queued message text is invalid.", nameof(text));
+        var remaining = _items.ToArray();
+        var current = remaining[index];
+        remaining[index] = current with { Text = text };
+        _items.Clear();
+        foreach (var queued in remaining) _items.Enqueue(queued);
+        return true;
+    }
+
     public void Clear() => _items.Clear();
 }

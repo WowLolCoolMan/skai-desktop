@@ -22,6 +22,7 @@ const env = {
   SRAI_SCHEDULED_TASKS_PATH: path.join(profileRoot, "scheduled-tasks.json"),
   SRAI_PROJECTS_PATH: path.join(profileRoot, "projects.json"),
   SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
+  SRAI_CHAT_QUEUE_PATH: path.join(profileRoot, "queued-messages.json"),
   SRAI_MCP_CONNECTIONS_PATH: path.join(profileRoot, "mcp-connections.json"),
   SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
 };
@@ -137,6 +138,18 @@ async function run() {
   const health = await request("runtime.health");
   if (!health.ok || !health.result?.capabilities?.includes("airllm.status") || !health.result?.capabilities?.includes("conversation.save") || !health.result?.capabilities?.includes("settings.save") || !health.result?.capabilities?.includes("voice.speak") || !health.result?.capabilities?.includes("tasks.execute") || !health.result?.capabilities?.includes("corpus.search") || !health.result?.capabilities?.includes("models.pull.start") || !health.result?.capabilities?.includes("models.pull.status") || !health.result?.capabilities?.includes("models.pull.cancel") || !health.result?.capabilities?.includes("skills.list") || !health.result?.capabilities?.includes("skills.read") || !health.result?.capabilities?.includes("mcp.connections.list") || !health.result?.capabilities?.includes("mcp.connection.connect") || !health.result?.capabilities?.includes("mcp.connection.revoke") || !health.result?.capabilities?.includes("mcp.tool.call") || !health.result?.capabilities?.includes("persona.discover"))
     throw new Error("runtime.health did not advertise the replacement persistence capabilities.");
+  const queuedFirst = await request("chat.queue.enqueue", { text: "Review the first draft", attachments: [{ fileName: "brief.txt", content: "Keep this attachment with the queued turn." }] });
+  const queuedSecond = await request("chat.queue.enqueue", { text: "Check the follow-up" });
+  const queuedEdit = await request("chat.queue.update", { index: 0, text: "Review the revised draft" });
+  if (!queuedFirst.ok || !queuedSecond.ok || !queuedEdit.ok || queuedEdit.result?.[0]?.text !== "Review the revised draft" || queuedEdit.result?.[0]?.attachments?.[0]?.fileName !== "brief.txt")
+    throw new Error(`chat.queue.update did not preserve queue position and attachments: ${JSON.stringify(queuedEdit)}`);
+  const queuedMove = await request("chat.queue.move", { fromIndex: 1, toIndex: 0 });
+  if (!queuedMove.ok || queuedMove.result?.[0]?.text !== "Check the follow-up" || queuedMove.result?.[1]?.text !== "Review the revised draft" || queuedMove.result?.[1]?.attachments?.[0]?.fileName !== "brief.txt")
+    throw new Error(`chat.queue.move did not persist the reordered queue and its attachments: ${JSON.stringify(queuedMove)}`);
+  const queuedRemove = await request("chat.queue.remove", { index: 0 });
+  if (!queuedRemove.ok || queuedRemove.result?.length !== 1 || queuedRemove.result?.[0]?.text !== "Review the revised draft" || queuedRemove.result?.[0]?.attachments?.[0]?.fileName !== "brief.txt")
+    throw new Error(`chat.queue.remove did not preserve the remaining edited prompt: ${JSON.stringify(queuedRemove)}`);
+  console.log("Queued chat smoke passed: text edit, ordering, preserved attachments, removal, and isolated persistence.");
   const capacity = await request("system.capacity");
   const reportedSlotLimit = capacity.result?.scheduler?.executionSlotLimit;
   if (!capacity.ok || capacity.result?.scheduler?.activeTaskCount !== 0 || capacity.result?.scheduler?.queuedTaskCount !== 0 || !Number.isInteger(reportedSlotLimit) || reportedSlotLimit < 1)

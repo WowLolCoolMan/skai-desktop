@@ -4529,3 +4529,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .voice-preset-actions label { display: grid; gap: 6px; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
 .voice-preset-actions select, .voice-preset-actions input { width: 100%; min-width: 0; min-height: 36px; padding: 7px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); }
 @media (max-width: 740px) { .voice-preset-actions { grid-template-columns: minmax(0,1fr) auto; } .voice-preset-actions label:first-child { grid-column: 1 / -1; } }
+.queued-message-edit { display: grid; flex: 1 1 100%; min-width: 0; gap: 7px; }
+.queued-message-edit textarea { width: 100%; min-height: 66px; resize: vertical; padding: 8px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; }
+.queued-message-edit > div { display: flex; gap: 6px; }
+.queued-message-edit button, .queued-message-actions button { min-width: 26px; min-height: 26px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); }
+.queued-message-edit button:not(:disabled):hover, .queued-message-actions button:not(:disabled):hover { color: var(--skai-color-text); border-color: var(--skai-color-accent); }
+.queued-message-edit button:disabled, .queued-message-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.queued-message-edit small { color: var(--skai-color-text-muted); }
