@@ -481,6 +481,19 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .project-file-preview > img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
 .project-pdf-preview-frame { width: 100%; min-height: 560px; flex: 1; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-document-page); }
 .project-html-preview-frame, .project-svg-preview-frame { width: 100%; min-height: 560px; flex: 1; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-document-page); }
+.project-markdown-preview-scroll { min-height: 330px; height: 540px; overflow: auto; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-document-page); }
+.app-content-coding .coding-page-active .project-markdown-preview-scroll { min-height: 0; height: 100%; }
+.markdown-document-preview { box-sizing: border-box; width: min(100%, 860px); min-height: 100%; margin: 0 auto; padding: clamp(24px, 5vw, 64px); color: var(--skai-color-text); font-size: var(--skai-text-md); line-height: 1.72; overflow-wrap: anywhere; }
+.markdown-document-preview h1, .markdown-document-preview h2, .markdown-document-preview h3, .markdown-document-preview h4, .markdown-document-preview h5, .markdown-document-preview h6 { margin: 1.4em 0 .5em; line-height: 1.2; }
+.markdown-document-preview h1 { margin-top: 0; font-size: clamp(1.8rem, 4vw, 2.6rem); }
+.markdown-document-preview h2 { padding-bottom: .35em; border-bottom: 1px solid var(--skai-color-border); font-size: 1.7rem; }
+.markdown-document-preview p, .markdown-document-preview ul, .markdown-document-preview ol, .markdown-document-preview blockquote, .markdown-document-preview pre { margin: 1em 0; }
+.markdown-document-preview li + li { margin-top: .3em; }
+.markdown-document-preview blockquote { padding: .15em 1em; border-left: 3px solid var(--skai-color-accent); color: var(--skai-color-text-muted); }
+.markdown-document-preview :not(pre) > code { padding: .15em .4em; border: 1px solid var(--skai-color-border); border-radius: 5px; background: var(--skai-color-surface); font-family: var(--skai-font-mono); font-size: .9em; }
+.markdown-document-preview pre { overflow: auto; padding: 1em; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-code-surface); }
+.markdown-document-preview pre code { font-family: var(--skai-font-mono); font-size: .9em; }
+.markdown-document-preview a { color: var(--skai-color-accent); text-decoration: underline; text-underline-offset: 2px; }
 .project-file-preview > p { align-self: center; margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
 .project-pdf-preview-label { width: 100%; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .project-file-preview > pre { width: 100%; margin: 0; color: var(--skai-color-text); font-family: var(--skai-font-mono); font-size: calc(var(--skai-text-sm) * var(--skai-code-scale)); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
