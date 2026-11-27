@@ -5211,6 +5211,28 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .sidebar-project-menu-trigger:focus-visible,
 .sidebar-project-new-thread:focus-visible { opacity: 1; }
 .coding-unsaved-close-dialog .dialog-actions { position: sticky; bottom: 0; justify-content: flex-end; padding-top: 10px; background: var(--skai-color-surface); }
+
+/* Gap-audit completion: transcript content and shared interaction geometry. */
+.message-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); scrollbar-gutter: stable; }
+.message-table { width: max-content; min-width: 100%; border-collapse: collapse; color: var(--skai-color-text); font-size: var(--skai-text-sm); }
+.message-table th, .message-table td { min-width: 8rem; max-width: 32rem; padding: 8px 10px; border-bottom: 1px solid var(--skai-color-border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.message-table th { color: var(--skai-color-text); background: var(--skai-color-surface-soft); font-weight: 650; }
+.message-table tr:last-child td { border-bottom: 0; }
+.chat-message:target { outline: 2px solid var(--skai-color-accent); outline-offset: 4px; }
+.message-actions .ui-button { min-height: 28px; }
+.chat-message:not(:hover):not(:focus-within) .message-actions { opacity: .7; }
+.chat-message:focus-within .message-actions, .chat-message:hover .message-actions { opacity: 1; }
+.message-meta > span, .sidebar-label, .sidebar-project-thread-count, .workspace-tab-status, .conversation-count, .panel-count, .model-picker-label { font-variant-numeric: tabular-nums; }
+.sidebar-muted, .sidebar-project-no-threads, .sidebar-project-thread-count, .form-helper, .composer-hint, .settings-save-status { font-size: max(var(--skai-text-xs), 12px); }
+.sidebar-project-tree-open span, .sidebar-project-thread > span, .sidebar-history-item, .workspace-tab-select > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.message-content, .message-content p, .message-content li, .message-content th, .message-content td { overflow-wrap: anywhere; }
+.ui-dialog { max-height: calc(100dvh - 32px); }
+.ui-dialog > :is(.dialog-body, .settings-content, .coding-review-content) { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+:where(button, a, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: 2px; }
+:where(.card, .panel, .workspace-tab-strip, .sidebar-history-list):focus-within { scroll-margin-block: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 @media (max-width: 1100px) and (min-width: 761px) {
   .app-content-coding .coding-page-active .coding-session-grid.is-chat { grid-template-columns: minmax(0, 1fr) minmax(280px, .88fr); }
 }
@@ -5248,10 +5270,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .composer-mode-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--skai-color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--skai-color-accent) 12%, transparent); }
 .composer-context-meter { display: inline-flex; min-width: 0; flex-direction: column; gap: 3px; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); white-space: nowrap; }
 .composer-context-meter-label { overflow: hidden; text-overflow: ellipsis; }
-.composer-context-meter-track { width: 74px; height: 3px; overflow: hidden; border-radius: var(--skai-radius-pill); background: var(--skai-color-border); }
+.composer-context-meter-track { display: block; flex: 0 0 3px; width: 60px; height: 3px; overflow: hidden; border-radius: var(--skai-radius-pill); background: var(--skai-color-border); }
 .composer-context-meter-track > span { display: block; height: 100%; border-radius: inherit; background: var(--skai-color-accent); transition: width 120ms ease; }
 .composer-context-meter.is-near-limit { color: var(--skai-color-warning); }
 .composer-context-meter.is-near-limit .composer-context-meter-track > span { background: var(--skai-color-warning); }
+@media (max-width: 1100px) {
+  /* The compact footer has less room; shrink the decorative track before it bleeds past the card. */
+  .composer-context-meter-track { width: 60px; max-width: 100%; }
+}
 .file-editor-heading > .file-editor-heading-copy { display: grid; min-width: 0; flex: 1 1 auto; justify-content: initial; gap: 2px; }
 .file-editor-heading-copy small { overflow: hidden; color: var(--skai-color-text-muted); font-family: var(--skai-font-sans); font-size: var(--skai-text-3xs); text-overflow: ellipsis; white-space: nowrap; }
 .file-editor-heading-copy span { overflow: hidden; color: var(--skai-color-text); text-overflow: ellipsis; white-space: nowrap; }

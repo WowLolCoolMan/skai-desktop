@@ -84,6 +84,13 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
     messageListRef.current?.scrollTo({ top: messageListRef.current.scrollHeight, behavior: "smooth" });
   };
 
+  useEffect(() => {
+    let targetId = window.location.hash.slice(1);
+    try { targetId = decodeURIComponent(targetId); } catch { return; }
+    if (!targetId.startsWith(`chat-message-${encodeURIComponent(conversationId ?? "new")}-`)) return;
+    window.requestAnimationFrame(() => document.getElementById(targetId)?.scrollIntoView({ block: "center" }));
+  }, [conversationId, messages.length]);
+
   return <>
     <div className="message-list" ref={messageListRef}>{messages.map((message, index) => <ChatMessage key={index} message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={onCopy} onRetry={onRetry} onFork={onFork} onEdit={onEdit} />)}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>
     {showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>{newOutputCount ? `${newOutputCount} new ${newOutputCount === 1 ? "message" : "messages"} · ` : ""}Jump to latest ↓</Button></div>}
