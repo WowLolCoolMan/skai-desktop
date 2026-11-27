@@ -1118,7 +1118,7 @@ function refreshTrayMenu(popUp = false) { return trayController.refreshTrayMenu(
 function createTray() { return trayController.createTray(); }
 
 const allowedMethods = new Set([
-    "runtime.health", "harness.adapters.list", "security.overview", "security.project.revoke", "models.list", "models.runtime.status", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files",
+    "runtime.health", "harness.adapters.list", "security.overview", "security.project.revoke", "workspace.backup.preview", "workspace.backup.export", "workspace.backup.restore.preview", "workspace.backup.restore.apply", "workspace.storage.overview", "models.list", "models.runtime.status", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files",
     "project.file.read", "project.preview.read", "tasks.list", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow",
     "tasks.plan", "tasks.delegate", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "tasks.steer", "tasks.worktree.release", "project.preflight", "project.checks.list", "project.check.run", "asset.generate3d", "image.generate.start",
     "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status",

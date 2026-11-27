@@ -70,6 +70,8 @@
     "smoke:chat-queue": "node scripts/smoke-chat-queue.cjs",
     "smoke:documents-only": "node scripts/smoke-documents-only.cjs",
     "smoke:memory": "node scripts/smoke-memory.cjs",
+    "smoke:workspace-backup": "node scripts/smoke-workspace-backup.cjs",
+    "check:syntax:workspace-backup": "node --check scripts/smoke-workspace-backup.cjs",
     "smoke:pdf-attachment": "node scripts/smoke-pdf-attachment.cjs",
     "test": "dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj",
     "agent-host:build": "dotnet build services/agent-host/SkaiDesktop.AgentHost.csproj",

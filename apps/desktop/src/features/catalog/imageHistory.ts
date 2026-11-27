@@ -57,6 +57,22 @@ export async function loadImageHistory(): Promise<ImageHistoryEntry[]> {
   }
 }
 
+/** Remove only Skai's generated-output index and embedded previews in this browser profile. */
+export async function clearImageHistory(): Promise<void> {
+  const database = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(storeName, "readwrite");
+      transaction.objectStore(storeName).clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Generated media history could not be cleared."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Generated media history cleanup was interrupted."));
+    });
+  } finally {
+    database.close();
+  }
+}
+
 /** Persist image outputs locally, keeping recent records within strict count and size limits. */
 export async function saveImageHistory(entries: ImageHistoryEntry[]): Promise<void> {
   if (!entries.length) return;

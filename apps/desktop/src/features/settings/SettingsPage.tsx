@@ -11,6 +11,7 @@ import { AppearancePreview } from "../../theme/AppearanceOptions";
 import { enableRetroTheme, readAchievements, unlockAchievement, type SkaiAchievement } from "./easterEggs";
 import { VoicePresetManager } from "./VoicePresetManager";
 import { PermissionCenter } from "./PermissionCenter";
+import { WorkspaceBackupManager } from "./WorkspaceBackupManager";
 
 const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Achievements", "Updates", "Advanced"] as const;
 type Category = typeof categories[number];
@@ -300,7 +301,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Privacy & Security" && <><div className="settings-callout"><strong>Local route in use</strong><span>Prompts, attachments, memory, voice, and image requests stay on this computer.</span></div><p className="settings-help">GitHub is used only for explicit project workflows. Local model and media endpoints are restricted to loopback addresses.</p><Toggle label="Use saved memory in prompts" detail="This is also available in Agents so the setting is easy to find." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><PermissionCenter /></>}
 
-        {activeCategory === "Storage" && <><div className="settings-callout"><strong>Workspace data is local</strong><span>Conversations, task plans, memory, and preferences are stored in the local Skai data directory.</span></div><div className="settings-model-actions"><Button variant="secondary" onClick={props.onExportMemory}>Export memory backup</Button><span>Exports a portable JSON backup without deleting anything.</span></div><p className="settings-help">There is no destructive "clear everything" button in the release candidate.</p></>}
+        {activeCategory === "Storage" && <WorkspaceBackupManager />}
 
         {activeCategory === "Achievements" && <AchievementsPanel achievements={achievements} />}
 
