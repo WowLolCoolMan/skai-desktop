@@ -4905,6 +4905,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .chat-share-disabled { margin:12px 0; border-color:color-mix(in srgb,var(--skai-color-warning) 45%,var(--skai-color-border)); }
 .chat-share-disabled strong { font-size:var(--skai-text-sm); }
 .chat-share-disabled span, .chat-share-notice, .chat-suggestion-preview small { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); line-height:1.5; }
+.chat-share-header-status { display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px 8px; max-width:min(100%,720px); margin-inline-start:8px; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); line-height:1.4; vertical-align:middle; }
+.chat-share-header-status strong { color:var(--skai-color-text); font-weight:600; }
+.chat-share-header-status span:not(:last-child)::after { content:"·"; margin-inline-start:8px; color:var(--skai-color-border-strong); }
 .chat-suggestion-preview { margin:14px 0; }
 .chat-suggestion-preview p { margin:4px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .chat-suggestion-preview small { font-size:var(--skai-text-2xs); }

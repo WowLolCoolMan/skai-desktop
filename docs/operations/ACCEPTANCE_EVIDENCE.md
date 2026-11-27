@@ -410,6 +410,35 @@ an OS-level disk-full condition by filling a developer or CI volume.
   separate first-token/stream/completion timing samples, and hardware-class
   acceptance beyond the current host.
 
+### Slice 29 — privacy-first collaboration
+
+- Outcome: make optional shared work local and reviewable. Chat collaboration
+  creates an offline, read-only HTML snapshot with an explicit included/excluded
+  boundary; the snapshot can export a suggestion or private fork, while the
+  owner imports suggestions into an unsent draft and can revoke future imports.
+  The active chat header visibly reports owner, access level, participant count,
+  and expiration.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run package:electron`; packaged Chat-route smoke with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=chat UI_MATRIX_EXERCISE_CHAT_BASE=1
+  UI_MATRIX_EXERCISE_CHAT_COLLABORATION=1` verifies the CSP-constrained
+  snapshot, excluded context disclosure, private-fork archive, suggestion
+  preview and draft-only acceptance, owner-side revocation, and the session
+  header fields.
+- Failure check: the smoke fails if sharing starts a network host, the snapshot
+  omits its read-only boundary, suggestions bypass review or execute tools, a
+  revoked share still previews imports, or the header hides ownership/access /
+  participant/expiry state.
+- Disposable profile / cleanup: the packaged matrix uses a throwaway Electron
+  profile and intercepts snapshot downloads in memory; no network listener,
+  companion device, project file, or tool execution is created.
+- Network and privacy boundary: live LAN, QR pairing, encrypted relay sync, and
+  remote tool actions remain disabled until a trusted host/device identity and
+  separate tool opt-in protocol are implemented and threat-modeled. Downloaded
+  snapshots cannot be remotely erased, which is disclosed to the owner.
+- Unverified: native LAN transport, QR key rotation, relay encryption review,
+  companion-device UX, and remote action approval are intentionally open.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record
