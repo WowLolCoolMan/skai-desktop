@@ -37,6 +37,10 @@ public static partial class AgentHostLoop
             endpoint = LocalEndpoint.IsLocal(settings.Endpoint) ? settings.Endpoint : "http://localhost:11434/v1",
             model = settings.Model,
             provider = settings.ModelProvider,
+            subagentModel = settings.SubagentModel,
+            subagentModelProvider = settings.SubagentModelProvider,
+            subagentModelSizeBytes = settings.SubagentModelSizeBytes,
+            subagentModelContextLength = settings.SubagentModelContextLength,
             ollamaContextWindowTokens = settings.OllamaContextWindowTokens,
             localRamBudgetBytes = settings.LocalRamBudgetBytes,
             localGpuBudgetBytes = settings.LocalGpuBudgetBytes,
@@ -69,6 +73,30 @@ public static partial class AgentHostLoop
                         throw new InvalidOperationException("provider exceeds the safety limit.");
                     settings.ModelProvider = requestedProvider.Trim();
                 }
+            }
+            if (parameters.TryGetProperty("subagentModel", out var subagentModel) && subagentModel.ValueKind == JsonValueKind.String)
+            {
+                var value = subagentModel.GetString()?.Trim() ?? "";
+                if (value.Length > 256 || value.Any(char.IsControl)) throw new InvalidOperationException("The subagent model exceeds the safety limit.");
+                settings.SubagentModel = value;
+            }
+            if (parameters.TryGetProperty("subagentModelProvider", out var subagentProvider) && subagentProvider.ValueKind == JsonValueKind.String)
+            {
+                var value = subagentProvider.GetString()?.Trim() ?? "";
+                if (value.Length > 128 || value.Any(char.IsControl)) throw new InvalidOperationException("The subagent model provider exceeds the safety limit.");
+                settings.SubagentModelProvider = value;
+            }
+            if (parameters.TryGetProperty("subagentModelSizeBytes", out var subagentSize))
+            {
+                if (subagentSize.ValueKind == JsonValueKind.Null) settings.SubagentModelSizeBytes = null;
+                else if (subagentSize.TryGetInt64(out var bytes) && bytes is >= 0 and <= (1L << 50)) settings.SubagentModelSizeBytes = bytes;
+                else throw new InvalidOperationException("The subagent model size must be between 0 and 1024 GiB.");
+            }
+            if (parameters.TryGetProperty("subagentModelContextLength", out var subagentContext))
+            {
+                if (subagentContext.ValueKind == JsonValueKind.Null) settings.SubagentModelContextLength = null;
+                else if (subagentContext.TryGetInt32(out var tokens) && tokens is >= 0 and <= 16_777_216) settings.SubagentModelContextLength = tokens;
+                else throw new InvalidOperationException("The subagent model context length is invalid.");
             }
             if (parameters.TryGetProperty("ollamaContextWindowTokens", out var contextWindow) && contextWindow.TryGetInt32(out var contextTokens))
             {
@@ -110,7 +138,7 @@ public static partial class AgentHostLoop
             }
         }
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled, personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes });
+        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, subagentModel = settings.SubagentModel, subagentModelProvider = settings.SubagentModelProvider, subagentModelSizeBytes = settings.SubagentModelSizeBytes, subagentModelContextLength = settings.SubagentModelContextLength, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled, personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes });
     }
 
 
