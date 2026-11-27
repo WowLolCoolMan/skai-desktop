@@ -181,7 +181,6 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const [imageRuntime, setImageRuntime] = useState<ImageRuntime | null>(null);
   const [imageRuntimeInstall, setImageRuntimeInstall] = useState<ImageRuntimeInstall | null>(null);
   const [imageRuntimeBusy, setImageRuntimeBusy] = useState(false);
-  const galleryImages = galleryFilter === "all" ? images : images.filter((image) => mediaTypeOf(image) === galleryFilter);
   const [savedWorkflows, setSavedWorkflows] = useState<Workflow[]>(() => {
     try {
       const value = JSON.parse(localStorage.getItem("skai.image.workflows") ?? "[]") as unknown;
@@ -263,6 +262,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
     setWorkflowSettingsOpen(preset.provider === "comfyui" && Boolean(preset.workflow.trim()));
   };
   const mediaTypeOf = (image: ImageResult) => image.mediaType ?? "image";
+  const galleryImages = galleryFilter === "all" ? images : images.filter((image) => mediaTypeOf(image) === galleryFilter);
   const renderMedia = (image: ImageResult, inGallery = false) => mediaTypeOf(image) === "video"
     ? <video className={inGallery ? "visuals-gallery-media" : "visuals-output-media"} src={image.url} muted={inGallery} controls={!inGallery} playsInline preload={inGallery ? "metadata" : "auto"} aria-label={image.fileName} />
     : mediaTypeOf(image) === "audio"
