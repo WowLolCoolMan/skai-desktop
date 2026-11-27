@@ -13,7 +13,7 @@ function modelVisionLabel(vision: string) {
 
 const modelKey = (model: Model) => `${model.provider ?? ""}|${model.endpoint ?? ""}|${model.model}`;
 
-export function ModelsPage({ models, onDiscover, onPull, onCancelPull, onSelect }: { models: Model[]; onDiscover: () => void | Promise<boolean>; onPull: (model: string, onProgress: (message: string) => void) => Promise<boolean>; onCancelPull: () => Promise<boolean>; onSelect: (model: Model) => void }) {
+export function ModelsPage({ models, onDiscover, onPull, onCancelPull, onSelect, onNavigate }: { models: Model[]; onDiscover: () => void | Promise<boolean>; onPull: (model: string, onProgress: (message: string) => void) => Promise<boolean>; onCancelPull: () => Promise<boolean>; onSelect: (model: Model) => void; onNavigate?: (route: "marketplace") => void }) {
   const [query, setQuery] = useState("");
   const [discovering, setDiscovering] = useState(false);
   const [discoveryState, setDiscoveryState] = useState<"idle" | "success" | "error">("idle");
@@ -45,7 +45,7 @@ export function ModelsPage({ models, onDiscover, onPull, onCancelPull, onSelect 
   };
   const cancelPull = async () => { if (!pulling) return; await onCancelPull(); setPullProgress((current) => [...current.slice(-3), "Cancellation requested for the local download."]); };
   return <div className="feature-page models-page">
-    <PageHeader eyebrow="MODEL LIBRARY" title="Choose your model" description="Choose models already running on this computer, or prepare a very large local model through AirLLM." actions={<><span role="status" aria-live="polite" aria-atomic="true"><StatusBadge tone={registryStatus.tone}>{registryStatus.label}</StatusBadge></span><Button variant="primary" disabled={discovering} aria-busy={discovering} onClick={() => void discover()}><NavIcon name="refresh" />{discovering ? "Discovering…" : "Discover local models"}</Button></>} />
+    <PageHeader eyebrow="MODEL LIBRARY" title="Choose your model" description="Choose models already running on this computer, or prepare a very large local model through AirLLM." actions={<><span role="status" aria-live="polite" aria-atomic="true"><StatusBadge tone={registryStatus.tone}>{registryStatus.label}</StatusBadge></span>{onNavigate && <Button variant="ghost" onClick={() => onNavigate("marketplace")}>Manage installed items</Button>}<Button variant="primary" disabled={discovering} aria-busy={discovering} onClick={() => void discover()}><NavIcon name="refresh" />{discovering ? "Discovering…" : "Discover local models"}</Button></>} />
     <section className="models-page-overview" aria-label="Local model readiness">
       <div><span>Ready on this computer</span><strong>{models.length}</strong><small>Models visible to Skai</small></div>
       <div><span>Loaded now</span><strong>{loadedCount}</strong><small>{loadedCount ? "Available without a cold start" : "No runtime-reported loaded models"}</small></div>
