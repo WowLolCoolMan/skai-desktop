@@ -444,20 +444,32 @@ async function run() {
           || body.includes("exhausted action JSON repair smoke")
           ? "```json\n{\"action\":\"done\",\"summary\": }\n```"
           : requestNumber === 1 ? `\`\`\`json\n${action}\n\`\`\`` : action;
-        response.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
+        // The agent considers the model response complete when the terminal
+        // SSE frame is emitted. Decrement before ending the socket so this
+        // probe measures model work, not a few milliseconds of HTTP teardown.
         if (request.method === "POST" && body.length > 0) activeQueueRequests -= 1;
+        response.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
       }, 750);
     });
   });
   pendingSmokeServers.add(queueModelServer);
   await new Promise(resolve => queueModelServer.listen(0, "127.0.0.1", resolve));
   const queueModelPort = queueModelServer.address().port;
-  // Give the mock task a bounded small-model estimate so this execution smoke
-  // tests FIFO dispatch without relying on the physical model installed here.
+  // Give the mock task a bounded large-model estimate so this execution smoke
+  // tests single-slot FIFO dispatch without relying on the physical model
+  // installed here. The mock endpoint itself remains tiny and local.
   const queueSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "queue-smoke-model", provider: "Local API" });
   if (!queueSettings.ok) throw new Error("settings.save could not prepare the queued task smoke endpoint.");
-  const firstQueued = await request("tasks.plan", { title: "First queued task", instruction: "Complete the first queued smoke task.", environment: "local", modelSizeBytes: 512 * 1024 * 1024, modelContextLength: 4096 });
-  const secondQueued = await request("tasks.plan", { title: "Second queued task", instruction: "Complete the second queued smoke task.", environment: "local", modelSizeBytes: 512 * 1024 * 1024, modelContextLength: 4096 });
+  // Re-read the scheduler after selecting the bounded mock model. The capacity
+  // policy intentionally incorporates the selected model size/context, so the
+  // initial health snapshot (taken before this settings change) is not the
+  // contract being exercised by the queued pair below.
+  const queueCapacity = await request("system.capacity");
+  const queueSlotLimit = queueCapacity.result?.scheduler?.executionSlotLimit;
+  if (!queueCapacity.ok || !Number.isInteger(queueSlotLimit) || queueSlotLimit < 1)
+    throw new Error(`system.capacity did not expose a usable queued-task slot limit: ${JSON.stringify(queueCapacity)}`);
+  const firstQueued = await request("tasks.plan", { title: "First queued task", instruction: "Complete the first queued smoke task.", environment: "local", modelSizeBytes: 8 * 1024 * 1024 * 1024, modelContextLength: 4096 });
+  const secondQueued = await request("tasks.plan", { title: "Second queued task", instruction: "Complete the second queued smoke task.", environment: "local", modelSizeBytes: 8 * 1024 * 1024 * 1024, modelContextLength: 4096 });
   if (!firstQueued.ok || !secondQueued.ok) throw new Error("tasks.plan could not create the queued task pair.");
   for (const task of [firstQueued, secondQueued]) {
     const queuedTask = await request("tasks.queue", { id: task.result.id });
@@ -478,8 +490,8 @@ async function run() {
     if ([firstTerminal, secondTerminal].every(task => task && ["completed", "failed", "cancelled", "blocked"].includes(task.status))) break;
   }
   const requestOrderIsFifo = queueRequestBodies[0]?.includes("first queued smoke task") && queueRequestBodies[1]?.includes("second queued smoke task");
-  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || !requestOrderIsFifo || !fencedActionServed || maxActiveQueueRequests < 1 || maxActiveQueueRequests > reportedSlotLimit)
-    throw new Error(`Queued task dispatch or fenced-action recovery failed: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, fencedActionServed, maxActiveQueueRequests, reportedSlotLimit, queueRequestBodies })}`);
+  if (!firstTerminal || firstTerminal.status !== "completed" || !secondTerminal || secondTerminal.status !== "completed" || queueRequests !== 2 || !requestOrderIsFifo || !fencedActionServed || maxActiveQueueRequests < 1 || maxActiveQueueRequests > queueSlotLimit)
+    throw new Error(`Queued task dispatch or fenced-action recovery failed: ${JSON.stringify({ firstTerminal, secondTerminal, queueRequests, fencedActionServed, maxActiveQueueRequests, reportedSlotLimit, queueSlotLimit, queueRequestBodies })}`);
   const ollamaSettings = await request("settings.save", { endpoint: `http://127.0.0.1:${queueModelPort}/v1`, model: "native-tools-smoke-model", provider: "Ollama" });
   if (!ollamaSettings.ok) throw new Error("settings.save could not prepare the native Ollama tool smoke endpoint.");
   const nativeToolTask = await request("tasks.plan", { title: "Native Ollama tools", instruction: "Review the local task workflow.", environment: "local", projectId: project.result.id });

@@ -1107,13 +1107,14 @@ async function main() {
                 for (let i = 0; i < 40; i++) {
                   const panel = document.querySelector('.coding-side-chat');
                   const mainThread = document.querySelector('.project-thread-panel .chat-page.is-coding-agent');
-                  if (panel?.innerText.toLowerCase().includes("completed") && panel.innerText.includes(summary) && mainThread?.innerText.includes("Review this project structure")) return { visible: true, overview: getComputedStyle(document.querySelector('.coding-project-overview')).display, projectHeading: getComputedStyle(document.querySelector('.coding-project-heading')).display, projectContext: getComputedStyle(document.querySelector('.coding-project-context')).display, contextStrip: getComputedStyle(document.querySelector('.coding-context-strip')).display, harness: getComputedStyle(document.querySelector('.coding-harness-adapters')).display, split: document.querySelector('.coding-session-grid')?.classList.contains('is-split-open') };
+                  if (panel?.innerText.toLowerCase().includes("completed") && panel.innerText.includes(summary) && mainThread?.innerText.includes("Review this project structure")) { const mainRect = mainThread.getBoundingClientRect(); const sideRect = panel.getBoundingClientRect(); return { visible: true, mainX: mainRect.left, mainWidth: mainRect.width, sideX: sideRect.left, sideWidth: sideRect.width, overview: getComputedStyle(document.querySelector('.coding-project-overview')).display, projectHeading: getComputedStyle(document.querySelector('.coding-project-heading')).display, projectContext: getComputedStyle(document.querySelector('.coding-project-context')).display, contextStrip: getComputedStyle(document.querySelector('.coding-context-strip')).display, harness: getComputedStyle(document.querySelector('.coding-harness-adapters')).display, split: document.querySelector('.coding-session-grid')?.classList.contains('is-split-open') }; }
                   await new Promise((resolve) => setTimeout(resolve, 100));
                 }
                 const response = await window.skaiAgent.request("tasks.list");
                 return { visible: false, projectId: document.querySelector('.coding-project-heading-actions select')?.value, panel: document.querySelector('.coding-side-chat')?.innerText ?? null, mainThreadFound: Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent')), mainThread: document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText?.slice(0, 240) ?? null, task: response.ok ? response.result.find((item) => item.id === taskId) ?? null : response };
               }, completedSideTask.resultSummary, sideTask.id);
               if (!sideTaskState?.visible || sideTaskState.overview !== "none" || !sideTaskState.split) throw new Error(`The completed Side chat result did not appear in the Codex-style split beside the still-visible main Coding Agent thread: ${JSON.stringify(sideTaskState)}`);
+              if (width >= 761 && (sideTaskState.mainX >= sideTaskState.sideX || sideTaskState.mainWidth < 300 || sideTaskState.sideWidth < 300)) throw new Error(`The main Coding Agent thread and subagent must occupy usable left and right panes: ${JSON.stringify(sideTaskState)}`);
               if (sideTaskState.projectHeading !== "none" || sideTaskState.projectContext !== "none" || sideTaskState.contextStrip !== "none" || sideTaskState.harness !== "none") throw new Error(`Side chat split retained secondary project chrome: ${JSON.stringify(sideTaskState)}`);
               await capturePanel("side-chat");
               console.log(`[coding-side-chat] ${JSON.stringify({ status: completedSideTask.status, requests: sideChatRequests, changedFiles: completedSideTask.changedFiles, summary: completedSideTask.resultSummary })}`);
@@ -1779,6 +1780,23 @@ async function main() {
               const permissionCenter = await cdp.evaluate(`(() => { const panel = document.querySelector('.permission-center'); return { ready: Boolean(panel), heading: panel?.querySelector('h2')?.innerText, sandbox: panel?.innerText.includes('What is sandboxed'), grants: panel?.innerText.includes('CURRENT GRANT RULES'), injection: panel?.innerText.includes('Prompts do not grant access'), audit: panel?.innerText.includes('Permission audit') }; })()`);
               if (!permissionCenter.ready || permissionCenter.heading !== 'Permission center' || !permissionCenter.sandbox || !permissionCenter.grants || !permissionCenter.injection || !permissionCenter.audit) throw new Error(`Permission center did not disclose scopes, sandbox, untrusted-content boundaries, and audit history: ${JSON.stringify(permissionCenter)}`);
               console.log(`[permission-center] ${JSON.stringify(permissionCenter)}`);
+              if (process.env.UI_MATRIX_EXERCISE_SUPPORT === '1') {
+                const supportFlow = await cdp.evaluate(`(async () => {
+                  const root = document.querySelector('.support-bundle-manager');
+                  if (!root) return { ok: false, reason: 'support bundle manager is missing' };
+                  const previewButton = [...root.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Preview bundle');
+                  const downloadButton = [...root.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Download bundle');
+                  const checkboxes = root.querySelectorAll('input[type="checkbox"]');
+                  if (!previewButton || !downloadButton || checkboxes.length !== 4) return { ok: false, reason: 'support bundle controls are missing', checkboxCount: checkboxes.length };
+                  previewButton.click();
+                  let preview = null;
+                  for (let i = 0; i < 80; i++) { preview = root.querySelector('.support-bundle-preview'); if (preview?.innerText.includes('Always excluded')) break; await new Promise((resolve) => setTimeout(resolve, 50)); }
+                  const text = preview?.innerText ?? '';
+                  return { ok: text.includes('Ready to review') && text.includes('Always excluded') && text.includes('Credentials') && text.includes('Machine paths') && downloadButton.disabled === false, redactions: text.includes('User content') && text.includes('Provider routes') };
+                })()`);
+                if (!supportFlow?.ok) throw new Error(`Support bundle workflow was not usable: ${JSON.stringify(supportFlow)}`);
+                console.log(`[support-bundle-workflow] ${JSON.stringify(supportFlow)}`);
+              }
             }
           }
           if (route === "settings" && category === "General" && process.env.UI_MATRIX_EXERCISE_TASK_NOTIFICATION_SETTINGS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {

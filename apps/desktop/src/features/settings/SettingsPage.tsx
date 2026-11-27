@@ -14,6 +14,7 @@ import { PermissionCenter } from "./PermissionCenter";
 import { WorkspaceBackupManager } from "./WorkspaceBackupManager";
 import { TaskNotificationSettings } from "../tasks/TaskNotifications";
 import { CommandWorkflowSettings } from "./CommandWorkflowSettings";
+import { SupportBundleManager } from "./SupportBundleManager";
 
 const categories = ["General", "Shortcuts", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Achievements", "Updates", "Advanced"] as const;
 type Category = typeof categories[number];
@@ -305,7 +306,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Integrations" && <><Integration title="GitHub project workflow" detail="Available from the Coding workspace through your local GitHub CLI session. Skai does not collect a separate token here." status="Available" /><Integration title="Local services" detail="Ollama, LM Studio, AirLLM, OS speech, and ComfyUI use local endpoints." status={localRoute ? "Available" : "Needs setup"} /></>}
 
-        {activeCategory === "Privacy & Security" && <><div className="settings-callout"><strong>Local route in use</strong><span>Prompts, attachments, memory, voice, and image requests stay on this computer.</span></div><p className="settings-help">GitHub is used only for explicit project workflows. Local model and media endpoints are restricted to loopback addresses.</p><Toggle label="Use saved memory in prompts" detail="This is also available in Agents so the setting is easy to find." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><PermissionCenter /></>}
+        {activeCategory === "Privacy & Security" && <><div className="settings-callout"><strong>Local route in use</strong><span>Prompts, attachments, memory, voice, and image requests stay on this computer.</span></div><p className="settings-help">GitHub is used only for explicit project workflows. Local model and media endpoints are restricted to loopback addresses.</p><Toggle label="Use saved memory in prompts" detail="This is also available in Agents so the setting is easy to find." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><PermissionCenter /><SupportBundleManager /></>}
 
         {activeCategory === "Storage" && <WorkspaceBackupManager />}
 

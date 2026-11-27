@@ -18,6 +18,8 @@ internal static class WebSearchTests
     {
         var searchProvider = new WebSearchProvider(new HttpClient(new StubHandler((request, _) =>
         {
+            if (request.RequestUri?.Host == "127.0.0.1")
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             Check(request.RequestUri?.Host == "html.duckduckgo.com", "opt-in web search uses the configured public search endpoint");
             var html = "<a class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.org%2Fdocs&amp;rut=abc\">Local &amp; private</a><a class=\"result__snippet\">Read <b>official</b> docs.</a>";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(html) });

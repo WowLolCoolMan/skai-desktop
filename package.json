@@ -71,6 +71,7 @@
     "smoke:documents-only": "node scripts/smoke-documents-only.cjs",
     "smoke:memory": "node scripts/smoke-memory.cjs",
     "smoke:workspace-backup": "node scripts/smoke-workspace-backup.cjs",
+    "smoke:support-bundle": "node scripts/smoke-support-bundle.cjs",
     "check:syntax:workspace-backup": "node --check scripts/smoke-workspace-backup.cjs",
     "smoke:pdf-attachment": "node scripts/smoke-pdf-attachment.cjs",
     "test": "dotnet run --project native/SkaiDesktop.Core.Tests/SkaiDesktop.Core.Tests.csproj",
