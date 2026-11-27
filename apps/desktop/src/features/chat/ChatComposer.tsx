@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
-import type { ChatAttachment, DesktopQueuedMessage } from "../../../shared/contracts";
+import type { ChatAttachment, DesktopProject, DesktopQueuedMessage } from "../../../shared/contracts";
 import type { Model, Route } from "../../app/types";
 import { Button } from "../../components/ui/Primitives";
 import { NavIcon } from "../../components/ui/NavIcon";
@@ -38,11 +38,14 @@ type ChatComposerProps = {
   onEditQueued?: (index: number) => void;
   onOpenTaskPlanner?: () => void;
   accessLabel?: string;
+  projects?: DesktopProject[];
+  projectId?: string | null;
+  onOpenProject?: (project: DesktopProject) => void;
 };
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onEditQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access" }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onQueueRemove, onEditQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
 
@@ -283,6 +286,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
             <button className="composer-menu-option" type="button" role="menuitem" onClick={() => { setOmniOpen(false); onNavigate("marketplace"); }}><NavIcon name="marketplace" /><span><strong>Browse tools and skills</strong><small>Explore available local integrations</small></span></button>
           </div>}
         </div>
+        {projects.length > 0 && onOpenProject && <label className="composer-project-switcher"><NavIcon name="project" /><span className="sr-only">Open a project workspace</span><select aria-label="Open a project workspace" value={projectId ?? ""} onChange={(event) => { const project = projects.find((item) => item.id === event.target.value); if (project) onOpenProject(project); }}><option value="">Open project…</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}
         <div className="composer-access-anchor" ref={accessMenuRef}>
           <button ref={accessTriggerRef} type="button" className="composer-access-button" onClick={() => setAccessOpen((open) => !open)} aria-haspopup="dialog" aria-expanded={accessOpen}>{accessLabel}<span aria-hidden="true">⌄</span></button>
           {accessOpen && <section className="composer-access-popover" role="dialog" aria-label={accessLabel}><strong>{accessLabel}</strong><p>Skai’s project tools can access folders you connect to a workspace. Skai does not provide unrestricted access to the whole computer.</p></section>}

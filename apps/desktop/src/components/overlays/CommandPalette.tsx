@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { Route } from "../../app/types";
+import type { DesktopProject } from "../../../shared/contracts";
 import { ModalDialog } from "../ui/ModalDialog";
 import { NavIcon } from "../ui/NavIcon";
 import { themeCommands } from "../../theme/themeCommands";
 import { unlockAchievement } from "../../features/settings/easterEggs";
 
-type Command = { id: string; label: string; detail: string; route?: Route; run?: () => void };
+type Command = { id: string; label: string; detail: string; route?: Route; project?: DesktopProject; run?: () => void };
 const commands: Command[] = [
   { id: "chat", label: "Open Chat", detail: "Start or continue a conversation", route: "chat" },
   { id: "projects", label: "Open Projects", detail: "Browse and choose a local workspace", route: "projects" },
@@ -20,15 +21,16 @@ const commands: Command[] = [
   ...themeCommands,
 ];
 
-export function CommandPalette({ open, onClose, onNavigate }: { open: boolean; onClose: () => void; onNavigate: (route: Route) => void }) {
+export function CommandPalette({ open, onClose, onNavigate, projects = [], onOpenProject }: { open: boolean; onClose: () => void; onNavigate: (route: Route) => void; projects?: DesktopProject[]; onOpenProject?: (project: DesktopProject) => void }) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const matches = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const easterEggCommands: Command[] = normalized === "hello skai" ? [{ id: "easter-hello-skai", label: "Say hello to Skai", detail: "A small hello from the team", run: () => unlockAchievement("hello-skai") }] : normalized === "sudo make me coffee" ? [{ id: "easter-coffee", label: "Make me coffee", detail: "Try the coffee dependency", run: () => unlockAchievement("coffee-command") }] : [];
-    return [...commands.filter((command) => `${command.label} ${command.detail}`.toLowerCase().includes(normalized)), ...easterEggCommands];
-  }, [query]);
+    const projectCommands = projects.map((project): Command => ({ id: `project-${project.id}`, label: `Open project: ${project.name}`, detail: project.folderPaths.join(" · ") || "Project workspace", project }));
+    return [...commands, ...projectCommands].filter((command) => `${command.label} ${command.detail}`.toLowerCase().includes(normalized)).concat(easterEggCommands);
+  }, [projects, query]);
   useEffect(() => {
     if (!open) {
       return;
@@ -37,7 +39,7 @@ export function CommandPalette({ open, onClose, onNavigate }: { open: boolean; o
     setActiveIndex(0);
   }, [open]);
   useEffect(() => { setActiveIndex((current) => Math.min(current, Math.max(0, matches.length - 1))); }, [matches.length]);
-  const openCommand = (command: Command) => { if (command.run) command.run(); else if (command.route) onNavigate(command.route); onClose(); };
+  const openCommand = (command: Command) => { if (command.run) command.run(); else if (command.project) onOpenProject?.(command.project); else if (command.route) onNavigate(command.route); onClose(); };
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
     if (event.key === "ArrowDown" && matches.length > 0) { event.preventDefault(); setActiveIndex((current) => (current + 1) % matches.length); return; }
