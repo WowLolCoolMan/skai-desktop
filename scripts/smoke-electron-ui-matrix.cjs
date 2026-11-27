@@ -716,6 +716,14 @@ async function main() {
             await clickButtonText(cdp, "Run command", ".coding-terminal-inspector");
             const terminalResult = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const result = document.querySelector('.coding-terminal-inspector .terminal-result'); if (result?.innerText.includes('terminal-ui-smoke')) return result.innerText; await new Promise((resolve) => setTimeout(resolve, 100)); } return null; })()`);
             if (!terminalResult || !terminalResult.includes('exit 0')) throw new Error(`The project terminal did not return a successful bounded command result: ${JSON.stringify(terminalResult)}`);
+            const terminalOutputControls = await cdp.evaluate(`(() => [...document.querySelectorAll('.coding-terminal-inspector .terminal-output-actions button')].map((button) => button.textContent?.trim()))()`);
+            if (!['Copy', 'Export', 'Clear'].every((label) => terminalOutputControls.includes(label))) throw new Error(`Terminal output is missing copy, bounded export, or clear controls: ${JSON.stringify(terminalOutputControls)}`);
+            await clickButtonText(cdp, 'Clear', '.coding-terminal-inspector .terminal-output-actions');
+            const terminalCleared = await cdp.evaluate(`Boolean(document.querySelector('.coding-terminal-inspector .terminal-output-actions') && !document.querySelector('.coding-terminal-inspector .terminal-output-block pre'))`);
+            if (!terminalCleared) throw new Error('Clear did not hide the displayed terminal output.');
+            await clickButtonText(cdp, 'Show', '.coding-terminal-inspector .terminal-output-actions');
+            const terminalRestored = await cdp.evaluate(`document.querySelector('.coding-terminal-inspector .terminal-output-block pre')?.innerText.includes('terminal-ui-smoke')`);
+            if (!terminalRestored) throw new Error('Show did not restore the buffered terminal output after Clear.');
             if (process.env.UI_MATRIX_CAPTURE === "1") {
               fs.mkdirSync(captureDirectory, { recursive: true });
               const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });

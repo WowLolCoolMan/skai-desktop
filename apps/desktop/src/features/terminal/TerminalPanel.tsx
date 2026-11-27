@@ -2,6 +2,33 @@ import { useEffect, useState } from "react";
 import type { DesktopProject } from "../../../shared/contracts";
 import { Button, Card, EmptyState } from "../../components/ui/Primitives";
 
+function TerminalOutput({ text, exitCode, label, className = "" }: { text: string; exitCode: number | null; label: string; className?: string }) {
+  const [hidden, setHidden] = useState(false);
+  const [message, setMessage] = useState("");
+  useEffect(() => { setHidden(false); setMessage(""); }, [text]);
+  const copy = async () => {
+    let copied = false;
+    try { if (navigator.clipboard) { await navigator.clipboard.writeText(text); copied = true; } } catch { /* Use the protected desktop clipboard bridge below. */ }
+    if (!copied) { try { copied = await window.skaiAgent?.clipboard?.writeText(text) ?? false; } catch { /* Clipboard access can be unavailable. */ } }
+    setMessage(copied ? "Copied" : "Copy unavailable");
+  };
+  const exportOutput = () => {
+    const maxCharacters = 100_000;
+    const truncated = text.length > maxCharacters;
+    const contents = `${text.slice(0, maxCharacters)}${truncated ? "\n\n[Export limited to the first 100,000 characters.]" : ""}`;
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([contents], { type: "text/plain;charset=utf-8" }));
+    link.download = `skai-terminal-output-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setMessage(truncated ? "Exported (first 100,000 characters)" : "Exported");
+  };
+  return <section className="terminal-output-block" aria-label={label}>
+    <div className="terminal-output-actions"><span>{exitCode === null ? label : `exit ${exitCode}`}</span><div><Button variant="ghost" onClick={() => void copy()}>Copy</Button><Button variant="ghost" onClick={exportOutput}>Export</Button><Button variant="ghost" onClick={() => { setHidden((value) => !value); setMessage(""); }}>{hidden ? "Show" : "Clear"}</Button>{message && <small role="status">{message}</small>}</div></div>
+    {!hidden && <pre tabIndex={0} className={exitCode === 0 ? `terminal-result ${className}`.trim() : `terminal-result terminal-failure ${className}`.trim()}>{text}</pre>}
+  </section>;
+}
+
 type TerminalPanelProps = {
   projects: DesktopProject[];
   initialProjectId?: string | null;
@@ -99,9 +126,9 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
       <input value={command} onChange={(event) => setCommand(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") run(); }} placeholder={targetMode === "ssh" ? "git status" : "git status"} aria-label={targetMode === "ssh" ? "Remote SSH command" : "Terminal command"} />
       <Button variant="primary" disabled={busy || sshBusy || !command.trim() || !projectId || targetMode === "ssh" && (!sshHost.trim() || !sshUsername.trim())} onClick={run}>{busy || sshBusy ? "Running…" : targetMode === "ssh" ? "Run on devbox" : "Run command"}</Button>
     </div>
-    {targetMode === "local" && output !== null && <pre tabIndex={0} className={exitCode === 0 ? "terminal-result" : "terminal-result terminal-failure"}><span>exit {exitCode}</span>{output}</pre>}
+    {targetMode === "local" && output !== null && <TerminalOutput text={output} exitCode={exitCode} label="Local command output" />}
     {targetMode === "ssh" && sshError && <p className="terminal-error" role="alert">{sshError}</p>}
-    {targetMode === "ssh" && sshOutput !== null && <pre tabIndex={0} className={sshExitCode === 0 ? "terminal-result" : "terminal-result terminal-failure"}><span>exit {sshExitCode}</span>{sshOutput}</pre>}</>}
-    {projects.length > 0 && onStartSession && <div className="terminal-session"><div className="terminal-session-heading"><div><p className="section-kicker">PERSISTENT PTY</p><h3>{sessionId ? "Session connected" : "Keep a shell open"}</h3></div><span className="terminal-safety-note">{sessionId ? "Local session" : "Not started"}</span></div>{sessionId ? <><pre className="terminal-result terminal-screen" aria-live="polite">{screen || "Starting shell…"}</pre><div className="terminal-command-row"><input value={sessionInput} onChange={(event) => setSessionInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendSessionInput(); }} placeholder="Type shell input…" aria-label="Persistent terminal input" /><Button variant="secondary" disabled={!sessionInput} onClick={() => void sendSessionInput()}>Send</Button><Button variant="ghost" onClick={() => void onRefreshSession?.()}>Refresh</Button><Button variant="danger" onClick={() => void onCloseSession?.()}>Close</Button></div></> : <div className="form-footer"><span>Interactive input persists between commands while this workspace is open.</span><Button variant="secondary" disabled={busy || !projectId} onClick={startSession}>Start persistent session</Button></div>}</div>}
+    {targetMode === "ssh" && sshOutput !== null && <TerminalOutput text={sshOutput} exitCode={sshExitCode} label="SSH command output" />}</>}
+    {projects.length > 0 && onStartSession && <div className="terminal-session"><div className="terminal-session-heading"><div><p className="section-kicker">PERSISTENT PTY</p><h3>{sessionId ? "Session connected" : "Keep a shell open"}</h3></div><span className="terminal-safety-note">{sessionId ? "Local session" : "Not started"}</span></div>{sessionId ? <><TerminalOutput key={`${sessionId}:${screen}`} text={screen || "Starting shell…"} exitCode={0} label="Persistent terminal screen" className="terminal-screen" /><div className="terminal-command-row"><input value={sessionInput} onChange={(event) => setSessionInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendSessionInput(); }} placeholder="Type shell input…" aria-label="Persistent terminal input" /><Button variant="secondary" disabled={!sessionInput} onClick={() => void sendSessionInput()}>Send</Button><Button variant="ghost" onClick={() => void onRefreshSession?.()}>Refresh</Button><Button variant="danger" onClick={() => void onCloseSession?.()}>Close</Button></div></> : <div className="form-footer"><span>Interactive input persists between commands while this workspace is open.</span><Button variant="secondary" disabled={busy || !projectId} onClick={startSession}>Start persistent session</Button></div>}</div>}
   </Card>;
 }

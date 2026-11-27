@@ -4549,3 +4549,4 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .queued-message-edit button:not(:disabled):hover, .queued-message-actions button:not(:disabled):hover { color: var(--skai-color-text); border-color: var(--skai-color-accent); }
 .queued-message-edit button:disabled, .queued-message-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .queued-message-edit small { color: var(--skai-color-text-muted); }
+.terminal-output-block { min-width: 0; }.terminal-output-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }.terminal-output-actions > div { display: flex; align-items: center; gap: 4px; }.terminal-output-actions .ui-button { min-height: 30px; padding: 4px 8px; }.terminal-output-actions small { color: var(--skai-color-success); }
