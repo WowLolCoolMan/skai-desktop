@@ -605,12 +605,14 @@ async function run() {
   if (rejectedEnvironment.ok || !rejectedEnvironment.error?.message.includes("Choose Local or isolated worktree")) throw new Error("tasks.plan accepted an unsupported environment.");
   const missingWorktreeProject = await request("tasks.plan", { title: "Missing worktree project", instruction: "Must be rejected.", environment: "worktree" });
   if (missingWorktreeProject.ok || !missingWorktreeProject.error?.message.includes("need one existing project folder")) throw new Error("tasks.plan accepted an isolated worktree without a selected project.");
-  const worktreePlan = await request("tasks.plan", { title: "Isolated worktree plan", instruction: "Verify the isolated environment selection.", environment: "worktree", projectId: project.result.id });
+  const rejectedIssueLink = await request("tasks.plan", { title: "Invalid issue link", instruction: "Must be rejected.", gitHubIssueUrl: "https://example.com/owner/repo/issues/7" });
+  if (rejectedIssueLink.ok) throw new Error("tasks.plan accepted a non-GitHub issue link.");
+  const worktreePlan = await request("tasks.plan", { title: "Isolated worktree plan", instruction: "Verify the isolated environment selection.", environment: "worktree", projectId: project.result.id, gitHubIssueUrl: "https://github.com/skai-smoke/example/issues/7", acceptanceCriteria: "The change has a focused verification check." });
   if (!worktreePlan.ok || worktreePlan.result?.environment !== "worktree" || worktreePlan.result?.projectId !== project.result.id)
     throw new Error(`tasks.plan did not preserve the isolated worktree and project selection: ${JSON.stringify(worktreePlan)}`);
   const worktreePlanList = await request("tasks.list");
   const persistedWorktreePlan = worktreePlanList.result?.find(task => task.id === worktreePlan.result.id);
-  if (!worktreePlanList.ok || persistedWorktreePlan?.environment !== "worktree" || persistedWorktreePlan?.projectId !== project.result.id)
+  if (!worktreePlanList.ok || persistedWorktreePlan?.environment !== "worktree" || persistedWorktreePlan?.projectId !== project.result.id || persistedWorktreePlan?.gitHubIssueUrl !== "https://github.com/skai-smoke/example/issues/7" || persistedWorktreePlan?.acceptanceCriteria !== "The change has a focused verification check.")
     throw new Error(`tasks.list did not preserve the isolated worktree plan: ${JSON.stringify(persistedWorktreePlan)}`);
   const delegationParent = await request("tasks.plan", { title: "Manual delegation smoke", instruction: "Coordinate two independent review tasks.", environment: "local", projectId: project.result.id });
   if (!delegationParent.ok) throw new Error(`Could not create the manual delegation parent: ${JSON.stringify(delegationParent)}`);

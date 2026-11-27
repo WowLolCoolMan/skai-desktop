@@ -22,6 +22,8 @@ public static partial class AgentHostLoop
                 id = task.Id,
                 title = task.Title,
                 instruction = task.Instruction,
+                gitHubIssueUrl = task.GitHubIssueUrl,
+                acceptanceCriteria = task.AcceptanceCriteria,
                 followUpInstructions = task.FollowUpInstructions,
                 responseMode = ChatResponseModes.IsValid(task.ResponseMode) ? task.ResponseMode : ChatResponseModes.Coding,
                 environment = task.Environment,
@@ -57,6 +59,10 @@ public static partial class AgentHostLoop
             && !string.Equals(environment, "worktree", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Choose Local or isolated worktree execution.");
         var projectId = OptionalString(request, "projectId");
+        var gitHubIssueUrl = OptionalString(request, "gitHubIssueUrl");
+        var acceptanceCriteria = OptionalString(request, "acceptanceCriteria");
+        if (gitHubIssueUrl?.Length > 512) throw new ArgumentException("The GitHub issue URL cannot exceed 512 characters.");
+        if (acceptanceCriteria?.Length > AgentTaskArtifactStore.MaxInstructionCharacters) throw new ArgumentException("Acceptance criteria cannot exceed 4,000 characters.");
         if (string.Equals(environment, "worktree", StringComparison.OrdinalIgnoreCase))
         {
             var project = projectId is null ? null : CreateProjectStore().Load().SingleOrDefault(item => item.Id == projectId);
@@ -77,11 +83,14 @@ public static partial class AgentHostLoop
             modelSizeBytes: OptionalLong(request, "modelSizeBytes"),
             modelContextLength: OptionalInt(request, "modelContextLength"),
             airLlmCompatible: OptionalBoolean(request, "airLlmCompatible"),
-            environment: environment);
+            environment: environment,
+            gitHubIssueUrl: gitHubIssueUrl,
+            acceptanceCriteria: acceptanceCriteria);
         EnsureTaskJournal(task);
         var proposedMetadata = new Dictionary<string, string> { ["requiresApproval"] = task.RequiresApproval ? "true" : "false" };
         if (!string.IsNullOrWhiteSpace(task.ProjectId)) proposedMetadata["projectId"] = task.ProjectId;
         if (!string.IsNullOrWhiteSpace(task.ConversationId)) proposedMetadata["conversationId"] = task.ConversationId;
+        if (!string.IsNullOrWhiteSpace(task.GitHubIssueUrl)) proposedMetadata["gitHubIssueUrl"] = task.GitHubIssueUrl;
         AppendTaskJournalEvent(task, "task.proposed", proposedMetadata);
         return new(ProtocolVersion, request.Id, true, new
         {
@@ -90,6 +99,7 @@ public static partial class AgentHostLoop
             status = task.Status,
             environment = task.Environment,
             projectId = task.ProjectId,
+            gitHubIssueUrl = task.GitHubIssueUrl,
             requiresApproval = task.RequiresApproval,
             updatedAt = task.UpdatedAtUtc,
         });
@@ -454,7 +464,7 @@ public static partial class AgentHostLoop
             var messages = new List<ChatMessage>
             {
                 new("system", system),
-                new("user", $"Task: {task.Instruction}\n\nProject: {project?.Name ?? "No project selected"}\n\nReadable project files:\n{string.Join("\n", files.Select(file => $"- {file.RelativePath} ({file.Bytes} bytes)"))}"),
+                new("user", $"Task: {task.Instruction}\n\n{(task.GitHubIssueUrl is null ? string.Empty : $"GitHub issue: {task.GitHubIssueUrl}\n\n")}{(task.AcceptanceCriteria is null ? string.Empty : $"Acceptance criteria:\n{task.AcceptanceCriteria}\n\n")}Project: {project?.Name ?? "No project selected"}\n\nReadable project files:\n{string.Join("\n", files.Select(file => $"- {file.RelativePath} ({file.Bytes} bytes)"))}"),
             };
             var useNativeOllamaTools = project is not null && string.Equals(settings.ModelProvider, "Ollama", StringComparison.OrdinalIgnoreCase);
             var ollamaMessages = useNativeOllamaTools

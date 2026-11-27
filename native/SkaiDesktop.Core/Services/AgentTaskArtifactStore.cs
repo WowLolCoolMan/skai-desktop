@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using SkaiDesktop.Core.Infrastructure;
 using SkaiDesktop.Core.Models;
 
@@ -43,7 +44,7 @@ public sealed class AgentTaskArtifactStore
         }
     }
 
-    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null, string responseMode = ChatResponseModes.Coding, string? model = null, string? modelProvider = null, long? modelSizeBytes = null, int? modelContextLength = null, bool airLlmCompatible = false, string environment = "local")
+    public AgentTaskArtifact Create(string title, string instruction, string role = "specialist", string? parentRunId = null, IEnumerable<string>? dependsOn = null, bool requiresApproval = false, string? projectId = null, string? conversationId = null, string responseMode = ChatResponseModes.Coding, string? model = null, string? modelProvider = null, long? modelSizeBytes = null, int? modelContextLength = null, bool airLlmCompatible = false, string environment = "local", string? gitHubIssueUrl = null, string? acceptanceCriteria = null)
     {
         var now = DateTimeOffset.UtcNow;
         var task = new AgentTaskArtifact
@@ -62,6 +63,8 @@ public sealed class AgentTaskArtifactStore
             ParentRunId = NormalizeOptional(parentRunId, 128, "parent run ID"),
             ProjectId = NormalizeOptional(projectId, 128, "project ID"),
             ConversationId = NormalizeOptional(conversationId, 128, "conversation ID"),
+            GitHubIssueUrl = NormalizeGitHubIssueUrl(gitHubIssueUrl),
+            AcceptanceCriteria = NormalizeOptional(acceptanceCriteria, MaxInstructionCharacters, "acceptance criteria"),
             DependsOn = NormalizeIds(dependsOn),
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -395,6 +398,8 @@ public sealed class AgentTaskArtifactStore
             NormalizeOptional(task.ParentRunId, 128, "parent run ID");
             NormalizeOptional(task.ProjectId, 128, "project ID");
             NormalizeOptional(task.ConversationId, 128, "conversation ID");
+            task.GitHubIssueUrl = NormalizeGitHubIssueUrl(task.GitHubIssueUrl);
+            NormalizeOptional(task.AcceptanceCriteria, MaxInstructionCharacters, "acceptance criteria");
             NormalizeIds(task.DependsOn);
             if (task.VerificationEvidence is { } evidence)
             {
@@ -436,6 +441,22 @@ public sealed class AgentTaskArtifactStore
         return Normalize(value, maxLength, label);
     }
 
+    private static string? NormalizeGitHubIssueUrl(string? value)
+    {
+        var normalized = NormalizeOptional(value, 512, "GitHub issue URL");
+        if (normalized is null) return null;
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || !uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Port != 443
+            || uri.UserInfo.Length > 0
+            || uri.Query.Length > 0
+            || uri.Fragment.Length > 0
+            || !Regex.IsMatch(uri.AbsolutePath, @"^/[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}/issues/[1-9][0-9]{0,15}/?$", RegexOptions.CultureInvariant))
+            throw new ArgumentException("Use a GitHub issue link in the form https://github.com/owner/repository/issues/123.", nameof(value));
+        return $"https://github.com{uri.AbsolutePath.TrimEnd('/')}";
+    }
+
     private static string NormalizeEnvironment(string? value)
     {
         if (string.Equals(value, "local", StringComparison.OrdinalIgnoreCase)) return "local";
@@ -463,6 +484,8 @@ public sealed class AgentTaskArtifactStore
         ParentRunId = source.ParentRunId,
         ProjectId = source.ProjectId,
         ConversationId = source.ConversationId,
+        GitHubIssueUrl = source.GitHubIssueUrl,
+        AcceptanceCriteria = source.AcceptanceCriteria,
         Title = source.Title,
         Instruction = source.Instruction,
         FollowUpInstructions = source.FollowUpInstructions.ToList(),

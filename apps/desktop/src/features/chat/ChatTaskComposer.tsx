@@ -27,7 +27,7 @@ function consumeTaskPrefill(): TaskPrefill | null {
 
 export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expanded, showToggle = true, onExpand, worktreeAvailable = false }: {
   busy: boolean;
-  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, requiresApproval: boolean) => Promise<boolean>;
+  onPlanTask: (title: string, instruction: string, environment: TaskEnvironment, requiresApproval: boolean, gitHubIssueUrl?: string, acceptanceCriteria?: string) => Promise<boolean>;
   initialOpen?: boolean;
   expanded?: boolean;
   showToggle?: boolean;
@@ -40,6 +40,8 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
   const [instruction, setInstruction] = useState("");
   const [environment, setEnvironment] = useState<TaskEnvironment>("local");
   const [requiresApproval, setRequiresApproval] = useState(true);
+  const [gitHubIssueUrl, setGitHubIssueUrl] = useState("");
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -70,7 +72,12 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
     const safeTitle = title.trim().slice(0, 200);
     const safeInstruction = instruction.trim().slice(0, 6000);
     if (!safeTitle || !safeInstruction || busy) return;
-    const saved = await onPlanTask(safeTitle, safeInstruction, environment, requiresApproval);
+    const safeIssueUrl = gitHubIssueUrl.trim();
+    if (safeIssueUrl && !/^https:\/\/github\.com\/[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}\/issues\/[1-9][0-9]{0,15}\/?$/i.test(safeIssueUrl)) {
+      setStatus("Use a GitHub issue link like https://github.com/owner/repository/issues/123.");
+      return;
+    }
+    const saved = await onPlanTask(safeTitle, safeInstruction, environment, requiresApproval, safeIssueUrl, acceptanceCriteria.trim().slice(0, 4_000));
     setStatus(saved ? "Plan saved to this conversation for review." : "The plan could not be saved. Check the status message and retry.");
   };
 
@@ -80,7 +87,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
       {showToggle && <Button variant="secondary" type="button" aria-expanded={open} aria-controls="chat-task-composer-fields" onClick={() => setLocalOpen((value) => !value)}>{open ? "Hide planner" : "Plan a task"}</Button>}
     </div>
     {open && <form id="chat-task-composer-fields" onSubmit={(event) => void submit(event)}>
-      <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={3} onChange={(event) => setInstruction(event.target.value)} required /></label></div>
+      <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={3} onChange={(event) => setInstruction(event.target.value)} required /></label><label>GitHub issue link <span className="settings-help">Optional · links the plan to its issue</span><input value={gitHubIssueUrl} maxLength={512} type="url" placeholder="https://github.com/owner/repository/issues/123" onChange={(event) => setGitHubIssueUrl(event.target.value)} /></label><label>Acceptance criteria <span className="settings-help">Optional · included in the agent task context</span><textarea value={acceptanceCriteria} maxLength={4000} rows={2} placeholder="List the checks or outcomes this task must satisfy…" onChange={(event) => setAcceptanceCriteria(event.target.value)} /></label></div>
       <EnvironmentPicker value={environment} worktreeAvailable={worktreeAvailable} onChange={setEnvironment} />
       <label className="task-require-approval"><input type="checkbox" checked={requiresApproval} onChange={(event) => setRequiresApproval(event.target.checked)} /> Require approval before starting the local agent run</label>
       <div className="task-composer-footer"><span role="status">{status || "Review the brief before saving the plan."}</span><Button variant="primary" type="submit" disabled={busy || !title.trim() || !instruction.trim()}>{busy ? "Saving plan…" : "Save plan in thread"}</Button></div>

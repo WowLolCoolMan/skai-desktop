@@ -196,6 +196,8 @@ export type DesktopTask = {
   worktreeBranch?: string | null;
   projectId?: string | null;
   conversationId?: string | null;
+  gitHubIssueUrl?: string | null;
+  acceptanceCriteria?: string | null;
   parentRunId?: string | null;
   changedFiles?: string[];
   role: string;

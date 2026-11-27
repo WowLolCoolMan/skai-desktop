@@ -13,10 +13,19 @@ internal static class AgentTaskArtifactTests
         try
         {
             var store = new AgentTaskArtifactStore(Path.Combine(root, "agent-tasks.json"));
-            var first = store.Create("Inspect provider routing", "Review capability preflight evidence.", "researcher", "run-1", responseMode: ChatResponseModes.Security, model: "org/model-8b", modelProvider: "AirLLM", modelSizeBytes: 8L << 30, modelContextLength: 131072, airLlmCompatible: true);
+            var first = store.Create("Inspect provider routing", "Review capability preflight evidence.", "researcher", "run-1", responseMode: ChatResponseModes.Security, model: "org/model-8b", modelProvider: "AirLLM", modelSizeBytes: 8L << 30, modelContextLength: 131072, airLlmCompatible: true, gitHubIssueUrl: "https://github.com/skai/example/issues/42/", acceptanceCriteria: "The issue context survives reload.");
             var second = store.Create("Verify the routing change", "Check the result against the first task.", "verifier", dependsOn: [first.Id]);
             var isolated = store.Create("Isolated task", "Keep the main checkout unchanged.", environment: "worktree");
-            Check(first.Status == AgentTaskStatuses.Proposed && first.ResponseMode == ChatResponseModes.Security && store.Get(first.Id).ResponseMode == ChatResponseModes.Security && store.Get(first.Id).Model == "org/model-8b" && store.Get(first.Id).AirLlmCompatible && second.DependsOn.SequenceEqual([first.Id]), "agent task artifacts persist response mode and model capacity metadata alongside roles and dependencies");
+            Check(first.Status == AgentTaskStatuses.Proposed && first.ResponseMode == ChatResponseModes.Security && store.Get(first.Id).ResponseMode == ChatResponseModes.Security && store.Get(first.Id).Model == "org/model-8b" && store.Get(first.Id).AirLlmCompatible && first.GitHubIssueUrl == "https://github.com/skai/example/issues/42" && first.AcceptanceCriteria == "The issue context survives reload." && second.DependsOn.SequenceEqual([first.Id]), "agent task artifacts persist response mode, model capacity, GitHub issue context, and acceptance criteria");
+            try
+            {
+                store.Create("Invalid issue context", "Reject non-GitHub issue links.", gitHubIssueUrl: "https://example.com/skai/example/issues/42");
+                throw new Exception("Expected a non-GitHub issue URL to be rejected.");
+            }
+            catch (ArgumentException)
+            {
+                Check(true, "agent task artifacts reject issue links outside canonical GitHub issue URLs");
+            }
             Check(isolated.Environment == "worktree" && store.Get(isolated.Id).Environment == "worktree", "agent task environment persists across store reloads");
             Check(store.GetNextReady() is null, "agent task readiness preview ignores proposed tasks");
             Check(store.TryClaimReady() is null, "queued dependent agent task is not claimable before its prerequisite is queued and completed");

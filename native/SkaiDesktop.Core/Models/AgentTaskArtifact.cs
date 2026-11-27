@@ -20,6 +20,8 @@ public sealed class AgentTaskArtifact
     public string? ParentRunId { get; set; }
     public string? ProjectId { get; set; }
     public string? ConversationId { get; set; }
+    public string? GitHubIssueUrl { get; set; }
+    public string? AcceptanceCriteria { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Instruction { get; set; } = string.Empty;
     public List<string> FollowUpInstructions { get; set; } = [];
