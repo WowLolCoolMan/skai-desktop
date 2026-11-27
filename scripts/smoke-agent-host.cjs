@@ -617,13 +617,13 @@ async function run() {
   const queuedDelegationParent = await request("tasks.queue", { id: delegationParent.result.id });
   if (!queuedDelegationParent.ok) throw new Error(`Could not queue the manual delegation parent: ${JSON.stringify(queuedDelegationParent)}`);
   const delegatedWorkers = await request("tasks.delegate", { parentId: delegationParent.result.id, workers: [
-    { title: "Review reliability", instruction: "Inspect failure recovery behavior and report concrete findings.", role: "reviewer" },
+    { title: "Review reliability", instruction: "Inspect failure recovery behavior and report concrete findings.", role: "reviewer", model: "specialist-smoke-model", modelProvider: "Local API", modelSizeBytes: 2_000_000, modelContextLength: 4096 },
     { title: "Review accessibility", instruction: "Inspect keyboard and screen reader behavior and report concrete findings.", role: "verifier" },
   ] });
   if (!delegatedWorkers.ok || delegatedWorkers.result?.length !== 2) throw new Error(`The host did not create the requested specialist tasks: ${JSON.stringify(delegatedWorkers)}`);
   const delegationSnapshot = await request("tasks.list");
   const persistedWorkers = delegationSnapshot.result?.filter(task => task.parentRunId === delegationParent.result.id) ?? [];
-  if (!delegationSnapshot.ok || persistedWorkers.length !== 2 || persistedWorkers.some(task => task.status !== "proposed") || !persistedWorkers.some(task => task.role === "reviewer") || !persistedWorkers.some(task => task.role === "verifier"))
+  if (!delegationSnapshot.ok || persistedWorkers.length !== 2 || persistedWorkers.some(task => task.status !== "proposed") || !persistedWorkers.some(task => task.role === "reviewer" && task.model === "specialist-smoke-model" && task.modelProvider === "Local API" && task.modelSizeBytes === 2_000_000 && task.modelContextLength === 4096) || !persistedWorkers.some(task => task.role === "verifier"))
     throw new Error(`Manual specialist tasks were not persisted as reviewable proposed work: ${JSON.stringify(persistedWorkers)}`);
   const retainedCleanWorktree = attachSmokeWorktree(worktreePlan.result.id);
   const releasedWorktree = await request("tasks.worktree.release", { id: worktreePlan.result.id });

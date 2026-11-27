@@ -222,7 +222,7 @@ export type DesktopTask = {
   updatedAt: string;
 };
 
-export type DesktopTaskWorkerDraft = { title: string; instruction: string; role: string };
+export type DesktopTaskWorkerDraft = { title: string; instruction: string; role: string; model?: string; modelProvider?: string; modelSizeBytes?: number | null; modelContextLength?: number | null; airLlmCompatible?: boolean };
 
 export type DesktopProjectCheck = {
   id: string;
