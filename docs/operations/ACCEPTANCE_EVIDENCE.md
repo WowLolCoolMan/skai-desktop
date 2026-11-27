@@ -372,6 +372,26 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Remaining: live Windows-to-Linux restore, disk quota enforcement, and runtime
   provider cache cleanup remain open follow-up work.
 
+### Slice 27 — accessibility and cross-platform polish
+
+- Outcome: make the existing accessibility affordances discoverable and
+  regression-tested. The Appearance gallery exposes the built-in High Contrast
+  theme, keyboard focus reaches its search and card controls, and preview state
+  is announced through the existing `role="status"` region. Reduced-motion
+  controls and screen-reader task summaries remain part of the shared shell.
+- Success check: packaged Settings-route matrix with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=settings
+  UI_MATRIX_EXERCISE_ACCESSIBILITY=1` verifies keyboard focus, High Contrast
+  discovery/preview/cancel, and the status announcement at five window sizes.
+- Failure check: the smoke fails if the accessible search/card is missing, the
+  High Contrast preview cannot be reached by keyboard, or cancel leaves a
+  preview active.
+- Disposable profile / cleanup: the packaged matrix uses a throwaway Electron
+  profile and cancels the preview; no theme files or user appearance settings
+  are changed.
+- Unverified: native Linux/macOS startup and input capture, manual screen-reader
+  review, high-DPI/fractional scaling, and long-translation layout acceptance.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record

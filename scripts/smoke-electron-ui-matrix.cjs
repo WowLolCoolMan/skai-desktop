@@ -36,6 +36,7 @@ const exerciseWorkspaceSearch = process.env.UI_MATRIX_EXERCISE_WORKSPACE_SEARCH 
 const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
 const exerciseRetention = process.env.UI_MATRIX_EXERCISE_RETENTION === "1";
 const exerciseBackup = process.env.UI_MATRIX_EXERCISE_BACKUP === "1";
+const exerciseAccessibility = process.env.UI_MATRIX_EXERCISE_ACCESSIBILITY === "1";
 const exercisePersona = process.env.UI_MATRIX_EXERCISE_PERSONA === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
@@ -1835,6 +1836,26 @@ async function main() {
             })()`);
             if (!backupFlow?.ok) throw new Error(`Workspace backup portability workflow failed: ${JSON.stringify(backupFlow)}`);
             console.log(`[workspace-backup-workflow] ${JSON.stringify(backupFlow)}`);
+          }
+          if (route === "settings" && category === "Appearance" && exerciseAccessibility && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            const accessibilityFlow = await cdp.evaluate(`(async () => {
+              const gallery = document.querySelector('.theme-gallery');
+              const search = gallery?.querySelector('input[aria-label="Search themes"]');
+              if (!gallery || !search) return { ok: false, reason: 'theme gallery or accessible search is missing' };
+              const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+              setter.call(search, 'High Contrast'); search.dispatchEvent(new Event('input', { bubbles: true }));
+              let card = null;
+              for (let i = 0; i < 60; i++) { card = [...gallery.querySelectorAll('.theme-card')].find((item) => item.innerText.includes('High Contrast Dark')); if (card) break; await new Promise((resolve) => setTimeout(resolve, 25)); }
+              if (!card) return { ok: false, reason: 'high contrast theme was not discoverable' };
+              card.focus(); card.click(); await new Promise((resolve) => setTimeout(resolve, 80));
+              const previewed = Boolean(gallery.querySelector('.theme-gallery-preview-bar')) && card.classList.contains('is-previewing') && document.documentElement.dataset.themeId.toLowerCase().includes('high contrast');
+              const status = gallery.querySelector('.theme-gallery-preview-bar[role="status"]');
+              card.click(); await new Promise((resolve) => setTimeout(resolve, 40));
+              const cancelled = !gallery.querySelector('.theme-gallery-preview-bar');
+              return { ok: previewed && cancelled && Boolean(status), previewed, cancelled, hasStatus: Boolean(status), focused: document.activeElement === card };
+            })()`);
+            if (!accessibilityFlow?.ok) throw new Error(`Accessibility theme discovery workflow failed: ${JSON.stringify(accessibilityFlow)}`);
+            console.log(`[accessibility-theme-workflow] ${JSON.stringify(accessibilityFlow)}`);
           }
           if (route === "settings" && category === "Voice & Audio" && process.env.UI_MATRIX_EXERCISE_VOICE_PRESETS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
             const presetWorkflow = await cdp.evaluate(`(async () => {
