@@ -359,6 +359,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
             <p>Skai’s project tools can access folders you connect to a workspace. Skai does not provide unrestricted access to the whole computer.</p>
             <div className="composer-capability-list" aria-label="Current context and tool availability">
               <div><span>Workspace files</span><span>{projectId ? (projects.find((project) => project.id === projectId)?.folderPaths.join(" · ") || "No folders connected") : "Only files you attach"}</span></div>
+              <div><span>Attached context</span><span>{attachments.length ? `${attachments.length} user-provided source${attachments.length === 1 ? "" : "s"} · ${attachments.map((attachment) => attachment.fileName).join(" · ")}` : "No attachments in this turn"}</span></div>
               <div><span>Skills</span><span>{[...new Set(draft.match(/\$([A-Za-z0-9._-]{1,80})\b/g) ?? [])].slice(0, 4).join(", ").replaceAll("$", "") || "Add a $skill-id in your prompt"}</span></div>
               <div><span>Connected tools</span><span>MCP tools require explicit review in Marketplace; they are not silently called from chat.</span></div>
               <div><span>Computer use</span><span>Starts only from Add to message and requires a local vision model.</span></div>
