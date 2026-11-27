@@ -370,7 +370,7 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
       </ul>
     </details> : <div className="coding-explorer-changes is-clean"><strong>Changed files</strong><span>{gitStatus ? "No local changes" : "Git status unavailable"}</span></div>}
     <section className="coding-explorer-project-files" aria-label="Project file tree"><div className="coding-explorer-section-heading"><strong>Project files</strong><span>{filteredFiles.length}</span></div>
-      {projectFiles.length === 0 ? <EmptyState title="No readable files" description="Protected names and unsupported files are hidden." /> : filteredFiles.length === 0 ? <EmptyState title="No matching files" description="Try a shorter path or filename." /> : <ProjectFileTree key={selectedProject.id} files={filteredFiles} query={fileQuery} selectedFile={selectedFile} onOpenFile={onSelectFile} onAddToContext={addFileToComposerContext} onCompareWithChat={compareFileWithChat} onStartReview={startFileReview} />}
+      {projectFiles.length === 0 ? <EmptyState title="No readable files" description="Protected names and unsupported files are hidden." /> : filteredFiles.length === 0 ? <EmptyState title="No matching files" description="Try a shorter path or filename." /> : <ProjectFileTree key={selectedProject.id} projectId={selectedProject.id} files={filteredFiles} query={fileQuery} selectedFile={selectedFile} onOpenFile={onSelectFile} onAddToContext={addFileToComposerContext} onCompareWithChat={compareFileWithChat} onStartReview={startFileReview} />}
     </section>
   </aside>;
 

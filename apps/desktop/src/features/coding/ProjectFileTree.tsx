@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DesktopProjectFile } from "../../../shared/contracts";
 
 type FileNode = { kind: "file"; file: DesktopProjectFile };
@@ -42,6 +42,7 @@ function buildTree(files: DesktopProjectFile[]): DirectoryNode {
 }
 
 type ProjectFileTreeProps = {
+  projectId: string;
   files: DesktopProjectFile[];
   selectedFile: string | null;
   query: string;
@@ -51,12 +52,27 @@ type ProjectFileTreeProps = {
   onStartReview?: (relativePath: string) => void;
 };
 
-export function ProjectFileTree({ files, selectedFile, query, onOpenFile, onAddToContext, onCompareWithChat, onStartReview }: ProjectFileTreeProps) {
+export function ProjectFileTree({ projectId, files, selectedFile, query, onOpenFile, onAddToContext, onCompareWithChat, onStartReview }: ProjectFileTreeProps) {
   const tree = useMemo(() => buildTree(files), [files]);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
+  const listRef = useRef<HTMLDivElement>(null);
+  const expandedStorageKey = `skai.coding.expandedFolders.${projectId}`;
+  const scrollStorageKey = `skai.coding.fileExplorerScroll.${projectId}`;
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(expandedStorageKey) ?? "[]");
+      return new Set(Array.isArray(stored) ? stored.filter((path): path is string => typeof path === "string") : []);
+    } catch { return new Set(); }
+  });
   const [collapsedSearchPaths, setCollapsedSearchPaths] = useState<Set<string>>(() => new Set());
   const normalizedQuery = query.trim().toLocaleLowerCase();
   useEffect(() => setCollapsedSearchPaths(new Set()), [normalizedQuery]);
+  useEffect(() => {
+    try { localStorage.setItem(expandedStorageKey, JSON.stringify([...expandedPaths].slice(0, 200))); } catch { /* tree state remains in memory */ }
+  }, [expandedPaths, expandedStorageKey]);
+  useEffect(() => {
+    const stored = Number(localStorage.getItem(scrollStorageKey));
+    if (Number.isFinite(stored) && stored > 0) window.requestAnimationFrame(() => { if (listRef.current) listRef.current.scrollTop = stored; });
+  }, [scrollStorageKey]);
 
   const renderNodes = (nodes: TreeNode[], depth: number): React.ReactNode => nodes.map((node) => {
     if (node.kind === "directory") {
@@ -122,7 +138,9 @@ export function ProjectFileTree({ files, selectedFile, query, onOpenFile, onAddT
     </div>;
   });
 
-  return <div className="project-file-list" aria-label="Project files">
+  return <div ref={listRef} className="project-file-list" aria-label="Project files" onScroll={(event) => {
+    try { localStorage.setItem(scrollStorageKey, String(event.currentTarget.scrollTop)); } catch { /* keep browsing usable if storage is unavailable */ }
+  }}>
     {renderNodes(tree.children, 0)}
   </div>;
 }
