@@ -334,7 +334,17 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         {projects.length > 0 && onOpenProject && <label className="composer-project-switcher"><NavIcon name="project" /><span className="sr-only">Open a project workspace</span><select aria-label="Open a project workspace" value={projectId ?? ""} onChange={(event) => { const project = projects.find((item) => item.id === event.target.value); if (project) onOpenProject(project); }}><option value="">Open project…</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}
         <div className="composer-access-anchor" ref={accessMenuRef}>
           <button ref={accessTriggerRef} type="button" className="composer-access-button" onClick={() => setAccessOpen((open) => !open)} aria-haspopup="dialog" aria-expanded={accessOpen}>{accessLabel}<span aria-hidden="true">⌄</span></button>
-          {accessOpen && <section className="composer-access-popover" role="dialog" aria-label={accessLabel}><strong>{accessLabel}</strong><p>Skai’s project tools can access folders you connect to a workspace. Skai does not provide unrestricted access to the whole computer.</p></section>}
+          {accessOpen && <section className="composer-access-popover" role="dialog" aria-label={`${accessLabel} and available tools`}>
+            <strong>{accessLabel}</strong>
+            <p>Skai’s project tools can access folders you connect to a workspace. Skai does not provide unrestricted access to the whole computer.</p>
+            <div className="composer-capability-list" aria-label="Current context and tool availability">
+              <div><span>Workspace files</span><span>{projectId ? (projects.find((project) => project.id === projectId)?.folderPaths.join(" · ") || "No folders connected") : "Only files you attach"}</span></div>
+              <div><span>Skills</span><span>{[...new Set(draft.match(/\$([A-Za-z0-9._-]{1,80})\b/g) ?? [])].slice(0, 4).join(", ").replaceAll("$", "") || "Add a $skill-id in your prompt"}</span></div>
+              <div><span>Connected tools</span><span>MCP tools require explicit review in Marketplace; they are not silently called from chat.</span></div>
+              <div><span>Computer use</span><span>Starts only from Add to message and requires a local vision model.</span></div>
+            </div>
+            {projectId && <p className="composer-capability-footnote">Project context is limited to the connected folders shown above.</p>}
+          </section>}
         </div>
         {documentsOnly && <span className="composer-docs-chip"><NavIcon name="document" /> Docs only</span>}
         <span id="attachment-help" className="sr-only">{attachments.length} of 5 attachments. Press Enter to {busy ? "queue" : "send"}; Shift+Enter starts a new line.</span>

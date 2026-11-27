@@ -4133,6 +4133,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .chat-page .composer-card .composer-access-popover { width: min(290px, calc(100vw - 40px)); padding: 13px 14px; }
 .chat-page .composer-card .composer-access-popover strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
 .chat-page .composer-card .composer-access-popover p { margin: 5px 0 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.45; }
+.chat-page .composer-card .composer-capability-list { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--skai-color-border); }
+.chat-page .composer-card .composer-capability-list > div { display: grid; gap: 2px; }
+.chat-page .composer-card .composer-capability-list > div > span:first-child { color: var(--skai-color-text); font-size: var(--skai-text-xs); font-weight: 650; }
+.chat-page .composer-card .composer-capability-list > div > span:last-child { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); line-height: 1.4; overflow-wrap: anywhere; }
+.chat-page .composer-card .composer-access-popover .composer-capability-footnote { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--skai-color-border); }
 .chat-page .composer-card .composer-action-right .model-picker { min-width: 160px; max-width: 250px; }
 .chat-page .composer-card .composer-action-right .model-picker-trigger { min-height: 34px; }
 .chat-page .composer-card .composer-send-button { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; padding: 0; border: 0; border-radius: var(--skai-radius-pill); color: var(--skai-color-on-accent); background: var(--skai-color-accent); font-size: var(--skai-text-4xl); line-height: 1; cursor: pointer; }
