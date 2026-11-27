@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { normalizeShortcut, readCommandPreferences } from "../features/commands/preferences";
 import type { AgentResponse, DesktopPersona, DesktopProject, DesktopProjectPreflight, DesktopScheduledTask, DesktopTask, DesktopTaskWorkerDraft, LocalCapacitySnapshot, RuntimeHealth, ScheduledTaskDraft, TaskEnvironment } from "../../shared/contracts";
 import { PRODUCT_DISPLAY_NAME } from "../../shared/productIdentity";
 import type { AppRouteActions, AppRouteState } from "./AppRouteView";
@@ -201,7 +202,28 @@ export function useDesktopWorkspace(): DesktopWorkspace {
     return removeVisibility;
   }, [petVisible, petWander, petInteractionDemo, reduceMotion]);
   useEffect(() => { window.skaiAgent?.pet?.setState(taskBusy ? "coding" : chat.busy ? "thinking" : "idle"); }, [taskBusy, chat.busy]);
-  useEffect(() => { const onShortcut = (event: KeyboardEvent) => { const modifier = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase(); if (modifier && key === "k") { event.preventDefault(); openCommandPalette(); return; } if (event.key === "Escape") { closeCommandPalette(); return; } if (!modifier) return; if (key === "n") { event.preventDefault(); startNewChat(); return; } if (key === ",") { event.preventDefault(); onNavigate("settings"); return; } if (key === "1") { event.preventDefault(); onNavigate("chat"); return; } if (key === "2") { event.preventDefault(); onNavigate("coding"); return; } if (key === "3" || (event.shiftKey && key === "l")) { event.preventDefault(); onNavigate("terminal"); } }; window.addEventListener("keydown", onShortcut); return () => window.removeEventListener("keydown", onShortcut); }, [closeCommandPalette, openCommandPalette, onNavigate, startNewChat]);
+  useEffect(() => {
+    const dispatchShortcut = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { closeCommandPalette(); return; }
+      const shortcut = normalizeShortcut(event);
+      if (!shortcut) return;
+      const preferences = readCommandPreferences();
+      const action = Object.entries(preferences.shortcuts).find(([, value]) => value === shortcut)?.[0];
+      if (!action) return;
+      const target = event.target;
+      const editing = target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      if (editing && action !== "palette") return;
+      event.preventDefault();
+      if (action === "palette") openCommandPalette();
+      else if (action === "newChat") startNewChat();
+      else if (action === "settings") onNavigate("settings");
+      else if (action === "chat") onNavigate("chat");
+      else if (action === "coding") onNavigate("coding");
+      else if (action === "terminal") onNavigate("terminal");
+    };
+    window.addEventListener("keydown", dispatchShortcut);
+    return () => window.removeEventListener("keydown", dispatchShortcut);
+  }, [closeCommandPalette, openCommandPalette, onNavigate, startNewChat]);
   const retryConnection = useCallback(() => { setConnection("checking"); setError(null); void request("runtime.health").then((response: AgentResponse) => { if (!response.ok) { setConnection("error"); setError(response.error?.message ?? "Agent host unavailable."); return; } setHealth(response.result as RuntimeHealth); setConnection("ready"); }).catch((requestError: unknown) => { setConnection("error"); setError(requestError instanceof Error ? requestError.message : "Agent host unavailable."); }); }, [request]);
   useEffect(() => { retryConnection(); }, [retryConnection]);
   useEffect(() => {

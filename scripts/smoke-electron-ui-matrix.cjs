@@ -1409,6 +1409,34 @@ async function main() {
           if (!modelShortcut) throw new Error(`Choose a model did not navigate from the new-chat start screen to Model Library: ${JSON.stringify(await cdp.evaluate(`({ page: document.querySelector('.feature-page')?.className, title: document.title, actions: document.querySelector('.chat-start-actions')?.innerText })`))}`);
           await clickInRenderer(cdp, ".global-rail-destinations button[aria-label='Home']");
           console.log(`[chat-base] ${JSON.stringify({ shell: "active conversation and persistent navigation", newChat: "project and model shortcuts", projectShortcut, modelShortcut, ...shellState })}`);
+          if (process.env.UI_MATRIX_EXERCISE_COMMAND_WORKFLOWS === "1") {
+            const before = await cdp.evaluate(`(() => Object.fromEntries(['skai.command-workflows.v1','skai.command-workflows.v1.recent','skai.command-workflows.v1.pinned'].map((key) => [key, localStorage.getItem(key)])))()`);
+            await cdp.evaluate(`(() => { localStorage.setItem('skai.command-workflows.v1', JSON.stringify({ shortcuts: { palette: 'Ctrl+Shift+J', newChat: 'Ctrl+N', settings: 'Ctrl+,', chat: 'Ctrl+1', coding: 'Ctrl+2', terminal: 'Ctrl+3' }, savedPrompts: [{ id: 'smoke-review-brief', name: 'Review Brief', alias: 'brief', prompt: 'Summarize the decision and list open questions.' }], sendBehavior: 'shift-enter-sends', toolbarLayout: 'compact' })); window.dispatchEvent(new Event('skai-command-workflows-changed')); return true; })()`);
+            await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "J", code: "KeyJ", windowsVirtualKeyCode: 74, modifiers: 10 });
+            await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "J", code: "KeyJ", windowsVirtualKeyCode: 74, modifiers: 10 });
+            const paletteOpened = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('#command-palette-title')) return true; await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
+            if (!paletteOpened) throw new Error("The personalized command palette shortcut did not open the palette.");
+            const pinnedVisible = await cdp.evaluate(`(async () => { const row = [...document.querySelectorAll('.command-row')].find((entry) => entry.innerText.includes('Open Memory')); if (!row) return { ok: false, reason: 'memory command missing', rows: [...document.querySelectorAll('.command-row')].map((entry) => entry.innerText) }; row.querySelector('.command-pin')?.click(); for (let i = 0; i < 40; i++) { if (document.querySelector('.command-filter-tabs [role=tab][aria-selected=true]')?.innerText.includes('Pinned') && [...document.querySelectorAll('.command-row')].some((entry) => entry.innerText.includes('Open Memory'))) return { ok: true }; await new Promise((r) => setTimeout(r, 25)); } return { ok: false, reason: 'pinned view did not update', tabs: document.querySelector('.command-filter-tabs')?.innerText, rows: [...document.querySelectorAll('.command-row')].map((entry) => entry.innerText) }; })()`);
+            if (!pinnedVisible?.ok) throw new Error(`Pinning a frequent command did not add it to the pinned palette view: ${JSON.stringify(pinnedVisible)}`);
+            await cdp.evaluate(`document.querySelector('.command-filter-tabs button[role=tab]:first-child')?.click(); 1`);
+            await cdp.evaluate(`([...document.querySelectorAll('.command-row')].find((entry) => entry.innerText.includes('Open Memory'))?.querySelector('.command-row-open')?.click(), 1)`);
+            const memoryOpened = await cdp.evaluate(`(async () => { for (let i = 0; i < 50; i++) { if (document.querySelector('.memory-page')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!memoryOpened) throw new Error("The command palette did not open the selected Memory destination.");
+            await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "J", code: "KeyJ", windowsVirtualKeyCode: 74, modifiers: 10 });
+            await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "J", code: "KeyJ", windowsVirtualKeyCode: 74, modifiers: 10 });
+            await cdp.evaluate(`document.querySelector('.command-filter-tabs button[role=tab]:nth-child(2)')?.click(); 1`);
+            const recentVisible = await cdp.evaluate(`([...document.querySelectorAll('.command-row')].some((entry) => entry.innerText.includes('Open Memory')))`);
+            if (!recentVisible) throw new Error("The recently used Memory command did not appear in the command palette.");
+            await cdp.evaluate(`document.querySelector('.command-heading button[aria-label="Close command palette"]')?.click(); 1`);
+            await clickInRenderer(cdp, ".global-rail-destinations button[aria-label='Home']");
+            await cdp.evaluate(`(() => { const field = document.querySelector('.composer-card textarea'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(field, '/brief'); field.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            const slashPrompt = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const button = [...document.querySelectorAll('.composer-command-menu button')].find((item) => item.innerText.includes('Review Brief')); if (button) { button.click(); return true; } await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
+            const promptInserted = slashPrompt && await cdp.evaluate(`document.querySelector('.composer-card textarea')?.value === 'Summarize the decision and list open questions.'`);
+            const composerPreferencesApplied = await cdp.evaluate(`document.querySelector('.composer-card')?.classList.contains('is-compact-toolbar') && document.querySelector('.composer-card')?.dataset.sendBehavior === 'shift-enter-sends'`);
+            await cdp.evaluateWith(function (values) { for (const [key, value] of Object.entries(values)) value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value); window.dispatchEvent(new Event('skai-command-workflows-changed')); return true; }, before);
+            if (!promptInserted || !composerPreferencesApplied) throw new Error(`Saved slash prompts or composer preferences were not applied: ${JSON.stringify({ promptInserted, composerPreferencesApplied })}`);
+            console.log(`[command-workflows] ${JSON.stringify({ personalizedShortcut: true, pinnedCommands: true, recentCommands: recentVisible, slashPromptInserted: promptInserted, compactToolbar: composerPreferencesApplied })}`);
+          }
           if (process.env.UI_MATRIX_EXERCISE_TASK_NOTIFICATIONS === "1") {
             const notificationFlow = await cdp.evaluate(`(async () => {
               const keys = ['skai.taskNotifications.preferences.v1', 'skai.taskNotifications.history.v1', 'skai.taskNotifications.statuses.v1'];
@@ -1663,6 +1691,40 @@ async function main() {
             })()`);
             if (!preferences?.ok || !preferences.safeByDefault) throw new Error(`Task notification privacy and quiet-hour settings did not persist as expected: ${JSON.stringify(preferences)}`);
             console.log(`[task-notification-settings] ${JSON.stringify(preferences)}`);
+          }
+          if (route === "settings" && category === "Shortcuts" && process.env.UI_MATRIX_EXERCISE_COMMAND_WORKFLOWS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            const workflow = await cdp.evaluate(`(async () => {
+              const key = 'skai.command-workflows.v1';
+              const previous = localStorage.getItem(key);
+              const section = document.querySelector('.settings-command-workflows');
+              const setValue = (element, value, prototype) => { Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); };
+              if (!section || section.getAttribute('aria-labelledby') !== 'command-workflows-title') return { ok: false, reason: 'workflow settings missing', heading: document.querySelector('.settings-section-heading h1')?.textContent };
+              section.querySelector('.settings-saved-prompts button')?.click();
+              let prompt = section.querySelector('.settings-saved-prompt');
+              for (let i = 0; i < 40 && !prompt; i++) { await new Promise((resolve) => setTimeout(resolve, 25)); prompt = section.querySelector('.settings-saved-prompt'); }
+              if (!prompt) return { ok: false, reason: 'prompt create action missing' };
+              const name = prompt.querySelector('.settings-command-fields input');
+              setValue(name, 'Review Brief', HTMLInputElement.prototype);
+              const alias = prompt.querySelector('input[aria-label="Slash alias for Review Brief"]');
+              const body = prompt.querySelector('textarea');
+              if (!alias || !body) return { ok: false, reason: 'prompt editor fields missing' };
+              setValue(alias, 'brief', HTMLInputElement.prototype); setValue(body, 'Summarize the decision and list open questions.', HTMLTextAreaElement.prototype);
+              const selectors = section.querySelectorAll('.settings-command-fields select');
+              setValue(selectors[0], 'shift-enter-sends', HTMLSelectElement.prototype); setValue(selectors[1], 'compact', HTMLSelectElement.prototype);
+              const shortcutButton = section.querySelector('button[aria-label="Change shortcut for New chat"]');
+              shortcutButton?.click(); await new Promise((resolve) => setTimeout(resolve, 25)); shortcutButton?.dispatchEvent(new KeyboardEvent('keydown', { key: 'K', ctrlKey: true, bubbles: true, cancelable: true })); await new Promise((resolve) => setTimeout(resolve, 25));
+              const conflictRejected = JSON.parse(localStorage.getItem(key) ?? '{}').shortcuts?.newChat !== 'Ctrl+K' && section.innerText.includes('already assigned');
+              shortcutButton?.click(); await new Promise((resolve) => setTimeout(resolve, 25)); shortcutButton?.dispatchEvent(new KeyboardEvent('keydown', { key: 'J', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })); await new Promise((resolve) => setTimeout(resolve, 25));
+              const capturedShortcut = JSON.parse(localStorage.getItem(key) ?? '{}').shortcuts?.newChat === 'Ctrl+Shift+J';
+              const saved = JSON.parse(localStorage.getItem(key) ?? '{}');
+              const promptSaved = saved.savedPrompts?.some((item) => item.name === 'Review Brief' && item.alias === 'brief' && item.prompt.startsWith('Summarize'));
+              const customBehavior = saved.sendBehavior === 'shift-enter-sends' && saved.toolbarLayout === 'compact';
+              if (previous === null) localStorage.removeItem(key); else localStorage.setItem(key, previous);
+              window.dispatchEvent(new Event('skai-command-workflows-changed'));
+              return { ok: promptSaved && customBehavior && conflictRejected && capturedShortcut, savedPrompt: promptSaved, sendAndToolbar: customBehavior, conflictRejected, capturedShortcut };
+            })()`);
+            if (!workflow?.ok) throw new Error(`Saved prompt aliases and composer preferences did not persist: ${JSON.stringify(workflow)}`);
+            console.log(`[command-workflow-settings] ${JSON.stringify(workflow)}`);
           }
           if (route === "settings" && category === "Storage" && exerciseRetention && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
             await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { const root = document.querySelector('.workspace-retention-card'); if (root?.querySelector('select[aria-label="Unpinned chats retention"]') && root.querySelector('select[aria-label="Generated media preview retention"]')) return true; await new Promise((resolve) => setTimeout(resolve, 50)); } return false; })()`);

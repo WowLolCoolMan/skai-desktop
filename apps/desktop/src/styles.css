@@ -4903,3 +4903,42 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .settings-notification-history li strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--skai-text-sm); }
 .settings-notification-history li small { flex:0 0 auto; }
 @media(max-width:600px){.settings-notification-grid{grid-template-columns:1fr}.settings-notification-quiet{grid-template-columns:1fr 1fr}.settings-notification-quiet>label:first-child,.settings-notification-quiet small{grid-column:1/-1}}
+
+.settings-command-workflows { display:grid; gap:16px; margin:20px 0; padding:18px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-xl); background:color-mix(in srgb,var(--skai-color-surface-soft) 45%,transparent); }
+.settings-command-workflows>.settings-section-heading { margin:0; padding-bottom:13px; }
+.settings-command-workflows>.settings-section-heading h2 { margin:5px 0; color:var(--skai-color-text); font-size:var(--skai-text-xl); }
+.settings-command-workflows>.settings-section-heading p:last-child,.settings-command-subheading small,.settings-command-shortcut small { color:var(--skai-color-text-muted); font-size:var(--skai-text-sm); line-height:1.45; }
+.settings-command-shortcuts,.settings-command-composer,.settings-saved-prompts { display:grid; gap:10px; }
+.settings-command-subheading,.settings-command-shortcut,.settings-command-export { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.settings-command-subheading>span,.settings-command-shortcut>span { display:grid; gap:3px; }
+.settings-command-subheading strong,.settings-command-composer>strong { color:var(--skai-color-text); font-size:var(--skai-text-md); }
+.settings-command-shortcut { padding:8px 0; border-bottom:1px solid var(--skai-color-border); }
+.settings-command-shortcut button { padding:5px 9px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-md); color:var(--skai-color-text); background:var(--skai-color-surface); }
+.settings-command-shortcut button.is-recording { border-color:var(--skai-color-accent); color:var(--skai-color-accent-text); }
+.settings-command-shortcut kbd { font:inherit; font-size:var(--skai-text-xs); }
+.settings-command-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.settings-command-fields label,.settings-saved-prompt>label { display:grid; gap:6px; color:var(--skai-color-text-muted); font-size:var(--skai-text-sm); }
+.settings-saved-prompt { display:grid; gap:10px; padding:12px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-lg); background:var(--skai-color-surface); }
+.settings-saved-prompt>button { justify-self:end; }
+.settings-command-export { justify-content:flex-start; padding-top:4px; }
+.command-filter-tabs { display:flex; gap:5px; padding:0 18px 10px; }
+.command-filter-tabs button { padding:6px 9px; border:1px solid transparent; border-radius:var(--skai-radius-md); color:var(--skai-color-text-muted); background:transparent; font-size:var(--skai-text-xs); }
+.command-filter-tabs button.is-active { border-color:var(--skai-color-border); color:var(--skai-color-text); background:var(--skai-color-surface-soft); }
+.command-row { display:grid; grid-template-columns:minmax(0,1fr) 32px; gap:4px; align-items:center; border:1px solid transparent; border-radius:var(--skai-radius-md); }
+.command-row.is-active,.command-row:hover { border-color:color-mix(in srgb,var(--skai-color-accent) 25%,transparent); background:color-mix(in srgb,var(--skai-color-accent) 8%,transparent); }
+.command-list .command-row-open { display:flex; min-width:0; align-items:center; justify-content:space-between; gap:14px; padding:10px; border:0; border-radius:inherit; color:var(--skai-color-text); background:transparent; text-align:left; }
+.command-row-open>span { display:grid; min-width:0; gap:3px; }
+.command-row-open strong,.command-row-open small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.command-row-open small { color:var(--skai-color-text-muted); font-size:var(--skai-text-sm); }
+.command-row-open kbd { flex:0 0 auto; padding:3px 6px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-sm); color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
+.command-row .command-pin { width:28px; height:28px; border:0; border-radius:var(--skai-radius-sm); color:var(--skai-color-text-muted); background:transparent; }
+.command-row .command-pin[aria-pressed="true"] { color:var(--skai-color-accent-text); }
+.command-row-open:focus-visible,.command-pin:focus-visible,.command-filter-tabs button:focus-visible { outline:2px solid var(--skai-color-accent); outline-offset:1px; }
+.composer-card.is-compact-toolbar .composer-actions { gap:6px; padding-top:8px; }
+.composer-card.is-compact-toolbar .composer-action-left,.composer-card.is-compact-toolbar .composer-action-right { gap:5px; }
+.composer-card.is-compact-toolbar .composer-tool-button,.composer-card.is-compact-toolbar .composer-send-button { min-width:32px; min-height:32px; }
+.composer-toolbar-label { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); white-space:nowrap; }
+.composer-send-button .composer-toolbar-label { color:var(--skai-color-on-accent); }
+.composer-card.is-compact-toolbar .composer-toolbar-label { display:none; }
+@media(max-width:640px){.composer-toolbar-label{display:none}}
+@media(max-width:640px){.settings-command-fields{grid-template-columns:1fr}.settings-command-workflows{padding:14px}.command-filter-tabs{padding-left:12px;padding-right:12px}}

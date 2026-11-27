@@ -13,13 +13,15 @@ import { VoicePresetManager } from "./VoicePresetManager";
 import { PermissionCenter } from "./PermissionCenter";
 import { WorkspaceBackupManager } from "./WorkspaceBackupManager";
 import { TaskNotificationSettings } from "../tasks/TaskNotifications";
+import { CommandWorkflowSettings } from "./CommandWorkflowSettings";
 
-const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Achievements", "Updates", "Advanced"] as const;
+const categories = ["General", "Shortcuts", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Achievements", "Updates", "Advanced"] as const;
 type Category = typeof categories[number];
 type AirLlmRuntimeStatus = { workerAvailable: boolean; dependenciesAvailable: boolean; pythonCommand: string; status: string; message: string };
 type AirLlmInstallSession = { id: string; status: string; progress: string[]; error?: string | null };
 const categoryIcons: Record<Category, NavIconName> = {
   General: "settings",
+  Shortcuts: "more",
   Appearance: "sparkle",
   Pet: "sparkle",
   "Models & Providers": "model",
@@ -36,6 +38,7 @@ const categoryIcons: Record<Category, NavIconName> = {
 
 const categorySearchText: Record<Category, string> = {
   General: "runtime provider model preferred chat coding rewrite vision voice answer local close window background tray quit linux",
+  Shortcuts: "keyboard hotkeys commands composer enter shift enter send slash prompts templates aliases compact toolbar palette recent pinned projects tasks export import",
   Appearance: "theme color accent density backdrop reduced motion pet companion animation",
   Pet: "pets companions sprite sheet character walk wander always on top overlay custom",
   "Models & Providers": "endpoint runtime model discover Ollama LM Studio AirLLM provider local context window tokens 1M",
@@ -286,6 +289,7 @@ export function SettingsPage(props: SettingsProps) {
         <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h1>{activeCategory}</h1><p>{categoryDescription(activeCategory)}</p></div></div>
 
         {activeCategory === "General" && <><AboutYouSetting /><PreferredModelsSetting props={props} change={change} /><CloseBehaviorSetting /><TaskNotificationSettings projects={props.projects} /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}
+        {activeCategory === "Shortcuts" && <CommandWorkflowSettings />}
 
         {activeCategory === "Appearance" && <><AppearancePreview /><div className="settings-field"><label>Color theme<select value={props.themeMode} onChange={(event) => change("themeMode", event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label>{/* Theme: the old Accent select (Cyan/Violet/Amber/Rose) was removed at the user's request: nothing read it. Appearance → Layout and motion → Accent sets the accent now. */}</div><ThemeSettings /><div className="settings-field"><label>Interface density<select value={props.density} onChange={(event) => change("density", event.target.value)}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label><label>Backdrop<select value={props.backdrop} onChange={(event) => change("backdrop", event.target.value)}><option value="none">None</option><option value="deep-sea">Deep sea</option><option value="deep-space">Deep space</option></select></label></div><Toggle label="Reduced motion" detail="Minimize interface animations and decorative movement." checked={props.reduceMotion} onChange={(value) => change("reduceMotion", value)} /></>}
 
@@ -320,7 +324,7 @@ export function SettingsPage(props: SettingsProps) {
 }
 
 function categoryDescription(category: Category) {
-  const descriptions: Record<Category, string> = { General: "Choose the local runtime, default model, and preferred model for each kind of work.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize your desktop pets.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, prompt rewriting, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review access grants, sandbox boundaries, and permission history.", Storage: "Back up local workspace data without destructive shortcuts.", Achievements: "A private collection of the little secrets you have found in Skai.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
+  const descriptions: Record<Category, string> = { General: "Choose the local runtime, default model, and preferred model for each kind of work.", Shortcuts: "Personalize keyboard shortcuts, prompt aliases, and composer behavior.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize your desktop pets.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, prompt rewriting, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review access grants, sandbox boundaries, and permission history.", Storage: "Back up local workspace data without destructive shortcuts.", Achievements: "A private collection of the little secrets you have found in Skai.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
   return descriptions[category];
 }
 

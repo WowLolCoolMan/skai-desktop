@@ -10,6 +10,7 @@ import { composerCommands, type ComposerCommand } from "./composerCommands";
 import { saveVoiceSetting, stopNativeSpeech } from "../../services/nativeTts";
 import { isLocalEndpoint } from "../../services/localOnly";
 import { useChatComposerVoice } from "./useChatComposerVoice";
+import { commandPreferencesEvent, readCommandPreferences, type CommandPreferences } from "../commands/preferences";
 
 type ChatComposerProps = {
   draft: string;
@@ -85,6 +86,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
   const [queueEditDraft, setQueueEditDraft] = useState("");
   const [queueUpdateBusy, setQueueUpdateBusy] = useState(false);
+  const [workflowPreferences, setWorkflowPreferences] = useState<CommandPreferences>(readCommandPreferences);
 
   const [omniOpen, setOmniOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
@@ -110,7 +112,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const accessTriggerRef = useRef<HTMLButtonElement>(null);
   const voiceDialogTitleRef = useRef<HTMLHeadingElement>(null);
   const commandQuery = draft.match(/^\/([^\s]*)$/)?.[1] ?? null;
-  const commandMatches = useMemo(() => commandQuery === null ? [] : composerCommands.filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery]);
+  const commandMatches = useMemo(() => commandQuery === null ? [] : [...composerCommands, ...workflowPreferences.savedPrompts.map((prompt) => ({ id: prompt.id, label: prompt.name, detail: prompt.prompt.slice(0, 100) || "Saved prompt template", shortcut: `/${prompt.alias}`, prompt: prompt.prompt }))].filter((command) => `${command.label} ${command.detail} ${command.shortcut}`.toLowerCase().includes(commandQuery.toLowerCase())), [commandQuery, workflowPreferences.savedPrompts]);
   const activeCommandId = commandMatches[commandIndex] ? `composer-command-${commandMatches[commandIndex].id}` : undefined;
   const computerVisionModel = useMemo(() => {
     const fallback: Model = { model, provider, endpoint, vision: "unknown", capabilities: [] };
@@ -137,6 +139,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   }, [endpoint, model, models, provider]);
 
   useEffect(() => { setCommandIndex(0); }, [commandQuery]);
+  useEffect(() => { const refresh = () => setWorkflowPreferences(readCommandPreferences()); window.addEventListener(commandPreferencesEvent, refresh); return () => window.removeEventListener(commandPreferencesEvent, refresh); }, []);
   useEffect(() => {
     if (!omniOpen && !accessOpen) return;
     const closeOutside = (event: PointerEvent) => {
@@ -182,7 +185,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
 
 
   const selectComposerCommand = (command: ComposerCommand) => {
-    onDraftChange("");
+    onDraftChange(command.prompt ?? "");
     if (command.route) onNavigate(command.route);
   };
 
@@ -284,7 +287,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); selectComposerCommand(commandMatches[commandIndex]); return; }
     }
     if (event.key === "Escape" && commandQuery !== null) { event.preventDefault(); onDraftChange(""); return; }
-    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSubmit(); }
+    if (workflowPreferences.sendBehavior === "enter-sends" && event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSubmit(); }
+    else if (workflowPreferences.sendBehavior === "shift-enter-sends" && event.key === "Enter" && event.shiftKey) { event.preventDefault(); onSubmit(); }
   };
 
   const handleDragOver = (event: DragEvent<HTMLElement>) => {
@@ -315,7 +319,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     }
   };
 
-  return <section className={`composer-card ${dragActive ? "is-drag-active" : ""}`} aria-busy={rewriteBusy} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+  return <section className={`composer-card${dragActive ? " is-drag-active" : ""}${workflowPreferences.toolbarLayout === "compact" ? " is-compact-toolbar" : ""}`} aria-busy={rewriteBusy} data-send-behavior={workflowPreferences.sendBehavior} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
     {commandQuery !== null && <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} />}
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}>{editingQueueIndex === queued.index ? <div className="queued-message-edit"><textarea autoFocus value={queueEditDraft} maxLength={50_000} aria-label={`Edit queued message ${queued.index + 1}`} onChange={(event) => setQueueEditDraft(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void saveQueuedEdit(queued.index); } if (event.key === "Escape") { setEditingQueueIndex(null); setQueueEditDraft(""); } }} /><div><button type="button" disabled={queueUpdateBusy || !queueEditDraft.trim()} onClick={() => void saveQueuedEdit(queued.index)}>Save</button><button type="button" disabled={queueUpdateBusy} onClick={() => { setEditingQueueIndex(null); setQueueEditDraft(""); }}>Cancel</button></div><small>Ctrl+Enter saves · Esc cancels</small></div> : <span>{queued.text}</span>}{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<div className="queued-message-actions"><button type="button" disabled={queueUpdateBusy} title="Edit this queued prompt" onClick={() => { if (editingQueueIndex !== queued.index) { setEditingQueueIndex(queued.index); setQueueEditDraft(queued.text); } }} aria-label={`Edit queued message ${queued.index + 1}`}>Edit</button><button type="button" disabled={queued.index === 0} onClick={() => void onMoveQueued(queued.index, queued.index - 1)} aria-label={`Move queued message ${queued.index + 1} up`} title="Move up">↑</button><button type="button" disabled={queued.index === queuedMessages.length - 1} onClick={() => void onMoveQueued(queued.index, queued.index + 1)} aria-label={`Move queued message ${queued.index + 1} down`} title="Move down">↓</button><button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`} title="Remove queued message">×</button></div></div>)}</div>}
@@ -331,7 +335,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     <div className="composer-actions">
       <div className="composer-action-left">
         <div className="composer-add-anchor" ref={addMenuRef}>
-          <button ref={addTriggerRef} className="composer-tool-button composer-add-button" type="button" onClick={() => setOmniOpen((open) => !open)} disabled={rewriteBusy} aria-label="Add to message" title="Add to message" aria-haspopup="menu" aria-expanded={omniOpen}><NavIcon name="plus" /></button>
+          <button ref={addTriggerRef} className="composer-tool-button composer-add-button" type="button" onClick={() => setOmniOpen((open) => !open)} disabled={rewriteBusy} aria-label="Add to message" title="Add to message" aria-haspopup="menu" aria-expanded={omniOpen}><NavIcon name="plus" /><span className="composer-toolbar-label">Add</span></button>
           {omniOpen && <div className="composer-add-menu" role="menu" aria-label="Add to message">
             <p className="composer-menu-label">Add to this message</p>
             <button className="composer-menu-option" type="button" role="menuitem" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><NavIcon name="document" /><span><strong>Files and folders</strong><small>Attach up to 5 images, documents, PDFs, or videos</small></span></button>
@@ -360,12 +364,12 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
           </section>}
         </div>
         {documentsOnly && <span className="composer-docs-chip"><NavIcon name="document" /> Docs only</span>}
-        <span id="attachment-help" className="sr-only">{attachments.length} of 5 attachments. Press Enter to {busy ? "queue" : "send"}; Shift+Enter starts a new line.</span>
+        <span id="attachment-help" className="sr-only">{attachments.length} of 5 attachments. {workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"} to {busy ? "queue" : "send"}; {workflowPreferences.sendBehavior === "enter-sends" ? "Shift+Enter" : "Enter"} starts a new line.</span>
       </div>
       <div className="composer-action-right">
         {modelControl}
-        <button className={`composer-tool-button composer-microphone-button${voiceListening ? " is-active" : ""}`} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop voice input" : "Start voice input"} title={voiceListening ? "Stop voice input" : "Dictate a message on this device"}><NavIcon name={voiceListening ? "stop" : "microphone"} /></button>
-        {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
+        <button className={`composer-tool-button composer-microphone-button${voiceListening ? " is-active" : ""}`} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop dictation" : "Dictate a message"} title={voiceListening ? "Stop dictation" : "Dictate a message on this device"}><NavIcon name={voiceListening ? "stop" : "microphone"} /><span className="composer-toolbar-label">{voiceListening ? "Stop" : "Dictate"}</span></button>
+        {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /><span className="composer-toolbar-label">{handsFreeActive ? "End voice" : "Voice"}</span></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={`${rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"} · ${workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"}`}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
       </div>
     </div>
     <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog">

@@ -1,6 +1,6 @@
 import type { Route } from "../../app/types";
 
-export type ComposerCommand = { id: string; label: string; detail: string; shortcut: string; route?: Route };
+export type ComposerCommand = { id: string; label: string; detail: string; shortcut: string; route?: Route; prompt?: string };
 
 export const composerCommands: ComposerCommand[] = [
   { id: "coding", label: "Open Coding Workspace", detail: "Projects, files, terminal, and edits", shortcut: "/coding", route: "coding" },
