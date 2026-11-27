@@ -5,8 +5,8 @@ export function Card({ children, className = "", ...props }: HTMLAttributes<HTML
   return <section className={`ui-card ${className}`} {...props}>{children}</section>;
 }
 
-export function Button({ children, variant = "secondary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" }) {
-  return <button className={`ui-button ui-button-${variant} ${className}`} {...props}>{children}</button>;
+export function Button({ children, variant = "secondary", className = "", title, "aria-label": ariaLabel, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" }) {
+  return <button className={`ui-button ui-button-${variant} ${className}`} title={title ?? ariaLabel} aria-label={ariaLabel} {...props}>{children}</button>;
 }
 
 export function PageHeader({ eyebrow, title, description, actions, className = "" }: { eyebrow: string; title: string; description: string; actions?: ReactNode; className?: string }) {

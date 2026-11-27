@@ -27,6 +27,26 @@ The app should feel approachable for everyday chat while giving advanced users d
 
 ## Screenshot index
 
+## Shared visual contract
+
+Use semantic roles from `apps/desktop/src/design-system/tokens.css` for shared
+surfaces: `--skai-color-canvas` is the app background; `--skai-color-surface`
+and `--skai-color-surface-raised` identify inset and lifted regions;
+`--skai-color-border` and `--skai-color-border-strong` separate them;
+`--skai-color-text` / `--skai-color-text-muted` carry primary and supporting
+copy; `--skai-color-focus-ring` marks keyboard focus; `--skai-color-selection`
+marks the selected item; and semantic `--skai-color-success`, `warning`,
+`info`, `danger-text`, and `danger-strong` communicate state. Component CSS
+should reference these roles rather than introduce route-specific raw colors.
+The token file defines dark and light values; verify both schemes and reduced
+motion when changing shared UI.
+
+Reusable components expose stable geometry hooks: `.ui-card`, `.ui-button`,
+`.page-header`, `.status-badge`, and `.ui-empty`. Keep their empty, loading,
+disabled, error, hover, and focus states driven by props or explicit state so
+the Electron UI matrix can inspect them without relying on page-specific
+screenshots.
+
 The numbered files in [`ui-references/`](../ui-references) are the original user-provided images, preserved unmodified.
 
 | File | What it demonstrates | Product guidance |
