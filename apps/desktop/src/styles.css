@@ -3088,8 +3088,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-coding .coding-project-heading-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
 .app-content-coding .coding-project-heading-actions select { width: min(220px, 26vw); min-width: 110px; min-height: 31px; padding: 4px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font-size: var(--skai-text-xs); }
 .app-content-coding .coding-project-heading-actions .ui-button { min-height: 31px; padding: 5px 9px; font-size: var(--skai-text-xs); }
-.coding-context-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; min-width: 0; padding: 8px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
+.coding-context-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; min-width: 0; padding: 8px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); }
 .coding-context-strip > span { display: grid; min-width: 0; gap: 3px; padding: 2px 8px; border-right: 1px solid var(--skai-color-border); }
+.coding-context-strip .coding-model-profile { display: grid; min-width: 0; gap: 3px; padding: 2px 8px; border-right: 1px solid var(--skai-color-border); }
+.coding-context-strip .coding-model-profile select { min-width: 0; max-width: 100%; padding: 2px 4px; border: 0; color: var(--skai-color-text); background: transparent; font: inherit; font-size: var(--skai-text-xs); }
+.coding-context-strip .coding-model-profile em { overflow: hidden; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .coding-context-strip > span:last-child { border-right: 0; }
 .coding-context-strip small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); text-transform: uppercase; letter-spacing: .06em; }
 .coding-context-strip strong { overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-xs); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
