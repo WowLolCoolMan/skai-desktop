@@ -827,6 +827,11 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .terminal-error { margin: 8px 0; color: var(--skai-color-danger-text); font-size: var(--skai-text-xs); }
 .coding-task-children { display: grid; gap: 5px; padding: 8px; border-left: 2px solid var(--skai-color-accent); background: var(--skai-color-surface); }
 .coding-task-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.coding-task-child-model { display: block; margin-top: 2px; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); overflow-wrap: anywhere; }
+.coding-task-model-context { display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 9px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); }
+.coding-task-model-context > span { display: grid; min-width: 0; gap: 3px; }
+.coding-task-model-context small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); letter-spacing: .04em; }
+.coding-task-model-context strong { color: var(--skai-color-text); font-size: var(--skai-text-xs); overflow-wrap: anywhere; }
 .coding-task-item { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
 .coding-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 8px 0; border-bottom: 1px solid var(--skai-color-border); }
 .coding-task-actions small { flex: 1 1 180px; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.4; }

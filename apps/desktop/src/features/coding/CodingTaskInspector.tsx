@@ -204,11 +204,12 @@ export function CodingTaskInspector({ projectId, tasks, models, projectChecks, p
           {taskStages.map((stage, index) => <li key={stage} className={index < taskStageIndex(task.status) ? "is-complete" : index === taskStageIndex(task.status) ? "is-current" : ""} aria-current={index === taskStageIndex(task.status) ? "step" : undefined}><span aria-hidden="true" />{stage}</li>)}
         </ol>}
         <div className={`coding-task-next-step is-${statusTone(task.status)}`}><strong>{task.status === "awaiting_approval" ? "Waiting for you" : task.status === "completed" ? "Completed" : task.status === "failed" || task.status === "blocked" ? "Needs attention" : "Next"}</strong><span>{taskNextStep(task)}</span></div>
+        <div className="coding-task-model-context"><span><small>{["proposed", "queued", "awaiting_approval"].includes(task.status) ? "MODEL ASSIGNMENT" : "MODEL USED"}</small><strong>{task.model ? `${task.modelProvider || "Local runtime"} · ${task.model}` : "Inherited coding model · resolved when execution starts"}</strong></span>{task.modelContextLength && <span><small>CONTEXT</small><strong>{task.modelContextLength.toLocaleString()} tokens</strong></span>}{task.modelSizeBytes != null && <span><small>MODEL SIZE</small><strong>{(task.modelSizeBytes / (1024 ** 3)).toFixed(1)} GiB</strong></span>}</div>
         <p className="coding-task-instruction">{task.instruction}</p>
         {tasks.some((child) => child.parentRunId === task.id) && <div className="coding-task-children" aria-label="Delegated subagents">
           <strong>Delegated work</strong>
           {tasks.filter((child) => child.parentRunId === task.id).map((child) => <div className="coding-task-child" key={child.id}>
-            <span>{child.title}</span><span className={`coding-task-status-pill is-${statusTone(child.status)}`}>{statusLabel(child.status)}</span>
+            <span>{child.title}{child.model && <small className="coding-task-child-model">{child.modelProvider || "Local runtime"} · {child.model}</small>}</span><span className={`coding-task-status-pill is-${statusTone(child.status)}`}>{statusLabel(child.status)}</span>
           </div>)}
         </div>}
         {task.resultSummary && <p className="coding-task-result"><strong>Result</strong> {task.resultSummary}</p>}

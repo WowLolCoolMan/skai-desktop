@@ -91,6 +91,27 @@ public sealed class AgentTaskArtifactStore
 
     public AgentTaskArtifact Get(string id) => Copy(Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist."));
 
+    /// <summary>Records the resolved local model once execution starts, including inherited profile assignments.</summary>
+    public AgentTaskArtifact RecordEffectiveModel(string id, string? model, string? provider, long? modelSizeBytes = null, int? modelContextLength = null, bool airLlmCompatible = false)
+    {
+        lock (StoreGate)
+        {
+            var tasks = Load().ToList();
+            var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+            if (task.Status != AgentTaskStatuses.Running) throw new InvalidOperationException("The effective model can only be recorded for a running task.");
+            task.Model = NormalizeOptional(model, 512, "effective model");
+            task.ModelProvider = NormalizeOptional(provider, 128, "effective model provider");
+            if (modelSizeBytes is < 0 or > (1L << 50)) throw new ArgumentOutOfRangeException(nameof(modelSizeBytes));
+            if (modelContextLength is < 0 or > 16_777_216) throw new ArgumentOutOfRangeException(nameof(modelContextLength));
+            task.ModelSizeBytes = modelSizeBytes;
+            task.ModelContextLength = modelContextLength;
+            task.AirLlmCompatible = airLlmCompatible;
+            task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            Save(tasks);
+            return Copy(task);
+        }
+    }
+
     /// <summary>Persists a user steering message for a task that is actively running.</summary>
     public AgentTaskArtifact AddFollowUpInstruction(string id, string instruction)
     {

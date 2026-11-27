@@ -34,6 +34,8 @@ internal static class AgentTaskArtifactTests
             Check(preview?.Id == first.Id && store.Load().Single(task => task.Id == first.Id).Status == AgentTaskStatuses.Queued, "agent task readiness preview is dependency-aware and non-mutating");
             var claimedFirst = store.TryClaimReady();
             Check(claimedFirst?.Id == first.Id && claimedFirst.Status == AgentTaskStatuses.Running, "queued root agent task can be claimed without dispatching external work");
+            var assignedModel = store.RecordEffectiveModel(first.Id, "org/model-8b", "AirLLM", 8L << 30, 131072, airLlmCompatible: true);
+            Check(assignedModel.Model == "org/model-8b" && assignedModel.ModelProvider == "AirLLM" && assignedModel.ModelContextLength == 131072 && assignedModel.ModelSizeBytes == 8L << 30, "running task records its resolved model assignment and capacity metadata");
             store.RecordChangedFile(first.Id, "src/layout.ts");
             var runningWithChanges = store.RecordChangedFile(first.Id, "src/layout.ts");
             Check(runningWithChanges.Status == AgentTaskStatuses.Running && runningWithChanges.ChangedFiles.SequenceEqual(["src/layout.ts"]), "successful edits are persisted immediately on a running task and duplicate paths are ignored");

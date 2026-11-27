@@ -393,15 +393,20 @@ public static partial class AgentHostLoop
         var settings = CreateSettingsStore().Load();
         var executor = new AgentTaskExecutor(CreateTaskStore());
         var journalTask = CreateTaskStore().Get(taskId);
+        var usesCodingModel = string.IsNullOrWhiteSpace(journalTask.Model) && !string.IsNullOrWhiteSpace(settings.CodingModel);
         if (!string.IsNullOrWhiteSpace(journalTask.Model)) settings.Model = journalTask.Model;
         else if (!string.IsNullOrWhiteSpace(settings.CodingModel)) settings.Model = settings.CodingModel;
         if (!string.IsNullOrWhiteSpace(journalTask.ModelProvider)) settings.ModelProvider = journalTask.ModelProvider;
         else if (string.IsNullOrWhiteSpace(journalTask.Model) && !string.IsNullOrWhiteSpace(settings.CodingModelProvider)) settings.ModelProvider = settings.CodingModelProvider;
         SetTaskJournalStatus(journalTask, AgentTaskStatuses.Running);
-        AppendTaskJournalEvent(journalTask, "task.execution_started");
         var finalTask = await executor.ExecuteAsync(taskId, async (task, cancellationToken) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
+            task = CreateTaskStore().RecordEffectiveModel(taskId, settings.Model, settings.ModelProvider,
+                task.ModelSizeBytes ?? (usesCodingModel ? settings.CodingModelSizeBytes : null),
+                task.ModelContextLength ?? (usesCodingModel ? settings.CodingModelContextLength : null),
+                task.AirLlmCompatible || usesCodingModel && string.Equals(settings.ModelProvider, "AirLLM", StringComparison.OrdinalIgnoreCase));
+            AppendTaskJournalEvent(task, "task.execution_started");
             var project = task.ProjectId is null ? null : CreateProjectStore().Load().SingleOrDefault(item => item.Id == task.ProjectId)
                 ?? throw new InvalidOperationException("The project linked to this thread is no longer available.");
             var root = project?.FolderPaths.FirstOrDefault();

@@ -189,8 +189,13 @@ export type DesktopTask = {
   id: string;
   title: string;
   instruction: string;
-    followUpInstructions?: string[];
+  followUpInstructions?: string[];
   responseMode?: "think" | "coding" | "security";
+  model?: string | null;
+  modelProvider?: string | null;
+  modelSizeBytes?: number | null;
+  modelContextLength?: number | null;
+  airLlmCompatible?: boolean;
   environment?: TaskEnvironment;
   worktreePath?: string | null;
   worktreeBranch?: string | null;
