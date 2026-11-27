@@ -4522,3 +4522,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .ui-dialog .coding-pr-draft-toggle { display: flex; align-items: center; gap: 9px; color: var(--skai-color-text); cursor: pointer; }
 .ui-dialog .coding-pr-draft-toggle input { width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--skai-color-accent); }
+.voice-preset-manager { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.voice-preset-manager h3 { margin: 0 0 5px; }
+.voice-preset-manager .settings-help { margin: 0; }
+.voice-preset-actions { display: grid; grid-template-columns: minmax(140px,1fr) auto auto minmax(150px,1fr) auto; gap: 8px; align-items: end; }
+.voice-preset-actions label { display: grid; gap: 6px; color: var(--skai-color-text-muted); font-size: var(--skai-text-sm); }
+.voice-preset-actions select, .voice-preset-actions input { width: 100%; min-width: 0; min-height: 36px; padding: 7px 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); }
+@media (max-width: 740px) { .voice-preset-actions { grid-template-columns: minmax(0,1fr) auto; } .voice-preset-actions label:first-child { grid-column: 1 / -1; } }

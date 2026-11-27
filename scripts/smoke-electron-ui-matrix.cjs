@@ -1294,6 +1294,38 @@ async function main() {
             await sleep(90);
             phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
           }
+          if (route === "settings" && category === "Voice & Audio" && process.env.UI_MATRIX_EXERCISE_VOICE_PRESETS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            const presetWorkflow = await cdp.evaluate(`(async () => {
+              const root = document.querySelector('.voice-preset-manager');
+              if (!root) return { ok: false, reason: 'voice preset controls are missing' };
+              localStorage.removeItem('skai.voice.presets.v1');
+              window.dispatchEvent(new CustomEvent('skai:voice-presets-updated'));
+              const name = root.querySelector('input');
+              const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+              inputSetter.call(name, 'Matrix voice preset');
+              name.dispatchEvent(new Event('input', { bubbles: true }));
+              [...root.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Save preset')?.click();
+              await new Promise((resolve) => setTimeout(resolve, 30));
+              const preset = JSON.parse(localStorage.getItem('skai.voice.presets.v1') || '[]')[0];
+              if (!preset || preset.name !== 'Matrix voice preset') return { ok: false, reason: 'save did not persist a named preset' };
+              const slider = document.querySelector('#voice-expressiveness');
+              if (!slider) return { ok: false, reason: 'expressiveness control is missing' };
+              inputSetter.call(slider, String(preset.settings.expressiveness === 100 ? 0 : 100));
+              slider.dispatchEvent(new Event('input', { bubbles: true }));
+              slider.dispatchEvent(new Event('change', { bubbles: true }));
+              const select = root.querySelector('select');
+              Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, preset.id);
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+              [...root.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Apply')?.click();
+              await new Promise((resolve) => setTimeout(resolve, 60));
+              const restored = Number(document.querySelector('#voice-expressiveness')?.value) === preset.settings.expressiveness;
+              [...root.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Remove')?.click();
+              await new Promise((resolve) => setTimeout(resolve, 30));
+              return { ok: restored && JSON.parse(localStorage.getItem('skai.voice.presets.v1') || '[]').length === 0, restored, removed: JSON.parse(localStorage.getItem('skai.voice.presets.v1') || '[]').length === 0 };
+            })()`);
+            if (!presetWorkflow?.ok) throw new Error(`Voice preset save/apply/remove workflow failed: ${JSON.stringify(presetWorkflow)}`);
+            console.log(`[voice-preset-workflow] ${JSON.stringify(presetWorkflow)}`);
+          }
           if (route === "coding" && width < 640) {
             await cdp.evaluate(`(() => { for (const selector of ['.app-main', '.app-content-coding', '.coding-session-grid', '.project-thread-panel .message-list']) { const element = document.querySelector(selector); if (element) element.scrollTop = 0; } window.scrollTo(0, 0); return 1; })()`);
           }

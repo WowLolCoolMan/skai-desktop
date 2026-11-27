@@ -13,6 +13,8 @@ export type VoiceCapabilities = {
 
 export type VoiceSource = "local" | "cloud";
 export type CloudVoiceProviderId = "elevenlabs" | "inworld" | "cartesia";
+export type VoiceSettings = ReturnType<typeof selectedVoiceSettings>;
+export type SavedVoicePreset = { id: string; name: string; settings: VoiceSettings; updatedAt: string };
 
 /**
  * Speech controls are deliberately structured tags, not free-form prompts for
@@ -104,6 +106,7 @@ const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
 const cloudModelIdKey = "skai.voice.cloudModelId";
 const qwenSpeakerKey = "skai.voice.qwenSpeaker";
 const expressivenessKey = "skai.voice.expressiveness";
+const savedVoicePresetsKey = "skai.voice.presets.v1";
 let activeCloudAudio: HTMLAudioElement | null = null;
 let speechGeneration = 0;
 function setVoicePlaybackActive(active: boolean) {
@@ -139,6 +142,45 @@ export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResou
   const safeValue = key === "primaryModelId" ? resolveInstalledVoiceModel(String(value)) : key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value), true) : key === "expressiveness" ? normalizeExpressiveness(Number(value)) : value;
   localStorage.setItem(storageKey, String(safeValue));
   window.dispatchEvent(new CustomEvent("skai:voice-settings-updated"));
+}
+
+export function listSavedVoicePresets(): SavedVoicePreset[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(savedVoicePresetsKey) ?? "[]");
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is SavedVoicePreset => Boolean(entry && typeof entry === "object"
+      && typeof entry.id === "string" && typeof entry.name === "string" && entry.name.trim()
+      && entry.settings && typeof entry.settings === "object" && typeof entry.updatedAt === "string"))
+      .slice(0, 16);
+  } catch {
+    return [];
+  }
+}
+
+export function saveCurrentVoicePreset(name: string): SavedVoicePreset {
+  const normalized = name.trim().replace(/\s+/g, " ").slice(0, 48);
+  if (!normalized) throw new Error("Enter a name for this voice preset.");
+  const presets = listSavedVoicePresets();
+  const existing = presets.find((preset) => preset.name.localeCompare(normalized, undefined, { sensitivity: "accent" }) === 0);
+  if (!existing && presets.length >= 16) throw new Error("You can save up to 16 voice presets. Remove one before adding another.");
+  const preset: SavedVoicePreset = { id: existing?.id ?? crypto.randomUUID(), name: normalized, settings: selectedVoiceSettings(), updatedAt: new Date().toISOString() };
+  localStorage.setItem(savedVoicePresetsKey, JSON.stringify([preset, ...presets.filter((item) => item.id !== preset.id)].slice(0, 16)));
+  window.dispatchEvent(new CustomEvent("skai:voice-presets-updated"));
+  return preset;
+}
+
+export function removeSavedVoicePreset(id: string) {
+  const next = listSavedVoicePresets().filter((preset) => preset.id !== id);
+  localStorage.setItem(savedVoicePresetsKey, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent("skai:voice-presets-updated"));
+  return next;
+}
+
+export function applyVoicePreset(preset: SavedVoicePreset) {
+  const settings = preset.settings;
+  for (const key of ["profileId", "primaryModelId", "lowResourceModelId", "lowResourceMode", "voiceOutputEnabled", "source", "cloudProvider", "cloudModelId", "cloudVoiceId", "qwenSpeaker", "expressiveness"] as const) {
+    saveVoiceSetting(key, settings[key]);
+  }
 }
 
 export function stopNativeSpeech() {
