@@ -567,6 +567,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .git-summary span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
 .git-summary.has-conflicts strong { color: var(--skai-color-danger); }
 .coding-health-banner { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface-soft); }.coding-health-banner > svg { flex: 0 0 auto; color: var(--skai-color-accent-text); }.coding-health-banner > div { display: grid; min-width: 0; gap: 2px; }.coding-health-banner strong { font-size: var(--skai-text-sm); }.coding-health-banner span { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }.coding-health-banner .ui-button { margin-left: auto; flex: 0 0 auto; }.coding-health-banner.is-warning { border-color: color-mix(in srgb, var(--skai-color-warning) 40%, var(--skai-color-border)); }.coding-health-banner.is-warning > svg { color: var(--skai-color-warning); }.coding-health-banner.is-danger { border-color: color-mix(in srgb, var(--skai-color-danger) 45%, var(--skai-color-border)); }.coding-health-banner.is-danger > svg { color: var(--skai-color-danger); }
+.coding-health-banner.is-success { border-color: color-mix(in srgb, var(--skai-color-success) 40%, var(--skai-color-border)); }.coding-health-banner.is-success > svg { color: var(--skai-color-success); }
 .composer-context-dedup { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--skai-color-warning) 38%, var(--skai-color-border)); border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: color-mix(in srgb, var(--skai-color-warning) 8%, transparent); font-size: var(--skai-text-xs); }.composer-context-dedup .ui-button { flex: 0 0 auto; min-height: 28px; padding: 4px 8px; }
 .coding-project-scratchpad { margin: 0 0 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }.coding-project-scratchpad summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; cursor: pointer; list-style: none; }.coding-project-scratchpad summary::-webkit-details-marker { display: none; }.coding-project-scratchpad summary > span:first-child { display: grid; gap: 2px; }.coding-project-scratchpad summary strong { font-size: var(--skai-text-sm); }.coding-project-scratchpad summary small, .coding-project-scratchpad summary > span:last-child { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }.coding-project-scratchpad textarea { display: block; width: calc(100% - 24px); min-height: 94px; margin: 0 12px 12px; resize: vertical; }
 .git-change-summary { display: grid; gap: 8px; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
@@ -5331,3 +5332,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .file-editor-heading-copy span { overflow: hidden; color: var(--skai-color-text); text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .chat-working-context { max-width: 100%; } .chat-working-context small { display: none; } .composer-mode-chip { max-width: 84px; overflow: hidden; text-overflow: ellipsis; } }
 @media (max-width: 1100px) { .coding-project-browser .file-editor-heading > .file-editor-heading-copy { width: 100%; } }
+/* Focus layout hides secondary UI through presentation only, so every pane's
+   open state and scroll position return unchanged when focus mode ends. */
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-page > .page-header,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-session-bar,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-context,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-health-banner,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .project-preflight,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-scratchpad,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-local-preview,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-task-inspector,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-terminal-inspector { display: none !important; }
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser .project-file-explorer { display: none; }
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser.is-file-explorer-hidden .project-file-layout,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser .project-file-layout { grid-template-columns: minmax(0, 1fr); }
