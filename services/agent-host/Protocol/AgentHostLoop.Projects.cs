@@ -17,89 +17,119 @@ public static partial class AgentHostLoop
         if (instructions.Length > 500_000 || instructions.Any(char.IsControl)) throw new InvalidOperationException("Project instructions exceed the safety limit.");
         var folderPaths = OptionalStringList(request, "folderPaths", 128, 32_768);
         var store = CreateProjectStore();
-        var projects = store.Load();
         var id = OptionalString(request, "id");
-        var project = string.IsNullOrWhiteSpace(id) ? new LocalProject { Name = name } : projects.SingleOrDefault(item => item.Id == id)
-            ?? throw new KeyNotFoundException("The project does not exist.");
-        project.Name = name;
-        project.Instructions = instructions;
-        project.FolderPaths = folderPaths;
-        project.UpdatedAt = DateTimeOffset.UtcNow;
-        if (projects.All(item => item.Id != project.Id)) projects.Add(project);
-        store.Save(projects);
+        LocalProject project;
+        HashSet<string> originalFolders;
+        lock (ProjectAccessGate)
+        {
+            var projects = store.Load();
+            project = string.IsNullOrWhiteSpace(id) ? new LocalProject { Name = name } : projects.SingleOrDefault(item => item.Id == id)
+                ?? throw new KeyNotFoundException("The project does not exist.");
+            originalFolders = project.FolderPaths.ToHashSet(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+            project.Name = name;
+            project.Instructions = instructions;
+            project.FolderPaths = folderPaths;
+            project.UpdatedAt = DateTimeOffset.UtcNow;
+            if (projects.All(item => item.Id != project.Id)) projects.Add(project);
+            store.Save(projects);
+        }
+        var newFolders = project.FolderPaths.ToHashSet(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (var folder in newFolders.Except(originalFolders))
+            AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.folder.granted", new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["resource"] = folder,
+                ["duration"] = "until-revoked",
+            });
+        foreach (var folder in originalFolders.Except(newFolders))
+            AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.folder.revoked", new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["resource"] = folder,
+                ["duration"] = "revoked",
+            });
         return new(ProtocolVersion, request.Id, true, new { id = project.Id, name = project.Name, updatedAt = project.UpdatedAt });
     }
 
     private static AgentResponse ListProjectFiles(AgentRequest request)
     {
         var id = RequiredBoundedString(request, "id", 128);
-        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
-            ?? throw new KeyNotFoundException("The project does not exist.");
-        var snapshot = WorkspaceFileContext.EnumerateTextFileBrowser(project.FolderPaths);
-        var visualPreviews = WorkspaceFileContext.EnumeratePreviewableFiles(project.FolderPaths, includeText: false);
-        var files = snapshot.Files.Select(file => new { relativePath = file.RelativePath, bytes = file.Bytes, kind = "text" })
-            .Concat(visualPreviews.Select(file => new { relativePath = file.RelativePath, bytes = file.Bytes, kind = file.Kind }))
-            .GroupBy(file => file.relativePath, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
-            .Select(group => group.First())
-            .ToArray();
-        return new(ProtocolVersion, request.Id, true, new
+        lock (ProjectAccessGate)
         {
-            projectId = id,
-            files,
-            protectedFilesSkipped = snapshot.ProtectedFilesSkipped,
-            excludedDirectoriesSkipped = snapshot.ExcludedDirectoriesSkipped,
-            linkedPathsSkipped = snapshot.LinkedPathsSkipped,
-            hitEntryLimit = snapshot.HitEntryLimit,
-        });
+            var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
+                ?? throw new KeyNotFoundException("The project does not exist.");
+            var snapshot = WorkspaceFileContext.EnumerateTextFileBrowser(project.FolderPaths);
+            var visualPreviews = WorkspaceFileContext.EnumeratePreviewableFiles(project.FolderPaths, includeText: false);
+            var files = snapshot.Files.Select(file => new { relativePath = file.RelativePath, bytes = file.Bytes, kind = "text" })
+                .Concat(visualPreviews.Select(file => new { relativePath = file.RelativePath, bytes = file.Bytes, kind = file.Kind }))
+                .GroupBy(file => file.relativePath, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToArray();
+            return new(ProtocolVersion, request.Id, true, new
+            {
+                projectId = id,
+                files,
+                protectedFilesSkipped = snapshot.ProtectedFilesSkipped,
+                excludedDirectoriesSkipped = snapshot.ExcludedDirectoriesSkipped,
+                linkedPathsSkipped = snapshot.LinkedPathsSkipped,
+                hitEntryLimit = snapshot.HitEntryLimit,
+            });
+        }
     }
 
     private static AgentResponse ReadProjectFile(AgentRequest request)
     {
         var id = RequiredBoundedString(request, "id", 128);
         var relativePath = RequiredBoundedString(request, "relativePath", 512);
-        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
-            ?? throw new KeyNotFoundException("The project does not exist.");
-        foreach (var root in project.FolderPaths)
+        lock (ProjectAccessGate)
         {
-            try
+            var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
+                ?? throw new KeyNotFoundException("The project does not exist.");
+            foreach (var root in project.FolderPaths)
             {
-                var editor = new WorkspaceFileEditor();
-                var content = editor.ReadText(root, relativePath);
-                return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, content, hash = editor.GetCurrentHash(root, relativePath) });
+                try
+                {
+                    var editor = new WorkspaceFileEditor();
+                    var content = editor.ReadText(root, relativePath);
+                    AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.file.read", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = relativePath, ["scope"] = "selected project folder" });
+                    return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, content, hash = editor.GetCurrentHash(root, relativePath) });
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
             }
-            catch (FileNotFoundException) { }
-            catch (DirectoryNotFoundException) { }
+            throw new FileNotFoundException("The selected project file is unavailable or protected.");
         }
-        throw new FileNotFoundException("The selected project file is unavailable or protected.");
     }
 
     private static AgentResponse ReadProjectPreview(AgentRequest request)
     {
         var id = RequiredBoundedString(request, "id", 128);
         var relativePath = RequiredBoundedString(request, "relativePath", 512);
-        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
-            ?? throw new KeyNotFoundException("The project does not exist.");
-        var (entry, bytes) = WorkspaceFileContext.ReadPreviewableFile(project.FolderPaths, relativePath);
-        if (entry.Kind == "image")
+        lock (ProjectAccessGate)
         {
-            var mediaType = ChatAttachmentPolicy.GetImageMediaType(entry.RelativePath);
-            if (mediaType is null || !ChatAttachmentPolicy.HasValidImageSignature(mediaType, bytes))
-                throw new InvalidDataException("The selected image has an unsupported or invalid file signature.");
-            return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "image", mediaType, content = Convert.ToBase64String(bytes) });
+            var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
+                ?? throw new KeyNotFoundException("The project does not exist.");
+            var (entry, bytes) = WorkspaceFileContext.ReadPreviewableFile(project.FolderPaths, relativePath);
+            AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.file.preview", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = relativePath, ["scope"] = "selected project folder" });
+            if (entry.Kind == "image")
+            {
+                var mediaType = ChatAttachmentPolicy.GetImageMediaType(entry.RelativePath);
+                if (mediaType is null || !ChatAttachmentPolicy.HasValidImageSignature(mediaType, bytes))
+                    throw new InvalidDataException("The selected image has an unsupported or invalid file signature.");
+                return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "image", mediaType, content = Convert.ToBase64String(bytes) });
+            }
+            if (entry.Kind == "svg")
+            {
+                string content;
+                try { content = new System.Text.UTF8Encoding(false, true).GetString(bytes); }
+                catch (System.Text.DecoderFallbackException error) { throw new InvalidDataException("The selected SVG is not valid UTF-8 text.", error); }
+                if (content.Contains('\0') || !content.Contains("<svg", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("The selected SVG does not contain a valid SVG root.");
+                return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "svg", mediaType = "image/svg+xml", content });
+            }
+            if (bytes.Length <= WorkspaceFileContext.MaxInlinePdfPreviewBytes)
+                return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = "application/pdf", content = Convert.ToBase64String(bytes) });
+            var text = PdfAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
+            return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = "text/plain", content = text });
         }
-        if (entry.Kind == "svg")
-        {
-            string content;
-            try { content = new System.Text.UTF8Encoding(false, true).GetString(bytes); }
-            catch (System.Text.DecoderFallbackException error) { throw new InvalidDataException("The selected SVG is not valid UTF-8 text.", error); }
-            if (content.Contains('\0') || !content.Contains("<svg", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("The selected SVG does not contain a valid SVG root.");
-            return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "svg", mediaType = "image/svg+xml", content });
-        }
-        if (bytes.Length <= WorkspaceFileContext.MaxInlinePdfPreviewBytes)
-            return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = "application/pdf", content = Convert.ToBase64String(bytes) });
-        var text = PdfAttachmentTextExtractor.Extract(bytes, ChatAttachmentPolicy.MaxCharactersPerFile);
-        return new(ProtocolVersion, request.Id, true, new { projectId = id, relativePath, kind = "pdf", mediaType = "text/plain", content = text });
     }
 
     private static AgentResponse WriteProjectFile(AgentRequest request)
@@ -109,23 +139,34 @@ public static partial class AgentHostLoop
         var content = request.Params?.TryGetProperty("content", out var contentValue) == true ? contentValue.GetString() : null;
         var expectedHash = RequiredBoundedString(request, "expectedHash", 128);
         if (content is null) throw new InvalidOperationException("project.file.write requires content.");
-        var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The project does not exist.");
-        var root = project.FolderPaths.FirstOrDefault() ?? throw new InvalidOperationException("Select a project folder before editing a file.");
-        var receipt = new WorkspaceFileEditor().Apply(root, relativePath, content, expectedHash);
-        var undoId = Guid.NewGuid().ToString("N");
-        var undoStore = CreateUndoStore();
-        undoStore.Add(undoStore.Load(), new WorkspaceUndoEntry(undoId, DateTimeOffset.UtcNow, project.Name, root, relativePath, receipt.PreviousContent, receipt.AppliedHash));
-        return new(ProtocolVersion, request.Id, true, new { undoId, hash = receipt.AppliedHash });
+        lock (ProjectAccessGate)
+        {
+            var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The project does not exist.");
+            var root = project.FolderPaths.FirstOrDefault() ?? throw new UnauthorizedAccessException("Select a project folder before editing a file.");
+            var receipt = new WorkspaceFileEditor().Apply(root, relativePath, content, expectedHash);
+            var undoId = Guid.NewGuid().ToString("N");
+            var undoStore = CreateUndoStore();
+            undoStore.Add(undoStore.Load(), new WorkspaceUndoEntry(undoId, DateTimeOffset.UtcNow, project.Name, root, relativePath, receipt.PreviousContent, receipt.AppliedHash));
+            AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.file.write", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = relativePath, ["characters"] = content.Length.ToString(CultureInfo.InvariantCulture), ["scope"] = "selected project folder" });
+            return new(ProtocolVersion, request.Id, true, new { undoId, hash = receipt.AppliedHash });
+        }
     }
 
     private static AgentResponse UndoProjectFile(AgentRequest request)
     {
         var undoId = RequiredBoundedString(request, "undoId", 128);
         var undoStore = CreateUndoStore();
-        var entry = undoStore.Load().SingleOrDefault(item => item.Id == undoId) ?? throw new KeyNotFoundException("The file edit is no longer available for undo.");
-        undoStore.Undo(entry, new WorkspaceFileEditor());
-        undoStore.Remove(undoStore.Load(), undoId);
-        return new(ProtocolVersion, request.Id, true, new { undone = true, relativePath = entry.RelativePath });
+        lock (ProjectAccessGate)
+        {
+            var entry = undoStore.Load().SingleOrDefault(item => item.Id == undoId) ?? throw new KeyNotFoundException("The file edit is no longer available for undo.");
+            var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            var project = CreateProjectStore().Load().FirstOrDefault(item => item.FolderPaths.Contains(entry.RootPath, pathComparer));
+            if (project is null) throw new UnauthorizedAccessException("Undo requires current access to the selected project folder.");
+            undoStore.Undo(entry, new WorkspaceFileEditor());
+            undoStore.Remove(undoStore.Load(), undoId);
+            AppendPermissionAuditEvent(project.Id, entry.ProjectName, "permission.project.file.undo", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = entry.RelativePath, ["scope"] = "selected project folder" });
+            return new(ProtocolVersion, request.Id, true, new { undone = true, relativePath = entry.RelativePath });
+        }
     }
 
     private static async Task<AgentResponse> RunProjectCommandAsync(AgentRequest request)
@@ -137,7 +178,14 @@ public static partial class AgentHostLoop
         var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id)
             ?? throw new KeyNotFoundException("The project does not exist.");
         var root = project.FolderPaths.FirstOrDefault() ?? throw new InvalidOperationException("Select a project folder before running a command.");
-        var result = await new WorkspaceCommandRunner().RunAsync(root, cwd, command, TimeSpan.FromSeconds(timeoutSeconds));
+        var result = await RunTrackedProjectCommandAsync(id, root, cwd, command, TimeSpan.FromSeconds(timeoutSeconds)).ConfigureAwait(false);
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.command.used", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["resource"] = string.IsNullOrWhiteSpace(cwd) ? "." : cwd,
+            ["timeoutSeconds"] = timeoutSeconds.ToString(CultureInfo.InvariantCulture),
+            ["exitCode"] = result.ExitCode.ToString(CultureInfo.InvariantCulture),
+            ["outputCharacters"] = result.Output.Length.ToString(CultureInfo.InvariantCulture),
+        });
         return new(ProtocolVersion, request.Id, true, new
         {
             exitCode = result.ExitCode,
@@ -168,10 +216,18 @@ public static partial class AgentHostLoop
         if (!string.Equals(task.ProjectId, projectId, StringComparison.Ordinal)) throw new InvalidOperationException("The selected task does not belong to this project.");
         var root = project.FolderPaths.FirstOrDefault() ?? throw new InvalidOperationException("Select a project folder before running a check.");
         var started = DateTimeOffset.UtcNow;
-        var result = await new WorkspaceCommandRunner().RunAsync(root, check.RelativeWorkingDirectory, check.Command, WorkspaceCommandRunner.MaxTimeout).ConfigureAwait(false);
+        var result = await RunTrackedProjectCommandAsync(project.Id, root, check.RelativeWorkingDirectory, check.Command, WorkspaceCommandRunner.MaxTimeout).ConfigureAwait(false);
         var completed = DateTimeOffset.UtcNow;
         var evidence = new ProjectCheckEvidence(check.Id, check.Label, check.Command, check.RelativeWorkingDirectory, check.Source, result.ExitCode, result.Output, result.TimedOut, result.OutputTruncated, started, completed, result.IsolationStatus);
         var updated = CreateTaskStore().AttachVerificationEvidence(taskId, evidence);
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.check.used", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["checkId"] = check.Id,
+            ["checkLabel"] = check.Label,
+            ["workingDirectory"] = check.RelativeWorkingDirectory,
+            ["exitCode"] = result.ExitCode.ToString(CultureInfo.InvariantCulture),
+            ["timedOut"] = result.TimedOut.ToString().ToLowerInvariant(),
+        });
         AppendTaskJournalEvent(task, result.ExitCode == 0 && !result.TimedOut ? "project.check.passed" : "project.check.failed", new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["projectId"] = projectId,
@@ -220,7 +276,27 @@ public static partial class AgentHostLoop
         var sessionId = $"terminal-{Guid.NewGuid():N}";
         var session = new WorkspaceTerminalSession(OptionalInt(request, "columns") ?? 100, OptionalInt(request, "rows") ?? 26);
         await session.StartAsync(root, OptionalString(request, "relativeWorkingDirectory") ?? ".", cancellationToken: CancellationToken.None).ConfigureAwait(false);
-        lock (TerminalSessionsGate) TerminalSessions[sessionId] = session;
+        var registered = false;
+        lock (ProjectAccessGate)
+        {
+            var currentProject = CreateProjectStore().Load().SingleOrDefault(item => item.Id == project.Id);
+            var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            if (currentProject?.FolderPaths.Contains(root, pathComparer) == true)
+            {
+                lock (TerminalSessionsGate)
+                {
+                    TerminalSessions[sessionId] = session;
+                    TerminalSessionProjects[sessionId] = project.Id;
+                    registered = true;
+                }
+            }
+        }
+        if (!registered)
+        {
+            await session.DisposeAsync().ConfigureAwait(false);
+            throw new UnauthorizedAccessException("Project folder access was revoked while the terminal was starting.");
+        }
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.terminal.started", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = root, ["scope"] = "user shell opened in selected project" });
         return new(ProtocolVersion, request.Id, true, new { sessionId, screen = session.ScreenText, exitCode = session.ExitCode, workingDirectory = root });
     }
 
@@ -242,7 +318,7 @@ public static partial class AgentHostLoop
     {
         var sessionId = RequiredBoundedString(request, "sessionId", 128);
         WorkspaceTerminalSession? session;
-        lock (TerminalSessionsGate) { TerminalSessions.Remove(sessionId, out session); }
+        lock (TerminalSessionsGate) { TerminalSessions.Remove(sessionId, out session); TerminalSessionProjects.Remove(sessionId); }
         if (session is not null) await session.DisposeAsync().ConfigureAwait(false);
         return new(ProtocolVersion, request.Id, true, new { closed = true });
     }
@@ -256,10 +332,47 @@ public static partial class AgentHostLoop
         throw new KeyNotFoundException("The terminal session does not exist or has expired.");
     }
 
+    private static async Task<WorkspaceCommandResult> RunTrackedProjectCommandAsync(string projectId, string root, string workingDirectory, string command, TimeSpan timeout)
+    {
+        return await RunTrackedProjectOperationAsync(projectId, root, token =>
+            new WorkspaceCommandRunner().RunAsync(root, workingDirectory, command, timeout, token)).ConfigureAwait(false);
+    }
+
+    private static async Task<T> RunTrackedProjectOperationAsync<T>(string projectId, string root, Func<CancellationToken, Task<T>> startOperation)
+    {
+        var operationId = Guid.NewGuid().ToString("N");
+        var cancellation = new CancellationTokenSource();
+        Task<T> operation;
+        try
+        {
+            lock (ProjectAccessGate)
+            {
+                var currentProject = CreateProjectStore().Load().SingleOrDefault(item => item.Id == projectId);
+                var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+                if (currentProject?.FolderPaths.Contains(root, pathComparer) != true)
+                    throw new UnauthorizedAccessException("Project folder access was revoked before the operation could start.");
+                operation = startOperation(cancellation.Token);
+                ProjectAccessOperations[operationId] = (projectId, cancellation, operation);
+            }
+        }
+        catch
+        {
+            cancellation.Dispose();
+            throw;
+        }
+
+        try { return await operation.ConfigureAwait(false); }
+        finally
+        {
+            lock (ProjectAccessGate) ProjectAccessOperations.Remove(operationId);
+            cancellation.Dispose();
+        }
+    }
+
     private static async Task DisposeTerminalSessionsAsync()
     {
         WorkspaceTerminalSession[] sessions;
-        lock (TerminalSessionsGate) { sessions = TerminalSessions.Values.ToArray(); TerminalSessions.Clear(); }
+        lock (TerminalSessionsGate) { sessions = TerminalSessions.Values.ToArray(); TerminalSessions.Clear(); TerminalSessionProjects.Clear(); }
         foreach (var session in sessions) await session.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -270,7 +383,8 @@ public static partial class AgentHostLoop
             ?? throw new KeyNotFoundException("The project does not exist.");
         var root = project.FolderPaths.FirstOrDefault()
             ?? throw new InvalidOperationException("Select a project folder before reading Git status.");
-        var status = await new GitHubWorkspaceService().GetLocalStatusAsync(root, CancellationToken.None).ConfigureAwait(false);
+        var status = await RunTrackedProjectOperationAsync(project.Id, root, token => new GitHubWorkspaceService().GetLocalStatusAsync(root, token)).ConfigureAwait(false);
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.git.status", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = root, ["changeCount"] = status.Changes.Count.ToString(CultureInfo.InvariantCulture), ["scope"] = "selected project repository" });
         return new(ProtocolVersion, request.Id, true, new
         {
             branch = status.Branch,
@@ -285,7 +399,8 @@ public static partial class AgentHostLoop
     private static async Task<AgentResponse> GetProjectGitDiffAsync(AgentRequest request)
     {
         var (project, root, changes) = await ResolveProjectGitSelectionAsync(request).ConfigureAwait(false);
-        var preview = await new GitHubWorkspaceService().GetDiffPreviewAsync(root, changes, CancellationToken.None).ConfigureAwait(false);
+        var preview = await RunTrackedProjectOperationAsync(project.Id, root, token => new GitHubWorkspaceService().GetDiffPreviewAsync(root, changes, token)).ConfigureAwait(false);
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.git.diff", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = "selected changes", ["includedFiles"] = preview.IncludedFiles.ToString(CultureInfo.InvariantCulture), ["scope"] = "selected project repository" });
         return new(ProtocolVersion, request.Id, true, new { repository = project.Name, text = preview.Text, includedFiles = preview.IncludedFiles, redactedFiles = preview.RedactedFiles, truncated = preview.IsTruncated });
     }
 
@@ -295,9 +410,10 @@ public static partial class AgentHostLoop
         var message = RequiredBoundedString(request, "message", 256);
         var hunkSelection = ReadGitHunkSelection(request);
         var service = new GitHubWorkspaceService();
-        var commit = hunkSelection is null
-            ? await service.CommitSelectedLocallyAsync(root, changes, message, CancellationToken.None).ConfigureAwait(false)
-            : await service.CommitSelectedHunksLocallyAsync(root, changes, hunkSelection, message, CancellationToken.None).ConfigureAwait(false);
+        var commit = await RunTrackedProjectOperationAsync(project.Id, root, token => hunkSelection is null
+            ? service.CommitSelectedLocallyAsync(root, changes, message, token)
+            : service.CommitSelectedHunksLocallyAsync(root, changes, hunkSelection, message, token)).ConfigureAwait(false);
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.git.commit", new Dictionary<string, string>(StringComparer.Ordinal) { ["fileCount"] = changes.Count.ToString(CultureInfo.InvariantCulture), ["partialSelection"] = (hunkSelection is not null).ToString().ToLowerInvariant(), ["scope"] = "selected project repository" });
         AppendProjectActivityEvent(project.Id, project.Name, "project.git.commit.completed", new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["commitMessage"] = message,
@@ -329,7 +445,8 @@ public static partial class AgentHostLoop
         var id = RequiredBoundedString(request, "id", 128);
         var project = CreateProjectStore().Load().SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The project does not exist.");
         var root = project.FolderPaths.FirstOrDefault() ?? throw new InvalidOperationException("Select a project folder before pushing.");
-        var output = await new GitHubWorkspaceService().PushLocalAsync(root, CancellationToken.None).ConfigureAwait(false);
+        var output = await RunTrackedProjectOperationAsync(project.Id, root, token => new GitHubWorkspaceService().PushLocalAsync(root, token)).ConfigureAwait(false);
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.git.push", new Dictionary<string, string>(StringComparer.Ordinal) { ["resource"] = root, ["scope"] = "selected project repository" });
         AppendProjectActivityEvent(project.Id, project.Name, "project.git.push.completed");
         return new(ProtocolVersion, request.Id, true, new { repository = project.Name, pushed = true, output });
     }
@@ -344,7 +461,8 @@ public static partial class AgentHostLoop
         var title = RequiredBoundedString(request, "title", 256);
         var body = OptionalString(request, "body") ?? string.Empty;
         var draft = OptionalBoolean(request, "draft");
-        var output = await new GitHubWorkspaceService().CreatePullRequestAsync(root, title, body, draft, CancellationToken.None).ConfigureAwait(false);
+        var output = await RunTrackedProjectOperationAsync(project.Id, root, token => new GitHubWorkspaceService().CreatePullRequestAsync(root, title, body, draft, token)).ConfigureAwait(false);
+        AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.git.pull_request", new Dictionary<string, string>(StringComparer.Ordinal) { ["draft"] = draft.ToString().ToLowerInvariant(), ["scope"] = "selected project repository" });
         AppendProjectActivityEvent(project.Id, project.Name, "project.git.pull_request.created", new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["title"] = title,
@@ -360,7 +478,7 @@ public static partial class AgentHostLoop
             ?? throw new KeyNotFoundException("The project does not exist.");
         var root = project.FolderPaths.FirstOrDefault()
             ?? throw new InvalidOperationException("Select a project folder before using Git review.");
-        var status = await new GitHubWorkspaceService().GetLocalStatusAsync(root, CancellationToken.None).ConfigureAwait(false);
+        var status = await RunTrackedProjectOperationAsync(project.Id, root, token => new GitHubWorkspaceService().GetLocalStatusAsync(root, token)).ConfigureAwait(false);
         if (request.Params is not { } parameters || !parameters.TryGetProperty("paths", out var paths) || paths.ValueKind != JsonValueKind.Array)
             throw new InvalidOperationException("Git review requires a paths array.");
         var selectedPaths = paths.EnumerateArray().Select(path => path.GetString()).Where(path => !string.IsNullOrWhiteSpace(path)).Cast<string>().Distinct(StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);

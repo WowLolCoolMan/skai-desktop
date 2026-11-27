@@ -19,6 +19,7 @@ const env = {
   SRAI_SETTINGS_PATH: path.join(profileRoot, "settings.json"),
   SRAI_CONVERSATIONS_PATH: path.join(profileRoot, "conversations.json"),
   SRAI_TASKS_PATH: path.join(profileRoot, "agent-tasks.json"),
+  SRAI_OPERATIONS_PATH: path.join(profileRoot, "operations.json"),
   SRAI_SCHEDULED_TASKS_PATH: path.join(profileRoot, "scheduled-tasks.json"),
   SRAI_PROJECTS_PATH: path.join(profileRoot, "projects.json"),
   SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
@@ -190,6 +191,14 @@ async function run() {
     throw new Error("Agent Host did not reconcile an interrupted task after restart.");
   const project = await request("project.save", { name: "Git status smoke", folderPaths: [tempRoot] });
   if (!project.ok || typeof project.result?.id !== "string") throw new Error("project.save did not create the Git status smoke project.");
+  const grantedOverview = await request("security.overview");
+  const grantedProject = grantedOverview.result?.projects?.find(item => item.id === project.result.id);
+  if (!grantedOverview.ok || !grantedProject?.folderPaths?.includes(tempRoot) || grantedProject.duration !== "Until the folder is removed or access is revoked.")
+    throw new Error(`security.overview did not disclose the exact project folder grant and duration: ${JSON.stringify(grantedOverview)}`);
+  if (grantedOverview.result?.limits?.diskGrowthEnforced !== false || grantedOverview.result?.limits?.commandTimeoutSeconds !== 120 || !grantedOverview.result?.sandbox)
+    throw new Error(`security.overview did not report enforced limits and missing disk quota accurately: ${JSON.stringify(grantedOverview.result?.limits)}`);
+  if (!grantedOverview.result?.grants?.some(item => item.area === "MCP tools" && item.duration === "Single call") || !grantedOverview.result?.grants?.some(item => item.area === "Global tool grants" && item.duration === "Not available"))
+    throw new Error("security.overview omitted actual per-call MCP scope or disclosed global grants that are not supported.");
   const terminal = await request("project.terminal.start", { id: project.result.id, relativeWorkingDirectory: ".", columns: 80, rows: 24 });
   if (!terminal.ok || typeof terminal.result?.sessionId !== "string") throw new Error("project.terminal.start did not create a persistent PTY session.");
   const terminalWrite = await request("project.terminal.write", { sessionId: terminal.result.sessionId, text: "echo terminal-smoke\r\n" });
@@ -237,6 +246,8 @@ async function run() {
   const projectEventTypes = new Set(activityAfterPush.result?.activity?.map(event => event.type) ?? []);
   if (!activityAfterPush.ok || !projectEventTypes.has("project.git.commit.completed") || !projectEventTypes.has("project.git.push.completed"))
     throw new Error(`Project Git activity did not retain commit and push events together: ${JSON.stringify(activityAfterPush)}`);
+  const permissionRead = await request("project.file.read", { id: project.result.id, relativePath: "status-smoke.txt" });
+  if (!permissionRead.ok || !permissionRead.result?.content?.includes("status")) throw new Error("project.file.read did not access the selected project grant.");
   const corpusDocument = await request("corpus.upsert", { title: "Local retrieval smoke", source: "smoke://document", content: "Skai retrieves explicit local documents with bounded snippets.", tags: ["local", "retrieval"] });
   if (!corpusDocument.ok || typeof corpusDocument.result?.id !== "string") throw new Error("corpus.upsert did not persist a local document.");
   const corpusSearch = await request("corpus.search", { query: "bounded snippets" });
@@ -375,7 +386,7 @@ async function run() {
   const execution = await request("tasks.execute", { id: planned.result.id });
   if (!execution.ok || execution.result?.id !== planned.result.id || !["running", "queued", "failed"].includes(execution.result?.status)) throw new Error(`tasks.execute did not start a background local execution: ${JSON.stringify(execution)}`);
   let terminalTask = null;
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 100));
     const snapshot = await request("tasks.list");
     if (!snapshot.ok) throw new Error("tasks.list failed while observing local execution.");
@@ -712,6 +723,28 @@ async function run() {
   if (!resumed.ok || resumed.result?.status !== "scheduled") throw new Error("scheduled.resume did not resume the scheduled run.");
   const cancelled = await request("scheduled.cancel", { id: scheduled.result.id });
   if (!cancelled.ok || cancelled.result?.status !== "cancelled") throw new Error("scheduled.cancel did not cancel the scheduled run.");
+  const undoFixture = await request("project.file.write", { id: project.result.id, relativePath: "status-smoke.txt", content: "permission-revoke-undo-fixture\n", expectedHash: permissionRead.result.hash });
+  if (!undoFixture.ok || !undoFixture.result?.undoId) throw new Error(`Could not prepare the revocation undo fixture: ${JSON.stringify(undoFixture)}`);
+  const revokeTerminal = await request("project.terminal.start", { id: project.result.id, relativeWorkingDirectory: ".", columns: 80, rows: 24 });
+  if (!revokeTerminal.ok || typeof revokeTerminal.result?.sessionId !== "string") throw new Error("Could not start the terminal fixture for project access revocation.");
+  const revokedAccess = await request("security.project.revoke", { id: project.result.id });
+  if (!revokedAccess.ok || revokedAccess.result?.revoked !== 1 || revokedAccess.result?.closedTerminals !== 1 || revokedAccess.result?.stoppedOperations !== 0 || revokedAccess.result?.folderPaths?.[0] !== tempRoot)
+    throw new Error(`Project access revocation did not clear its root and close its terminal: ${JSON.stringify(revokedAccess)}`);
+  const revokedFiles = await request("project.files", { id: project.result.id });
+  if (!revokedFiles.ok || revokedFiles.result?.files?.length !== 0) throw new Error("Project file access remained available after its folder grant was revoked.");
+  const revokedRead = await request("project.file.read", { id: project.result.id, relativePath: "status-smoke.txt" });
+  if (revokedRead.ok) throw new Error("A previously selected project file remained readable after its folder grant was revoked.");
+  const revokedUndo = await request("project.file.undo", { undoId: undoFixture.result.undoId });
+  if (revokedUndo.ok || fs.readFileSync(path.join(tempRoot, "status-smoke.txt"), "utf8") !== "permission-revoke-undo-fixture\n")
+    throw new Error("An old undo token wrote into the project after its folder grant was revoked.");
+  const finalSecurityOverview = await request("security.overview");
+  const finalProject = finalSecurityOverview.result?.projects?.find(item => item.id === project.result.id);
+  const permissionEvents = finalSecurityOverview.result?.audit ?? [];
+  if (!finalSecurityOverview.ok || finalProject?.folderPaths?.length !== 0 || !permissionEvents.some(item => item.type === "permission.project.folder.revoked" && item.payload?.resource === tempRoot) || !permissionEvents.some(item => item.type === "permission.project.file.read" && item.payload?.resource === "status-smoke.txt"))
+    throw new Error(`The permission audit did not retain exact grant, use, and revocation metadata: ${JSON.stringify({ finalProject, permissionEvents: permissionEvents.length })}`);
+  const permissionAuditText = JSON.stringify(permissionEvents);
+  if (permissionAuditText.includes("terminal-smoke") || permissionAuditText.includes("push through configured credential helper") || permissionEvents.some(item => item.payload?.command))
+    throw new Error("Permission audit entries recorded terminal input, file contents, or raw command text.");
   await new Promise(resolve => scheduledModelServer.close(resolve));
   pendingSmokeServers.delete(scheduledModelServer);
   console.log("Agent host replacement smoke passed: health, voice protocol, disposable conversation/settings persistence, persona and group conversations, live task steering, explicit specialist delegation, task cancellation, isolated-worktree planning and guarded release, scheduled automation lifecycle, and direct host lifecycle.");

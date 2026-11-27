@@ -204,14 +204,44 @@ public static partial class AgentHostLoop
             if (!ActiveMcpTools.TryGetValue(connectionId, out var tools) || (descriptor = tools.SingleOrDefault(tool => tool.ToolName.Equals(toolName, StringComparison.Ordinal))!) is null)
                 throw new KeyNotFoundException("The MCP tool is not available on this connection.");
         }
-        var result = await client.CallToolAsync(descriptor, new McpToolGrant
+        AppendPermissionAuditEvent(null, null, "permission.mcp.call.attempted", new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ServerId = descriptor.ServerId,
-            ToolName = descriptor.ToolName,
-            ConnectionId = connectionId,
-            ApprovalId = approvalId,
-            Capabilities = capabilities,
-        }, arguments, cancellationToken).ConfigureAwait(false);
+            ["resource"] = $"{descriptor.ServerId}/{descriptor.ToolName}",
+            ["connectionId"] = connectionId,
+            ["approvalId"] = approvalId,
+            ["capabilities"] = string.Join(",", capabilities),
+            ["duration"] = "single call",
+        });
+        McpToolCallResult result;
+        try
+        {
+            result = await client.CallToolAsync(descriptor, new McpToolGrant
+            {
+                ServerId = descriptor.ServerId,
+                ToolName = descriptor.ToolName,
+                ConnectionId = connectionId,
+                ApprovalId = approvalId,
+                Capabilities = capabilities,
+            }, arguments, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            AppendPermissionAuditEvent(null, null, "permission.mcp.call.failed", new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["resource"] = $"{descriptor.ServerId}/{descriptor.ToolName}",
+                ["connectionId"] = connectionId,
+                ["errorType"] = error.GetType().Name,
+                ["duration"] = "single call",
+            });
+            throw;
+        }
+        AppendPermissionAuditEvent(null, null, "permission.mcp.call.completed", new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["resource"] = $"{descriptor.ServerId}/{descriptor.ToolName}",
+            ["connectionId"] = connectionId,
+            ["resultIsError"] = result.IsError.ToString().ToLowerInvariant(),
+            ["duration"] = "single call",
+        });
         return new(ProtocolVersion, request.Id, true, new { toolName, isError = result.IsError, text = result.Text });
     }
 

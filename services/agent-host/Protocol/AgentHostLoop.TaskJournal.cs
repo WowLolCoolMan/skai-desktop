@@ -65,6 +65,32 @@ public static partial class AgentHostLoop
         }
     }
 
+    private static void AppendPermissionAuditEvent(string? projectId, string? projectName, string type, IReadOnlyDictionary<string, string>? payload = null)
+    {
+        lock (TaskJournalGate)
+        {
+            var journal = TaskJournal.Value;
+            var snapshot = journal.Load();
+            var workspaceId = string.IsNullOrWhiteSpace(projectId) ? "local" : projectId;
+            const string streamTitle = "Permission audit stream";
+            var run = snapshot.Runs.FirstOrDefault(item => item.WorkspaceId == workspaceId && item.UserInstruction == streamTitle);
+            if (run is null)
+            {
+                var identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(workspaceId))).ToLowerInvariant()[..20];
+                run = journal.Create(workspaceId, streamTitle, actor: "system", modelProvider: "local", model: "permission-audit", endpointPrivacy: "local", runId: $"permission-audit-{identity}");
+            }
+            var safePayload = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["scope"] = string.IsNullOrWhiteSpace(projectId) ? "workspace" : "project",
+            };
+            if (!string.IsNullOrWhiteSpace(projectId)) safePayload["projectId"] = projectId;
+            if (!string.IsNullOrWhiteSpace(projectName)) safePayload["projectName"] = projectName;
+            if (payload is not null)
+                foreach (var item in payload) safePayload[item.Key] = item.Value;
+            journal.AppendEvent(run.RunId, type, actor: "desktop-user-action", payload: safePayload, correlationId: projectId);
+        }
+    }
+
     private static void SetTaskJournalStatus(AgentTaskArtifact task, string taskStatus)
     {
         lock (TaskJournalGate)

@@ -130,6 +130,8 @@ public static partial class AgentHostLoop
                 ?? throw new KeyNotFoundException("The selected project does not exist.");
             projectName = project.Name;
             var context = BuildProjectContext(project);
+            if (!string.IsNullOrWhiteSpace(context))
+                AppendPermissionAuditEvent(project.Id, project.Name, "permission.project.context.used", new Dictionary<string, string>(StringComparer.Ordinal) { ["scope"] = "selected project excerpts" });
             if (!string.IsNullOrWhiteSpace(context)) messages.Insert(0, new ChatMessage("system", context));
         }
 

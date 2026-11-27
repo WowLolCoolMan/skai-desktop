@@ -26,6 +26,7 @@ const env = {
   SRAI_TASKS_PATH: path.join(profileRoot, "agent-tasks.json"),
   SRAI_SCHEDULED_TASKS_PATH: path.join(profileRoot, "scheduled-tasks.json"),
   SRAI_PROJECTS_PATH: path.join(profileRoot, "projects.json"),
+  SRAI_OPERATIONS_PATH: path.join(profileRoot, "operations.json"),
   SRAI_CORPUS_PATH: path.join(profileRoot, "document-corpus.json"),
   SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
 };
@@ -362,6 +363,12 @@ async function run() {
   });
   if (!listed.ok || listed.result?.isError || !listed.result?.text?.includes("sample.txt")) {
     throw new Error(`Filesystem MCP could not execute its approved read-only list tool: ${JSON.stringify(listed)}`);
+  }
+  const mcpPermissionOverview = await request("security.overview");
+  const mcpAudit = mcpPermissionOverview.result?.audit ?? [];
+  if (!mcpPermissionOverview.ok || !mcpAudit.some(event => event.type === "permission.mcp.call.completed" && event.payload?.resource === "filesystem/list_directory" && event.payload?.duration === "single call")
+    || mcpAudit.some(event => event.type.startsWith("permission.mcp.call.") && (event.payload?.arguments || event.payload?.toolArguments || event.payload?.command))) {
+    throw new Error(`Approved MCP use was not audited at one-call scope without logging arguments: ${JSON.stringify(mcpPermissionOverview)}`);
   }
   const revoked = await request("mcp.connection.revoke", { connectionId: filesystem.result.connection.connectionId });
   if (!revoked.ok) throw new Error("Filesystem MCP could not be cleanly stopped after the smoke check.");

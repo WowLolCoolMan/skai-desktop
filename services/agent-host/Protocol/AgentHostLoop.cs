@@ -22,7 +22,10 @@ public static partial class AgentHostLoop
     private static readonly object RuntimeCapacityGate = new();
     private static RuntimeCapacitySnapshot? CachedRuntimeCapacity;
     private static readonly Dictionary<string, WorkspaceTerminalSession> TerminalSessions = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, string> TerminalSessionProjects = new(StringComparer.Ordinal);
     private static readonly object TerminalSessionsGate = new();
+    private static readonly object ProjectAccessGate = new();
+    private static readonly Dictionary<string, (string ProjectId, CancellationTokenSource Cancellation, Task Operation)> ProjectAccessOperations = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, ModelPullOperation> ModelPulls = new(StringComparer.Ordinal);
     private static readonly object ModelPullsGate = new();
     private static readonly Dictionary<string, AirLlmInstallOperation> AirLlmInstalls = new(StringComparer.Ordinal);

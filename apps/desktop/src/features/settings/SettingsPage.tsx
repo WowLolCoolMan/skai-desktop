@@ -10,6 +10,7 @@ import { ThemeSettings } from "../../theme/ThemeSettings";
 import { AppearancePreview } from "../../theme/AppearanceOptions";
 import { enableRetroTheme, readAchievements, unlockAchievement, type SkaiAchievement } from "./easterEggs";
 import { VoicePresetManager } from "./VoicePresetManager";
+import { PermissionCenter } from "./PermissionCenter";
 
 const categories = ["General", "Appearance", "Pet", "Models & Providers", "Voice & Audio", "Image Generation", "Agents", "Integrations", "Privacy & Security", "Storage", "Achievements", "Updates", "Advanced"] as const;
 type Category = typeof categories[number];
@@ -40,7 +41,7 @@ const categorySearchText: Record<Category, string> = {
   "Image Generation": "image ComfyUI workflow prompt endpoint generation",
   Agents: "task developer diagnostics memory prompts planning smart rewrite reengineering",
   Integrations: "GitHub local services ComfyUI integrations repository",
-  "Privacy & Security": "privacy security local storage memory credentials data boundary",
+  "Privacy & Security": "privacy security permissions grants folder access sandbox audit revoke local storage memory credentials data boundary",
   Storage: "export backup data workspace local memory",
   Achievements: "achievements easter eggs unlocked badges secrets",
   Updates: "release channel automatic update delivery",
@@ -297,7 +298,7 @@ export function SettingsPage(props: SettingsProps) {
 
         {activeCategory === "Integrations" && <><Integration title="GitHub project workflow" detail="Available from the Coding workspace through your local GitHub CLI session. Skai does not collect a separate token here." status="Available" /><Integration title="Local services" detail="Ollama, LM Studio, AirLLM, OS speech, and ComfyUI use local endpoints." status={localRoute ? "Available" : "Needs setup"} /></>}
 
-        {activeCategory === "Privacy & Security" && <><div className="settings-callout"><strong>Local route in use</strong><span>Prompts, attachments, memory, voice, and image requests stay on this computer.</span></div><p className="settings-help">GitHub is used only for explicit project workflows. Local model and media endpoints are restricted to loopback addresses.</p><Toggle label="Use saved memory in prompts" detail="This is also available in Agents so the setting is easy to find." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /></>}
+        {activeCategory === "Privacy & Security" && <><div className="settings-callout"><strong>Local route in use</strong><span>Prompts, attachments, memory, voice, and image requests stay on this computer.</span></div><p className="settings-help">GitHub is used only for explicit project workflows. Local model and media endpoints are restricted to loopback addresses.</p><Toggle label="Use saved memory in prompts" detail="This is also available in Agents so the setting is easy to find." checked={props.memoryInjectionEnabled} onChange={(value) => change("memoryInjectionEnabled", value)} /><PermissionCenter /></>}
 
         {activeCategory === "Storage" && <><div className="settings-callout"><strong>Workspace data is local</strong><span>Conversations, task plans, memory, and preferences are stored in the local Skai data directory.</span></div><div className="settings-model-actions"><Button variant="secondary" onClick={props.onExportMemory}>Export memory backup</Button><span>Exports a portable JSON backup without deleting anything.</span></div><p className="settings-help">There is no destructive "clear everything" button in the release candidate.</p></>}
 
@@ -316,7 +317,7 @@ export function SettingsPage(props: SettingsProps) {
 }
 
 function categoryDescription(category: Category) {
-  const descriptions: Record<Category, string> = { General: "Choose the local runtime, default model, and preferred model for each kind of work.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize your desktop pets.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, prompt rewriting, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review the local data boundary and storage controls.", Storage: "Back up local workspace data without destructive shortcuts.", Achievements: "A private collection of the little secrets you have found in Skai.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
+  const descriptions: Record<Category, string> = { General: "Choose the local runtime, default model, and preferred model for each kind of work.", Appearance: "Tune the visual environment without changing companion settings.", Pet: "Choose, show, and personalize your desktop pets.", "Models & Providers": "Choose a model runtime already running on this computer.", "Voice & Audio": "Choose local speech behavior and preview it safely.", "Image Generation": "Configure the local image workflow used by the Images workspace.", Agents: "Control task planning, prompt rewriting, diagnostics, and memory injection.", Integrations: "Review the local services and project integrations currently connected.", "Privacy & Security": "Review access grants, sandbox boundaries, and permission history.", Storage: "Back up local workspace data without destructive shortcuts.", Achievements: "A private collection of the little secrets you have found in Skai.", Updates: "See the release channel and update delivery status.", Advanced: "Review controls that affect diagnostics and motion." };
   return descriptions[category];
 }
 
