@@ -466,6 +466,34 @@ an OS-level disk-full condition by filling a developer or CI volume.
 - Unverified: native OS notification action buttons, lock-screen privacy across
   platforms, companion-device transport, and offline mobile reconciliation.
 
+### Slice 31 — shortcuts and command workflows
+
+- Outcome: make frequent commands faster without hiding the workflow from new
+  users. The command palette already supports search, contextual relevance,
+  recent/pinned actions, and keyboard navigation; Settings owns conflict-aware
+  shortcuts, saved slash aliases, toolbar density, and Enter/Shift+Enter
+  behavior. Menus and palette actions now expose the same shortcuts through
+  tooltips and `aria-keyshortcuts`.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`;
+  `npm run package:electron`; packaged Settings-route smoke with
+  `UI_MATRIX_QUICK=1 UI_MATRIX_ROUTE=settings UI_MATRIX_VIEWPORT=1440x900
+  UI_MATRIX_EXERCISE_COMMAND_WORKFLOWS=1` verifies saved aliases, conflict
+  rejection, custom shortcut capture, and toolbar/send persistence. The same
+  matrix waits for the asynchronous Permission Center data before asserting
+  its disclosures, and `npm run check:acceptance-evidence` passes.
+- Failure check: shortcut conflicts must be rejected without overwriting the
+  existing binding; imported aliases must not contain credentials; menu and
+  palette actions must keep their visible shortcut, tooltip, and accessible
+  shortcut name aligned.
+- Disposable profile / cleanup: the packaged matrix uses a throwaway Electron
+  profile and restores the command-workflow preference key after exercising
+  the controls; no project files, credentials, or network services are used.
+- Network and privacy boundary: aliases and shortcut preferences remain local;
+  command discovery does not grant tool access or execute a tool during the
+  settings workflow.
+- Unverified: selection-aware command dispatch, native OS menu accelerators,
+  and platform-specific keyboard layouts outside the Windows packaged run.
+
 ### Slice 32 — evidence-driven completion
 
 - Outcome: link each capability status to an executable check and record

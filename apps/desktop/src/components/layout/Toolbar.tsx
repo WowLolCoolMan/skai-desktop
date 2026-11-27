@@ -10,12 +10,13 @@ const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png"
 
 type MenuItem = { label: string; shortcut?: string; onSelect: () => void; separatorBefore?: boolean };
 export type WorkspaceLayoutPreset = "chat" | "coding" | "review" | "research" | "media";
+const ariaShortcut = (shortcut?: string) => shortcut?.replace(/^Ctrl\+/, "Control+").replace(/^⌘\+/, "Meta+");
 
 function AppMenu({ label, items }: { label: string; items: MenuItem[] }) {
   const [open, setOpen] = useState(false);
   return <div className="app-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
     <button className="app-menu-trigger" type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{label}</button>
-    {open && <div className="app-menu-popover" role="menu" aria-label={`${label} menu`}>{items.map((item) => <button key={`${label}-${item.label}`} className={`app-menu-item ${item.separatorBefore ? "has-separator" : ""}`} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => { setOpen(false); item.onSelect(); }}><span>{item.label}</span>{item.shortcut && <kbd>{item.shortcut}</kbd>}</button>)}</div>}
+    {open && <div className="app-menu-popover" role="menu" aria-label={`${label} menu`}>{items.map((item) => <button key={`${label}-${item.label}`} className={`app-menu-item ${item.separatorBefore ? "has-separator" : ""}`} type="button" role="menuitem" aria-keyshortcuts={ariaShortcut(item.shortcut)} title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label} onMouseDown={(event) => event.preventDefault()} onClick={() => { setOpen(false); item.onSelect(); }}><span>{item.label}</span>{item.shortcut && <kbd>{item.shortcut}</kbd>}</button>)}</div>}
   </div>;
 }
 
