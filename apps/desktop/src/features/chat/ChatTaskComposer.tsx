@@ -6,6 +6,16 @@ import { EnvironmentPicker } from "../../components/ui/EnvironmentPicker";
 const PREFILL_KEY = "skai.chat.taskPrefill";
 
 type TaskPrefill = { title: string; instruction: string; environment: TaskEnvironment };
+type TaskTemplate = { id: string; label: string; title: string; instruction: string; acceptance: string; environment: TaskEnvironment };
+
+const TASK_TEMPLATES: TaskTemplate[] = [
+  { id: "bug-fix", label: "Bug fix", title: "Fix a reported bug", instruction: "Reproduce the reported issue, identify the smallest safe fix, implement it, and verify the affected workflow without changing unrelated behavior.", acceptance: "The issue is reproducible before the change, the focused fix is implemented, and a regression check passes.", environment: "local" },
+  { id: "feature", label: "Feature", title: "Implement a focused feature", instruction: "Design and implement the requested feature in small, reviewable steps. Preserve existing behavior outside the feature and document important decisions.", acceptance: "The feature works through its primary UI path, handles its failure state, and has focused verification evidence.", environment: "worktree" },
+  { id: "refactor", label: "Refactor", title: "Refactor without behavior change", instruction: "Map the current behavior, make the smallest structural improvement, and keep public behavior stable while removing duplication or unnecessary complexity.", acceptance: "The refactor preserves existing behavior and the relevant typecheck, build, or test checks pass.", environment: "worktree" },
+  { id: "dependency", label: "Dependency update", title: "Update a dependency safely", instruction: "Inspect the current dependency usage and release notes, update only the requested dependency, and check for API, lockfile, and runtime compatibility.", acceptance: "The dependency is updated with a reviewable lockfile change and compatibility checks pass.", environment: "worktree" },
+  { id: "documentation", label: "Documentation", title: "Improve project documentation", instruction: "Review the existing documentation for stale or missing guidance, then make a focused update with accurate commands, boundaries, and examples.", acceptance: "The documentation matches the current workflow and links or commands are internally consistent.", environment: "local" },
+  { id: "security", label: "Security review", title: "Review a security boundary", instruction: "Inspect the requested code path for trust boundaries, unsafe inputs, secrets, permissions, and failure handling. Report concrete findings before proposing changes.", acceptance: "Findings include severity, evidence, affected files, and a safe remediation or an explicit no-findings note.", environment: "local" },
+];
 
 function consumeTaskPrefill(): TaskPrefill | null {
   try {
@@ -42,7 +52,19 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [gitHubIssueUrl, setGitHubIssueUrl] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
+  const [templateId, setTemplateId] = useState("");
   const [status, setStatus] = useState("");
+
+  const applyTemplate = (value: string) => {
+    setTemplateId(value);
+    const template = TASK_TEMPLATES.find((item) => item.id === value);
+    if (!template) return;
+    setTitle(template.title);
+    setInstruction(template.instruction);
+    setAcceptanceCriteria(template.acceptance);
+    setEnvironment(template.environment === "worktree" && !worktreeAvailable ? "local" : template.environment);
+    setStatus(`${template.label} template loaded. Adjust the scope before saving.`);
+  };
 
   useEffect(() => {
     const applyPrefill = () => {
@@ -87,7 +109,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
       {showToggle && <Button variant="secondary" type="button" aria-expanded={open} aria-controls="chat-task-composer-fields" onClick={() => setLocalOpen((value) => !value)}>{open ? "Hide planner" : "Plan a task"}</Button>}
     </div>
     {open && <form id="chat-task-composer-fields" onSubmit={(event) => void submit(event)}>
-      <div className="task-composer-fields"><label>Task title<input value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={3} onChange={(event) => setInstruction(event.target.value)} required /></label><label>GitHub issue link <span className="settings-help">Optional · links the plan to its issue</span><input value={gitHubIssueUrl} maxLength={512} type="url" placeholder="https://github.com/owner/repository/issues/123" onChange={(event) => setGitHubIssueUrl(event.target.value)} /></label><label>Acceptance criteria <span className="settings-help">Optional · included in the agent task context</span><textarea value={acceptanceCriteria} maxLength={4000} rows={2} placeholder="List the checks or outcomes this task must satisfy…" onChange={(event) => setAcceptanceCriteria(event.target.value)} /></label></div>
+      <div className="task-composer-fields"><label>Start from a template <span className="settings-help">A bounded starting brief; edit every field before saving.</span><select value={templateId} onChange={(event) => applyTemplate(event.target.value)}><option value="">Custom task</option>{TASK_TEMPLATES.map((template) => <option value={template.id} key={template.id}>{template.label}</option>)}</select></label><label>Task title<input value={title} maxLength={200} onChange={(event) => { setTemplateId(""); setTitle(event.target.value); }} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={3} onChange={(event) => { setTemplateId(""); setInstruction(event.target.value); }} required /></label><label>GitHub issue link <span className="settings-help">Optional · links the plan to its issue</span><input value={gitHubIssueUrl} maxLength={512} type="url" placeholder="https://github.com/owner/repository/issues/123" onChange={(event) => setGitHubIssueUrl(event.target.value)} /></label><label>Acceptance criteria <span className="settings-help">Optional · included in the agent task context</span><textarea value={acceptanceCriteria} maxLength={4000} rows={2} placeholder="List the checks or outcomes this task must satisfy…" onChange={(event) => setAcceptanceCriteria(event.target.value)} /></label></div>
       <EnvironmentPicker value={environment} worktreeAvailable={worktreeAvailable} onChange={setEnvironment} />
       <label className="task-require-approval"><input type="checkbox" checked={requiresApproval} onChange={(event) => setRequiresApproval(event.target.checked)} /> Require approval before starting the local agent run</label>
       <div className="task-composer-footer"><span role="status">{status || "Review the brief before saving the plan."}</span><Button variant="primary" type="submit" disabled={busy || !title.trim() || !instruction.trim()}>{busy ? "Saving plan…" : "Save plan in thread"}</Button></div>
