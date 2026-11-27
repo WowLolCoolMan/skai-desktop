@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { Model, Route, ThemeMode } from "../../app/types";
 import type { AgentResponse, CloseBehavior, UpdateCheckResult } from "../../../shared/contracts";
 import { cloudVoiceProviders, installedVoiceModels, refreshInstalledVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
@@ -103,6 +103,7 @@ type SettingsProps = {
 export function SettingsPage(props: SettingsProps) {
   const [activeCategory, setActiveCategory] = useState<Category>("General");
   const [query, setQuery] = useState("");
+  const settingsContentRef = useRef<HTMLDivElement>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [discoveringModels, setDiscoveringModels] = useState(false);
   const [subagentChoice, setSubagentChoice] = useState("");
@@ -137,6 +138,18 @@ export function SettingsPage(props: SettingsProps) {
     return () => { active = false; };
   }, [props.provider]);
   const visibleCategories = useMemo(() => categories.filter((category) => !normalizedQuery || `${category} ${categoryDescription(category)} ${categorySearchText[category]}`.toLowerCase().includes(normalizedQuery)), [normalizedQuery]);
+  const jumpToMatchingSetting = () => {
+    if (!normalizedQuery) return;
+    const root = settingsContentRef.current;
+    if (!root) return;
+    const target = [...root.querySelectorAll<HTMLElement>("label, [role=switch], button")]
+      .find((element) => (element.innerText || element.getAttribute("aria-label") || "").toLowerCase().includes(normalizedQuery));
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("settings-search-highlight");
+    window.setTimeout(() => target.classList.remove("settings-search-highlight"), 1400);
+    target.querySelector<HTMLElement>("input, select, textarea, button")?.focus({ preventScroll: true });
+  };
   useEffect(() => {
     if (!normalizedQuery || visibleCategories.includes(activeCategory)) return;
     const nextCategory = visibleCategories[0];
@@ -262,9 +275,9 @@ export function SettingsPage(props: SettingsProps) {
   return <div className="feature-page settings-page">
     <PageHeader className="settings-page-header" eyebrow="CONTROL CENTER" title="Workspace settings" description="Tune the local runtime, appearance, voice, media, memory, and workspace behavior." />
     <div className="settings-window">
-      <aside className="settings-nav" aria-label="Settings sections"><p className="section-kicker">PREFERENCES</p><label className="settings-search-wrap"><NavIcon name="search" /><input className="settings-search" value={query} onChange={(event) => { const value = event.target.value; setQuery(value); if (value.trim().toLowerCase() === "konami") { enableRetroTheme(); unlockAchievement("retro-search"); } }} placeholder="Find a setting" aria-label="Search settings" /></label>{normalizedQuery && <p className="settings-search-status" role="status">{visibleCategories.length} matching {visibleCategories.length === 1 ? "section" : "sections"}</p>}<nav className="settings-category-list" aria-label="Settings categories">{visibleCategories.map((category) => <button className={activeCategory === category ? "is-active" : ""} aria-current={activeCategory === category ? "page" : undefined} key={category} onClick={() => setActiveCategory(category)} type="button"><NavIcon name={categoryIcons[category]} /><span>{category}</span>{category === "Achievements" && achievements.length > 0 && <small className="settings-achievement-count">{achievements.length}</small>}</button>)}</nav>{visibleCategories.length === 0 && <p className="settings-no-results">No settings match. Try a label such as endpoint, motion, or memory.</p>}</aside>
+      <aside className="settings-nav" aria-label="Settings sections"><p className="section-kicker">PREFERENCES</p><label className="settings-search-wrap"><NavIcon name="search" /><input className="settings-search" value={query} onChange={(event) => { const value = event.target.value; setQuery(value); if (value.trim().toLowerCase() === "konami") { enableRetroTheme(); unlockAchievement("retro-search"); } }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); jumpToMatchingSetting(); } }} placeholder="Find a setting" aria-label="Search settings" /></label>{normalizedQuery && <><p className="settings-search-status" role="status">{visibleCategories.length} matching {visibleCategories.length === 1 ? "section" : "sections"}</p><Button className="settings-search-jump" variant="secondary" type="button" onClick={jumpToMatchingSetting}>Jump to matching control <kbd>Enter</kbd></Button></>}<nav className="settings-category-list" aria-label="Settings categories">{visibleCategories.map((category) => <button className={activeCategory === category ? "is-active" : ""} aria-current={activeCategory === category ? "page" : undefined} key={category} onClick={() => setActiveCategory(category)} type="button"><NavIcon name={categoryIcons[category]} /><span>{category}</span>{category === "Achievements" && achievements.length > 0 && <small className="settings-achievement-count">{achievements.length}</small>}</button>)}</nav>{visibleCategories.length === 0 && <p className="settings-no-results">No settings match. Try a label such as endpoint, motion, or memory.</p>}</aside>
       <main className="settings-content">
-        <div className="settings-content-scroll">
+        <div className="settings-content-scroll" ref={settingsContentRef}>
         <div className="settings-section-heading"><div><p className="section-kicker">{activeCategory.toUpperCase()}</p><h1>{activeCategory}</h1><p>{categoryDescription(activeCategory)}</p></div></div>
 
         {activeCategory === "General" && <><AboutYouSetting /><PreferredModelsSetting props={props} change={change} /><CloseBehaviorSetting /><div className="settings-callout"><strong>Current model: {props.model}</strong><span>{selectedProvider.label} · {selectedProvider.detail} Model and endpoint controls are grouped under Models &amp; Providers.</span><Button variant="secondary" type="button" onClick={() => setActiveCategory("Models & Providers")}>Configure models &amp; providers</Button></div></>}

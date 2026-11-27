@@ -2521,6 +2521,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .settings-overlay-panel .settings-search:focus { outline: 0; box-shadow: none; }
 .settings-overlay-panel .settings-search::placeholder { color: var(--skai-color-text-muted); }
 .settings-search-status { margin: -10px 9px 10px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.settings-search-jump { display: flex; width: calc(100% - 8px); justify-content: space-between; margin: -2px 4px 12px; font-size: var(--skai-text-xs); }
+.settings-search-jump kbd { padding: 1px 5px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); font: inherit; }
+.settings-search-highlight { outline: 2px solid color-mix(in srgb, var(--skai-color-accent) 70%, transparent); outline-offset: 5px; border-radius: var(--skai-radius-md); transition: outline-color 1.2s ease; }
 .settings-category-list { display: grid; gap: 3px; }
 .settings-category-list button { display: flex; min-height: 39px; align-items: center; gap: 10px; width: 100%; padding: 0 10px; border: 1px solid transparent; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: transparent; text-align: left; font-size: var(--skai-text-sm); transition: color 120ms ease, background 120ms ease, border-color 120ms ease; }
 .settings-category-list button:hover { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
