@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CorpusDocument, MemoryEntry } from "../../app/types";
 import type { DesktopProject } from "../../../shared/contracts";
 import { Button, Card, EmptyState, PageHeader, StatusBadge } from "../../components/ui/Primitives";
@@ -36,7 +36,7 @@ function corpusFreshness(updatedAtUtc: string) {
 }
 
 export function MemoryPage({ projects, entries, busy, loading, error, onRetry, onSearch, onSave, onToggle, onRemove, onExport, corpusDocuments, corpusLoading, corpusError, onSearchCorpus, onSaveCorpus, onRemoveCorpus, onImportCorpus }: MemoryPageProps) {
-  const [view, setView] = useState<"memory" | "documents">("memory");
+  const [view, setView] = useState<"memory" | "documents">(() => localStorage.getItem("skai.search.reference-query.v1") ? "documents" : "memory");
   const [content, setContent] = useState("");
   const [scope, setScope] = useState("global");
   const [tags, setTags] = useState("");
@@ -45,7 +45,7 @@ export function MemoryPage({ projects, entries, busy, loading, error, onRetry, o
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [scopeFilter, setScopeFilter] = useState("all");
-  const [corpusQuery, setCorpusQuery] = useState("");
+  const [corpusQuery, setCorpusQuery] = useState(() => localStorage.getItem("skai.search.reference-query.v1") ?? "");
   const [corpusTitle, setCorpusTitle] = useState("");
   const [corpusSource, setCorpusSource] = useState("");
   const [corpusContent, setCorpusContent] = useState("");
@@ -59,6 +59,12 @@ export function MemoryPage({ projects, entries, busy, loading, error, onRetry, o
   const removeEntry = async (entry: MemoryEntry) => { if (busy) return; if (await onRemove(entry)) setPendingRemoveId(null); };
   const saveDocument = async () => { if (!corpusTitle.trim() || !corpusSource.trim() || !corpusContent.trim() || corpusLoading) return; const scope = corpusScope === "all" ? "workspace" : corpusScope; if (await onSaveCorpus(corpusTitle.trim(), corpusSource.trim(), corpusContent.trim(), corpusTags, scope)) { setCorpusTitle(""); setCorpusSource(""); setCorpusContent(""); setCorpusTags(""); } };
   const documentScopeLabel = (scope: string) => scope === "workspace" ? "Workspace" : projects.find((project) => scope === `project:${project.id}`)?.name ?? "Archived project";
+  useEffect(() => {
+    const pendingQuery = localStorage.getItem("skai.search.reference-query.v1");
+    if (!pendingQuery) return;
+    localStorage.removeItem("skai.search.reference-query.v1");
+    onSearchCorpus(pendingQuery, "all");
+  }, [onSearchCorpus]);
 
   return <div className="feature-page memory-page">
     <PageHeader eyebrow="LOCAL MEMORY" title="Review what Skai remembers" description="Only explicitly saved notes are stored. Search, edit, disable, remove, or export them at any time." actions={<><Button variant="ghost" onClick={onExport}>Export backup</Button>{view === "documents" && <Button variant="secondary" disabled={corpusLoading} onClick={() => onImportCorpus(corpusScope === "all" ? "workspace" : corpusScope)}>Import local files</Button>}</>} />

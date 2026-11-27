@@ -213,14 +213,16 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
     return true;
   };
 
-  const openProjectFile = async (relativePath: string, preserveCurrentDraft = true) => {
-    if (!selectedProject) return;
+  const openProjectFile = async (relativePath: string, preserveCurrentDraft = true, projectOverride?: DesktopProject) => {
+    const activeProject = projectOverride ?? selectedProject;
+    if (!activeProject) return;
     if (selectedFile && preserveCurrentDraft) persistCurrentProjectDraft();
     const requestId = ++fileReadRequestId.current;
     setSelectedFile(relativePath); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null);
-    const kind = projectFiles.find((file) => file.relativePath === relativePath)?.kind ?? "text";
+    const suffix = relativePath.toLowerCase().split(".").pop() ?? "";
+    const kind = (activeProject.id === selectedProject?.id ? projectFiles.find((file) => file.relativePath === relativePath)?.kind : undefined) ?? (suffix === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(suffix) ? "image" : "text");
     if (kind === "image" || kind === "pdf") {
-      const previewResponse = await request("project.preview.read", { id: selectedProject.id, relativePath });
+      const previewResponse = await request("project.preview.read", { id: activeProject.id, relativePath });
       if (requestId !== fileReadRequestId.current) return;
       if (!previewResponse.ok) { const message = previewResponse.error?.message ?? "Project file preview failed."; setFilePreviewError(message); onError(message); return; }
       setFilePreview(previewResponse.result as DesktopProjectPreview);
@@ -228,12 +230,12 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
       onError(null);
       return;
     }
-    const response = await request("project.file.read", { id: selectedProject.id, relativePath });
+    const response = await request("project.file.read", { id: activeProject.id, relativePath });
     if (requestId !== fileReadRequestId.current) return;
     if (!response.ok) { onError(response.error?.message ?? "File preview failed."); return; }
     const result = response.result as { content: string; hash: string };
-    const draftKey = projectDraftKey(selectedProject.id, relativePath);
-    const savedDraft = localFileDrafts.current.has(draftKey) ? localFileDrafts.current.get(draftKey)! : await loadProjectEditorDraft(selectedProject.id, relativePath);
+    const draftKey = projectDraftKey(activeProject.id, relativePath);
+    const savedDraft = localFileDrafts.current.has(draftKey) ? localFileDrafts.current.get(draftKey)! : await loadProjectEditorDraft(activeProject.id, relativePath);
     if (requestId !== fileReadRequestId.current) return;
     const content = savedDraft ?? result.content;
     if (savedDraft !== null && savedDraft !== undefined) localFileDrafts.current.set(draftKey, savedDraft);

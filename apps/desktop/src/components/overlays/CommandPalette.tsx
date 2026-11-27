@@ -8,6 +8,7 @@ import { unlockAchievement } from "../../features/settings/easterEggs";
 
 type Command = { id: string; label: string; detail: string; route?: Route; project?: DesktopProject; run?: () => void };
 const commands: Command[] = [
+  { id: "search", label: "Search workspace", detail: "Find chats, projects, tasks, files, and local artifacts", route: "search" },
   { id: "onboarding", label: "Open Getting Started", detail: "Review setup, privacy, and local capability readiness", route: "onboarding" },
   { id: "chat", label: "Open Chat", detail: "Start or continue a conversation", route: "chat" },
   { id: "projects", label: "Open Projects", detail: "Browse and choose a local workspace", route: "projects" },

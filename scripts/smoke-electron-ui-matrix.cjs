@@ -32,6 +32,7 @@ const exerciseSideChat = process.env.UI_MATRIX_EXERCISE_SIDE_CHAT === "1";
 const exerciseProjectTerminal = process.env.UI_MATRIX_EXERCISE_PROJECT_TERMINAL === "1";
 const exerciseMcpReview = process.env.UI_MATRIX_EXERCISE_MCP_REVIEW === "1";
 const exerciseOnboarding = process.env.UI_MATRIX_EXERCISE_ONBOARDING === "1";
+const exerciseWorkspaceSearch = process.env.UI_MATRIX_EXERCISE_WORKSPACE_SEARCH === "1";
 const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
@@ -370,7 +371,7 @@ async function main() {
       fs.writeFileSync(path.join(seedProject, "src", "plan.ts"), "export const gardenPlan = { columns: 2, spacing: 12 };\n");
     }
   }
-  const seeded = await cdp.evaluateWith(async function(captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions, exerciseChatBase) {
+  const seeded = await cdp.evaluateWith(async function(captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions, exerciseChatBase, exerciseWorkspaceSearch) {
     const r = (m, p) => window.skaiAgent.request(m, p);
     const results = [];
     results.push(await r("conversation.save", { title: longTitle, messages: [{ role: "user", content: captureMode ? "Help me plan a low-maintenance herb garden for a sunny patio." : `Unbroken token: ${longWord}` }, { role: "assistant", content: captureMode ? "Start with basil, thyme, and parsley in containers with good drainage. Check the soil before watering and group pots by sunlight needs." : "Code:\n\n```bash\necho " + "x".repeat(260) + "\n```\n\n| one | two | three | four | five |\n|---|---|---|---|---|\n| " + "data ".repeat(12) + "| b | c | d | e |\n\nURL https://example.invalid/" + "path/".repeat(40) }] }));
@@ -396,6 +397,8 @@ async function main() {
       { title: "Plant list", query: "Which herbs work well in pots?", answer: "Basil, thyme, parsley, and chives all grow well in containers." },
       { title: "Budget", query: "What supplies should I budget for?", answer: "Start with containers, potting mix, seeds or seedlings, and a watering can." },
     ]) results.push(await r("conversation.save", { title: item.title, messages: [{ role: "user", content: item.query }, { role: "assistant", content: item.answer }] }));
+    if (exerciseWorkspaceSearch) results.push(await r("conversation.save", { title: "Workspace search fixture", messages: [{ role: "user", content: "Find the sunny patio herb garden plan and its local care notes." }, { role: "assistant", content: "Basil and thyme grow well in containers on a sunny patio." }] }));
+    if (exerciseWorkspaceSearch) results.push(await r("corpus.upsert", { title: "Orchid care report", source: "Search smoke fixture", content: "The orchid report recommends bright indirect light and a light watering schedule.", scope: "workspace", tags: ["search-smoke"] }));
     if (captureMode && exerciseChatActions) for (const text of ["Add a week-by-week planting schedule.", "Include a simple materials checklist.", "Estimate the monthly watering routine."]) results.push(await r("chat.queue.enqueue", { text }));
     if (captureMode) for (const card of [
       { name: "Default", roles: "General-purpose assistant", instructions: "Be clear, practical, and adaptable to the user's task." },
@@ -404,7 +407,7 @@ async function main() {
       { name: "Tech Writer", roles: "Drafts and edits clear technical docs", instructions: "Use plain language, organize information clearly, and preserve technical accuracy." },
     ]) results.push(await r("persona.save", { persona: { ...card, sourceMode: "own-material", subjectType: "character", voice: "Friendly and clear", personality: "Patient, focused, and direct", thinkingStyle: "Work step by step and explain important choices", interactionStyle: "Ask for missing context only when it affects the result", values: "Clarity, accuracy, and useful next steps", knowledge: "Use the supplied material and task context", evidenceBoundaries: "State uncertainty and do not invent unsupported facts", sourceMaterial: card.instructions } }));
     return results;
-  }, captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions, exerciseChatBase);
+  }, captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions, exerciseChatBase, exerciseWorkspaceSearch);
   if (!Array.isArray(seeded) || seeded.some((result) => result?.ok !== true)) throw new Error(`Seeding the throwaway profile failed: ${JSON.stringify(seeded)}`);
 
   const findings = [];
@@ -462,6 +465,75 @@ async function main() {
           fs.mkdirSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4"), { recursive: true });
           const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
           fs.writeFileSync(path.join(__dirname, "..", "docs", "design-review", "workflow-collection", "revision-4", "evidence-chat-shell-390.png"), Buffer.from(screenshot.data, "base64"));
+        }
+        if (route === "search" && exerciseWorkspaceSearch && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          const searchInput = await cdp.evaluate(`(() => { const input = document.querySelector('.workspace-search-input input'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'sunny patio'); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+          if (!searchInput) throw new Error("Workspace search did not render its main input.");
+          const chatFound = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.workspace-search-result')].some((item) => item.innerText.includes('Workspace search fixture'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!chatFound) throw new Error(`Global workspace search did not find the seeded conversation content: ${JSON.stringify(await cdp.evaluate(`({ heading: document.querySelector('.workspace-search-results-heading')?.innerText, rows: [...document.querySelectorAll('.workspace-search-result')].map((item) => item.innerText), input: document.querySelector('.workspace-search-input input')?.value, error: document.querySelector('.workspace-search-error')?.innerText })`))}`);
+          await clickButtonText(cdp, "Save search", ".workspace-search-toolbar");
+          const saved = await cdp.evaluate(`Boolean([...document.querySelectorAll('.workspace-saved-searches button')].find((item) => item.textContent?.trim() === 'sunny patio'))`);
+          if (!saved) throw new Error("The workspace search query could not be saved as a local shortcut.");
+          const typeFilter = await cdp.evaluate(`(() => { const select = document.querySelector('.workspace-search-filters label:first-child select'); if (!select) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'chat'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+          if (!typeFilter) throw new Error("The workspace search content-type filter was unavailable.");
+          const onlyChat = await cdp.evaluate(`(async () => { await new Promise((r) => setTimeout(r, 100)); const items = [...document.querySelectorAll('.workspace-search-result')]; return items.length > 0 && items.every((item) => item.querySelector('.workspace-search-result-type')?.textContent?.trim() === 'Chat'); })()`);
+          if (!onlyChat) throw new Error("The workspace content-type filter did not constrain the result list to chats.");
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            const capture = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "workspace-search-1440.png"), Buffer.from(capture.data, "base64"));
+          }
+          await cdp.evaluate(`document.querySelector('.workspace-search-result')?.click()`);
+          const openedChat = await cdp.evaluate(`(async () => { for (let i = 0; i < 50; i++) { if (document.title.endsWith(' · chat')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!openedChat) throw new Error("Opening a global search result did not open its saved conversation.");
+          await clickInRenderer(cdp, '[aria-label="Extras"]');
+          const returnedToSearch = await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.global-rail-extras-panel .global-rail-extra')].find((button) => button.innerText.includes('Search & Activity')); item?.click(); return Boolean(item); })()`);
+          if (!returnedToSearch) throw new Error("Search & Activity could not be reopened from Extras.");
+          const restored = await cdp.evaluate(`(async () => { for (let i = 0; i < 50; i++) { const input = document.querySelector('.workspace-search-input input'); if (document.title.endsWith(' · search') && input?.value === 'sunny patio') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!restored) throw new Error("Returning to workspace search did not restore the query.");
+          const restoredFilter = await cdp.evaluate(`document.querySelector('.workspace-search-filters label:first-child select')?.value === 'chat'`);
+          if (!restoredFilter) throw new Error("Returning to workspace search did not restore its filters.");
+          const fileQueryEntered = await cdp.evaluate(`(() => { const type = document.querySelector('.workspace-search-filters label:first-child select'); const input = document.querySelector('.workspace-search-input input'); if (!type || !input) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(type, 'all'); type.dispatchEvent(new Event('change', { bubbles: true })); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'README.md'); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+          if (!fileQueryEntered) throw new Error("The global filename search fixture could not be entered.");
+          const fileFound = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.workspace-search-result')].some((item) => item.querySelector('.workspace-search-result-type')?.textContent?.trim() === 'File' && item.innerText.includes('README.md'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!fileFound) throw new Error("Global search did not find a project file by its relative path.");
+          await cdp.evaluate(`([...document.querySelectorAll('.workspace-search-result')].find((item) => item.querySelector('.workspace-search-result-type')?.textContent?.trim() === 'File' && item.innerText.includes('README.md'))?.click(), true)`);
+          const fileOpened = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.title.endsWith(' · coding') && document.querySelector('.coding-project-browser.is-editor-panel .file-editor-heading')?.innerText.includes('README.md')) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!fileOpened) throw new Error("Opening a file search result did not select the owning project and open its editor.");
+          await clickInRenderer(cdp, '[aria-label="Extras"]');
+          const fileSearchReopened = await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.global-rail-extras-panel .global-rail-extra')].find((button) => button.innerText.includes('Search & Activity')); item?.click(); return Boolean(item); })()`);
+          const fileQueryRestored = fileSearchReopened && await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.workspace-search-input input')?.value === 'README.md' && document.querySelector('.workspace-search-filters label:first-child select')?.value === 'all') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!fileQueryRestored) throw new Error("Returning from the project file editor did not preserve the file query and type filter.");
+          const corpusQueryEntered = await cdp.evaluate(`(() => { const input = document.querySelector('.workspace-search-input input'); if (!input) return false; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'orchid report'); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+          const referenceFound = corpusQueryEntered && await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if ([...document.querySelectorAll('.workspace-search-result')].some((item) => item.querySelector('.workspace-search-result-type')?.textContent?.trim() === 'Reference' && item.innerText.includes('Orchid care report'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!referenceFound) throw new Error("Global search did not find a saved local corpus document.");
+          await cdp.evaluate(`([...document.querySelectorAll('.workspace-search-result')].find((item) => item.querySelector('.workspace-search-result-type')?.textContent?.trim() === 'Reference' && item.innerText.includes('Orchid care report'))?.click(), true)`);
+          const referenceOpened = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · memory') && document.querySelector('.memory-view-tabs button[aria-current="page"]')?.innerText.includes('Document corpus') && document.querySelector('input[aria-label="Search document corpus"]')?.value === 'orchid report') return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!referenceOpened) throw new Error("Opening a corpus search result did not select and search the Document corpus view.");
+          const referenceVisible = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.corpus-list .memory-entry')].some((item) => item.innerText.includes('Orchid care report'))) return true; await new Promise((r) => setTimeout(r, 100)); } return false; })()`);
+          if (!referenceVisible) throw new Error("The selected corpus search result was not visible in its destination view.");
+          await clickInRenderer(cdp, '[aria-label="Extras"]');
+          const referenceSearchReopened = await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.global-rail-extras-panel .global-rail-extra')].find((button) => button.innerText.includes('Search & Activity')); item?.click(); return Boolean(item); })()`);
+          const referenceQueryRestored = referenceSearchReopened && await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.workspace-search-input input')?.value === 'orchid report') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!referenceQueryRestored) throw new Error("Returning from a corpus result did not preserve the workspace query.");
+          await clickButtonText(cdp, "Activity", ".workspace-search-view-toggle");
+          const boardReady = await cdp.evaluate(`Boolean(document.querySelector('.workspace-activity-board') && document.querySelector('.workspace-activity-controls select'))`);
+          if (!boardReady) throw new Error("The activity board did not show its live lanes and activity filters.");
+          const grouping = await cdp.evaluate(`(() => [...document.querySelectorAll('.workspace-activity-controls label select')].some((select) => [...select.options].some((option) => option.value === 'environment')))()`);
+          if (!grouping) throw new Error("The activity board did not expose project, agent, and environment grouping options.");
+          const groupedByProject = await cdp.evaluate(`(() => { const select = [...document.querySelectorAll('.workspace-activity-controls label select')].find((item) => [...item.options].some((option) => option.value === 'environment')); if (!select) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'project'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+          const groupHeadingReady = groupedByProject && await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if ([...document.querySelectorAll('.workspace-activity-group h3')].some((item) => item.textContent?.trim() === 'Workspace')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!groupHeadingReady) throw new Error("Grouping the live activity board by project did not create project sections.");
+          const decisionsFilter = await cdp.evaluate(`(() => { const select = [...document.querySelectorAll('.workspace-activity-controls label select')].find((item) => [...item.options].some((option) => option.value === 'decisions')); if (!select) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'decisions'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+          const decisionVisible = decisionsFilter && await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { if ([...document.querySelectorAll('.workspace-activity-task .usage-task-status')].some((item) => item.textContent?.trim() === 'Proposed')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!decisionVisible) throw new Error("Filtering live activity to user decisions hid the proposed task requiring a decision.");
+          await cdp.evaluate(`(() => { const selects = [...document.querySelectorAll('.workspace-activity-controls label select')]; const group = selects.find((item) => [...item.options].some((option) => option.value === 'environment')); const filter = selects.find((item) => [...item.options].some((option) => option.value === 'decisions')); if (group) { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(group, 'status'); group.dispatchEvent(new Event('change', { bubbles: true })); } if (filter) { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(filter, 'all'); filter.dispatchEvent(new Event('change', { bubbles: true })); } return 1; })()`);
+          const taskVisible = await cdp.evaluate(`document.querySelectorAll('.workspace-activity-task').length > 0`);
+          if (!taskVisible) throw new Error("The activity board did not show tasks from the workspace.");
+          if (process.env.UI_MATRIX_CAPTURE === "1") {
+            const capture = await cdp.send("Page.captureScreenshot", { format: "png" });
+            fs.writeFileSync(path.join(captureDirectory, "workspace-activity-1440.png"), Buffer.from(capture.data, "base64"));
+          }
+          console.log(`[workspace-search-activity] ${JSON.stringify({ globalContentSearch: chatFound, savedQuery: saved, typeFilter: onlyChat, preservedQueryAndFilters: restored && restoredFilter, projectFileSearchAndOpen: fileOpened && fileQueryRestored, corpusSearchAndOpen: referenceOpened && referenceVisible && referenceQueryRestored, activityBoard: boardReady, projectGrouping: groupHeadingReady, decisionFilter: decisionVisible, tasks: taskVisible })}`);
         }
         if (route === "terminal" && exerciseProjectTerminal && width === 1440 && height === 900) {
           const projectPicker = await cdp.evaluate(`Boolean(document.querySelector('.terminal-workspace-main .terminal-controls select'))`);

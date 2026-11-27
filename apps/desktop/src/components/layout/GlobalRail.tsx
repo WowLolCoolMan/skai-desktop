@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "../../app/types";
+import type { DesktopTask } from "../../../shared/contracts";
 import { NavIcon, type NavIconName } from "../ui/NavIcon";
 import { installedVoiceModels } from "../../services/nativeTts";
 
@@ -13,10 +14,11 @@ const destinations: Array<{ route: Route; icon: NavIconName; label: string }> = 
 
 const recentExtraRoutes: Route[] = ["memory", "voice-workbench", "pet-workshop"];
 
-export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (route: Route) => void }) {
+export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: DesktopTask[]; onNavigate: (route: Route) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPetWorkshop, setShowPetWorkshop] = useState(() => localStorage.getItem("skai.pet.workshop.enabled") === "true");
   const [query, setQuery] = useState("");
+  const [lastActivityVisit, setLastActivityVisit] = useState(() => Number(localStorage.getItem("skai.workspace-activity.last-visit.v1") ?? 0));
   const [recentRoutes, setRecentRoutes] = useState<Route[]>(() => {
     try { const value = JSON.parse(localStorage.getItem("skai.extras.recent") ?? "[]"); return Array.isArray(value) ? value.filter((route): route is Route => recentExtraRoutes.includes(route)).filter((route, index, items) => items.indexOf(route) === index).slice(0, 3) : []; }
     catch { return []; }
@@ -29,6 +31,12 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
     return () => { window.removeEventListener("storage", refresh); window.removeEventListener("skai:pet-workshop-setting", refresh); };
   }, []);
   useEffect(() => {
+    const refresh = () => setLastActivityVisit(Number(localStorage.getItem("skai.workspace-activity.last-visit.v1") ?? 0));
+    window.addEventListener("storage", refresh);
+    window.addEventListener("skai:workspace-activity-read", refresh);
+    return () => { window.removeEventListener("storage", refresh); window.removeEventListener("skai:workspace-activity-read", refresh); };
+  }, []);
+  useEffect(() => {
     localStorage.setItem("skai.extras.recent", JSON.stringify(recentRoutes));
   }, [recentRoutes]);
   useEffect(() => {
@@ -39,7 +47,8 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
     document.addEventListener("keydown", closeEscape);
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape); };
   }, [menuOpen]);
-  const menuItems = useMemo(() => [
+  const menuItems = useMemo<Array<{ route: Route; label: string; icon: NavIconName; description: string; unavailable: boolean; attention?: number }>>(() => [
+    { route: "search" as Route, label: "Search & Activity", icon: "search" as NavIconName, description: "Find work or review live task progress", unavailable: false, attention: tasks.filter((task) => ["awaiting_approval", "blocked", "paused", "proposed", "failed"].includes(task.status) || (task.status === "completed" && Date.parse(task.updatedAt) > lastActivityVisit)).length },
     { route: "onboarding" as Route, label: "Getting started", icon: "sparkle" as NavIconName, description: "Setup checklist, privacy, and local readiness", unavailable: false },
     { route: "models" as Route, label: "Models", icon: "model" as NavIconName, description: "Browse and manage local models", unavailable: false },
     { route: "compare" as Route, label: "Compare", icon: "compare" as NavIconName, description: "Compare model responses", unavailable: false },
@@ -51,7 +60,7 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
     { route: "memory" as Route, label: "Memory", icon: "memory" as NavIconName, description: "Review saved notes and documents", unavailable: false },
     { route: "voice-workbench" as Route, label: "Voice Workbench", icon: "audio" as NavIconName, description: "Choose and preview local voices", unavailable: installedVoiceModels.length === 0 },
     ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pets", icon: "sparkle" as NavIconName, description: "Customize your desktop companion", unavailable: false }] : []),
-  ], [showPetWorkshop]);
+  ], [lastActivityVisit, showPetWorkshop, tasks]);
   const filteredItems = menuItems.filter((item) => !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase()));
   const openExtra = (itemRoute: Route) => {
     const next = recentExtraRoutes.includes(itemRoute)
@@ -73,7 +82,7 @@ export function GlobalRail({ route, onNavigate }: { route: Route; onNavigate: (r
           {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search extras" aria-label="Search extras" /></label>}
           {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PICK UP WHERE YOU LEFT OFF</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
           <div className="global-rail-extras-group"><p className="global-rail-extras-label">FEATURES</p>
-          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching tools.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.description}</small></span>{item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
+          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching tools.</p> : filteredItems.map((item) => <button className="global-rail-extra" type="button" key={item.route} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.description}</small></span>{item.attention ? <span className="global-rail-extra-status">{item.attention} new</span> : item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button>)}
           </div>
         </section>}
       </div>

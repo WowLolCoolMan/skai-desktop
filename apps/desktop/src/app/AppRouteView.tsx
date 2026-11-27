@@ -17,6 +17,7 @@ import { PersonaWorkshopPage } from "../features/personas/PersonaWorkshopPage";
 import { ScheduledPage } from "../features/tasks/ScheduledPage";
 import { VideoPage } from "../features/video/VideoPage";
 import { OnboardingPage } from "../features/onboarding/OnboardingPage";
+import { WorkspaceSearchPage, type WorkspaceSearchResult } from "../features/search/WorkspaceSearchPage";
 
 export type AppRouteState = {
   route: Route;
@@ -112,6 +113,8 @@ export type AppRouteState = {
 
 export type AppRouteActions = {
   onNavigate: (route: Route) => void;
+  onSearchWorkspace: (query: string) => Promise<WorkspaceSearchResult[]>;
+  onOpenSearchFile: (project: DesktopProject, path: string) => void;
   onSelectConversation: (id: string) => void;
   onNewWorkspaceTab: () => void;
   onNewProjectThread: (project: DesktopProject) => void;
@@ -202,6 +205,7 @@ export function AppRouteView({ state, actions }: { state: AppRouteState; actions
   const chat = (workspaceMode: "conversation" | "project" = "conversation", projectId?: string | null) => <ChatPage workspaceTabId={state.workspaceTabId} capacity={state.capacity} provider={state.provider} model={state.model} responseMode={state.responseMode} onResponseModeChange={actions.onResponseModeChange} endpoint={state.endpoint} models={state.models} messages={state.messages} busy={state.busy} taskBusy={state.taskBusy} tasks={state.tasks} scheduledTasks={state.scheduledTasks} attachments={state.attachments} queuedMessages={state.queuedMessages} conversationId={state.conversationId} conversationTitle={state.conversationTitle} pinned={state.pinned} archived={state.archived} smartPromptRewritingEnabled={state.smartPromptRewritingEnabled} onRewritePrompt={actions.onRewritePrompt} onSend={actions.onSend} onStartTemporaryChat={actions.onStartTemporaryChat} onQueue={actions.onQueue} onRemoveQueued={actions.onRemoveQueued} onUpdateQueued={actions.onUpdateQueued} onMoveQueued={actions.onMoveQueued} onAttach={actions.onAttach} onFilesDropped={actions.onFilesDropped} onRemoveAttachment={actions.onRemoveAttachment} onSetAttachments={actions.onSetAttachments} onModelChange={actions.onModelChange} onNavigate={actions.onNavigate} onTaskAction={actions.onTaskAction} onOpenFile={actions.onOpenFile} onPlanTask={actions.onPlanTask} onScheduleTask={actions.onScheduleTask} onTransitionScheduledTask={actions.onTransitionScheduledTask} onExport={actions.onExportConversations} onPreviewImport={actions.onPreviewConversationImport} onApplyImport={actions.onApplyConversationImport} onFork={actions.onFork} onForkFromMessage={actions.onForkFromMessage} onRetryMessage={actions.onRetryMessage} onEditMessage={actions.onEditMessage} onTogglePinned={actions.onTogglePinned} onArchive={actions.onArchive} onRenameConversation={actions.onRenameConversation} workspaceMode={workspaceMode} projectId={projectId} worktreeAvailable={Boolean(projectId && state.gitStatus && state.selectedProject?.folderPaths.length === 1)} onNewWorkspaceTab={actions.onNewWorkspaceTab} projects={state.projects} onOpenProject={actions.onOpenProject} />;
   if (route === "chat") return chat();
   if (route === "onboarding") return <OnboardingPage connection={state.connection ?? "checking"} health={state.health ?? null} models={state.models} selectedModel={state.model} provider={state.provider} projectCount={state.projects.length} connectedFolderCount={state.projects.reduce((count, project) => count + project.folderPaths.length, 0)} ramTotalBytes={state.capacity?.ramTotalBytes ?? null} onNavigate={actions.onNavigate} onSendSample={(prompt) => { actions.onNavigate("chat"); actions.onSend(prompt, [], false); }} />;
+  if (route === "search") return <WorkspaceSearchPage conversations={state.conversations} projects={state.projects} tasks={state.tasks} scheduledTasks={state.scheduledTasks} models={state.models} personas={state.personas ?? []} memories={state.memoryEntries} references={state.corpusDocuments.map((document) => ({ id: document.id, title: document.title, source: document.source, content: document.content, updatedAtUtc: document.updatedAtUtc }))} images={state.generatedImages} onSearchWorkspace={actions.onSearchWorkspace} onNavigate={actions.onNavigate} onOpenConversation={actions.onSelectConversation} onOpenProject={actions.onOpenProject} onOpenFile={actions.onOpenSearchFile} onTransitionTask={actions.onTransitionTask} onExecuteTask={actions.onExecuteTask} />;
   if (route === "scheduled") return <ScheduledPage scheduledTasks={state.scheduledTasks} busyTask={state.taskBusy} loading={state.tasksLoading} loadError={state.tasksError} onRetry={actions.onRetryWorkbench} onSchedule={actions.onScheduleTask} onTransition={actions.onTransitionScheduledTask} />;
   if (route === "compare") return <ComparePage models={state.models} onNavigate={actions.onNavigate} onCompareModel={actions.onCompareModel} />;
   if (route === "coding" || route === "projects") {
