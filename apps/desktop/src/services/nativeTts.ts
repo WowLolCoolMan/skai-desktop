@@ -225,7 +225,6 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const runtime = installedVoiceModels.find((voice) => voice.id === runtimeId);
   const safeText = removeUnsupportedSpeechCues(text, runtime);
   if (!safeText) return false;
-  window.dispatchEvent(new CustomEvent("skai:voice-caption", { detail: { text: safeText } }));
   const expressiveness = settings.expressiveness;
   // Skai profiles control pacing on every engine. Pitch is applied only by the
   // browser's native fallback; local model runtimes do not expose pitch control.
@@ -236,6 +235,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
       : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, expressiveness, modelId: runtimeId, speaker: runtimeId === "qwen3-tts" ? settings.qwenSpeaker : undefined });
     if (speech?.ok) {
       if (generation !== speechGeneration) return false;
+      window.dispatchEvent(new CustomEvent("skai:voice-caption", { detail: { text: safeText } }));
       const audioDataUrl = (speech.result as { audioDataUrl?: unknown } | undefined)?.audioDataUrl;
       if (typeof audioDataUrl === "string" && audioDataUrl.startsWith("data:audio/")) {
         activeCloudAudio?.pause();
@@ -307,6 +307,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(safeText.replace(/[`*_>#]/g, "").replace(/\s+/g, " ").trim().slice(0, 4000));
+  window.dispatchEvent(new CustomEvent("skai:voice-caption", { detail: { text: utterance.text } }));
   utterance.voice = localVoice;
   utterance.rate = profile.rate;
   utterance.pitch = fallbackPitch;

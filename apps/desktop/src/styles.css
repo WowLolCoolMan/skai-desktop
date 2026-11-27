@@ -696,7 +696,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .computer-use-agent { padding: 10px; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 28%, var(--skai-color-border)); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 5%, var(--skai-color-surface)); }
 .computer-use-steps { max-height: 150px; margin: 12px 0 0; padding: 10px 10px 10px 30px; overflow: auto; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-sm); }
 @media (max-width: 680px) { .computer-use-dialog { padding: 14px; } .computer-use-controls > * { flex: 1 1 auto; } }
-.voice-mode-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+.voice-mode-dialog { width: min(560px, calc(100vw - 32px)); height: min(86dvh, 780px); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
 .voice-mode-session { display: grid; justify-items: center; gap: 12px; padding: 24px 16px 16px; text-align: center; }
 .voice-mode-session h3 { margin: 0; color: var(--skai-color-text); font-size: var(--skai-text-2xl); }
 .voice-mode-session p { margin: 0; }

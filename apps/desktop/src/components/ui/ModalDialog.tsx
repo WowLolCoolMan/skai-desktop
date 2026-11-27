@@ -30,7 +30,7 @@ export function ModalDialog({ open, titleId, onClose, children, initialFocusRef,
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusFrame = window.requestAnimationFrame(() => {
       const first = initialFocusRef?.current ?? focusableElements(dialogRef.current!).at(0);
-      first?.focus();
+      first?.focus({ preventScroll: true });
     });
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {

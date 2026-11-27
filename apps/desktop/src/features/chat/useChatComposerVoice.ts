@@ -52,6 +52,8 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const [voiceOutputDevices, setVoiceOutputDevices] = useState<VoiceDevice[]>([]);
   const [voiceInputDeviceId, setVoiceInputDeviceId] = useState(() => localStorage.getItem("skai.voice.inputDevice") ?? "default");
   const [voiceOutputDeviceId, setVoiceOutputDeviceId] = useState(() => localStorage.getItem("skai.voice.outputDevice") ?? "default");
+  const voiceInputDeviceIdRef = useRef(voiceInputDeviceId);
+  const voiceOutputDeviceIdRef = useRef(voiceOutputDeviceId);
   const [voiceInteractionMode, setVoiceInteractionMode] = useState<"hands-free" | "push-to-talk">(() => localStorage.getItem("skai.voice.interactionMode") === "push-to-talk" ? "push-to-talk" : "hands-free");
   const [pushToTalkHeld, setPushToTalkHeld] = useState(false);
   const [voiceCalibration, setVoiceCalibration] = useState(() => localStorage.getItem("skai.voice.calibrated.v1") ?? "not-calibrated");
@@ -106,8 +108,12 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      setVoiceInputDevices(devices.filter((device) => device.kind === "audioinput").map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Microphone ${index + 1}` })));
-      setVoiceOutputDevices(devices.filter((device) => device.kind === "audiooutput").map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Speaker ${index + 1}` })));
+      const inputs = devices.filter((device) => device.kind === "audioinput").map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Microphone ${index + 1}` }));
+      const outputs = devices.filter((device) => device.kind === "audiooutput").map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Speaker ${index + 1}` }));
+      setVoiceInputDevices(inputs);
+      setVoiceOutputDevices(outputs);
+      if (voiceInputDeviceIdRef.current !== "default" && !inputs.some((device) => device.deviceId === voiceInputDeviceIdRef.current)) { voiceInputDeviceIdRef.current = "default"; setVoiceInputDeviceId("default"); localStorage.setItem("skai.voice.inputDevice", "default"); }
+      if (voiceOutputDeviceIdRef.current !== "default" && !outputs.some((device) => device.deviceId === voiceOutputDeviceIdRef.current)) { voiceOutputDeviceIdRef.current = "default"; setVoiceOutputDeviceId("default"); localStorage.setItem("skai.voice.outputDevice", "default"); }
     } catch { /* Device labels may be unavailable until microphone permission is granted. */ }
   };
 
@@ -119,10 +125,12 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   }, []);
 
   const setVoiceInputDevice = (deviceId: string) => {
+    voiceInputDeviceIdRef.current = deviceId;
     setVoiceInputDeviceId(deviceId);
     localStorage.setItem("skai.voice.inputDevice", deviceId);
   };
   const setVoiceOutputDevice = (deviceId: string) => {
+    voiceOutputDeviceIdRef.current = deviceId;
     setVoiceOutputDeviceId(deviceId);
     localStorage.setItem("skai.voice.outputDevice", deviceId);
     window.dispatchEvent(new CustomEvent("skai:voice-output-device", { detail: deviceId }));
@@ -239,7 +247,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     const onCaption = (event: Event) => {
       const text = (event as CustomEvent<{ text?: string }>).detail?.text?.trim();
       if (!text) return;
-      setVoiceSessionTranscript((current) => [...current, { id: Date.now(), speaker: "skai" as const, text }].slice(-30));
+      setVoiceSessionTranscript((current) => [...current, { id: Date.now(), speaker: "skai" as const, text }].slice(-200));
     };
     window.addEventListener("skai:voice-caption", onCaption);
     const onOutputLevel = (event: Event) => setVoiceOutputLevel(Number((event as CustomEvent<number>).detail) || 0);
@@ -515,7 +523,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     let pendingContext: AudioContext | null = null;
     try {
       const whisper = await window.skaiAgent?.request("voice.whisper.install.status");
-      if (!handsFreeRef.current) return;
+      if (!handsFreeRef.current || (voiceInteractionMode === "push-to-talk" && !pushToTalkRef.current)) return;
       if (!whisper?.ok || !(whisper.result as { installed?: boolean } | undefined)?.installed) {
         setVoiceError("Install the local Whisper voice runtime before starting hands-free Voice Mode. Speech is never sent to a remote service.");
         endVoiceMode();
@@ -524,10 +532,10 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       const audio: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
       if (voiceInputDeviceId !== "default") audio.deviceId = { exact: voiceInputDeviceId };
       const stream = pendingStream = await navigator.mediaDevices.getUserMedia({ audio });
-      if (!handsFreeRef.current || (monitorDuringPlayback && !voicePlaybackActiveRef.current)) { stream.getTracks().forEach((track) => track.stop()); return; }
+      if (!handsFreeRef.current || (voiceInteractionMode === "push-to-talk" && !pushToTalkRef.current) || (monitorDuringPlayback && !voicePlaybackActiveRef.current)) { stream.getTracks().forEach((track) => track.stop()); return; }
       const context = pendingContext = new AudioContext();
       await context.resume();
-      if (!handsFreeRef.current || (monitorDuringPlayback && !voicePlaybackActiveRef.current)) {
+      if (!handsFreeRef.current || (voiceInteractionMode === "push-to-talk" && !pushToTalkRef.current) || (monitorDuringPlayback && !voicePlaybackActiveRef.current)) {
         stream.getTracks().forEach((track) => track.stop());
         await context.close().catch(() => {});
         pendingStream = null;
@@ -581,7 +589,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
           void transcribeLocalAudioFile(new File([blob], `voice-turn-${Date.now()}.webm`, { type: "audio/webm" }), controller.signal).then((transcript) => {
             if (!handsFreeRef.current || controller.signal.aborted) return;
             setVoiceTranscriptPreview(transcript);
-            setVoiceSessionTranscript((current) => [...current, { id: Date.now(), speaker: "you" as const, text: transcript }].slice(-30));
+            setVoiceSessionTranscript((current) => [...current, { id: Date.now(), speaker: "you" as const, text: transcript }].slice(-200));
             if (voiceReviewBeforeSend) {
               setPendingVoiceTranscript(transcript);
               return;
