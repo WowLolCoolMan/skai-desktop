@@ -191,6 +191,7 @@ export type DesktopPersona = {
   sources: DesktopPersonaSource[];
   profileEvidenceUrls?: string[];
   updatedAtUtc: string;
+  versions?: Array<{ versionId: string; createdAtUtc: string; name: string }>;
 };
 
 export type ChatAttachment = { fileName: string; content: string; mediaType?: string | null; ocr?: boolean };

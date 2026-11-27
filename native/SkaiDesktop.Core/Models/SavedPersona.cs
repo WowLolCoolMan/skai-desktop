@@ -42,6 +42,8 @@ public sealed class SavedPersona
     public SavedPersonaDistillation? LatestDistillation { get; set; }
     public List<SavedPersonaResearchPass> ResearchHistory { get; set; } = [];
     public List<SavedPersonaContinuityTurn> Continuity { get; set; } = [];
+    /// <summary>Recent editable profile revisions. Snapshots never include conversation memory.</summary>
+    public List<SavedPersonaVersion> Versions { get; set; } = [];
     public List<SavedPersonaQuote> VerifiedQuotes { get; set; } = [];
     public List<SavedPersonaSource> Sources { get; set; } = [];
     /// <summary>Sources used to draft the current public-research profile fields.</summary>
@@ -49,6 +51,13 @@ public sealed class SavedPersona
     /// <summary>Sources explicitly removed by the user; progressive research must not re-add them.</summary>
     public List<string> ExcludedResearchUrls { get; set; } = [];
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class SavedPersonaVersion
+{
+    public string VersionId { get; set; } = Guid.NewGuid().ToString("N");
+    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public SavedPersona Snapshot { get; set; } = new();
 }
 
 public sealed class SavedPersonaSource

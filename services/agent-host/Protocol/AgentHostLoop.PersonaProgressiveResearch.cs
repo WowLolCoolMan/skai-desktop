@@ -26,6 +26,7 @@ public static partial class AgentHostLoop
             var focus = focusOptions[persona.ResearchPassCount % focusOptions.Length];
             var results = await new WebSearchProvider().SearchAsync($"\"{persona.Name}\" {focus}").ConfigureAwait(false);
             var added = 0;
+            var versionBaseline = SnapshotPersona(persona);
             foreach (var result in results.Take(4))
             {
                 if (!IsPersonaResearchHostAllowed(result.Url) || !IsPersonaSearchResultRelevant(persona.Name, persona.Roles, result.Title, result.Snippet) || persona.Sources.Any(source => source.Url.Equals(result.Url, StringComparison.OrdinalIgnoreCase)) || persona.ExcludedResearchUrls.Contains(result.Url, StringComparer.OrdinalIgnoreCase)) continue;
@@ -49,6 +50,7 @@ public static partial class AgentHostLoop
                 added++;
             }
             persona.Sources = persona.Sources.Take(32).ToList();
+            if (added > 0) RecordPersonaVersion(persona, versionBaseline);
             persona.ResearchPassCount++;
             persona.LastResearchAtUtc = DateTimeOffset.UtcNow;
             persona.LastResearchSummary = $"Checked {focus}; added {added} new public source{(added == 1 ? "" : "s")}.";

@@ -40,6 +40,8 @@ public static partial class AgentHostLoop
         var previous = settings.SavedPersonas.SingleOrDefault(item => item.Id == persona.Id);
         if (previous is not null)
         {
+            RecordPersonaVersion(previous);
+            persona.Versions = previous.Versions;
             persona.PersonalContinuityEnabled = previous.PersonalContinuityEnabled;
             persona.InteractionCount = previous.InteractionCount;
             persona.ResearchPassCount = previous.ResearchPassCount;
@@ -57,6 +59,50 @@ public static partial class AgentHostLoop
         settings.SavedPersonas = settings.SavedPersonas.Take(24).ToList();
         store.Save(settings);
         return new(ProtocolVersion, request.Id, true, new { persona = PersonaResponse(persona), activePersonaId = (string?)null });
+    }
+
+    private static AgentResponse RestorePersonaVersion(AgentRequest request)
+    {
+        var id = RequiredBoundedString(request, "id", 128);
+        var versionId = RequiredBoundedString(request, "versionId", 128);
+        var store = CreateSettingsStore();
+        var settings = store.Load();
+        var index = settings.SavedPersonas.FindIndex(item => item.Id == id);
+        if (index < 0) throw new KeyNotFoundException("The persona does not exist.");
+        var current = settings.SavedPersonas[index];
+        current.Versions ??= [];
+        var target = current.Versions.FirstOrDefault(item => item.VersionId == versionId)
+            ?? throw new KeyNotFoundException("That saved persona version is no longer available.");
+        var restored = SnapshotPersona(target.Snapshot);
+        restored.Id = current.Id;
+        restored.Continuity = current.Continuity;
+        restored.PersonalContinuityEnabled = current.PersonalContinuityEnabled;
+        restored.InteractionCount = current.InteractionCount;
+        restored.Versions = current.Versions;
+        RecordPersonaVersion(restored, current);
+        restored.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        settings.SavedPersonas[index] = restored;
+        store.Save(settings);
+        return new(ProtocolVersion, request.Id, true, new { persona = PersonaResponse(restored) });
+    }
+
+    private static SavedPersona SnapshotPersona(SavedPersona persona)
+    {
+        var snapshot = JsonSerializer.Deserialize<SavedPersona>(JsonSerializer.Serialize(persona, JsonOptions), JsonOptions) ?? new SavedPersona();
+        snapshot.Versions = [];
+        snapshot.Continuity = [];
+        return snapshot;
+    }
+
+    private static void RecordPersonaVersion(SavedPersona persona, SavedPersona? snapshotSource = null)
+    {
+        persona.Versions ??= [];
+        persona.Versions.Insert(0, new SavedPersonaVersion
+        {
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Snapshot = SnapshotPersona(snapshotSource ?? persona),
+        });
+        persona.Versions = persona.Versions.Take(10).ToList();
     }
 
     private static AgentResponse RemovePersona(AgentRequest request)
@@ -157,6 +203,8 @@ public static partial class AgentHostLoop
         var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == personaId) ?? throw new KeyNotFoundException("The persona does not exist.");
         if (persona.SourceMode != "public-research") throw new InvalidOperationException("Handcrafted personas do not accept web research sources.");
         if (persona.Sources.All(source => !source.Url.Equals(url, StringComparison.OrdinalIgnoreCase)))
+        {
+            RecordPersonaVersion(persona);
             persona.Sources.Add(new SavedPersonaSource
             {
                 Title = BoundPersonaText(OptionalString(request, "title") ?? url, 300),
@@ -167,6 +215,7 @@ public static partial class AgentHostLoop
                 ReliabilityNote = BoundPersonaText(OptionalString(request, "reliabilityNote") ?? "User-selected public source; review before relying on it.", 500),
                 Excerpt = (OptionalString(request, "excerpt") ?? string.Empty)[..Math.Min((OptionalString(request, "excerpt") ?? string.Empty).Length, 1_200)],
             });
+        }
         persona.ExcludedResearchUrls = persona.ExcludedResearchUrls.Where(excluded => !excluded.Equals(url, StringComparison.OrdinalIgnoreCase)).ToList();
         persona.Sources = persona.Sources.Take(32).ToList();
         persona.UpdatedAtUtc = DateTimeOffset.UtcNow;
@@ -184,6 +233,7 @@ public static partial class AgentHostLoop
         var persona = settings.SavedPersonas.SingleOrDefault(item => item.Id == personaId) ?? throw new KeyNotFoundException("The persona does not exist.");
         var source = persona.Sources.SingleOrDefault(item => item.Url.Equals(url, StringComparison.OrdinalIgnoreCase));
         if (source is null) throw new KeyNotFoundException("The research source no longer exists.");
+        RecordPersonaVersion(persona);
         persona.ExcludedResearchUrls ??= [];
         if (!persona.ExcludedResearchUrls.Contains(url, StringComparer.OrdinalIgnoreCase)) persona.ExcludedResearchUrls.Add(url);
         var profileNeedsRebuild = persona.SourceMode == "public-research"
@@ -254,6 +304,8 @@ public static partial class AgentHostLoop
         persona.ProfileEvidenceUrls = persona.ProfileEvidenceUrls.Where(url => persona.Sources.Any(source => source.Url.Equals(url, StringComparison.OrdinalIgnoreCase))).Distinct(StringComparer.OrdinalIgnoreCase).Take(32).ToList();
         persona.ExcludedResearchUrls ??= [];
         persona.ExcludedResearchUrls = persona.ExcludedResearchUrls.Where(url => Uri.TryCreate(url, UriKind.Absolute, out var parsed) && parsed.Scheme is "http" or "https").Distinct(StringComparer.OrdinalIgnoreCase).Take(128).ToList();
+        persona.Versions ??= [];
+        persona.Versions = persona.Versions.Take(10).Where(version => version is not null && version.Snapshot is not null).ToList();
         if (persona.VerifiedQuotes.Any(quote => persona.Sources.All(source => source.Url != quote.SourceId)))
             throw new InvalidOperationException("Every verified quote must point to a saved source.");
     }
@@ -302,6 +354,7 @@ public static partial class AgentHostLoop
         profileEvidenceUrls = persona.ProfileEvidenceUrls,
         excludedResearchUrls = persona.ExcludedResearchUrls,
         updatedAtUtc = persona.UpdatedAtUtc,
+        versions = (persona.Versions ?? []).Select(version => new { versionId = version.VersionId, createdAtUtc = version.CreatedAtUtc, name = version.Snapshot.Name }).ToArray(),
     };
 
 }

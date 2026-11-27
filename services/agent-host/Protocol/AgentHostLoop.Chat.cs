@@ -134,6 +134,7 @@ public static partial class AgentHostLoop
         }
 
         var storedSettings = CreateSettingsStore().Load();
+        var personaTestSandbox = OptionalBoolean(request, "personaTestSandbox");
         var requestedPersonaId = OptionalString(request, "personaId");
         SavedPersona? activePersona = null;
         string? personaQuery = null;
@@ -142,7 +143,7 @@ public static partial class AgentHostLoop
             var persona = storedSettings.SavedPersonas.SingleOrDefault(item => item.Id == requestedPersonaId)
                 ?? throw new KeyNotFoundException("The selected persona does not exist.");
             activePersona = persona;
-            if (persona.SourceMode == "public-research" && persona.ProgressiveResearchEnabled && !OptionalBoolean(request, "suppressProgressiveResearch"))
+            if (!personaTestSandbox && persona.SourceMode == "public-research" && persona.ProgressiveResearchEnabled && !OptionalBoolean(request, "suppressProgressiveResearch"))
             {
                 persona.InteractionCount = Math.Min(1_000_000, persona.InteractionCount + 1);
                 storedSettings.SavedPersonas = storedSettings.SavedPersonas.Select(item => item.Id == persona.Id ? persona : item).ToList();
@@ -284,7 +285,7 @@ public static partial class AgentHostLoop
         var responseText = StripModelReasoningMarkup(text.ToString());
         if (activePersona is { SourceMode: "public-research" } && evidenceSummary is null && ContainsUnverifiedQuotation(activePersona, responseText))
             responseText = "I can't verify that quoted wording in the selected evidence, so I won't present it as a real line. I can summarize what the sources establish instead.";
-        if (activePersona?.PersonalContinuityEnabled == true && !OptionalBoolean(request, "suppressPersonaContinuity"))
+        if (activePersona?.PersonalContinuityEnabled == true && !personaTestSandbox && !OptionalBoolean(request, "suppressPersonaContinuity"))
             SavePersonaContinuity(activePersona.Id, messages, responseText);
         return new(ProtocolVersion, request.Id, true, new
         {

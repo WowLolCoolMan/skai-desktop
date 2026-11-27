@@ -252,6 +252,11 @@ async function run() {
   const persona = await request("persona.save", { persona: { name: "Workshop persona", sourceMode: "own-material", sourceMaterial: "A focused, kind persona used for workflow verification.", personalContinuityEnabled: true } });
   if (!persona.ok || !persona.result?.persona?.id) throw new Error("persona.save did not create a Workshop persona.");
   const personaId = persona.result.persona.id;
+  const revisedPersona = await request("persona.save", { persona: { ...persona.result.persona, name: "Workshop persona revised", sourceMaterial: "A revised test profile." } });
+  const revisionId = revisedPersona.result?.persona?.versions?.[0]?.versionId;
+  if (!revisedPersona.ok || revisedPersona.result.persona.name !== "Workshop persona revised" || !revisionId) throw new Error("persona.save did not preserve a prior profile revision.");
+  const restoredPersona = await request("persona.restoreVersion", { id: personaId, versionId: revisionId });
+  if (!restoredPersona.ok || restoredPersona.result?.persona?.name !== "Workshop persona" || !Array.isArray(restoredPersona.result.persona.versions)) throw new Error("persona.restoreVersion did not restore the selected profile revision.");
   const secondPersona = await request("persona.save", { persona: { name: "Group persona", sourceMode: "own-material", sourceMaterial: "A second group participant." } });
   if (!secondPersona.ok || !secondPersona.result?.persona?.id) throw new Error("persona.save did not create a second group persona.");
   const evidencePersona = await request("persona.save", { persona: { name: "Research character", sourceMode: "public-research", subjectType: "character", sources: [{ title: "Canon source", url: "https://example.org/canon", authorOrPublisher: "Example", publishedDate: "", type: "Canon reference", reliabilityNote: "Smoke test source.", excerpt: "A short evidence chunk." }] } });
@@ -282,10 +287,15 @@ async function run() {
   await new Promise(resolve => individualModelServer.listen(0, "127.0.0.1", resolve));
   const individualPort = individualModelServer.address().port;
   const individualReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${individualPort}/v1`, model: "persona-individual-smoke-model", personaId, messages: [{ role: "user", content: "What do you know about this conversation?" }], responseMode: "think" });
+  const memoryBeforeSandbox = await request("persona.memory.list", { id: personaId });
+  const sandboxReply = await request("chat.complete", { provider: "Local API", endpoint: `http://127.0.0.1:${individualPort}/v1`, model: "persona-individual-smoke-model", personaId, personaTestSandbox: true, messages: [{ role: "user", content: "Preview only: introduce yourself." }], responseMode: "think" });
+  const memoryAfterSandbox = await request("persona.memory.list", { id: personaId });
   await new Promise(resolve => individualModelServer.close(resolve));
   pendingSmokeServers.delete(individualModelServer);
-  if (!individualReply.ok || individualReply.result?.content !== "individual persona smoke reply" || individualModelRequests.length !== 1 || !individualModelRequests[0].messages.some(message => message.role === "system" && message.content.includes("AI simulation of Workshop persona")))
+  if (!individualReply.ok || individualReply.result?.content !== "individual persona smoke reply" || individualModelRequests.length !== 2 || !individualModelRequests[0].messages.some(message => message.role === "system" && message.content.includes("AI simulation of Workshop persona")))
     throw new Error(`chat.complete did not use the selected persona profile: ${JSON.stringify(individualReply)}`);
+  if (!memoryBeforeSandbox.ok || !sandboxReply.ok || !memoryAfterSandbox.ok || sandboxReply.result?.content !== "individual persona smoke reply" || memoryBeforeSandbox.result?.turns?.length !== memoryAfterSandbox.result?.turns?.length || individualModelRequests.length !== 2)
+    throw new Error("The persona test sandbox did not preview the profile without saving memory or a conversation.");
   const completedPersonaThread = await request("conversation.save", { id: personaThread.result.id, title: "Persona workshop thread", personaId, messages: [{ role: "user", content: "Keep this inside the workshop." }, { role: "user", content: "What do you know about this conversation?" }, { role: "assistant", content: individualReply.result.content }] });
   const savedPersonaThreads = await request("conversations.list", { scope: "persona" });
   if (!completedPersonaThread.ok || !savedPersonaThreads.ok || !savedPersonaThreads.result.some(thread => thread.id === personaThread.result.id && thread.messages.some(message => message.content === "individual persona smoke reply")))

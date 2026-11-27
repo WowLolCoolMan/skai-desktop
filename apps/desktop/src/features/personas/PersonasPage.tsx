@@ -83,6 +83,16 @@ export function PersonasPage({ onChanged, editingPersona, onCancel, onSaved, end
   const [forceResearchStatus, setForceResearchStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [profileDraftStatus, setProfileDraftStatus] = useState<string | null>(null);
+  const applyStarter = (template: "coding" | "research" | "writing" | "support") => {
+    const starters = {
+      coding: { name: "Coding partner", roles: "Software development, debugging, and code review.", notes: "Work from the user's stated goal. Inspect relevant code before proposing changes. Explain tradeoffs clearly, preserve existing behavior, and call out what you verified.", material: "Help me plan, implement, debug, and review software. Prefer small, well-scoped changes and concrete evidence." },
+      research: { name: "Research analyst", roles: "Evidence-led research and synthesis.", notes: "Separate verified facts from inference. Prefer primary sources, identify uncertainty, and summarize the strongest evidence before drawing conclusions.", material: "Help me research questions, compare evidence, and produce useful, source-aware summaries." },
+      writing: { name: "Writing coach", roles: "Clear writing, revision, and editorial feedback.", notes: "Preserve the author's intent and voice. Give specific edits, explain the highest-impact changes, and avoid polishing away useful personality.", material: "Help me draft, revise, and strengthen writing for its intended audience." },
+      support: { name: "Support guide", roles: "Patient, practical troubleshooting and customer support.", notes: "Acknowledge the issue briefly, ask only for essential missing details, and give safe steps in a clear order. Do not claim an action succeeded unless it did.", material: "Help me solve practical problems with clear, respectful guidance." },
+    };
+    const selected = starters[template];
+    setMode("own-material"); setStep("profile"); setName(selected.name); setRoles(selected.roles); setNotes(selected.notes); setMaterial(selected.material); setError(null);
+  };
   const request = async (method: string, params?: Record<string, unknown>) => window.skaiAgent.request(method, params);
 
   const load = async () => {
@@ -295,6 +305,7 @@ export function PersonasPage({ onChanged, editingPersona, onCancel, onSaved, end
     <div className="persona-builder-grid">
       <Card className={`persona-builder-card${onSaved ? " persona-builder-card-full" : ""}`}>
         {error && <p className="form-error" role="alert">{error}</p>}
+        {!editingId && <section className="persona-starter-templates" aria-label="Starter persona templates"><strong>Start from a template</strong><div>{(["coding", "research", "writing", "support"] as const).map((template) => <Button key={template} variant="secondary" type="button" onClick={() => applyStarter(template)}>{template[0].toUpperCase() + template.slice(1)}</Button>)}</div><small>Templates are editable profiles; they do not grant tools, project access, or memory.</small></section>}
         {!editingId && mode === "public-research" && <div className="persona-research-steps" aria-label="Profile setup progress"><div className={step === "identify" ? "is-active" : "is-complete"}><span>1</span><strong>Identify</strong></div><i /><div className={step === "research" ? "is-active" : step === "profile" ? "is-complete" : ""}><span>2</span><strong>Research</strong></div><i /><div className={step === "profile" ? "is-active" : ""}><span>3</span><strong>Build profile</strong></div></div>}
         <div className="persona-mode-tabs" role="tablist" aria-label="Persona source mode"><button type="button" className={mode === "public-research" ? "is-active" : ""} onClick={() => { setMode("public-research"); setStep("identify"); setResearch(null); }}>Research public sources</button><button type="button" className={mode === "own-material" ? "is-active" : ""} onClick={() => { setMode("own-material"); setStep("profile"); setResearch(null); }}>From my own material</button></div>
         {mode === "public-research" && <div className="persona-subject-tabs" role="group" aria-label="What are you creating?"><button type="button" className={subjectType === "person" ? "is-active" : ""} onClick={() => { setSubjectType("person"); setMatches([]); setSelectedMatch(null); setResearch(null); setSources([]); }}>Real person</button><button type="button" className={subjectType === "character" ? "is-active" : ""} onClick={() => { setSubjectType("character"); setMatches([]); setSelectedMatch(null); setResearch(null); setSources([]); }}>Fictional character</button><small>{subjectType === "character" ? "Searches canon, character dialogue, story transcripts, and lore." : "Searches biographies, interviews, public conversations, and video captions."}</small></div>}

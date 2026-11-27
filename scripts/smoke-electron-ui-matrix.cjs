@@ -1233,12 +1233,23 @@ async function main() {
           const personaCopyReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-library-detail h2')?.textContent?.trim() === 'Release Engineer copy') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!personaCopyReady) throw new Error('Duplicating a persona did not select the new profile in the library.');
           const personaCopy = await cdp.evaluate(`(async () => { const response = await window.skaiAgent.request('persona.list'); const personas = response.ok ? response.result.personas : []; const copy = personas.find((item) => item.name === 'Release Engineer copy'); return copy && { id: copy.id, continuity: copy.personalContinuityEnabled, sourceCount: copy.sources.length, roles: copy.roles, scope: document.querySelector('.persona-library-effective-scope')?.innerText }; })()`);
-          if (!personaCopy?.id || personaCopy.continuity || !personaCopy.roles || personaCopy.scope?.includes('No project files or tools are attached') !== true) throw new Error(`Persona duplication did not copy its profile safely or explain its effective scope: ${JSON.stringify(personaCopy)}`);
+          if (!personaCopy?.id || personaCopy.continuity || !personaCopy.roles || personaCopy.scope?.includes('no project-file, shell, or tool access') !== true) throw new Error(`Persona duplication did not copy its profile safely or explain its effective scope: ${JSON.stringify(personaCopy)}`);
+          const personaWorkflow = await cdp.evaluate(`(() => ({ sandbox: Boolean(document.querySelector('.persona-test-sandbox')), provenance: Boolean(document.querySelector('.persona-instruction-provenance')), exportButton: [...document.querySelectorAll('button')].some((button) => button.textContent.trim() === 'Export definition') }))()`);
+          if (!personaWorkflow.sandbox || !personaWorkflow.provenance || !personaWorkflow.exportButton) throw new Error(`Persona preview, provenance, and export controls did not render: ${JSON.stringify(personaWorkflow)}`);
           if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
             fs.mkdirSync(captureDirectory, { recursive: true });
             const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
             fs.writeFileSync(path.join(captureDirectory, "persona-library-duplicate-1440.png"), Buffer.from(screenshot.data, "base64"));
           }
+          await clickButtonText(cdp, "New persona");
+          const starterReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.persona-starter-templates')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!starterReady) throw new Error('The persona create page did not show starter templates.');
+          const starterTemplates = await cdp.evaluate(`(() => [...document.querySelectorAll('.persona-starter-templates button')].map((button) => button.textContent.trim()))()`);
+          if (!['Coding', 'Research', 'Writing', 'Support'].every((label) => starterTemplates.includes(label))) throw new Error(`Starter persona templates are incomplete: ${JSON.stringify(starterTemplates)}`);
+          await clickButtonText(cdp, "Coding", ".persona-starter-templates");
+          const codingStarterName = await cdp.evaluate(`document.querySelector('.persona-card-fields input')?.value`);
+          if (codingStarterName !== "Coding partner") throw new Error(`Selecting the coding persona template did not prefill its profile: ${codingStarterName}`);
+          await clickButtonText(cdp, "Back to Workshop");
         }
         await sleep(process.env.UI_MATRIX_CAPTURE === "1" ? 350 : 120);
         if (process.env.UI_MATRIX_CAPTURE === "1" && (route === "marketplace" || route === "memory")) {

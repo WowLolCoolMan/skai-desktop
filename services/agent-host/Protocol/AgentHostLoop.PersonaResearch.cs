@@ -137,6 +137,7 @@ public static partial class AgentHostLoop
                 || source.Type is "Biography" or "Canon reference" or "Official source" or "Character analysis" or "Other reference")
             .Take(Math.Min(8, remaining))
             .ToList();
+        if (newSources.Count > 0) RecordPersonaVersion(persona);
         persona.Sources.AddRange(newSources);
         var effectiveFocus = string.IsNullOrWhiteSpace(focus) ? "additional public evidence" : focus;
         SavedPersonaDistillation? distillation = null;
