@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Editor } from "./monacoLazy";
 import { useMonacoTheme } from "../../theme/useMonacoTheme";
@@ -29,6 +29,15 @@ function terminalStorageKey(projectId: string) {
 
 function fileExplorerStorageKey(projectId: string) {
   return `skai.coding.fileExplorerVisible.${projectId}`;
+}
+
+function splitPaneRatioStorageKey(projectId: string) {
+  return `skai.coding.threadPanePercent.${projectId}`;
+}
+
+function readSplitPanePercent(projectId: string) {
+  const stored = Number(localStorage.getItem(splitPaneRatioStorageKey(projectId)));
+  return Number.isFinite(stored) && stored >= 30 && stored <= 70 ? stored : 54;
 }
 
 function languageForPath(path: string | null) {
@@ -169,8 +178,13 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
   const [workspaceView, setWorkspaceView] = useState<"chat" | "files">("chat");
   const [codingLayout, setCodingLayout] = useState(() => ({ projectId: selectedProject.id, threadFirst: localStorage.getItem(`skai.coding.threadFirst.${selectedProject.id}`) !== "false" }));
   const threadFirst = codingLayout.projectId === selectedProject.id && codingLayout.threadFirst;
+  const [codingSplitRatio, setCodingSplitRatio] = useState(() => ({ projectId: selectedProject.id, threadPercent: readSplitPanePercent(selectedProject.id) }));
+  const threadPanePercent = codingSplitRatio.projectId === selectedProject.id ? codingSplitRatio.threadPercent : readSplitPanePercent(selectedProject.id);
+  const [splitResizeActive, setSplitResizeActive] = useState(false);
   useEffect(() => { setCodingLayout({ projectId: selectedProject.id, threadFirst: localStorage.getItem(`skai.coding.threadFirst.${selectedProject.id}`) !== "false" }); }, [selectedProject.id]);
   useEffect(() => { if (codingLayout.projectId === selectedProject.id) localStorage.setItem(`skai.coding.threadFirst.${selectedProject.id}`, String(codingLayout.threadFirst)); }, [codingLayout, selectedProject.id]);
+  useEffect(() => { setCodingSplitRatio({ projectId: selectedProject.id, threadPercent: readSplitPanePercent(selectedProject.id) }); }, [selectedProject.id]);
+  useEffect(() => { if (codingSplitRatio.projectId === selectedProject.id) localStorage.setItem(splitPaneRatioStorageKey(selectedProject.id), String(codingSplitRatio.threadPercent)); }, [codingSplitRatio, selectedProject.id]);
   const codingPane = useCodingPaneWorkspace(selectedProject.id);
   const { pages: codingPanePages, activePageId: activeCodingPanePageId, panel: workspacePanel, isSplitOpen: codingSplitOpen } = codingPane;
   const lastSideChatRequest = useRef(sideChatRequest);
@@ -336,6 +350,42 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
     setTerminalOpen(false);
   };
 
+  const updateSplitRatioFromPointer = (clientX: number, grid: Element) => {
+    const bounds = grid.getBoundingClientRect();
+    if (bounds.width <= 0) return;
+    const ratio = threadFirst ? (clientX - bounds.left) / bounds.width : (bounds.right - clientX) / bounds.width;
+    const threadPercent = Math.min(70, Math.max(30, Math.round(ratio * 100)));
+    setCodingSplitRatio({ projectId: selectedProject.id, threadPercent });
+  };
+
+  const beginSplitResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSplitResizeActive(true);
+    const grid = event.currentTarget.closest(".coding-session-grid");
+    if (grid) updateSplitRatioFromPointer(event.clientX, grid);
+  };
+
+  const moveSplitResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const grid = event.currentTarget.closest(".coding-session-grid");
+    if (grid) updateSplitRatioFromPointer(event.clientX, grid);
+  };
+
+  const endSplitResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setSplitResizeActive(false);
+  };
+
+  const adjustSplitRatioByKeyboard = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const threadPercent = Math.min(70, Math.max(30, threadPanePercent + direction * (threadFirst ? 3 : -3)));
+    setCodingSplitRatio({ projectId: selectedProject.id, threadPercent });
+  };
+
   const requestCloseFileTab = (path: string) => {
     if (path === selectedFile && hasChanges) {
       setPendingCloseFile(path);
@@ -381,7 +431,8 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
     <div className={`coding-health-banner is-${health.tone}`} role={health.tone === "danger" ? "alert" : "status"}><NavIcon name="activity" /><div><strong>{health.title}</strong><span>{health.detail}</span></div>{health.tone === "warning" && !gitStatus && selectedProject.folderPaths.length > 0 && <Button variant="secondary" type="button" disabled={gitBusy} onClick={onRefreshGitStatus}>{gitBusy ? "Checking…" : "Check Git"}</Button>}{health.tone === "danger" && gitStatus?.hasConflicts && <Button variant="secondary" type="button" onClick={() => { setInspectorTab("changes"); setWorkspaceView("files"); setTaskInspectorOpen(true); }}>Open changes</Button>}{health.tone === "danger" && !gitStatus?.hasConflicts && <Button variant="secondary" type="button" onClick={() => { setInspectorTab("activity"); setWorkspaceView("chat"); setTaskInspectorOpen(true); }}>Open activity</Button>}</div>
     {(preflight || preflightMessage) && <Card className="project-preflight" aria-label="Project preflight results"><div className="panel-heading"><div><p className="section-kicker">LOCAL PREFLIGHT</p><h3>{preflight ? "Project setup" : "Preflight status"}</h3></div><Button variant="ghost" onClick={() => { setPreflight(null); setPreflightMessage(""); }}>Dismiss</Button></div>{preflightMessage && <p role="status">{preflightMessage}</p>}{preflight && <><p>{preflight.manifests.length ? `Detected ${preflight.manifests.join(", ")}.` : "No supported dependency manifest was detected at the selected folder roots."}</p>{preflight.runtimes.length > 0 && <ul className="project-preflight-runtimes">{preflight.runtimes.map((runtime) => <li key={runtime.name}><strong>{runtime.name}</strong><span>{runtime.available ? "Available" : "Required runtime not found on PATH"}</span></li>)}</ul>}{preflight.suggestedChecks.length > 0 && <><strong>Suggested checks (not run)</strong><ul className="project-preflight-checks">{preflight.suggestedChecks.map((command) => <li key={command}><code>{command}</code></li>)}</ul></>}<small>{preflight.executionNote}</small></>}</Card>}
     {snapshotMode && <div className="coding-snapshot-notice" role="status"><NavIcon name="document" /><div><strong>Read-only project snapshot</strong><span>Files, previews, and diffs are available for review. Saving edits and terminal commands are disabled.</span></div><Button variant="secondary" type="button" onClick={() => setSnapshotMode(false)}>Exit snapshot</Button></div>}
-    <div className={`coding-session-grid is-${workspaceView}${codingSplitOpen ? " is-split-open" : ""}${threadFirst && codingSplitOpen ? " is-thread-first" : ""}${panelMode === "diff" ? " is-reviewing-diff" : ""}${workspaceView === "files" && gitDiff ? " is-reviewing-git" : ""}${focusLayout ? " is-focus-layout" : ""}`}>
+    <div className={`coding-session-grid is-${workspaceView}${codingSplitOpen ? " is-split-open" : ""}${threadFirst && codingSplitOpen ? " is-thread-first" : ""}${panelMode === "diff" ? " is-reviewing-diff" : ""}${workspaceView === "files" && gitDiff ? " is-reviewing-git" : ""}${focusLayout ? " is-focus-layout" : ""}`} style={{ "--coding-thread-pane-size": `${threadPanePercent}%` } as CSSProperties}>
+      {codingSplitOpen && <button className={`coding-split-resizer${splitResizeActive ? " is-resizing" : ""}`} type="button" role="separator" aria-orientation="vertical" aria-label="Resize conversation and workspace panes" aria-valuemin={30} aria-valuemax={70} aria-valuenow={threadPanePercent} title="Drag or use the arrow keys to resize the split" onPointerDown={beginSplitResize} onPointerMove={moveSplitResize} onPointerUp={endSplitResize} onPointerCancel={endSplitResize} onKeyDown={adjustSplitRatioByKeyboard} />}
       <Card id="coding-files-workspace" role="tabpanel" className={`project-browser-card coding-project-browser is-${workspacePanel}-panel${workspacePanel === "editor" && !fileExplorerVisible ? " is-file-explorer-hidden" : ""}${workspacePanel === "editor" && !selectedFile ? " is-empty-editor" : ""}`}>
       <div className="panel-heading"><div><p className="section-kicker">{workspacePanel === "editor" ? "PROJECT EDITOR" : workspacePanel === "side-chat" ? "CODING AGENT" : workspacePanel === "files" ? "PROJECT FILES" : workspacePanel === "changes" ? "LOCAL GIT REVIEW" : workspacePanel === "scratchpad" ? "PROJECT NOTES" : "LOCAL PREVIEW"}</p><h3>{workspacePanel === "editor" ? "Editor" : workspacePanel === "side-chat" ? "Side chat" : workspacePanel === "files" ? "Files" : workspacePanel === "changes" ? "Changes" : workspacePanel === "scratchpad" ? "Scratchpad" : "Preview"}</h3></div><div className="project-browser-actions">{workspacePanel === "editor" && <><Button variant={focusLayout ? "secondary" : "ghost"} type="button" aria-pressed={focusLayout} title="Temporarily hide project details and secondary panes" onClick={() => setFocusLayout((focused) => !focused)}>{focusLayout ? "Exit focus" : "Focus layout"}</Button><Button variant="ghost" type="button" title="Restore the default thread and editor layout" onClick={fitWorkspace}>Fit workspace</Button><Button variant="ghost" type="button" aria-pressed={threadFirst} className="coding-layout-swap" title="Swap the conversation and editor sides" onClick={() => setCodingLayout({ projectId: selectedProject.id, threadFirst: !threadFirst })}>Swap sides</Button><Button variant={snapshotMode ? "secondary" : "ghost"} type="button" aria-pressed={snapshotMode} title="Inspect this project without saving edits or running terminal commands" onClick={() => setSnapshotMode((enabled) => !enabled)}>{snapshotMode ? "Snapshot on" : "Snapshot"}</Button><Button variant={fileExplorerVisible ? "secondary" : "ghost"} type="button" aria-pressed={fileExplorerVisible} aria-label={fileExplorerVisible ? "Hide file explorer" : "Show file explorer"} onClick={() => setFileExplorerVisible((visible) => !visible)}>{fileExplorerVisible ? "Hide files" : "Show files"}</Button><Button variant="ghost" type="button" aria-controls="coding-project-scratchpad" onClick={() => openCodingPanePanel("scratchpad")}>Scratchpad</Button><Button variant="ghost" type="button" aria-controls="coding-local-preview" onClick={() => openCodingPanePanel("preview")}>Preview</Button></>}{workspacePanel !== "side-chat" && <Button variant={terminalOpen ? "secondary" : "ghost"} disabled={snapshotMode} aria-pressed={terminalOpen} onClick={() => setTerminalOpen((open) => !open)}>{terminalOpen ? "Hide terminal" : "Show terminal"}</Button>}</div></div>
       {workspacePanel === "scratchpad" && <section id="coding-project-scratchpad" className="coding-project-scratchpad" aria-label={`Project scratchpad for ${selectedProject.name}`}><div className="coding-project-scratchpad-heading"><strong>Project scratchpad</strong><span>{scratchpadText.trim() ? "Saved locally" : "Notes stay on this device"}</span></div><textarea value={scratchpadText} onChange={(event) => setScratchpadText(event.target.value)} placeholder="Capture decisions, commands, links, or follow-ups…" aria-label="Project scratchpad" /></section>}

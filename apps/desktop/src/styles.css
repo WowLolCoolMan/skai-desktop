@@ -5433,9 +5433,9 @@ body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-proje
 /* Keep the project conversation and an opened side task visible together,
    matching the paired chat layout used by Codex. */
 .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open {
-  grid-template-columns: minmax(0, 1.08fr) minmax(320px, .92fr);
+  grid-template-columns: minmax(300px, 1fr) 12px minmax(300px, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 12px;
+  gap: 0;
   min-height: min(720px, calc(100dvh - 240px));
 }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .project-thread-panel,
@@ -5444,10 +5444,15 @@ body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-proje
   min-width: 0;
   min-height: 0;
 }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first { grid-template-columns: minmax(300px, var(--coding-thread-pane-size, 54%)) 12px minmax(300px, 1fr); }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) { grid-template-columns: minmax(300px, 1fr) 12px minmax(300px, var(--coding-thread-pane-size, 54%)); }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .coding-project-browser { grid-column: 1; }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .project-thread-panel { grid-column: 2; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .project-thread-panel { grid-column: 3; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .project-thread-panel { grid-column: 1; }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .coding-project-browser { grid-column: 2; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .coding-project-browser { grid-column: 3; }
+.coding-split-resizer { position: relative; z-index: 4; grid-row: 1; grid-column: 2; width: 12px; min-width: 12px; min-height: 0; padding: 0; border: 0; border-radius: var(--skai-radius-pill); background: transparent; cursor: col-resize; touch-action: none; }
+.coding-split-resizer::after { position: absolute; top: 50%; left: 50%; width: 3px; height: 42px; border-radius: var(--skai-radius-pill); background: var(--skai-color-border-strong); content: ""; opacity: .78; transform: translate(-50%, -50%); transition: height var(--skai-duration-fast) var(--skai-ease-standard), background var(--skai-duration-fast) var(--skai-ease-standard); }
+.coding-split-resizer:hover::after, .coding-split-resizer:focus-visible::after, .coding-split-resizer.is-resizing::after { height: 64px; background: var(--skai-color-accent); opacity: 1; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser:is(.is-scratchpad-panel, .is-preview-panel) { display: flex; flex-direction: column; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-scratchpad,
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-local-preview { display: flex; min-width: 0; min-height: 0; flex: 1 1 0; flex-direction: column; }
@@ -5458,12 +5463,13 @@ body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-proje
 .skai-browser-empty { display: grid; min-height: 100%; place-content: center; gap: 6px; padding: 20px; color: var(--skai-color-text-muted); text-align: center; }
 .skai-browser-empty strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
 .skai-browser-empty span { font-size: var(--skai-text-xs); }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(440px, auto) minmax(520px, auto);
     min-height: 960px;
   }
+  .coding-split-resizer { display: none; }
   .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .project-thread-panel,
   .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .coding-project-browser { grid-column: 1; }
   .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .project-thread-panel { grid-row: 1; }
