@@ -131,6 +131,11 @@ async function main() {
   const navigationResult = await evaluate(`(() => { const skip = document.querySelector('.skip-link'); const main = document.querySelector('#main-content'); const controls = [...document.querySelectorAll('button,a,input,select,textarea,[tabindex]')].filter((el) => !el.disabled && el.tabIndex >= 0); skip?.focus(); return JSON.stringify({ skipLink: Boolean(skip && skip.getAttribute('href') === '#main-content'), skipFocusWorks: document.activeElement === skip, mainLandmark: Boolean(main?.closest('main')), focusableCount: controls.length }); })()`);
   const keyboard = JSON.parse(navigationResult);
   console.log("Checking skip link, main landmark, and keyboard focus...");
+  currentPhase = "checking reduced-motion preference propagation";
+  console.log(`Accessibility smoke: ${currentPhase}`);
+  await command("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+  const motion = JSON.parse(await evaluate(`(() => { const main = document.querySelector('.app-main'); const duration = main ? getComputedStyle(main).transitionDuration : ''; return JSON.stringify({ preference: matchMedia('(prefers-reduced-motion: reduce)').matches, explicitFullMotion: document.documentElement.dataset.motion === 'full', duration }); })()`));
+  await command("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
   let popups = { skipped: true };
   if (process.env.ACCESSIBILITY_SKIP_INTERACTION_CHECKS !== "1") {
     const inspectPopup = async (selector, expectedRole) => {
@@ -155,8 +160,9 @@ async function main() {
   const incomplete = [...incompleteByNode.values()];
   const critical = violations.filter((item) => item.impact === "critical");
   const serious = violations.filter((item) => item.impact === "serious");
-  console.log(JSON.stringify({ routesInspected: results.length, wcagViolations: violations.length, serious: serious.length, critical: critical.length, keyboard, popups, violations, incompleteChecks: results.reduce((sum, result) => sum + result.incomplete.length, 0), uniqueIncompletePatterns: incomplete.length, incomplete }, null, 2));
+  console.log(JSON.stringify({ routesInspected: results.length, wcagViolations: violations.length, serious: serious.length, critical: critical.length, keyboard, motion, popups, violations, incompleteChecks: results.reduce((sum, result) => sum + result.incomplete.length, 0), uniqueIncompletePatterns: incomplete.length, incomplete }, null, 2));
   if (keyboard.skipLink !== true || keyboard.skipFocusWorks !== true || keyboard.mainLandmark !== true || keyboard.focusableCount < 1) throw new Error(`Keyboard navigation landmarks failed: ${JSON.stringify(keyboard)}`);
+  if (!motion.preference || !motion.explicitFullMotion && !motion.duration.split(",").some((duration) => Number.parseFloat(duration) <= 0.01)) throw new Error(`Reduced-motion preference was not applied: ${JSON.stringify(motion)}`);
   if (!popups.skipped && (!popups.modelPicker.controlsValid || popups.modelPicker.popupType !== "dialog" || !popups.overflowMenu.controlsValid || popups.overflowMenu.popupType !== "menu")) throw new Error(`Expanded popover accessibility relationships failed: ${JSON.stringify(popups)}`);
   if (violations.length) throw new Error(`axe-core found ${violations.length} WCAG A/AA violation(s) across the packaged routes.`);
 }

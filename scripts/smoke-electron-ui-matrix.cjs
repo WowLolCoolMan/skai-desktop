@@ -226,6 +226,13 @@ async function clickButtonText(cdp, text, scope = "body") {
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x, y: point.y, button: "left", clickCount: 1 });
 }
 
+async function pressEnterOnButtonText(cdp, text, scope = "body", containingText = "") {
+  const focused = await cdp.evaluateWith(function (text, scope, containingText) { const root = document.querySelector(scope); const container = containingText ? [...(root?.querySelectorAll('.coding-task-item') ?? [])].find((item) => item.innerText.includes(containingText)) : root; const button = [...(container?.querySelectorAll('button') ?? [])].find((item) => item.innerText.trim() === text && !item.disabled); if (!button) return false; button.scrollIntoView({ block: 'center', inline: 'nearest' }); button.focus(); return document.activeElement === button; }, text, scope, containingText);
+  if (!focused) throw new Error(`UI button could not receive keyboard focus: ${text}`);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+}
+
 async function clickButtonContainingText(cdp, text, scope = "body") {
   const point = await cdp.evaluateWith(function (text, scope) { const root = document.querySelector(scope); const element = [...(root?.querySelectorAll('button') ?? [])].find((button) => button.innerText.includes(text)); if (!element || element.disabled) return null; element.scrollIntoView({ block: 'center', inline: 'nearest' }); const rect = element.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; }, text, scope);
   if (!point) throw new Error(`UI button containing text was not found or is disabled: ${text}`);
@@ -1146,7 +1153,7 @@ async function main() {
               const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
               fs.writeFileSync(path.join(captureDirectory, "coding-task-plan-1440.png"), Buffer.from(screenshot.data, "base64"));
             }
-            await clickButtonText(cdp, "Save plan in thread", ".project-task-planner-slot");
+            await pressEnterOnButtonText(cdp, "Save plan in thread", ".project-task-planner-slot");
             const planSaved = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.project-task-planner-slot [role="status"]')?.textContent.includes('Plan saved to this conversation for review')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!planSaved) throw new Error(`Saving the project task plan did not confirm it for review in the conversation: ${JSON.stringify(await cdp.evaluate(`(() => ({ status: document.querySelector('.project-task-planner-slot [role="status"]')?.textContent, planner: document.querySelector('.project-task-planner-slot')?.innerText, saveDisabled: document.querySelector('.project-task-planner-slot button[type="submit"]')?.disabled }))()`))}`);
             const approvalPlan = await cdp.evaluateWith(async function (title) { const response = await window.skaiAgent.request('tasks.list', {}); const task = response.ok ? response.result.find((item) => item.title === title) : null; return task ? { status: task.status, requiresApproval: task.requiresApproval } : null; }, "Add tests for API client");
@@ -1155,10 +1162,10 @@ async function main() {
             await clickButtonText(cdp, "Open activity", ".overflow-menu-item");
             const planActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); if (item?.innerText.includes('Queue plan')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!planActionReady) throw new Error("A saved task plan did not appear with an explicit Queue plan action in project activity.");
-            await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); [...item.querySelectorAll('button')].find((button) => button.textContent?.includes('Queue plan'))?.click(); return Boolean(item); })()`);
+            await pressEnterOnButtonText(cdp, "Queue plan", ".coding-task-drawer", "Add tests for API client");
             const approvalActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); if (item?.innerText.includes('Approve') && item?.innerText.includes('Waiting for you')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!approvalActionReady) throw new Error("Queueing a plan that requires approval did not expose the explicit approval decision.");
-            await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); [...item.querySelectorAll('button')].find((button) => button.textContent?.includes('Approve'))?.click(); return Boolean(item); })()`);
+            await pressEnterOnButtonText(cdp, "Approve", ".coding-task-drawer", "Add tests for API client");
             const queuedActionReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const item = [...document.querySelectorAll('.coding-task-drawer .coding-task-item')].find((node) => node.innerText.includes('Add tests for API client')); if (item?.innerText.includes('Start task') && item?.innerText.toLowerCase().includes('queued')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!queuedActionReady) throw new Error("Queue plan did not transition the saved plan to an explicit Start task state.");
             if (width < 640) await clickButtonText(cdp, "Close planner", ".project-thread-panel");
