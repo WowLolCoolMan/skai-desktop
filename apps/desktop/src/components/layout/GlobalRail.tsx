@@ -91,6 +91,8 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
     ...(showPetWorkshop ? [{ route: "pet-workshop" as Route, label: "Pets", icon: "sparkle" as NavIconName, description: "Customize your desktop companion", unavailable: false }] : []),
   ], [lastActivityVisit, showPetWorkshop, tasks]);
   const filteredItems = menuItems.filter((item) => !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const pinnedItems = filteredItems.filter((item) => pinnedRoutes.includes(item.route));
+  const availableItems = filteredItems.filter((item) => !pinnedRoutes.includes(item.route));
   const pinnedDestinations = pinnedRoutes.map((itemRoute) => menuItems.find((item) => item.route === itemRoute)).filter((item): item is (typeof menuItems)[number] => Boolean(item));
   const railDestinations = [...destinations, ...pinnedDestinations];
   const railRoutes = railDestinations.map((item) => item.route);
@@ -123,18 +125,30 @@ export function GlobalRail({ route, tasks, onNavigate }: { route: Route; tasks: 
     setQuery("");
     onNavigate(itemRoute);
   };
+  const renderExtraRow = (item: (typeof menuItems)[number]) => {
+    const isPinned = pinnedRoutes.includes(item.route);
+    return <div className="global-rail-extra-row" key={item.route}>
+      <button className="global-rail-extra" type="button" onClick={() => openExtra(item.route)}>
+        <span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span>
+        <span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.description}</small></span>
+        {item.attention ? <span className="global-rail-extra-status">{item.attention} new</span> : item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}
+      </button>
+      <button type="button" className={`global-rail-pin-toggle${isPinned ? " is-pinned" : ""}`} aria-pressed={isPinned} aria-label={isPinned ? `Remove ${item.label} from the rail` : `Add ${item.label} to the rail`} title={isPinned ? `Remove ${item.label} from the rail` : `Add ${item.label} to the rail`} onClick={() => togglePinned(item.route)}>{isPinned ? "Remove" : "Add"}</button>
+    </div>;
+  };
   return <aside className="global-rail" aria-label="Global navigation">
     <nav className="global-rail-destinations" aria-label="Primary navigation">
       {orderedDestinations.map((item) => <button key={item.route} className={`${route === item.route ? "is-active" : ""}${customizeRail ? " is-customizing" : ""}`} draggable={customizeRail} type="button" aria-current={route === item.route ? "page" : undefined} aria-label={item.label} title={customizeRail ? `Drag to reorder ${item.label}` : item.label} onDragStart={() => { draggedRailRouteRef.current = item.route; }} onDragOver={(event) => { if (customizeRail) event.preventDefault(); }} onDrop={() => { if (customizeRail) moveRailRoute(item.route); }} onClick={() => { if (!customizeRail) onNavigate(item.route); }}><NavIcon name={item.icon} /></button>)}
       <div className="global-rail-app-menu" ref={menuRef}>
         <button className={menuOpen ? "is-active" : ""} type="button" aria-label="Extras" title="Extras" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><NavIcon name="more" />{menuItems.some((item) => item.unavailable) && <span className="global-rail-attention-dot" aria-label="Setup needs attention" />}</button>
         {menuOpen && <section className="global-rail-extras-panel" aria-label="Extras">
-          <header><div><p className="section-kicker">YOUR WORKSPACE</p><strong>Extras</strong><span>More ways to work with Skai</span></div><div className="global-rail-extras-header-actions"><button type="button" className="global-rail-customize-toggle" onClick={() => setCustomizeRail((open) => !open)} aria-pressed={customizeRail}>{customizeRail ? "Done" : "Customize rail"}</button><button type="button" aria-label="Close Extras" onClick={() => setMenuOpen(false)}>×</button></div></header>
-          {customizeRail && <p className="global-rail-customize-hint" role="status">Drag the primary destinations to choose your order. Your arrangement stays on this device.</p>}
-          {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search extras" aria-label="Search extras" /></label>}
-          {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PICK UP WHERE YOU LEFT OFF</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
-          <div className="global-rail-extras-group"><p className="global-rail-extras-label">FEATURES</p>
-          {filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching tools.</p> : filteredItems.map((item) => <div className="global-rail-extra-row" key={item.route}><button className="global-rail-extra" type="button" onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>{item.description}</small></span>{item.attention ? <span className="global-rail-extra-status">{item.attention} new</span> : item.unavailable ? <span className="global-rail-extra-status">Set up</span> : <span className="global-rail-extra-arrow">↗</span>}</button><button type="button" className={`global-rail-pin-toggle${pinnedRoutes.includes(item.route) ? " is-pinned" : ""}`} aria-pressed={pinnedRoutes.includes(item.route)} aria-label={pinnedRoutes.includes(item.route) ? `Unpin ${item.label} from rail` : `Pin ${item.label} to rail`} title={pinnedRoutes.includes(item.route) ? "Unpin from rail" : "Pin to rail"} onClick={() => togglePinned(item.route)}>★</button></div>)}
+          <header><div><p className="section-kicker">YOUR WORKSPACE</p><strong>Extras</strong><span>Open a destination or manage your rail</span></div><div className="global-rail-extras-header-actions"><button type="button" className="global-rail-customize-toggle" onClick={() => setCustomizeRail((open) => !open)} aria-pressed={customizeRail}>{customizeRail ? "Done" : "Arrange"}</button><button type="button" aria-label="Close Extras" onClick={() => setMenuOpen(false)}>×</button></div></header>
+          {customizeRail && <p className="global-rail-customize-hint" role="status">Drag the primary destinations to reorder them. Add or remove extras below; changes stay on this device.</p>}
+          {menuItems.length > 5 && <label className="global-rail-extras-search"><NavIcon name="search" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search features" aria-label="Search features" /></label>}
+          <div className="global-rail-extras-list">
+            {recentRoutes.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">RECENTLY OPENED</p>{recentRoutes.map((recent) => { const item = menuItems.find((entry) => entry.route === recent); return item ? <button className="global-rail-extra is-recent" type="button" key={`recent-${item.route}`} onClick={() => openExtra(item.route)}><span className="global-rail-extra-icon"><NavIcon name={item.icon} /></span><span className="global-rail-extra-copy"><strong>{item.label}</strong><small>Recently opened</small></span><span className="global-rail-extra-arrow">↗</span></button> : null; })}</div>}
+            {pinnedItems.length > 0 && <div className="global-rail-extras-group"><p className="global-rail-extras-label">PINNED TO RAIL</p>{pinnedItems.map(renderExtraRow)}</div>}
+            <div className="global-rail-extras-group"><p className="global-rail-extras-label">{pinnedItems.length > 0 ? "AVAILABLE FEATURES" : "FEATURES"}</p>{filteredItems.length === 0 ? <p className="global-rail-extras-empty">No matching features.</p> : availableItems.length === 0 && pinnedItems.length > 0 ? <p className="global-rail-extras-empty">Everything matching your search is already pinned.</p> : availableItems.map(renderExtraRow)}</div>
           </div>
         </section>}
       </div>

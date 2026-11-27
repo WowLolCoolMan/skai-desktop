@@ -5422,8 +5422,6 @@ body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-conte
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-harness-adapters,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-health-banner,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .project-preflight,
-body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-scratchpad,
-body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-local-preview,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-task-inspector,
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-terminal-inspector { display: none !important; }
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser .project-file-explorer { display: none !important; }
@@ -5431,3 +5429,56 @@ body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-proje
 body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-browser .project-file-layout { grid-template-columns: minmax(0, 1fr); }
 .message-timestamp { align-self: center; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-variant-numeric: tabular-nums; opacity: .82; }
 .chat-date-separator { display: block; width: fit-content; margin: 12px auto; padding: 4px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-xs); font-variant-numeric: tabular-nums; }
+
+/* Keep the project conversation and an opened side task visible together,
+   matching the paired chat layout used by Codex. */
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open {
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, .92fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  min-height: min(720px, calc(100dvh - 240px));
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .project-thread-panel,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .coding-project-browser {
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .coding-project-browser { grid-column: 1; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .project-thread-panel { grid-column: 2; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .project-thread-panel { grid-column: 1; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .coding-project-browser { grid-column: 2; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser:is(.is-scratchpad-panel, .is-preview-panel) { display: flex; flex-direction: column; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-scratchpad,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-local-preview { display: flex; min-width: 0; min-height: 0; flex: 1 1 0; flex-direction: column; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-scratchpad textarea { min-height: 0; max-height: none; flex: 1 1 0; resize: none; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-local-preview > .skai-browser-preview { min-height: 0; flex: 1 1 0; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-local-preview > .skai-browser-preview { height: auto; max-height: none; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-local-preview .skai-browser-viewport { min-height: 0; }
+.skai-browser-empty { display: grid; min-height: 100%; place-content: center; gap: 6px; padding: 20px; color: var(--skai-color-text-muted); text-align: center; }
+.skai-browser-empty strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
+.skai-browser-empty span { font-size: var(--skai-text-xs); }
+@media (max-width: 760px) {
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(440px, auto) minmax(520px, auto);
+    min-height: 960px;
+  }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .project-thread-panel,
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .coding-project-browser { grid-column: 1; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .project-thread-panel { grid-row: 1; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .coding-project-browser { grid-row: 2; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .coding-project-browser { grid-row: 1; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .project-thread-panel { grid-row: 2; }
+}
+/* Extras management: make pinning an explicit add/remove action and keep the list usable at short heights. */
+.global-rail-extras-panel .global-rail-extras-list { display: grid; gap: 12px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.global-rail-extras-panel .global-rail-extras-group { gap: 4px; }
+.global-rail-extras-panel .global-rail-extras-label { margin-top: 2px; }
+.global-rail-extras-panel .global-rail-extra-row { align-items: center; gap: 6px; }
+.global-rail-extras-panel .global-rail-pin-toggle { display: inline-flex; width: auto; min-width: 58px; height: 30px; flex: 0 0 auto; align-items: center; justify-content: center; padding: 0 8px; border-color: var(--skai-color-border); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-2xs); font-weight: 650; }
+.global-rail-extras-panel .global-rail-pin-toggle:hover,
+.global-rail-extras-panel .global-rail-pin-toggle:focus-visible { color: var(--skai-color-text); background: var(--skai-color-surface-raised); }
+.global-rail-extras-panel .global-rail-pin-toggle.is-pinned { color: var(--skai-color-accent-text); border-color: color-mix(in srgb, var(--skai-color-accent) 42%, var(--skai-color-border)); background: color-mix(in srgb, var(--skai-color-accent) 9%, var(--skai-color-surface)); }
+.global-rail-extras-panel .global-rail-extra-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.global-rail-extras-panel .global-rail-extra-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

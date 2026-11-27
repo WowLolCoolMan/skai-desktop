@@ -22,6 +22,8 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
     { label: selectedFile ? `Editor · ${selectedFile.split(/[\\/]/).pop()}` : "Editor", onSelect: () => onOpenPanel("editor", selectedFile ?? undefined) },
     { label: "Files", onSelect: () => onOpenPanel("files") },
     { label: "Changes", onSelect: () => onOpenPanel("changes") },
+    { label: "Scratchpad", onSelect: () => onOpenPanel("scratchpad") },
+    { label: "Preview", onSelect: () => onOpenPanel("preview") },
   ];
 
   if (!isSplitOpen) {
@@ -31,7 +33,7 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
   return <div className="workspace-tab-strip coding-pane-tab-strip is-split-open" role="group" aria-label="Right workspace pages">
     <div className="workspace-tab-list">{pages.map((page) => {
       const title = codingPanePageTitle(page);
-      const icon = page.panel === "side-chat" ? "chat" : page.panel === "changes" ? "activity" : page.panel === "files" ? "project" : "code";
+      const icon = page.panel === "side-chat" ? "chat" : page.panel === "changes" ? "activity" : page.panel === "files" ? "project" : page.panel === "scratchpad" ? "document" : page.panel === "preview" ? "image" : "code";
       return <div className={`workspace-tab${page.id === activePageId ? " is-active" : ""}`} key={page.id} draggable
         onDragStart={(event) => { event.dataTransfer.setData("text/skai-coding-pane", page.id); event.dataTransfer.effectAllowed = "move"; }}
         onDragOver={(event) => event.preventDefault()}

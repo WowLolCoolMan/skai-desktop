@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { reorderItem } from "../../app/reorderItem";
 
-export type CodingPanePanel = "editor" | "files" | "side-chat" | "changes";
+export type CodingPanePanel = "editor" | "files" | "side-chat" | "changes" | "scratchpad" | "preview";
 export type CodingPanePage = { id: string; panel: CodingPanePanel; filePath?: string };
 
 const DEFAULT_PAGES: CodingPanePage[] = [
@@ -11,7 +11,7 @@ const DEFAULT_PAGES: CodingPanePage[] = [
   { id: "coding-changes", panel: "changes" },
 ];
 
-const pagePanels: CodingPanePanel[] = ["editor", "files", "side-chat", "changes"];
+const pagePanels: CodingPanePanel[] = ["editor", "files", "side-chat", "changes", "scratchpad", "preview"];
 const MAX_PAGES = 24;
 
 const pagesKey = (projectId: string) => `skai.coding.panePages.${projectId}`;
@@ -30,7 +30,7 @@ function isCodingPanePage(value: unknown): value is CodingPanePage {
 
 export function codingPanePageTitle(page: CodingPanePage) {
   if (page.filePath) return page.filePath.split(/[\\/]/).pop() ?? page.filePath;
-  return page.panel === "side-chat" ? "Side chat" : page.panel === "editor" ? "Editor" : page.panel === "files" ? "Files" : "Changes";
+  return page.panel === "side-chat" ? "Side chat" : page.panel === "editor" ? "Editor" : page.panel === "files" ? "Files" : page.panel === "changes" ? "Changes" : page.panel === "scratchpad" ? "Scratchpad" : "Preview";
 }
 
 export function useCodingPaneWorkspace(projectId: string) {
@@ -48,7 +48,7 @@ export function useCodingPaneWorkspace(projectId: string) {
         const valid = stored.filter(isCodingPanePage);
         if (valid.length) restoredPages = valid.slice(0, MAX_PAGES);
       }
-      localStorage.setItem(versionKey(projectId), "5");
+      localStorage.setItem(versionKey(projectId), "6");
     } catch { /* use the standard project pages */ }
 
     const storedActiveId = localStorage.getItem(activePageKey(projectId));

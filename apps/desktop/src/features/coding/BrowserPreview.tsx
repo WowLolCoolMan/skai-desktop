@@ -27,6 +27,7 @@ export function BrowserPreview({ projectId }: { projectId: string }) {
   const guestRef = useRef<BrowserGuest | null>(null);
   const [address, setAddress] = useState("http://localhost:5173");
   const [activeUrl, setActiveUrl] = useState("");
+  const [previewStarted, setPreviewStarted] = useState(false);
   const [error, setError] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
   const partition = `persist:skai-preview-${projectId.replace(/[^a-z0-9_-]/gi, "").slice(0, 48) || "project"}`;
@@ -112,11 +113,12 @@ export function BrowserPreview({ projectId }: { projectId: string }) {
     const url = normalizeLoopbackUrl(address.trim());
     if (!url) { setError("Enter a localhost URL such as http://localhost:5173."); return; }
     setError("");
-    guestRef.current?.loadURL(url);
     setActiveUrl(url);
+    if (previewStarted) guestRef.current?.loadURL(url);
+    else setPreviewStarted(true);
   };
 
-  const guest = createElement(Webview, {
+  const guest = previewStarted ? createElement(Webview, {
     ref: (element: BrowserGuest | null) => { guestRef.current = element; },
     className: "skai-browser-guest",
     src: activeUrl || "about:blank",
@@ -124,7 +126,7 @@ export function BrowserPreview({ projectId }: { projectId: string }) {
     allowpopups: false,
     webpreferences: "contextIsolation=yes,nodeIntegration=no,sandbox=yes,webSecurity=yes,allowRunningInsecureContent=no",
     title: "Local project browser preview",
-  });
+  }) : null;
 
   return <Card className="skai-browser-preview" aria-label="In-app browser preview">
     <div className="skai-browser-toolbar">
@@ -140,7 +142,7 @@ export function BrowserPreview({ projectId }: { projectId: string }) {
       {activeUrl && <Button variant="ghost" onClick={() => { setMessages([]); guestRef.current?.stop(); }}>Stop</Button>}
     </div>
     {error && <p className="skai-browser-error" role="alert">{error}</p>}
-    <div className="skai-browser-viewport">{guest}</div>
+    <div className="skai-browser-viewport">{guest ?? <div className="skai-browser-empty"><strong>Local preview is ready</strong><span>Open a localhost URL to start the embedded browser.</span></div>}</div>
     <details className="skai-browser-console"><summary>Console messages ({messages.length})</summary>{messages.length ? <pre>{messages.join("\n")}</pre> : <p>No console messages captured.</p>}</details>
   </Card>;
 }
