@@ -1175,6 +1175,23 @@ const agentHostClient = createAgentHostClient({
 const startAgentHost = () => agentHostClient.start();
 const stopAgentHost = (onStopped) => agentHostClient.stop(onStopped);
 const requestAgent = (method, params, onProgress) => agentHostClient.request(method, params, onProgress);
+ipcMain.handle("workspace:open-task-worktree", async (event, requestedTaskId) => {
+  if (!BrowserWindow.fromWebContents(event.sender)) return { ok: false, error: "The worktree folder can only be opened from the desktop window." };
+  const taskId = typeof requestedTaskId === "string" ? requestedTaskId.trim().slice(0, 128) : "";
+  if (!taskId) return { ok: false, error: "Select a task with an isolated worktree." };
+  const response = await requestAgent("tasks.list", {});
+  if (!response?.ok || !Array.isArray(response.result)) return { ok: false, error: response?.error?.message ?? "Task history could not be loaded." };
+  const task = response.result.find((item) => item.id === taskId);
+  if (task?.environment !== "worktree" || typeof task.worktreePath !== "string" || !path.isAbsolute(task.worktreePath))
+    return { ok: false, error: "This task does not have a retained isolated worktree." };
+  try {
+    if (!fsSync.statSync(task.worktreePath).isDirectory()) return { ok: false, error: "The retained worktree folder is no longer available." };
+    const openError = await shell.openPath(task.worktreePath);
+    return openError ? { ok: false, error: "The system could not open the retained worktree folder." } : { ok: true };
+  } catch {
+    return { ok: false, error: "The retained worktree folder is no longer available." };
+  }
+});
 const trayController = createTrayController({
   app,
   Tray,

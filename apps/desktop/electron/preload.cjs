@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld("skaiAgent", {
     capture: () => ipcRenderer.invoke("computer:capture"),
     action: (action) => ipcRenderer.invoke("computer:action", action),
   },
+  worktree: {
+    openFolder: (taskId) => ipcRenderer.invoke("workspace:open-task-worktree", String(taskId)),
+  },
   media: {
     createLocalUrl: (mediaType, content) => ipcRenderer.invoke("media:create-local-url", { mediaType: String(mediaType), content: String(content) }),
     revokeLocalUrl: (url) => ipcRenderer.invoke("media:revoke-local-url", String(url)),

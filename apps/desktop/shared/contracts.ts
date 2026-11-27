@@ -393,6 +393,7 @@ export interface AgentBridge {
     capture(): Promise<Array<{ id: string; name: string; displayId: string; display: { x: number; y: number; width: number; height: number; scaleFactor: number } | null; previewWidth: number; previewHeight: number; content: string; mediaType: "image/png" }>>;
     action(action: { action: "click" | "scroll" | "type" | "key"; displayId: string; x?: number; y?: number; button?: "left" | "right"; delta?: number; text?: string; key?: string }): Promise<{ ok: true }>;
   };
+  worktree?: { openFolder(taskId: string): Promise<{ ok: boolean; error?: string }> };
   media?: {
     createLocalUrl(mediaType: "video/mp4" | "video/webm" | "audio/mp4" | "audio/webm" | "audio/mpeg" | "audio/wav" | "audio/ogg", content: string): Promise<string>;
     revokeLocalUrl(url: string): Promise<boolean>;

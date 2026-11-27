@@ -20,6 +20,7 @@ type CodingTaskInspectorProps = {
   onTransitionTask: (taskId: string, operation: "queue" | "approve" | "deny" | "retry" | "release") => void;
   onSteerTask: (taskId: string, instruction: string) => Promise<boolean>;
   onDelegateTask: (parentId: string, workers: DesktopTaskWorkerDraft[]) => Promise<boolean>;
+  onOpenTaskWorktree: (taskId: string) => Promise<boolean>;
   onExecuteTask: (taskId: string) => void;
 };
 
@@ -120,7 +121,7 @@ function taskStageIndex(status: string) {
   return 0;
 }
 
-export function CodingTaskInspector({ projectId, tasks, models, projectChecks, projectChecksBusy, projectCheckBusy, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges, onLoadProjectChecks, onRunProjectCheck, onCancelTask, onTransitionTask, onSteerTask, onDelegateTask, onExecuteTask }: CodingTaskInspectorProps) {
+export function CodingTaskInspector({ projectId, tasks, models, projectChecks, projectChecksBusy, projectCheckBusy, gitStatus, gitDiffReady, gitDiffBusy, onReviewChanges, onLoadProjectChecks, onRunProjectCheck, onCancelTask, onTransitionTask, onSteerTask, onDelegateTask, onOpenTaskWorktree, onExecuteTask }: CodingTaskInspectorProps) {
   const recentTasks = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedCheckId, setSelectedCheckId] = useState("");
@@ -131,6 +132,8 @@ export function CodingTaskInspector({ projectId, tasks, models, projectChecks, p
   const [delegationTaskId, setDelegationTaskId] = useState<string | null>(null);
   const [delegationDrafts, setDelegationDrafts] = useState<DesktopTaskWorkerDraft[]>([{ title: "", instruction: "", role: "implementer" }]);
   const [delegationError, setDelegationError] = useState<string | null>(null);
+  const [openingWorktreeId, setOpeningWorktreeId] = useState<string | null>(null);
+  const [worktreeOpenError, setWorktreeOpenError] = useState<string | null>(null);
   const changedPaths = gitStatus?.changes.map((change) => change.path) ?? [];
   const attentionCount = tasks.filter((task) => task.status === "failed" || task.status === "blocked").length;
   const activeCount = tasks.filter((task) => task.status === "running" || task.status === "verifying").length;
@@ -194,7 +197,7 @@ export function CodingTaskInspector({ projectId, tasks, models, projectChecks, p
           {delegationError && <p role="alert" className="coding-task-delegation-error">{delegationError}</p>}<div className="coding-task-delegation-actions"><Button variant="ghost" type="button" disabled={delegationDrafts.length >= 6 || Boolean(delegationTaskId)} onClick={() => setDelegationDrafts((current) => [...current, { title: "", instruction: "", role: "reviewer" }])}>Add specialist</Button><Button variant="secondary" type="submit" disabled={Boolean(delegationTaskId)}>{delegationTaskId === task.id ? "Creating specialists…" : "Create specialist tasks"}</Button></div>
         </form></details>}
         {!!task.followUpInstructions?.length && <details className="coding-task-follow-ups"><summary>{task.followUpInstructions.length} follow-up instruction{task.followUpInstructions.length === 1 ? "" : "s"}</summary><ol>{task.followUpInstructions.map((instruction, index) => <li key={`${index}-${instruction}`}>{instruction}</li>)}</ol></details>}
-        {task.environment === "worktree" && <div className="coding-task-worktree"><strong>{task.worktreePath ? "Retained isolated worktree" : "Isolated worktree"}</strong>{task.worktreeBranch && <code>{task.worktreeBranch}</code>}{task.worktreePath ? <><small title={task.worktreePath}>{task.worktreePath}</small>{!["proposed", "queued", "awaiting_approval", "running", "verifying"].includes(task.status) && <Button variant="secondary" type="button" disabled={Boolean(pendingTaskActions[task.id])} onClick={() => { if (window.confirm(`Release the clean worktree for “${task.title}”? This removes the checkout from disk and keeps the Git branch.`)) runTaskAction(task, () => onTransitionTask(task.id, "release")); }}>{pendingTaskActions[task.id] ? "Releasing worktree…" : "Release clean worktree"}</Button>}<small>Only a clean checkout can be released. The task branch remains available in Git.</small></> : task.status === "completed" || task.status === "failed" || task.status === "blocked" || task.status === "cancelled" ? <small>Its retained checkout has been released.</small> : <small>The isolated checkout will be attached when execution starts.</small>}</div>}
+        {task.environment === "worktree" && <div className="coding-task-worktree"><strong>{task.worktreePath ? "Retained isolated worktree" : "Isolated worktree"}</strong>{task.worktreeBranch && <code>{task.worktreeBranch}</code>}{task.worktreePath ? <><small title={task.worktreePath}>{task.worktreePath}</small><Button variant="secondary" type="button" disabled={openingWorktreeId === task.id} onClick={() => { setOpeningWorktreeId(task.id); setWorktreeOpenError(null); void onOpenTaskWorktree(task.id).then((opened) => { if (!opened) setWorktreeOpenError("The retained worktree folder could not be opened."); }).finally(() => setOpeningWorktreeId(null)); }}>{openingWorktreeId === task.id ? "Opening folder…" : "Open worktree folder"}</Button>{worktreeOpenError && <small role="status">{worktreeOpenError}</small>}{!["proposed", "queued", "awaiting_approval", "running", "verifying"].includes(task.status) && <Button variant="secondary" type="button" disabled={Boolean(pendingTaskActions[task.id])} onClick={() => { if (window.confirm(`Release the clean worktree for “${task.title}”? This removes the checkout from disk and keeps the Git branch.`)) runTaskAction(task, () => onTransitionTask(task.id, "release")); }}>{pendingTaskActions[task.id] ? "Releasing worktree…" : "Release clean worktree"}</Button>}<small>Only a clean checkout can be released. The task branch remains available in Git.</small></> : task.status === "completed" || task.status === "failed" || task.status === "blocked" || task.status === "cancelled" ? <small>Its retained checkout has been released.</small> : <small>The isolated checkout will be attached when execution starts.</small>}</div>}
         {task.status === "cancelled" ? <small>Stopped before verification.</small> : <ol className="coding-task-progress" aria-label={`Task progress: ${statusLabel(task.status)}`}>
           {taskStages.map((stage, index) => <li key={stage} className={index < taskStageIndex(task.status) ? "is-complete" : index === taskStageIndex(task.status) ? "is-current" : ""} aria-current={index === taskStageIndex(task.status) ? "step" : undefined}><span aria-hidden="true" />{stage}</li>)}
         </ol>}
