@@ -11,7 +11,7 @@ const SKAI_WOLF_ICON = new URL("../../../../../assets/branding/skaiwolficon.png"
 type MenuItem = { label: string; shortcut?: string; onSelect: () => void; separatorBefore?: boolean };
 export type WorkspaceLayoutPreset = "chat" | "coding" | "review" | "research" | "media";
 const ariaShortcut = (shortcut?: string) => shortcut?.replace(/^Ctrl\+/, "Control+").replace(/^⌘\+/, "Meta+");
-const routeLabels: Partial<Record<Route, string>> = { chat: "Chat", projects: "Projects", coding: "Coding", models: "Models", compare: "Compare", images: "Visuals", video: "Video", marketplace: "Marketplace", plugins: "Tools", terminal: "Terminal", memory: "Memory", usage: "Usage", scheduled: "Scheduled", search: "Search", "voice-workbench": "Voice", "persona-workshop": "Personas", personas: "Personas", "persona-groups": "Personas", "pet-workshop": "Pet workshop" };
+const routeLabels: Partial<Record<Route, string>> = { chat: "Chat", projects: "Projects", coding: "Coding", models: "Models", compare: "Compare", images: "Visuals", video: "Video", marketplace: "Marketplace", plugins: "Tools", terminal: "Terminal", memory: "Memory", usage: "Usage", scheduled: "Scheduled", search: "Search", settings: "Settings", onboarding: "Getting started", workbench: "Workspace", "voice-workbench": "Voice", "persona-workshop": "Personas", personas: "Personas", "persona-groups": "Personas", "pet-workshop": "Pet workshop" };
 
 function AppMenu({ label, items }: { label: string; items: MenuItem[] }) {
   const [open, setOpen] = useState(false);
