@@ -63,6 +63,12 @@ async function run() {
     messages: [{ role: "user", content: "secret sk-abcdefghijklmnopqrstuvwxyz and api_key=private-secret-12345" }],
   });
   await ok("settings.save", { endpoint: "http://127.0.0.1:11435/v1", model: "backup-smoke", provider: "Ollama", themeMode: "light", interfaceDensity: "compact" });
+  await ok("settings.save", { chatRetentionDays: 30, taskRetentionDays: 90, taskLogRetentionDays: 7 });
+  const retentionSettings = await ok("settings.get");
+  assert(retentionSettings.chatRetentionDays === 30 && retentionSettings.taskRetentionDays === 90 && retentionSettings.taskLogRetentionDays === 7, "Partial retention settings were not persisted.");
+  assert(retentionSettings.endpoint === "http://127.0.0.1:11435/v1" && retentionSettings.model === "backup-smoke", "Saving retention preferences overwrote unrelated runtime settings.");
+  const invalidRetention = await request("settings.save", { taskRetentionDays: 14 });
+  assert(!invalidRetention.ok, "Unsupported retention duration was accepted.");
 
   const categories = ["conversations", "settings", "personas", "projects"];
   const preview = await ok("workspace.backup.preview", { categories });
@@ -74,6 +80,7 @@ async function run() {
   assert(!text.includes("sk-abcdefghijklmnopqrstuvwxyz") && !text.includes("private-secret-12345"), "Secret-like values were not redacted.");
   assert(!text.includes(projectFolder) && !text.includes("Do not export this private instruction."), "Project path or instructions leaked into the portable backup.");
   assert(portable.settings.endpoint === "http://localhost:11434/v1", "Provider endpoint was not reset to a portable local default.");
+  assert(portable.settings.chatRetentionDays === 30 && portable.settings.taskRetentionDays === 90 && portable.settings.taskLogRetentionDays === 7, "Retention preferences were not included in the portable settings backup.");
   const backedUpChat = portable.conversations.find(item => item.id === chat.id);
   assert(backedUpChat && backedUpChat.projectId === null && backedUpChat.projectInstructions === null && backedUpChat.includeProjectFilesInChat === false, "Project trust context remained attached to the exported conversation.");
 

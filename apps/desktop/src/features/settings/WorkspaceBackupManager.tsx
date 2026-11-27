@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, StatusBadge } from "../../components/ui/Primitives";
-import { clearImageHistory, loadImageHistory } from "../catalog/imageHistory";
+import { clearImageHistory, loadImageHistory, pruneImageHistoryBefore } from "../catalog/imageHistory";
+import { WorkspaceRetentionControls } from "./WorkspaceRetentionControls";
 import "./WorkspaceBackupManager.css";
 
 type BackupCategory = "conversations" | "settings" | "personas" | "projects";
@@ -37,6 +38,8 @@ export function WorkspaceBackupManager() {
 
   const refreshStorage = useCallback(async () => {
     try {
+      const configuredMediaDays = Number(window.localStorage.getItem("skai.mediaRetentionDays") ?? 0);
+      if ([7, 30, 90, 365].includes(configuredMediaDays)) await pruneImageHistoryBefore(new Date(Date.now() - configuredMediaDays * 24 * 60 * 60 * 1_000));
       const [overview, media] = await Promise.all([request("workspace.storage.overview"), loadImageHistory()]);
       setStorage(overview as StorageOverview);
       setMediaHistoryCount(media.length);
@@ -148,5 +151,6 @@ export function WorkspaceBackupManager() {
       <div className="workspace-backup-card-heading"><div><p className="section-kicker">LOCAL STORAGE</p><h4>Where Skai keeps data</h4><p>{storage?.localRoot ?? "Reading local app storage…"}</p></div><Button variant="secondary" type="button" disabled={busy !== ""} onClick={() => void refreshStorage()}>Refresh</Button></div>
       {storage && <><div className="workspace-storage-total"><strong>{formatBytes(storage.totalBytes + mediaHistoryBytes)}</strong><span>reported app-owned data · media estimate included</span></div><div className="workspace-storage-rows">{[...storage.rows, { label: "Generated media history (browser)", bytes: mediaHistoryBytes, exists: mediaHistoryCount > 0 }].map(row => <div key={row.label}><span>{row.label}</span><span>{formatBytes(row.bytes)}</span></div>)}</div><div className="workspace-backup-actions"><Button variant="secondary" type="button" disabled={!mediaHistoryCount || busy !== ""} onClick={() => void clearMediaHistory()}>{busy === "clear-media" ? "Clearing…" : `Clear generated media history (${mediaHistoryCount})`}</Button></div><p className="workspace-backup-help">Media size is estimated from the saved browser-history previews. Clearing this index removes previews stored by Skai, not files you downloaded.</p><p className="workspace-backup-help">{storage.retention}</p><p className="workspace-backup-help">{storage.cleanup}</p><div className="workspace-data-flows"><h5>What leaves this device</h5>{storage.privacy.map(item => <div key={item.integration}><strong>{item.integration}</strong><span>{item.data}. {item.route}</span></div>)}</div></>}
     </div>
+    <WorkspaceRetentionControls onMediaChange={() => void refreshStorage()} />
   </section>;
 }

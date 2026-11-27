@@ -32,6 +32,19 @@ public sealed class OperationJournal
         return new(store.Runs, store.Events);
     }
 
+    /// <summary>Removes old terminal runs and their events; in-flight or ambiguous work is retained.</summary>
+    public int RemoveTerminalRunsBefore(DateTimeOffset cutoff)
+    {
+        var snapshot = Load();
+        var removable = snapshot.Runs.Where(run => run.UpdatedAt < cutoff && OperationRunStatuses.IsTerminal(run.Status))
+            .Select(run => run.RunId).ToHashSet(StringComparer.Ordinal);
+        if (removable.Count == 0) return 0;
+        snapshot.Runs.RemoveAll(run => removable.Contains(run.RunId));
+        snapshot.Events.RemoveAll(item => removable.Contains(item.RunId));
+        Save(snapshot);
+        return removable.Count;
+    }
+
     /// <summary>Returns a versioned, validated local export without changing operation state.</summary>
     public string ExportJson()
     {

@@ -60,6 +60,9 @@ public static partial class AgentHostLoop
             memoryInjectionEnabled = settings.MemoryInjectionEnabled,
             smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled,
             personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes,
+            chatRetentionDays = settings.ChatRetentionDays,
+            taskRetentionDays = settings.TaskRetentionDays,
+            taskLogRetentionDays = settings.TaskLogRetentionDays,
         });
     }
 
@@ -67,10 +70,14 @@ public static partial class AgentHostLoop
     {
         var store = CreateSettingsStore();
         var settings = store.Load();
-        settings.Endpoint = RequiredLocalEndpoint(request, "endpoint", 2_000);
-        settings.Model = RequiredBoundedString(request, "model", 256);
         if (request.Params is { } parameters)
         {
+            // Settings pages may update a single preference. Leave unrelated
+            // runtime choices untouched when the caller omits them.
+            if (parameters.TryGetProperty("endpoint", out _))
+                settings.Endpoint = RequiredLocalEndpoint(request, "endpoint", 2_000);
+            if (parameters.TryGetProperty("model", out _))
+                settings.Model = RequiredBoundedString(request, "model", 256);
             if (parameters.TryGetProperty("comfyEndpoint", out var comfyEndpoint) && comfyEndpoint.ValueKind == JsonValueKind.String)
             {
                 var value = comfyEndpoint.GetString()?.Trim() ?? "";
@@ -186,10 +193,20 @@ public static partial class AgentHostLoop
                     throw new InvalidOperationException("Persona conversation retention must be 15 minutes, 1 hour, 4 hours, 1 day, or 7 days.");
                 settings.PersonaConversationRetentionMinutes = retentionMinutes;
             }
+            if (parameters.TryGetProperty("chatRetentionDays", out var chatRetention) && chatRetention.TryGetInt32(out var chatDays))
+                settings.ChatRetentionDays = ValidateRetentionDays(chatDays, "Chat");
+            if (parameters.TryGetProperty("taskRetentionDays", out var taskRetention) && taskRetention.TryGetInt32(out var taskDays))
+                settings.TaskRetentionDays = ValidateRetentionDays(taskDays, "Task");
+            if (parameters.TryGetProperty("taskLogRetentionDays", out var taskLogRetention) && taskLogRetention.TryGetInt32(out var taskLogDays))
+                settings.TaskLogRetentionDays = ValidateRetentionDays(taskLogDays, "Task log");
         }
         store.Save(settings);
-        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, comfyEndpoint = settings.ComfyEndpoint, imageWorkflow = settings.ImageWorkflow, threeDWorkflow = settings.ThreeDWorkflow, subagentModel = settings.SubagentModel, subagentModelProvider = settings.SubagentModelProvider, subagentModelSizeBytes = settings.SubagentModelSizeBytes, subagentModelContextLength = settings.SubagentModelContextLength, codingModel = settings.CodingModel, codingModelProvider = settings.CodingModelProvider, codingModelSizeBytes = settings.CodingModelSizeBytes, codingModelContextLength = settings.CodingModelContextLength, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled, personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes });
+        return new(ProtocolVersion, request.Id, true, new { endpoint = settings.Endpoint, model = settings.Model, provider = settings.ModelProvider, comfyEndpoint = settings.ComfyEndpoint, imageWorkflow = settings.ImageWorkflow, threeDWorkflow = settings.ThreeDWorkflow, subagentModel = settings.SubagentModel, subagentModelProvider = settings.SubagentModelProvider, subagentModelSizeBytes = settings.SubagentModelSizeBytes, subagentModelContextLength = settings.SubagentModelContextLength, codingModel = settings.CodingModel, codingModelProvider = settings.CodingModelProvider, codingModelSizeBytes = settings.CodingModelSizeBytes, codingModelContextLength = settings.CodingModelContextLength, ollamaContextWindowTokens = settings.OllamaContextWindowTokens, localRamBudgetBytes = settings.LocalRamBudgetBytes, localGpuBudgetBytes = settings.LocalGpuBudgetBytes, themeMode = settings.ThemeMode, accentColor = settings.AccentColor, interfaceDensity = settings.InterfaceDensity, backdropPreset = settings.BackdropPreset, reduceMotion = settings.ReduceMotion, developerMode = settings.DeveloperMode, memoryInjectionEnabled = settings.MemoryInjectionEnabled, smartPromptRewritingEnabled = settings.SmartPromptRewritingEnabled, personaConversationRetentionMinutes = settings.PersonaConversationRetentionMinutes, chatRetentionDays = settings.ChatRetentionDays, taskRetentionDays = settings.TaskRetentionDays, taskLogRetentionDays = settings.TaskLogRetentionDays });
     }
+
+    private static int ValidateRetentionDays(int days, string label) => days is 0 or 7 or 30 or 90 or 365
+        ? days
+        : throw new InvalidOperationException($"{label} retention must be Never, 7, 30, 90, or 365 days.");
 
 
 }

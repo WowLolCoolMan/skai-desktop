@@ -26,7 +26,9 @@ public static partial class AgentHostLoop
             foreach (var task in interruptedTasks) TaskJournal.Value.ReconcileRunAfterRestart(task.Id);
         var scheduledDispatcher = Task.Run(() => RunScheduledDispatcherAsync(hostCancellation.Token), hostCancellation.Token);
         CleanupExpiredPersonaConversations();
+        CleanupExpiredWorkspaceData();
         var personaConversationCleanup = Task.Run(() => RunPersonaConversationCleanupAsync(hostCancellation.Token), hostCancellation.Token);
+        var workspaceRetentionCleanup = Task.Run(() => RunWorkspaceRetentionCleanupAsync(hostCancellation.Token), hostCancellation.Token);
 
         try
         {
@@ -102,6 +104,8 @@ public static partial class AgentHostLoop
             try { await scheduledDispatcher.ConfigureAwait(false); }
             catch (OperationCanceledException) when (hostCancellation.IsCancellationRequested) { }
             try { await personaConversationCleanup.ConfigureAwait(false); }
+            catch (OperationCanceledException) when (hostCancellation.IsCancellationRequested) { }
+            try { await workspaceRetentionCleanup.ConfigureAwait(false); }
             catch (OperationCanceledException) when (hostCancellation.IsCancellationRequested) { }
         }
         await DisposeTerminalSessionsAsync().ConfigureAwait(false);

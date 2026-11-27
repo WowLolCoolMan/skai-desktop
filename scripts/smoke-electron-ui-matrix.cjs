@@ -34,6 +34,7 @@ const exerciseMcpReview = process.env.UI_MATRIX_EXERCISE_MCP_REVIEW === "1";
 const exerciseOnboarding = process.env.UI_MATRIX_EXERCISE_ONBOARDING === "1";
 const exerciseWorkspaceSearch = process.env.UI_MATRIX_EXERCISE_WORKSPACE_SEARCH === "1";
 const exerciseCodingCollapsedLayout = process.env.UI_MATRIX_EXERCISE_CODING_LAYOUT === "1";
+const exerciseRetention = process.env.UI_MATRIX_EXERCISE_RETENTION === "1";
 let taskProgressRequests = 0;
 let taskProgressServerProblem = "";
 let sideChatRequests = 0;
@@ -1564,6 +1565,36 @@ async function main() {
             await cdp.evaluateWith(function (category) { [...document.querySelectorAll('.settings-nav button')].find((button) => button.textContent?.trim() === category)?.click(); return 1; }, category);
             await sleep(90);
             phase = `${theme}/${collapsed === "true" ? "collapsed" : "expanded"} ${width}x${height} #/settings (${category})`;
+          }
+          if (route === "settings" && category === "Storage" && exerciseRetention && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+            await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { const root = document.querySelector('.workspace-retention-card'); if (root?.querySelector('select[aria-label="Unpinned chats retention"]') && root.querySelector('select[aria-label="Generated media preview retention"]')) return true; await new Promise((resolve) => setTimeout(resolve, 50)); } return false; })()`);
+            const retentionFlow = await cdp.evaluate(`(async () => {
+              const root = document.querySelector('.workspace-retention-card');
+              const chat = root?.querySelector('select[aria-label="Unpinned chats retention"]');
+              const media = root?.querySelector('select[aria-label="Generated media preview retention"]');
+              if (!chat || !media) return { ok: false, reason: 'retention controls are missing', heading: document.querySelector('.settings-section-heading h1')?.textContent, content: document.querySelector('.settings-content')?.innerText.slice(0, 500) };
+              const setSelect = (select, value) => { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, String(value)); select.dispatchEvent(new Event('change', { bubbles: true })); };
+              const savedChat = Number(chat.value);
+              setSelect(chat, 30);
+              let saved = false;
+              for (let i = 0; i < 40; i++) { const result = await window.skaiAgent.request('settings.get'); if (result.ok && result.result.chatRetentionDays === 30) { saved = true; break; } await new Promise((resolve) => setTimeout(resolve, 50)); }
+              for (let i = 0; i < 40 && chat.disabled; i++) await new Promise((resolve) => setTimeout(resolve, 50));
+              setSelect(chat, savedChat);
+              let restored = false;
+              for (let i = 0; i < 40; i++) { const result = await window.skaiAgent.request('settings.get'); if (result.ok && result.result.chatRetentionDays === savedChat) { restored = true; break; } await new Promise((resolve) => setTimeout(resolve, 50)); }
+              const database = await new Promise((resolve, reject) => { const request = indexedDB.open('skai-image-history'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+              const oldId = 'retention-smoke-old'; const freshId = 'retention-smoke-fresh';
+              await new Promise((resolve, reject) => { const tx = database.transaction('outputs', 'readwrite'); const store = tx.objectStore('outputs'); store.put({ id: oldId, url: 'data:image/png;base64,AA==', fileName: 'old.png', createdAt: new Date(Date.now() - 10 * 86400000).toISOString(), provider: 'comfyui', prompt: 'fixture' }); store.put({ id: freshId, url: 'data:image/png;base64,AA==', fileName: 'fresh.png', createdAt: new Date().toISOString(), provider: 'comfyui', prompt: 'fixture' }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+              setSelect(media, 7);
+              let mediaState = [];
+              for (let i = 0; i < 40; i++) { mediaState = await new Promise((resolve, reject) => { const tx = database.transaction('outputs', 'readonly'); const request = tx.objectStore('outputs').getAll(); request.onsuccess = () => resolve(request.result.map((item) => item.id)); request.onerror = () => reject(request.error); }); if (!mediaState.includes(oldId) && mediaState.includes(freshId)) break; await new Promise((resolve) => setTimeout(resolve, 50)); }
+              setSelect(media, 0);
+              const mediaPruned = !mediaState.includes(oldId) && mediaState.includes(freshId);
+              database.close();
+              return { ok: saved && restored && mediaPruned, saved, restored, mediaPruned, controlCount: root.querySelectorAll('select').length };
+            })()`);
+            if (!retentionFlow?.ok) throw new Error(`Storage retention save/prune workflow failed: ${JSON.stringify(retentionFlow)}`);
+            console.log(`[retention-workflow] ${JSON.stringify(retentionFlow)}`);
           }
           if (route === "settings" && category === "Voice & Audio" && process.env.UI_MATRIX_EXERCISE_VOICE_PRESETS === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
             const presetWorkflow = await cdp.evaluate(`(async () => {

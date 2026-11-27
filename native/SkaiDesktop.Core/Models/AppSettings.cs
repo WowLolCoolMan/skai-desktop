@@ -101,6 +101,12 @@ public sealed class AppSettings
     public List<SavedPreset> SavedPresets { get; set; } = [];
     /// <summary>Inactivity retention for individual and group Persona Workshop threads, in minutes. One hour by default.</summary>
     public int PersonaConversationRetentionMinutes { get; set; } = 60;
+    /// <summary>Inactivity retention for regular conversations. Zero keeps them until manually removed.</summary>
+    public int ChatRetentionDays { get; set; }
+    /// <summary>Retention for terminal agent task records. Zero keeps them until manually removed.</summary>
+    public int TaskRetentionDays { get; set; }
+    /// <summary>Retention for completed operation journal records. Zero keeps them until manually removed.</summary>
+    public int TaskLogRetentionDays { get; set; }
 
     // Optional "About you" details the user chooses to share with every chat and persona. Empty
     // means not shared; the model is never told a value the user left blank.

@@ -11,7 +11,7 @@ import { createAgentClient } from "../services/agentClient";
 import { isLocalEndpoint, LOCAL_ENDPOINT_ERROR, localEndpointOrFallback, localProviderOrFallback } from "../services/localOnly";
 import { useChatWorkspace } from "../features/chat/useChatWorkspace";
 import { useCodingWorkspace } from "../features/coding/useCodingWorkspace";
-import { loadImageHistory, saveImageHistory, type ImageHistoryEntry } from "../features/catalog/imageHistory";
+import { loadImageHistory, pruneImageHistoryBefore, saveImageHistory, type ImageHistoryEntry } from "../features/catalog/imageHistory";
 import { useThemeEngine } from "../theme/useThemeEngine";
 import { useWorkspaceSessionTabs } from "./useWorkspaceSessionTabs";
 
@@ -95,6 +95,17 @@ export function useDesktopWorkspace(): DesktopWorkspace {
   const [imageProgress, setImageProgress] = useState<string[]>([]);
   const [generatedImages, setGeneratedImages] = useState<ImageHistoryEntry[]>([]);
   const dismissError = useCallback(() => setError(null), []);
+
+  useEffect(() => {
+    const pruneExpiredMedia = () => {
+      const days = Number(localStorage.getItem("skai.mediaRetentionDays") ?? 0);
+      if (![7, 30, 90, 365].includes(days)) return;
+      void pruneImageHistoryBefore(new Date(Date.now() - days * 24 * 60 * 60 * 1_000));
+    };
+    pruneExpiredMedia();
+    const timer = window.setInterval(pruneExpiredMedia, 10 * 60 * 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (connection !== "ready") return;

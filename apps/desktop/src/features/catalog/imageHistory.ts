@@ -57,6 +57,38 @@ export async function loadImageHistory(): Promise<ImageHistoryEntry[]> {
   }
 }
 
+/** Remove expired Skai-owned previews only; source media files are never touched. */
+export async function pruneImageHistoryBefore(cutoff: Date): Promise<number> {
+  try {
+    const database = await openDatabase();
+    try {
+      const transaction = database.transaction(storeName, "readwrite");
+      let removed = 0;
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error ?? new Error("Generated media retention could not be applied."));
+        transaction.onabort = () => reject(transaction.error ?? new Error("Generated media retention was interrupted."));
+        const cursorRequest = transaction.objectStore(storeName).openCursor();
+        cursorRequest.onerror = () => reject(cursorRequest.error ?? new Error("Generated media history could not be read."));
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+          const entry = cursor.value as ImageHistoryEntry & { id: string };
+          const createdAt = Date.parse(entry.createdAt);
+          if (!Number.isNaN(createdAt) && createdAt < cutoff.getTime()) {
+            cursor.delete();
+            removed += 1;
+          }
+          cursor.continue();
+        };
+      });
+      return removed;
+    } finally { database.close(); }
+  } catch {
+    return 0;
+  }
+}
+
 /** Remove only Skai's generated-output index and embedded previews in this browser profile. */
 export async function clearImageHistory(): Promise<void> {
   const database = await openDatabase();

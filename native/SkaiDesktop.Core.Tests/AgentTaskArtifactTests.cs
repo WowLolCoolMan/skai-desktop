@@ -140,6 +140,23 @@ internal static class AgentTaskArtifactTests
             {
                 Check(true, "agent task artifacts reject dependencies outside the local task set");
             }
+            var retainedBeforeCleanup = store.Load().Count;
+            var pruned = store.RemoveTerminalTasksBefore(DateTimeOffset.MaxValue);
+            Check(pruned > 0 && store.Load().Count == retainedBeforeCleanup - pruned && store.Load().All(task => task.Status is AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued or AgentTaskStatuses.AwaitingApproval or AgentTaskStatuses.Running or AgentTaskStatuses.Verifying), "task retention removes only terminal records while retaining queued and active plans");
+
+            var retainedWorktree = store.Create("Retain reviewed worktree", "Keep the branch for review.");
+            store.Queue(retainedWorktree.Id);
+            store.TryClaim(retainedWorktree.Id);
+            store.AttachWorktree(retainedWorktree.Id, root, Path.Combine(root, "worktree"), "codex/retained-review");
+            store.Complete(retainedWorktree.Id, "Ready for review.");
+            var retainedDependency = store.Create("Retain dependency", "Keep this prerequisite for its dependent.");
+            store.Queue(retainedDependency.Id);
+            store.TryClaim(retainedDependency.Id);
+            store.Complete(retainedDependency.Id, "Prerequisite completed.");
+            var liveDependent = store.Create("Live dependent", "Still waiting for explicit review.", dependsOn: [retainedDependency.Id]);
+            store.RemoveTerminalTasksBefore(DateTimeOffset.MaxValue);
+            var retainedIds = store.Load().Select(task => task.Id).ToHashSet(StringComparer.Ordinal);
+            Check(retainedIds.Contains(retainedWorktree.Id) && retainedIds.Contains(retainedDependency.Id) && retainedIds.Contains(liveDependent.Id), "task retention preserves reviewed worktrees and terminal prerequisites of retained tasks");
         }
         finally { DeleteDirectoryTree(root); }
     }

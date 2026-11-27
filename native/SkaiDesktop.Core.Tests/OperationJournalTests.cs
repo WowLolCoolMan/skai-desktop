@@ -48,6 +48,15 @@ internal static class OperationJournalTests
             journal.Transition(taskRun.RunId, OperationRunStatuses.Running);
             var taskRecovery = journal.ReconcileRunAfterRestart(taskRun.RunId);
             Check(taskRecovery?.Status == OperationRunStatuses.NeedsReconciliation && journal.Load().Events.Last().CorrelationId == taskRun.RunId, "single-run recovery records the interrupted task correlation without replay");
+            var completedRun = journal.Create("workspace-3", "Finish a retention fixture.");
+            journal.Transition(completedRun.RunId, OperationRunStatuses.Validating);
+            journal.Transition(completedRun.RunId, OperationRunStatuses.Queued);
+            journal.Transition(completedRun.RunId, OperationRunStatuses.Running);
+            journal.Transition(completedRun.RunId, OperationRunStatuses.Verifying);
+            journal.Transition(completedRun.RunId, OperationRunStatuses.Completed);
+            var pruned = journal.RemoveTerminalRunsBefore(DateTimeOffset.MaxValue);
+            var retained = journal.Load();
+            Check(pruned == 2 && retained.Runs.Count == 1 && retained.Runs[0].Status == OperationRunStatuses.NeedsReconciliation && retained.Events.All(item => item.RunId == taskRun.RunId), "operation-log retention prunes terminal runs while preserving unresolved work and its audit history");
         }
         finally
         {

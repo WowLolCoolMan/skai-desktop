@@ -359,6 +359,37 @@ public sealed class AgentTaskArtifactStore
         return Load().Where(task => normalized.Length == 0 || task.Title.Contains(normalized, StringComparison.OrdinalIgnoreCase) || task.Instruction.Contains(normalized, StringComparison.OrdinalIgnoreCase) || task.Role.Contains(normalized, StringComparison.OrdinalIgnoreCase) || task.Status.Contains(normalized, StringComparison.OrdinalIgnoreCase)).ToArray();
     }
 
+    /// <summary>Prunes only old terminal tasks without retained worktrees or live dependents.</summary>
+    public int RemoveTerminalTasksBefore(DateTimeOffset cutoff)
+    {
+        lock (StoreGate)
+        {
+            var tasks = Load().ToList();
+            var candidates = tasks.Where(task => task.UpdatedAtUtc < cutoff
+                && (task.Status is AgentTaskStatuses.Completed or AgentTaskStatuses.Failed or AgentTaskStatuses.Cancelled or AgentTaskStatuses.Blocked)
+                && task.WorktreePath is null && task.WorktreeRepositoryRoot is null).Select(task => task.Id).ToHashSet(StringComparer.Ordinal);
+            if (candidates.Count == 0) return 0;
+
+            // Keep old records while any retained record points at them as a parent or dependency.
+            var retained = tasks.Where(task => !candidates.Contains(task.Id)).ToArray();
+            var required = retained.SelectMany(task => task.DependsOn.Append(task.ParentRunId ?? "")).Where(candidates.Contains).ToHashSet(StringComparer.Ordinal);
+            while (true)
+            {
+                var newlyRequired = tasks.Where(task => required.Contains(task.Id))
+                    .SelectMany(task => task.DependsOn.Append(task.ParentRunId ?? ""))
+                    .Where(candidates.Contains).ToArray();
+                var added = false;
+                foreach (var id in newlyRequired) added |= required.Add(id);
+                if (!added) break;
+            }
+
+            var remove = candidates.Except(required, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
+            if (remove.Count == 0) return 0;
+            Save(tasks.Where(task => !remove.Contains(task.Id)));
+            return remove.Count;
+        }
+    }
+
     private AgentTaskArtifact Transition(string id, string expected, string next, string? summary = null)
     {
         lock (StoreGate)

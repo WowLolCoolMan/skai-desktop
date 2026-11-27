@@ -191,8 +191,8 @@ public static partial class AgentHostLoop
                 new { integration = "GitHub", data = "Repository metadata, selected diffs, commit or pull request details", route = "Sent only when the user starts an explicit GitHub operation." },
                 new { integration = "Web search", data = "Search query and fetched public pages", route = "Sent to the selected search provider when web search is used." },
             },
-            retention = "Conversations, tasks, media history, operation logs, and caches are currently retained until the user removes them or uses the owning feature's cleanup control. No automatic deletion schedule is enabled.",
-            cleanup = "Skai reports app-owned JSON storage here. Model, voice, image, and Electron caches belong to their runtime/provider and are not deleted by this page.",
+            retention = "Automatic retention is optional. It can remove old unpinned regular chats, terminal task records without retained worktrees, completed operation logs, and expired generated-media previews. Persona threads and pinned chats are excluded.",
+            cleanup = "Skai reports app-owned JSON storage here. Runtime and browser caches belong to their provider and are not deleted by Skai; use each runtime's own cache controls.",
         });
     }
 
