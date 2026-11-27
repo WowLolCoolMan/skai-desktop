@@ -73,6 +73,39 @@ platform or theme that was not recorded.
 | Disk full / storage exhaustion | [`Atomic file writer fault-injection test`](../../native/SkaiDesktop.Core.Tests/AtomicFileWriterTests.cs), [`Agent Host smoke`](../../scripts/smoke-agent-host.cjs) | A deterministic injected ENOSPC write failure verifies that the last complete file is preserved and the partial temp file is cleaned up. It does not fill a real disk or verify the packaged UI recovery message; disk-growth quota remains unenforced. |
 | Privacy / explicit network boundary | [`Local-only audit`](../../package.json), [`Marketplace host smoke`](../../package.json) | Release audit rejects unapproved hosted inference and host smoke rejects hosted MCP/model removal paths. Provider-specific outbound request inspection remains scoped to the relevant integration smoke. |
 
+### Slice 17 completion — review workflow affordances
+
+- Outcome: the local Git review surface now keeps anchored notes with open,
+  resolved, or deferred status and a local history, offers an explicit reviewer
+  agent handoff, maps changed files to detected checks as advisory coverage,
+  and gives media/document/rename/binary changes a clear before-versus-working
+  copy review path.
+- Reference / workflow: packaged Coding Changes pane and the Revision 4 Git
+  review workflow reference.
+- Success check: `npm run desktop:typecheck`; `npm run desktop:build`; focused
+  packaged UI matrix with `UI_MATRIX_ROUTE=coding`,
+  `UI_MATRIX_VIEWPORT=1440x900`, and `UI_MATRIX_QUICK=1`.
+- Failure check: the review UI preserves stale anchors, labels unavailable
+  binary bytes as metadata-only, and does not claim a check or reviewer ran;
+  all actions remain disabled or advisory where the required evidence is absent.
+- Disposable profile / cleanup: packaged UI matrix uses a throwaway Electron
+  profile and local fixture project; no user repository is modified.
+- Platform / OS: Windows x64 packaged Electron.
+- Viewport / theme / sidebar: 1440×900, dark theme, expanded sidebar.
+- Runtime / app revision: packaged frontend production build; smoke completed
+  against the current local revision before commit.
+- Network and privacy boundary: local-only project fixture and local Agent Host;
+  reviewer handoff creates a local chat prompt and sends no source externally.
+- Before screenshot: prior Git review surface with anchored notes and hunk
+  selection only.
+- After screenshot: review surface includes advisory check coverage, explicit
+  before/working-copy cards, reviewer-agent handoff, and note status/history
+  controls. The existing UI matrix capture remains the interaction evidence.
+- Comparison: changed-file selection and hunk staging remain unchanged; new
+  controls add review context without implying unavailable binary or CI data.
+- Unverified platforms, integrations, or hardware: native Linux/macOS visual
+  review; native binary-content rendering; remote CI result correlation.
+
 ### Slice 33 — safer Marketplace and installed inventory
 
 - Outcome: one category-filtered installed inventory feeds a shared inspector
