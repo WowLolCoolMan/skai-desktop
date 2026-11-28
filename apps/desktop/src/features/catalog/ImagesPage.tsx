@@ -8,7 +8,7 @@ import "./ImagesContactSheet.css";
 type ImageResult = { url: string; fileName: string; mediaType?: "image" | "video" | "audio"; provider?: ImageProvider; prompt?: string; createdAt?: string; model?: string; seed?: number; width?: number; height?: number; workflow?: string; origin?: "generated" | "edited" | "imported" | "user-authored" };
 type Workflow = { name: string; workflow: string };
 type VisualPreset = { id: string; name: string; tool: VisualTool; prompt: string; provider: ImageProvider; workflow: string };
-type VisualJob = { id: string; prompt: string; source?: ChatAttachment; options: { provider: ImageProvider; prompt: string; workflow?: string; model?: string; seed?: number; width?: number; height?: number }; status: "queued" | "running" | "completed" | "failed" | "cancelled"; error?: string };
+type VisualJob = { id: string; prompt: string; source?: ChatAttachment; options: { provider: ImageProvider; prompt: string; workflow?: string; model?: string; seed?: number; width?: number; height?: number }; status: "queued" | "running" | "completed" | "failed" | "cancelled"; attempts?: number; error?: string };
 type VisualCollection = { id: string; name: string; description: string; tags: string[]; projectLink: string; coverUrl?: string; assetUrls: string[]; createdAt: string };
 type VisualComment = { id: string; mediaUrl: string; text: string; annotation?: string; createdAt: string };
 type WorkflowMode = "generate" | "edit";
@@ -414,7 +414,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
         const next = visualJobsRef.current.find((job) => job.status === "queued");
         if (!next) break;
         setActiveVisualJobId(next.id);
-        updateVisualJobs((current) => current.map((job) => job.id === next.id ? { ...job, status: "running", error: undefined } : job));
+        updateVisualJobs((current) => current.map((job) => job.id === next.id ? { ...job, status: "running", attempts: (job.attempts ?? 0) + 1, error: undefined } : job));
         preserveImageSelectionRef.current = false;
         let succeeded = false;
         try { succeeded = await onGenerate(next.source, next.options); }
@@ -447,7 +447,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
         : metadata.seed;
       const jobPrompt = composedPrompt;
       return {
-        id: crypto.randomUUID(), prompt: jobPrompt, source: sourceImage ?? undefined, status: "queued",
+        id: crypto.randomUUID(), prompt: jobPrompt, source: sourceImage ?? undefined, status: "queued", attempts: 0,
         options: { provider: generationProvider, prompt: jobPrompt, workflow: generationWorkflow, model: generationProvider === "diffusers" ? "Stable Diffusion Turbo" : metadata.model ?? "ComfyUI workflow", seed: generationSeed, width: metadata.width ?? (generationProvider === "diffusers" ? 512 : undefined), height: metadata.height ?? (generationProvider === "diffusers" ? 512 : undefined) },
       };
     });
