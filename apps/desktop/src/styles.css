@@ -2844,6 +2844,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .response-branch-columns section { display: grid; min-width: 0; gap: 6px; }
 .response-branch-columns section > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 600; }
 .response-branch-columns pre { max-height: 360px; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.message-edit-attachments-label { margin: 10px 0 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 600; }
+.message-edit-form .attachment-list-message { margin: 0; }
+.message-edit-hint { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 @media (max-width: 760px) { .response-branch-columns { grid-template-columns: 1fr; } }
 
 

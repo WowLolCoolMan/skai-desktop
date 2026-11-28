@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { Message, Model } from "../../app/types";
+import type { ChatAttachment } from "../../../shared/contracts";
 import { Button } from "../../components/ui/Primitives";
 import { ChatMessage } from "./ChatMessage";
 
@@ -31,7 +32,7 @@ type ChatMessageListProps = {
   onCopy: (content: string, index: number) => void;
   onRetry: (index: number, model?: string) => void;
   onFork: (index: number) => void;
-  onEdit: (index: number, content: string) => Promise<boolean>;
+  onEdit: (index: number, content: string, attachments: ChatAttachment[]) => Promise<boolean>;
 };
 
 export function ChatMessageList({ conversationId, messages, busy, model, models, copiedMessage, onCopy, onRetry, onFork, onEdit }: ChatMessageListProps) {

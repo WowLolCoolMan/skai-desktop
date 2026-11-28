@@ -430,13 +430,13 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     void speakNativeResponse(completed.at(-1)?.content ?? "", false);
   };
 
-  const editMessage = async (messageIndex: number, content: string) => {
+  const editMessage = async (messageIndex: number, content: string, messageAttachments: ChatAttachment[] = []) => {
     if (busy || !conversationId || !content.trim()) return false;
     if (messages[messageIndex]?.role !== "user") return false;
     if (!isLocalEndpoint(endpoint)) { onError(LOCAL_ENDPOINT_ERROR); return false; }
     const originalMessages = messages;
     const prefix = messages.slice(0, messageIndex);
-    const edited = { ...messages[messageIndex], content: content.trim() };
+    const edited = { ...messages[messageIndex], content: content.trim(), attachments: messageAttachments.length ? messageAttachments : undefined };
     const next = [...prefix, edited];
     stopNativeSpeech();
     setMessages(next); setBusy(true); onError(null);
