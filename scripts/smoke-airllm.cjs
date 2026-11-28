@@ -37,9 +37,9 @@ async function main() {
   }
 
   const worker = path.join(root, "services", "airllm", "skai_airllm.py");
-  const result = await run(python, [worker], `${JSON.stringify({ model: "hf-internal-testing/tiny-random-LlamaForCausalLM", messages: [], max_new_tokens: 1 })}\n`);
+  const result = await run(python, [worker], `${JSON.stringify({ model: "hf-internal-testing/tiny-random-LlamaForCausalLM", device: "cuda:0", messages: [{ role: "user", content: "smoke" }], max_new_tokens: 1 })}\n`);
   const event = result.stdout.trim().split(/\r?\n/).map((line) => { try { return JSON.parse(line); } catch { return null; } }).find((item) => item?.type === "error");
-  if (result.code === 0 || !event || !event.message.includes("CUDA-capable PyTorch installation") || !event.message.includes("NVIDIA GPU")) {
+  if (result.code === 0 || !event || !event.message.includes("configured to use CUDA") || !event.message.includes("no available CUDA device")) {
     throw new Error(`AirLLM worker did not fail closed before inference: ${JSON.stringify({ code: result.code, event, stdout: result.stdout, stderr: result.stderr })}`);
   }
   console.log("AirLLM smoke passed: installed worker returns a structured CUDA/NVIDIA preflight error without downloading model weights.");
