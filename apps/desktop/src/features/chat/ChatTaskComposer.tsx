@@ -102,7 +102,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const safeTitle = title.trim().slice(0, 200);
-    const safeInstruction = instruction.trim().slice(0, 6000);
+    const safeInstruction = instruction.trim().slice(0, 5_600);
     if (!safeTitle || !safeInstruction || busy) return;
     const safeIssueUrl = gitHubIssueUrl.trim();
     if (safeIssueUrl && !/^https:\/\/github\.com\/[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}\/issues\/[1-9][0-9]{0,15}\/?$/i.test(safeIssueUrl)) {
