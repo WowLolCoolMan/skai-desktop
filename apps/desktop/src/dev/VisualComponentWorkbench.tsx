@@ -8,7 +8,7 @@ const densities = ["comfortable", "compact"] as const;
 export function VisualComponentWorkbench() {
   const [theme, setTheme] = useState<(typeof themes)[number]>("dark");
   const [density, setDensity] = useState<(typeof densities)[number]>("comfortable");
-  return <main className="visual-workbench" data-theme={theme} data-density={density} data-testid="component-workbench">
+  return <main className="visual-workbench" data-theme={theme} data-scheme={theme} data-density={density} data-testid="component-workbench">
     <header className="visual-workbench-toolbar">
       <div><p className="section-kicker">DEVELOPER PREVIEW</p><h1>Shared UI workbench</h1><p>Same reusable components, rendered with explicit props across themes, density, and interaction states.</p></div>
       <div className="visual-workbench-options">

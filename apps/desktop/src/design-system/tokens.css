@@ -57,6 +57,10 @@
   --skai-color-surface-soft: rgba(255, 255, 255, 0.045);
   --skai-color-border: rgba(167, 184, 218, 0.14);
   --skai-color-border-strong: rgba(167, 184, 218, 0.24);
+  /* Semantic UI roles: surfaces, dividers, focus/selection, warnings, disabled. */
+  --skai-color-divider: var(--skai-color-border);
+  --skai-color-disabled: color-mix(in srgb, var(--skai-color-text-muted) 42%, transparent);
+  --skai-color-mask-solid: #000000;
   --skai-color-text: #e7edf7;
   --skai-color-code-surface: #090f1c;
   --skai-color-code-text: #d0d9e8;
