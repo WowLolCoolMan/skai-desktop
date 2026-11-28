@@ -23,9 +23,32 @@ function AppMenu({ label, items }: { label: string; items: MenuItem[] }) {
 export function Toolbar({ route = "chat", contextDetail, modeLabel, connection, canGoBack, canGoForward, onBack, onForward, onRetryConnection, onNavigate, onNewChat, onOpenCommandPalette, onApplyLayoutPreset, onToggleSidebar, sidebarOpen = false, windowsTitleBarOverlay = false }: { route?: Route; contextDetail?: string; modeLabel?: string; connection: "checking" | "ready" | "error"; canGoBack: boolean; canGoForward: boolean; onBack: () => void; onForward: () => void; onRetryConnection: () => void; onNavigate: (route: Route) => void; onNewChat: () => void; onOpenCommandPalette: () => void; onApplyLayoutPreset: (preset: WorkspaceLayoutPreset) => void; onToggleSidebar?: () => void; sidebarOpen?: boolean; windowsTitleBarOverlay?: boolean }) {
   const [helpPanel, setHelpPanel] = useState<"shortcuts" | "about" | null>(null);
   const [shortcuts, setShortcuts] = useState(() => readCommandPreferences().shortcuts);
+  const [otherSessionCount, setOtherSessionCount] = useState(0);
   const logoTaps = useRef(0);
   const navigate = (nextRoute: Route) => () => onNavigate(nextRoute);
   useEffect(() => { const refresh = () => setShortcuts(readCommandPreferences().shortcuts); window.addEventListener(commandPreferencesEvent, refresh); return () => window.removeEventListener(commandPreferencesEvent, refresh); }, []);
+  useEffect(() => {
+    const instanceId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    const peers = new Map<string, number>();
+    const channel = typeof BroadcastChannel === "function" ? new BroadcastChannel("skai-session-presence-v1") : null;
+    const updateCount = () => {
+      const cutoff = Date.now() - 15_000;
+      for (const [id, timestamp] of peers) if (timestamp < cutoff) peers.delete(id);
+      setOtherSessionCount(peers.size);
+    };
+    const announce = () => channel?.postMessage({ type: "heartbeat", id: instanceId, timestamp: Date.now() });
+    const onMessage = (event: MessageEvent) => {
+      const message = event.data as { type?: string; id?: string; timestamp?: number } | null;
+      if (!message?.id || message.id === instanceId) return;
+      if (message.type === "leave") peers.delete(message.id);
+      else if (message.type === "heartbeat" && typeof message.timestamp === "number") peers.set(message.id, message.timestamp);
+      updateCount();
+    };
+    channel?.addEventListener("message", onMessage);
+    announce();
+    const heartbeat = window.setInterval(() => { announce(); updateCount(); }, 5_000);
+    return () => { window.clearInterval(heartbeat); channel?.postMessage({ type: "leave", id: instanceId }); channel?.removeEventListener("message", onMessage); channel?.close(); };
+  }, []);
   const shortcutLabel = (id: string) => formatShortcutLabel(shortcuts[id] ?? "");
   return <header className={`app-toolbar ${windowsTitleBarOverlay ? "is-titlebar-overlay" : ""}`}>
     {onToggleSidebar && <button className="toolbar-sidebar-toggle" type="button" aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} title={`Toggle sidebar (${formatShortcutLabel("Ctrl+Shift+S")})`} aria-expanded={sidebarOpen} aria-controls="workspace-sidebar" onClick={onToggleSidebar}><NavIcon name="sidebar" /></button>}
@@ -38,7 +61,7 @@ export function Toolbar({ route = "chat", contextDetail, modeLabel, connection, 
     </nav>
     <div className="toolbar-route-context" aria-live="polite"><NavIcon name={route === "chat" ? "chat" : route === "coding" ? "code" : route === "settings" ? "settings" : "project"} /><span className="toolbar-route-context-copy"><strong>{routeLabels[route] ?? "Workspace"}</strong>{contextDetail && <small title={contextDetail}>{contextDetail}</small>}</span>{modeLabel && <span className="toolbar-mode-chip">{modeLabel}</span>}</div>
     <div className="toolbar-history"><Button variant="ghost" aria-label="Go back" title="Go back" disabled={!canGoBack} onClick={onBack}><NavIcon name="chevron-left" /></Button><Button variant="ghost" aria-label="Go forward" title="Go forward" disabled={!canGoForward} onClick={onForward}><NavIcon name="chevron-right" /></Button></div>
-    <div className="toolbar-actions"><StatusBadge tone={connection === "ready" ? "success" : connection === "error" ? "danger" : "warning"}>{connection === "ready" ? "Agent ready" : connection === "error" ? "Offline" : "Connecting"}</StatusBadge>{connection === "error" && <Button variant="ghost" onClick={onRetryConnection}>Retry connection</Button>}</div>
+    <div className="toolbar-actions">{otherSessionCount > 0 && <span className="toolbar-mode-chip" role="status" aria-label={`${otherSessionCount} other Skai session${otherSessionCount === 1 ? "" : "s"} active`} title="Another Skai window is using this local workspace">{otherSessionCount} other session{otherSessionCount === 1 ? "" : "s"}</span>}<StatusBadge tone={connection === "ready" ? "success" : connection === "error" ? "danger" : "warning"}>{connection === "ready" ? "Agent ready" : connection === "error" ? "Offline" : "Connecting"}</StatusBadge>{connection === "error" && <Button variant="ghost" onClick={onRetryConnection}>Retry connection</Button>}</div>
     {helpPanel && <div className="app-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setHelpPanel(null); }}><section className="app-help-dialog" role="dialog" aria-modal="true" aria-labelledby="app-help-title"><button className="app-help-close" type="button" aria-label="Close help" onClick={() => setHelpPanel(null)}>×</button><p className="eyebrow">SKAI DESKTOP</p><h2 id="app-help-title">{helpPanel === "shortcuts" ? "Keyboard shortcuts" : "About Skai Desktop"}</h2>{helpPanel === "shortcuts" ? <dl><div><dt>New chat</dt><dd><kbd>{shortcutLabel("newChat")}</kbd></dd></div><div><dt>Quick actions</dt><dd><kbd>{shortcutLabel("palette")}</kbd></dd></div><div><dt>Settings</dt><dd><kbd>{shortcutLabel("settings")}</kbd></dd></div><div><dt>Chat</dt><dd><kbd>{shortcutLabel("chat")}</kbd></dd></div><div><dt>Coding workspace</dt><dd><kbd>{shortcutLabel("coding")}</kbd></dd></div><div><dt>Terminal</dt><dd><kbd>{shortcutLabel("terminal")}</kbd></dd></div><div><dt>Chat, coding, review, research, media layouts</dt><dd><kbd>{formatShortcutLabel("Ctrl+Alt+1–5").split("+").join(" + ")}</kbd></dd></div><div><dt>Find file</dt><dd><kbd>{formatShortcutLabel("Ctrl+P").split("+").join(" + ")}</kbd></dd></div></dl> : <p className="app-help-about">A local-first workspace for chat, coding, and creative tools.</p>}<Button variant="secondary" type="button" onClick={() => setHelpPanel(null)}>Done</Button></section></div>}
   </header>;
 }
