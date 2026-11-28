@@ -23,6 +23,13 @@ type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
 type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
 type VoiceDevice = { deviceId: string; label: string };
 type VoiceTranscriptLine = { id: number; speaker: "you" | "skai"; text: string };
+export type VoicePreflight = {
+  microphone: "ready" | "blocked" | "unsupported" | "unknown";
+  runtime: "ready" | "missing" | "unknown";
+  speaker: "ready" | "limited" | "unknown";
+  fallback: "available" | "unavailable" | "unknown";
+  checkedAt: number;
+};
 type HandsFreeCapture = { stream: MediaStream; context: AudioContext; frame: number; recorder: MediaRecorder | null; chunks: Blob[]; recentMonitorChunk: Blob | null; abort: AbortController | null; startedAt: number; lastSpeechAt: number; speechStartedAt: number; noiseFloor: number; monitorDuringPlayback: boolean; bargeInTriggered: boolean; finish?: () => void };
 
 type UseChatComposerVoiceOptions = {
@@ -62,6 +69,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const [pendingVoiceTranscript, setPendingVoiceTranscript] = useState<string | null>(null);
   const [voicePaused, setVoicePaused] = useState(false);
   const [voiceSessionTranscript, setVoiceSessionTranscript] = useState<VoiceTranscriptLine[]>([]);
+  const [voicePreflight, setVoicePreflight] = useState<VoicePreflight | null>(null);
   const [audioTranscriptReady, setAudioTranscriptReady] = useState(false);
   const audioPickerRef = useRef<HTMLInputElement>(null);
   const audioAbortRef = useRef<AbortController | null>(null);
@@ -120,6 +128,28 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       if (voiceInputDeviceIdRef.current !== "default" && !inputs.some((device) => device.deviceId === voiceInputDeviceIdRef.current)) { voiceInputDeviceIdRef.current = "default"; setVoiceInputDeviceId("default"); localStorage.setItem("skai.voice.inputDevice", "default"); }
       if (voiceOutputDeviceIdRef.current !== "default" && !outputs.some((device) => device.deviceId === voiceOutputDeviceIdRef.current)) { voiceOutputDeviceIdRef.current = "default"; setVoiceOutputDeviceId("default"); localStorage.setItem("skai.voice.outputDevice", "default"); }
     } catch { /* Device labels may be unavailable until microphone permission is granted. */ }
+  };
+
+  const checkVoicePreflight = async (): Promise<VoicePreflight> => {
+    let microphone: VoicePreflight["microphone"] = navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function" && typeof MediaRecorder !== "undefined" && typeof AudioContext !== "undefined" ? "ready" : "unsupported";
+    if (microphone === "ready") {
+      try {
+        const permission = await navigator.permissions.query({ name: "microphone" as PermissionName });
+        if (permission.state === "denied") microphone = "blocked";
+      } catch { /* permission queries are optional in desktop Chromium */ }
+    }
+    let runtime: VoicePreflight["runtime"] = "unknown";
+    try {
+      const response = await window.skaiAgent?.request("voice.whisper.install.status");
+      runtime = response?.ok && (response.result as { installed?: boolean } | undefined)?.installed ? "ready" : "missing";
+    } catch { /* the status is displayed as unknown until the bridge responds */ }
+    const speaker = typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype ? "ready" : "limited";
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    const fallback = Recognition && "processLocally" in Recognition.prototype ? "available" : "unavailable";
+    const result: VoicePreflight = { microphone, runtime, speaker, fallback, checkedAt: Date.now() };
+    setVoicePreflight(result);
+    return result;
   };
 
   useEffect(() => {
@@ -527,6 +557,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       return;
     }
     if (busyRef.current || voiceListening) return;
+    void checkVoicePreflight();
     handsFreeRef.current = true;
     awaitingResponseRef.current = false;
     setHandsFreeActive(true);
@@ -792,5 +823,5 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       setVoicePackInstalling(false);
     }
   };
-  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode };
+  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight };
 }
