@@ -5,6 +5,7 @@ import { PetWindow } from "./components/overlays/PetWindow";
 import { VisualComponentWorkbench } from "./dev/VisualComponentWorkbench";
 import "./design-system/tokens.css";
 import "./styles.css";
+import "./design-system/essential-text.css";
 import "./features/settings/easterEggs.css";
 
 const searchParams = new URLSearchParams(window.location.search);

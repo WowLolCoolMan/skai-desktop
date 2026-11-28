@@ -11,11 +11,14 @@ function registerWorkspaceIpc({
       const response = await requestAgent(method, params);
       const needsOcr = (response?.ok && response.result?.ocrRequired === true)
         || (!response?.ok && /no selectable text was found in this pdf/i.test(response?.error?.message ?? ""));
-      if (!needsOcr) return response;
+      if (!needsOcr) return response?.ok && response.result
+        ? { ...response, result: { ...response.result, sizeBytes: params?.sizeBytes } }
+        : response;
       try {
         const extraction = await extractPdfAttachmentText({
           fileName: params?.fileName,
           content: params?.content,
+          sizeBytes: params?.sizeBytes,
           dependenciesPath: path.resolve(__dirname, "..", "node_modules"),
         });
         return {
@@ -29,6 +32,7 @@ function registerWorkspaceIpc({
             ocr: extraction.ocrPages.length > 0,
             ocrPages: extraction.ocrPages,
             pageCount: extraction.pageCount,
+            sizeBytes: params.sizeBytes,
           },
         };
       } catch (error) {
@@ -86,14 +90,14 @@ function registerWorkspaceIpc({
           if (!(imageType === "image/png" ? isPng(bytes) : isJpeg(bytes))) throw new Error(`The selected image is not valid: ${fileName}`);
           imageBytes += bytes.length;
           if (imageBytes > 6 * 1024 * 1024) throw new Error("Selected images exceed the combined size limit.");
-          attachments.push({ fileName, mediaType: imageType, content: bytes.toString("base64") });
+          attachments.push({ fileName, mediaType: imageType, content: bytes.toString("base64"), sizeBytes: bytes.length });
         } else if (isPdf) {
-          attachments.push({ fileName, mediaType: null, content: bytes.toString("base64") });
+          attachments.push({ fileName, mediaType: null, content: bytes.toString("base64"), sizeBytes: bytes.length });
         } else if (videoType) {
           if (!(videoType === "video/mp4" ? isMp4(bytes) : isWebm(bytes))) throw new Error(`The selected video is not a valid ${videoType} file: ${fileName}`);
           videoBytes += bytes.length;
           if (videoBytes > 40 * 1024 * 1024) throw new Error("Selected videos exceed the combined 40 MB limit.");
-          attachments.push({ fileName, mediaType: videoType, content: bytes.toString("base64") });
+          attachments.push({ fileName, mediaType: videoType, content: bytes.toString("base64"), sizeBytes: bytes.length });
         } else if (isSpreadsheet) {
           if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error(`The selected spreadsheet is not a valid Open XML file: ${fileName}`);
           const extracted = await requestAgent("workspace.attachment.extractSpreadsheet", { fileName, content: bytes.toString("base64") });
@@ -101,12 +105,12 @@ function registerWorkspaceIpc({
           const content = extracted.result?.content ?? "";
           textCharacters += content.length;
           if (textCharacters > 48_000) throw new Error("Selected text files exceed the combined character limit.");
-          attachments.push({ fileName, mediaType: null, content });
+          attachments.push({ fileName, mediaType: null, content, sizeBytes: bytes.length });
         } else {
           const content = bytes.toString("utf8").slice(0, 16000);
           textCharacters += content.length;
           if (textCharacters > 48_000) throw new Error("Selected text files exceed the combined character limit.");
-          attachments.push({ fileName, mediaType: null, content });
+          attachments.push({ fileName, mediaType: null, content, sizeBytes: bytes.length });
         }
       }
       return { v: 1, ok: true, result: { attachments } };

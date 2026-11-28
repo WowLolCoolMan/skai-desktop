@@ -60,8 +60,8 @@ type ChatComposerProps = {
   onQueueRemove: (index: number) => void;
   onUpdateQueued: (index: number, text: string) => Promise<boolean>;
   onMoveQueued: (fromIndex: number, toIndex: number) => Promise<boolean>;
-  onAttach: () => void;
-  onFilesDropped: (files: File[]) => void;
+  onAttach: () => void | Promise<void>;
+  onFilesDropped: (files: File[]) => void | Promise<void>;
   onRemoveAttachment: (index: number) => void;
   onNavigate: (route: Route) => void;
   onToggleDocumentsOnly: () => void;
@@ -156,7 +156,19 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [computerSteps, setComputerSteps] = useState<string[]>([]);
   const [computerRequireApproval, setComputerRequireApproval] = useState(true);
   const [pendingComputerAction, setPendingComputerAction] = useState<PlannedComputerAction | null>(null);
-  const voice = useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTranscript, onAudioTranscript, onFilesDropped });
+  const [attachmentProcessingCount, setAttachmentProcessingCount] = useState(0);
+  const attachmentProcessingRef = useRef(0);
+  const withAttachmentProcessing = async (work: () => void | Promise<void>) => {
+    attachmentProcessingRef.current += 1;
+    setAttachmentProcessingCount(attachmentProcessingRef.current);
+    try { await work(); }
+    finally {
+      attachmentProcessingRef.current = Math.max(0, attachmentProcessingRef.current - 1);
+      setAttachmentProcessingCount(attachmentProcessingRef.current);
+    }
+  };
+  const processDroppedFiles = (files: File[]) => withAttachmentProcessing(() => onFilesDropped(files));
+  const voice = useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTranscript, onAudioTranscript, onFilesDropped: processDroppedFiles });
   const { voiceListening, handsFreeActive, voiceSessionStatus, voiceExpressiveness, setVoiceExpressiveness, voicePlaybackRate, setVoicePlaybackRate, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceInterruptions, voiceAudioEvidence, voiceEvidenceRetention, updateVoiceEvidenceRetention, clearVoiceSessionEvidence, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, updatePendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight } = voice;
   const computerStopRef = useRef(false);
   const computerApprovalResolver = useRef<((approved: boolean) => void) | null>(null);
@@ -318,7 +330,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
 
   const openFilePickerFromOmni = () => {
     setOmniOpen(false);
-    onAttach();
+    void withAttachmentProcessing(onAttach);
   };
 
   const openAudioPickerFromOmni = () => {
@@ -449,6 +461,10 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); selectComposerCommand(commandMatches[commandIndex]); return; }
     }
     if (event.key === "Escape" && (commandQuery !== null || contextQuery !== null)) { event.preventDefault(); onDraftChange(""); return; }
+    if (attachmentProcessingCount > 0 && event.key === "Enter" && (workflowPreferences.sendBehavior === "enter-sends" ? !event.shiftKey : event.shiftKey)) {
+      event.preventDefault();
+      return;
+    }
     if (workflowPreferences.sendBehavior === "enter-sends" && event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSubmit(); }
     else if (workflowPreferences.sendBehavior === "shift-enter-sends" && event.key === "Enter" && event.shiftKey) { event.preventDefault(); onSubmit(); }
   };
@@ -597,7 +613,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
-  return <section className={`composer-card${dragActive ? " is-drag-active" : ""}${workflowPreferences.toolbarLayout === "compact" ? " is-compact-toolbar" : ""}`} aria-busy={rewriteBusy} data-send-behavior={workflowPreferences.sendBehavior} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+  return <section className={`composer-card${dragActive ? " is-drag-active" : ""}${workflowPreferences.toolbarLayout === "compact" ? " is-compact-toolbar" : ""}`} aria-busy={rewriteBusy || attachmentProcessingCount > 0} data-send-behavior={workflowPreferences.sendBehavior} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
     {commandQuery !== null ? <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} /> : contextQuery !== null && <ComposerCommandMenu commands={contextMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectContextCommand} />}
     {queuedMessages.length > 0 && <div className="queued-messages" aria-label="Queued messages"><div className="queued-heading"><span className="section-kicker">UP NEXT</span><span>{queuedMessages.length}/8 queued</span></div>{queuedMessages.map((queued) => <div className="queued-message" key={queued.index}>{editingQueueIndex === queued.index ? <div className="queued-message-edit"><textarea autoFocus value={queueEditDraft} maxLength={50_000} aria-label={`Edit queued message ${queued.index + 1}`} onChange={(event) => setQueueEditDraft(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void saveQueuedEdit(queued.index); } if (event.key === "Escape") { setEditingQueueIndex(null); setQueueEditDraft(""); } }} /><div><button type="button" disabled={queueUpdateBusy || !queueEditDraft.trim()} onClick={() => void saveQueuedEdit(queued.index)}>Save</button><button type="button" disabled={queueUpdateBusy} onClick={() => { setEditingQueueIndex(null); setQueueEditDraft(""); }}>Cancel</button></div><small>Ctrl+Enter saves · Esc cancels</small></div> : <span>{queued.text}</span>}{queued.attachments?.length ? <small>{queued.attachments.map((attachment) => attachment.fileName).join(", ")}</small> : null}<div className="queued-message-actions"><button type="button" disabled={queueUpdateBusy} title="Edit this queued prompt" onClick={() => { if (editingQueueIndex !== queued.index) { setEditingQueueIndex(queued.index); setQueueEditDraft(queued.text); } }} aria-label={`Edit queued message ${queued.index + 1}`}>Edit</button><button type="button" disabled={queued.index === 0} onClick={() => void onMoveQueued(queued.index, queued.index - 1)} aria-label={`Move queued message ${queued.index + 1} up`} title="Move up">↑</button><button type="button" disabled={queued.index === queuedMessages.length - 1} onClick={() => void onMoveQueued(queued.index, queued.index + 1)} aria-label={`Move queued message ${queued.index + 1} down`} title="Move down">↓</button><button type="button" onClick={() => onQueueRemove(queued.index)} aria-label={`Remove queued message ${queued.index + 1}`} title="Remove queued message">×</button></div></div>)}</div>}
@@ -607,6 +623,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     {recommendedTools.length > 0 && !busy && !rewriteBusy && <div className="composer-tool-recommendations" aria-label="Recommended local tools"><span>Suggested for this draft</span>{recommendedTools.map((tool) => <button type="button" key={tool} title={recommendedComposerTools[tool].detail} onClick={() => activateRecommendedTool(tool)}><NavIcon name={tool === "files" ? "document" : tool === "audio" || tool === "voice" ? "microphone" : tool === "computer" ? "image" : tool === "plan" ? "code" : "marketplace"} /><span>{recommendedComposerTools[tool].label}</span></button>)}</div>}
      {draftQualityHints.length > 0 && <div className="composer-draft-hints" role="status" aria-label="Draft quality suggestions"><span className="composer-draft-hints-label">Draft check</span>{draftQualityHints.map((hint) => <span className="composer-draft-hint" key={hint}>{hint}</span>)}</div>}
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
+    {attachmentProcessingCount > 0 && <p className="composer-hint" role="status">Processing attachment{attachmentProcessingCount === 1 ? "" : "s"} locally… Sending will be available when they are ready.</p>}
     {voiceListening && whisperRecorderRef.current && <p className="composer-hint" role="status">Recording locally. Select the microphone again to transcribe, or leave it to stop automatically after five minutes.</p>}
     {audioTranscribing && <p className="composer-hint" role="status">Transcribing audio with local Whisper on this device…</p>}
     {audioTranscriptReady && <p className="composer-hint" role="status">Local transcript added to the draft. Review it before sending.</p>}
@@ -672,7 +689,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         {modelControl}
         {busy && modeLabel !== "Coding" && <button className="composer-tool-button composer-stop-button" type="button" onClick={() => void onStop()} aria-label="Stop local response" title="Stop the active local response"><NavIcon name="stop" /><span className="composer-toolbar-label">Stop</span></button>}
         <button className={`composer-tool-button composer-microphone-button${voiceListening ? " is-active" : ""}`} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop dictation" : "Dictate a message"} title={voiceListening ? "Stop dictation" : "Dictate a message on this device"}><NavIcon name={voiceListening ? "stop" : "microphone"} /><span className="composer-toolbar-label">{voiceListening ? "Stop" : "Dictate"}</span></button>
-        {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-keyshortcuts="Control+Alt+V Meta+Alt+V" aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation · Ctrl+Alt+V" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation · Ctrl+Alt+V"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /><span className="composer-toolbar-label">{handsFreeActive ? "End voice" : "Voice"}</span></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={() => { onSubmit(selectedToolIds); setOneTurnToolIds([]); }} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={`${rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"} · ${workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"}`}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
+        {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-keyshortcuts="Control+Alt+V Meta+Alt+V" aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation · Ctrl+Alt+V" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation · Ctrl+Alt+V"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /><span className="composer-toolbar-label">{handsFreeActive ? "End voice" : "Voice"}</span></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || attachmentProcessingCount > 0 || (documentsOnly && attachments.length === 0)} onClick={() => { onSubmit(selectedToolIds); setOneTurnToolIds([]); }} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={`${attachmentProcessingCount > 0 ? "Processing attachment…" : rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"} · ${workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"}`}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
       </div>
     </div>
     <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog">

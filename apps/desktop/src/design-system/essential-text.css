@@ -1,0 +1,14 @@
+/* Essential status and navigation metadata must remain readable at compact UI scales. */
+.status-badge,
+.workspace-tab-status,
+.sidebar-label,
+.sidebar-label-row,
+.sidebar-project-item small,
+.sidebar-project-empty span,
+.sidebar-history-item > time,
+.message-timestamp,
+.chat-date-separator,
+.usage-activity-row small,
+.usage-activity-row time {
+  font-size: max(var(--skai-text-essential), 11px);
+}

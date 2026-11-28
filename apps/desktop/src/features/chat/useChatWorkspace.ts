@@ -436,7 +436,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         if (isVideoAttachment(attachment)) {
           extracted.push(...await extractVideoFrameAttachments(base64ToBlob(attachment.content, attachment.mediaType!), attachment.fileName));
         } else if (attachment.fileName.toLowerCase().endsWith(".pdf")) {
-          const extraction = await request("workspace.attachment.extract", { fileName: attachment.fileName, content: attachment.content });
+          const extraction = await request("workspace.attachment.extract", { fileName: attachment.fileName, content: attachment.content, sizeBytes: attachment.sizeBytes });
           if (!extraction.ok) { onError(extraction.error?.message ?? `Could not read ${attachment.fileName}.`); return; }
           extracted.push(extraction.result as ChatAttachment);
         } else extracted.push(attachment);
@@ -456,7 +456,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       for (const file of files.slice(0, 5)) {
         const mediaType = videoMediaType(file.name, file.type);
         if (mediaType) attachments.push(...await extractVideoFrameAttachments(file, file.name));
-        else attachments.push({ fileName: file.name, mediaType: file.type || null, content: await readFileAsBase64(file) });
+        else attachments.push({ fileName: file.name, mediaType: file.type || null, content: await readFileAsBase64(file), sizeBytes: file.size });
         if (attachments.length >= 5) break;
       }
       const response = await request("workspace.importDroppedFiles", { attachments });
@@ -465,7 +465,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
       const extracted: ChatAttachment[] = [];
       for (const attachment of imported) {
         if (attachment.fileName.toLowerCase().endsWith(".pdf")) {
-          const extraction = await request("workspace.attachment.extract", { fileName: attachment.fileName, content: attachment.content });
+          const extraction = await request("workspace.attachment.extract", { fileName: attachment.fileName, content: attachment.content, sizeBytes: attachment.sizeBytes });
           if (!extraction.ok) { onError(extraction.error?.message ?? `Could not read ${attachment.fileName}.`); return; }
           extracted.push(extraction.result as ChatAttachment);
         } else extracted.push(attachment);

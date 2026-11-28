@@ -247,11 +247,11 @@ function decodeDroppedAttachment(attachment) {
   if (bytes.length > (isPdf ? 20 * 1024 * 1024 : 2 * 1024 * 1024)) throw new Error(`The dropped file is too large: ${fileName}`);
   if (imageType) {
     if (!(imageType === "image/png" ? isPng(bytes) : isJpeg(bytes))) throw new Error(`The dropped image is not valid: ${fileName}`);
-    return { fileName, mediaType: imageType, content: bytes.toString("base64"), byteLength: bytes.length, textLength: 0 };
+    return { fileName, mediaType: imageType, content: bytes.toString("base64"), byteLength: bytes.length, textLength: 0, sizeBytes: bytes.length };
   }
-  if (isPdf) return { fileName, mediaType: null, content: bytes.toString("base64"), byteLength: bytes.length, textLength: 0 };
+  if (isPdf) return { fileName, mediaType: null, content: bytes.toString("base64"), byteLength: bytes.length, textLength: 0, sizeBytes: bytes.length };
   const content = bytes.toString("utf8").slice(0, 16_000);
-  return { fileName, mediaType: null, content, byteLength: bytes.length, textLength: content.length };
+  return { fileName, mediaType: null, content, byteLength: bytes.length, textLength: content.length, sizeBytes: bytes.length };
 }
 
 function petBounds() {

@@ -216,7 +216,7 @@ export type DesktopPersona = {
   versions?: Array<{ versionId: string; createdAtUtc: string; name: string }>;
 };
 
-export type ChatAttachment = { fileName: string; content: string; mediaType?: string | null; ocr?: boolean };
+export type ChatAttachment = { fileName: string; content: string; mediaType?: string | null; ocr?: boolean; sizeBytes?: number };
 
 export type DesktopConversationSearchResult = DesktopConversation & {
   display: string;

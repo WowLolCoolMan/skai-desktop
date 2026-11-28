@@ -45,7 +45,8 @@ export async function extractVideoFrameAttachments(video: Blob, fileName: string
       frames.push({
         fileName: `${stem}.frame-${String(index + 1).padStart(2, "0")}-at-${timeLabel}.jpg`,
         mediaType: "image/jpeg",
-        content: await blobToBase64(image)
+        content: await blobToBase64(image),
+        sizeBytes: image.size
       });
     }
     return frames;

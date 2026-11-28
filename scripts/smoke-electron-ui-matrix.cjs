@@ -470,6 +470,8 @@ async function main() {
     return results;
   }, captureMode, longTitle, longWord, seedProject, includeCodingFixture, exerciseChatSchedule, exerciseDocuments, exerciseChatSearch, exerciseChatActions, exerciseChatBase, exerciseWorkspaceSearch);
   if (!Array.isArray(seeded) || seeded.some((result) => result?.ok !== true)) throw new Error(`Seeding the throwaway profile failed: ${JSON.stringify(seeded)}`);
+  const codingProjectId = seeded[3]?.result?.id;
+  let codingPaneMigrationVerified = false;
 
   const findings = [];
   for (const [theme, collapsed] of variants) {
@@ -990,6 +992,55 @@ async function main() {
           await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
           const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const panel = document.querySelector('.project-thread-panel .chat-page.is-coding-agent'); if (panel && getComputedStyle(panel.closest('.project-thread-panel')).display !== 'none') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!seededCodingThreadActive) throw new Error(`Coding workflow opened the project without restoring its linked Coding Agent conversation: ${JSON.stringify(await cdp.evaluate(`(() => ({ project: document.querySelector('.coding-project-heading strong')?.textContent?.trim(), threadButtons: [...document.querySelectorAll('.sidebar-project-thread')].map((item) => item.innerText), panel: document.querySelector('.project-thread-panel')?.innerText?.slice(0, 240), classes: document.querySelector('.project-thread-panel')?.className }))()`))}`);
+          if (exerciseCodingPanels && !codingPaneMigrationVerified) {
+            const paneScopeId = await cdp.evaluateWith(async function (projectId) {
+              for (let attempt = 0; attempt < 80; attempt += 1) {
+                const grid = document.querySelector('.coding-session-grid');
+                const activeProjectId = grid?.getAttribute('data-project-id');
+                const workspaceTabId = grid?.getAttribute('data-workspace-tab-id');
+                if (activeProjectId && workspaceTabId) return { scopeId: `${activeProjectId}::${workspaceTabId}`, activeProjectId, workspaceTabId, expectedProjectId: projectId };
+                await new Promise((resolve) => setTimeout(resolve, 50));
+              }
+              const grid = document.querySelector('.coding-session-grid');
+              return { scopeId: null, activeProjectId: grid?.getAttribute('data-project-id') ?? null, workspaceTabId: grid?.getAttribute('data-workspace-tab-id') ?? null, selectedProjectId: document.querySelector('.coding-project-heading-actions select')?.value ?? null, expectedProjectId: projectId };
+            }, codingProjectId);
+            if (!paneScopeId?.scopeId) throw new Error(`Could not identify the active project's thread-scoped pane state for legacy migration coverage: ${JSON.stringify(paneScopeId)}`);
+            const scopedPaneId = paneScopeId.scopeId;
+            const scopedProjectId = paneScopeId.activeProjectId;
+            await cdp.evaluateWith(function (scopeId) {
+              localStorage.setItem(`skai.coding.panePages.${scopeId}`, JSON.stringify([
+                { id: "coding-side-chat", panel: "side-chat" },
+                { id: "coding-editor", panel: "editor" },
+                { id: "coding-file-README.md", panel: "editor", filePath: "README.md" },
+                { id: "coding-file-src-index.ts", panel: "editor", filePath: "src/index.ts" },
+                { id: "coding-files-changes", panel: "files-changes" },
+              ]));
+              localStorage.setItem(`skai.coding.activePanePage.${scopeId}`, "coding-file-src-index.ts");
+              localStorage.setItem(`skai.coding.splitOpen.${scopeId}`, "true");
+              return true;
+            }, scopedPaneId);
+            await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: 'chat', index: 0, length: 1 } }, '', '#/chat'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
+            const chatRemounted = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · chat')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!chatRemounted) throw new Error("Could not leave Coding to reload the thread-scoped legacy pane state.");
+            await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: 'coding', index: 0, length: 1 } }, '', '#/coding'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
+            const codingRemounted = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const grid = document.querySelector('.coding-session-grid'); if (document.title.endsWith(' · coding') && grid?.getAttribute('data-project-id') === ${JSON.stringify(scopedProjectId)}) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!codingRemounted) throw new Error("Coding did not restore the selected project after loading legacy pane state.");
+            const migration = await cdp.evaluateWith(async function (scopeId) {
+              for (let attempt = 0; attempt < 40; attempt += 1) {
+                const pages = JSON.parse(localStorage.getItem(`skai.coding.panePages.${scopeId}`) ?? "[]");
+                const activePageId = localStorage.getItem(`skai.coding.activePanePage.${scopeId}`);
+                const version = localStorage.getItem(`skai.coding.panePagesVersion.${scopeId}`);
+                const editorPages = pages.filter((page) => page.panel === "editor");
+                if (version === "8" && editorPages.length === 1 && activePageId === "coding-editor") return { pages, activePageId, version };
+                await new Promise((resolve) => setTimeout(resolve, 50));
+              }
+              const pages = JSON.parse(localStorage.getItem(`skai.coding.panePages.${scopeId}`) ?? "[]");
+              return { pages, activePageId: localStorage.getItem(`skai.coding.activePanePage.${scopeId}`), version: localStorage.getItem(`skai.coding.panePagesVersion.${scopeId}`) };
+            }, scopedPaneId);
+            if (migration.version !== "8" || migration.pages.filter((page) => page.panel === "editor").length !== 1 || migration.activePageId !== "coding-editor" || migration.pages.some((page) => page.panel === "editor" && page.filePath)) throw new Error(`Legacy file-specific Editor pages did not consolidate into one Editor page while preserving the project file tabs: ${JSON.stringify(migration)}`);
+            codingPaneMigrationVerified = true;
+            console.log(`[coding-pane-migration] ${JSON.stringify({ pages: migration.pages.map((page) => page.panel), activePageId: migration.activePageId, version: migration.version })}`);
+          }
           const projectThreadButtons = await cdp.evaluate(`(() => ({ header: [...document.querySelectorAll('.coding-project-heading-actions button')].some((button) => button.textContent?.trim() === 'New thread'), sidebar: Boolean(document.querySelector('.sidebar-project-new-thread')) }))()`);
           if (!projectThreadButtons.header || !projectThreadButtons.sidebar) throw new Error(`The active project did not expose project-scoped New thread actions in the header and sidebar: ${JSON.stringify(projectThreadButtons)}`);
           if (exerciseCodingPanels && width === 1440 && height === 900) {
