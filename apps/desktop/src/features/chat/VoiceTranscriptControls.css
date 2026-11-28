@@ -36,3 +36,16 @@
   background: var(--skai-color-surface);
   font: inherit;
 }
+
+.voice-mode-transcript-review textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid var(--skai-color-border);
+  border-radius: var(--skai-radius-md);
+  color: var(--skai-color-text);
+  background: var(--skai-color-surface);
+  font: inherit;
+  line-height: 1.45;
+}
