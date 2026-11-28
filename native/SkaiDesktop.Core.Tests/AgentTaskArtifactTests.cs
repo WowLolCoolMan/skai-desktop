@@ -27,7 +27,13 @@ internal static class AgentTaskArtifactTests
                 Check(true, "agent task artifacts reject issue links outside canonical GitHub issue URLs");
             }
             Check(isolated.Environment == "worktree" && store.Get(isolated.Id).Environment == "worktree", "agent task environment persists across store reloads");
+            var blockedPlan = store.Create("Contradictory plan", "Edit the protected file.");
+            var blocked = store.BlockPlanned(blockedPlan.Id, "Contradiction flagged before editing.");
+            Check(blocked.Status == AgentTaskStatuses.Blocked && blocked.ResultSummary == "Contradiction flagged before editing.", "agent task plans can be blocked with a reviewable contradiction reason before execution");
             Check(store.GetNextReady() is null, "agent task readiness preview ignores proposed tasks");
+            var retriedBlocked = store.RetryBlocked(blockedPlan.Id);
+            Check(retriedBlocked.Status == AgentTaskStatuses.Queued, "blocked contradiction plans require an explicit retry decision before execution");
+            store.CancelPlanned(blockedPlan.Id, "Test cleanup.");
             Check(store.TryClaimReady() is null, "queued dependent agent task is not claimable before its prerequisite is queued and completed");
             store.Queue(first.Id);
             var preview = store.GetNextReady();

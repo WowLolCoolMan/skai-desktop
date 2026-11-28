@@ -25,6 +25,12 @@ if (args.Length == 1 && args[0].Equals("--workspace-sandbox", StringComparison.O
     Console.WriteLine("Selected workspace and sandbox checks passed.");
     return;
 }
+if (args.Length == 1 && args[0].Equals("--instruction-conflicts", StringComparison.OrdinalIgnoreCase))
+{
+    InstructionConflictTests.Run();
+    Console.WriteLine("Selected instruction-conflict checks passed.");
+    return;
+}
 
 await DiagnosticsTests.RunAsync();
 ProductIdentityTests.Run();
@@ -56,6 +62,7 @@ OpenApiToolDiscoveryTests.Run();
 ExternalLinkTests.Run();
 OperationJournalTests.Run();
 OperationServiceTests.Run();
+InstructionConflictTests.Run();
 WorkflowServiceTests.Run();
 WorkflowRunServiceTests.Run();
 WorkflowApprovalTimingTests.Run();

@@ -206,6 +206,23 @@ public sealed class AgentTaskArtifactStore
         return Copy(task);
     }
 
+    /// <summary>Stops a proposed or queued task when its instructions conflict before any tool can run.</summary>
+    public AgentTaskArtifact BlockPlanned(string id, string reason)
+    {
+        lock (StoreGate)
+        {
+            var tasks = Load().ToList();
+            var task = tasks.SingleOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("The agent task does not exist.");
+            if (task.Status is not (AgentTaskStatuses.Proposed or AgentTaskStatuses.Queued))
+                throw new InvalidOperationException($"A task in {task.Status} state cannot be blocked before execution.");
+            task.Status = AgentTaskStatuses.Blocked;
+            task.ResultSummary = Normalize(reason, MaxResultCharacters, "task blocking reason");
+            task.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            Save(tasks);
+            return Copy(task);
+        }
+    }
+
     /// <summary>
     /// Re-queues a blocked task only after an explicit user decision. Retained
     /// worktrees must be reviewed or released first; retry never starts work.
