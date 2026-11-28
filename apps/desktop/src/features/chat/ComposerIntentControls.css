@@ -135,3 +135,5 @@
 .composer-tool-picker-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .composer-tool-picker-actions button { padding: 5px 8px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: transparent; font-size: var(--skai-text-3xs); }
 .composer-tool-picker-actions button:hover, .composer-tool-picker-actions button:focus-visible, .composer-tool-picker-back:hover, .composer-tool-picker-back:focus-visible { color: var(--skai-color-text); border-color: var(--skai-color-accent); }
+.composer-context-freeze-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--skai-color-border); }
+.composer-context-freeze-actions .ui-button { min-height: 24px; padding: 4px 7px; font-size: var(--skai-text-3xs); }

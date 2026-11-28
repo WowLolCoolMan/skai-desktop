@@ -142,6 +142,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     } catch { return []; }
   });
   const [accessOpen, setAccessOpen] = useState(false);
+  const [contextSnapshot, setContextSnapshot] = useState<{ draft: string; attachments: ChatAttachment[]; toolIds: string[]; persistentToolIds: string[]; capturedAt: string } | null>(null);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerScreens, setComputerScreens] = useState<Awaited<ReturnType<NonNullable<typeof window.skaiAgent.computer>['capture']>>>([]);
   const [computerScreenId, setComputerScreenId] = useState("");
@@ -514,6 +515,14 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     else { setOmniOpen(false); onNavigate("marketplace"); }
   };
   const selectedToolIds = [...new Set([...persistentToolIds, ...oneTurnToolIds])];
+  const freezeContext = () => setContextSnapshot({ draft, attachments: attachments.map((attachment) => ({ ...attachment })), toolIds: selectedToolIds, persistentToolIds: [...persistentToolIds], capturedAt: new Date().toISOString() });
+  const restoreContext = () => {
+    if (!contextSnapshot) return;
+    onDraftChange(contextSnapshot.draft);
+    onSetAttachments(contextSnapshot.attachments.map((attachment) => ({ ...attachment })));
+    setPersistentToolIds(contextSnapshot.persistentToolIds);
+    setOneTurnToolIds(contextSnapshot.toolIds.filter((id) => !contextSnapshot.persistentToolIds.includes(id)));
+  };
   const filteredSkills = availableSkills.filter((skill) => `${skill.name} ${skill.id} ${skill.description ?? ""} ${skill.category ?? ""}`.toLowerCase().includes(toolQuery.trim().toLowerCase()));
   const toolPolicyLabel = target === "review" || target === "research" || modeLabel === "Review" ? "Read-only skills only" : target === "edit" || modeLabel === "Coding" || modeLabel === "Agent" ? "Mutating skills require approval" : "Conversation skills stay local";
   const skillBlockedByMode = (skill: ComposerSkill) => (target === "review" || target === "research" || modeLabel === "Review") && (skill.permissions ?? []).some((permission) => /write|execute|shell|desktop|network|mutat/i.test(permission));
@@ -620,6 +629,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
               <div><span>Workspace files</span><span>{projectId ? (projects.find((project) => project.id === projectId)?.folderPaths.join(" · ") || "No folders connected") : "Only files you attach"}</span></div>
               <div><span>Attached context</span><span>{attachments.length ? `${attachments.length} user-provided source${attachments.length === 1 ? "" : "s"} · ${attachments.map((attachment) => attachment.fileName).join(" · ")}` : "No attachments in this turn"}</span></div>
               <div><span>Context coverage</span><span>{contextCoverageLabel}</span></div>
+              <div><span>Context freeze</span><span>{contextSnapshot ? `Captured ${new Date(contextSnapshot.capturedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · restore available` : "Not captured"}</span></div>
               <div><span>Skills and tools</span><span>{selectedToolIds.length ? `${selectedToolIds.length} selected for ${toolScope === "persistent" ? "future turns" : "this turn"}` : ([...new Set(draft.match(/\$([A-Za-z0-9._-]{1,80})\b/g) ?? [])].slice(0, 4).join(", ").replaceAll("$", "") || "Add a $skill-id or choose Skills and tools")}</span></div>
               <div><span>Memory</span><span>{localStorage.getItem("skai.memoryInjectionEnabled") === "true" ? "Enabled · approved local notes only" : "Off for this workspace"}</span></div>
               <div><span>Mode policy</span><span>{modeLabel === "Agent" || modeLabel === "Coding" ? "Mutating tools require approval" : modeLabel === "Review" ? "Read-only review · no writes" : "Conversation tools stay local and explicit"}</span></div>
@@ -627,6 +637,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
               <div><span>Computer use</span><span>Starts only from Add to message and requires a local vision model.</span></div>
             </div>
             {duplicateAttachmentCount > 0 && <div className="composer-context-dedup" role="status"><span>{duplicateAttachmentCount} duplicate attachment{duplicateAttachmentCount === 1 ? "" : "s"} will be sent more than once.</span><Button variant="ghost" type="button" onClick={removeDuplicateAttachments}>Remove duplicates</Button></div>}
+            <div className="composer-context-freeze-actions"><Button variant="ghost" type="button" onClick={freezeContext}>{contextSnapshot ? "Recapture context" : "Freeze context"}</Button>{contextSnapshot && <><Button variant="ghost" type="button" onClick={restoreContext}>Restore frozen context</Button><Button variant="ghost" type="button" onClick={() => setContextSnapshot(null)}>Clear</Button></>}</div>
             {projectId && <p className="composer-capability-footnote">Project context is limited to the connected folders shown above.</p>}
           </section>}
         </div>
