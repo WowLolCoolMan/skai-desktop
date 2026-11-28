@@ -4724,6 +4724,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .settings-overlay-panel .settings-window { border-radius: 0; }
 }
 
+/* Revision 4 #101: essential metadata never falls to the unreadable micro-caption scale. */
+small[class], time,
+.status-badge, .workspace-tab-status, .sidebar-label, .sidebar-label-row,
+.sidebar-project-item small, .sidebar-project-empty span, .sidebar-session-item small,
+.coding-activity-count, .coding-task-inspector-count, .workbench-filter-count {
+  font-size: var(--skai-text-essential);
+}
+
 /* Revision 4 #28: keep the saved-note list beside its selected editor. */
 .memory-page { padding-top: 18px; }
 .memory-page > .page-header { margin-top: 18px; }

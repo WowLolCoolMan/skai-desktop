@@ -35,6 +35,8 @@
   --skai-radius-pill: 999px;
   /* Theme: type scale. --skai-text-scale is the "text size" knob. */
   --skai-text-scale: 1;
+  /* Essential metadata stays readable even when a theme requests a compact scale. */
+  --skai-text-essential: max(11px, calc(10px * var(--skai-text-scale)));
   --skai-text-3xs: calc(8px * var(--skai-text-scale));
   --skai-text-2xs: calc(9px * var(--skai-text-scale));
   --skai-text-xs: calc(10px * var(--skai-text-scale));
