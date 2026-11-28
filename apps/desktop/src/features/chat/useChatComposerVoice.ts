@@ -25,6 +25,7 @@ type VoiceDevice = { deviceId: string; label: string };
 type VoiceTranscriptLine = { id: number; speaker: "you" | "skai"; text: string };
 type VoiceAudioEvidence = { blob: Blob; fileName: string };
 type VoiceEvidenceRetention = "voice-session" | "app-session";
+type VoiceSessionStatus = "ready" | "suspended" | "reconnecting";
 export type VoicePreflight = {
   microphone: "ready" | "blocked" | "unsupported" | "unknown";
   runtime: "ready" | "missing" | "unknown";
@@ -73,6 +74,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const [voiceSessionTranscript, setVoiceSessionTranscript] = useState<VoiceTranscriptLine[]>([]);
   const [voiceAudioEvidence, setVoiceAudioEvidence] = useState<VoiceAudioEvidence | null>(null);
   const [voiceEvidenceRetention, setVoiceEvidenceRetention] = useState<VoiceEvidenceRetention>(() => localStorage.getItem("skai.voice.evidenceRetention") === "voice-session" ? "voice-session" : "app-session");
+  const [voiceSessionStatus, setVoiceSessionStatus] = useState<VoiceSessionStatus>("ready");
   const [voicePreflight, setVoicePreflight] = useState<VoicePreflight | null>(null);
   const [audioTranscriptReady, setAudioTranscriptReady] = useState(false);
   const audioPickerRef = useRef<HTMLInputElement>(null);
@@ -94,6 +96,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const busyRef = useRef(busy);
   const draftRef = useRef(draft);
   const restartTimerRef = useRef<number | null>(null);
+  const voiceResumeTimerRef = useRef<number | null>(null);
   const resumingRef = useRef(false);
   busyRef.current = busy;
   draftRef.current = draft;
@@ -108,6 +111,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     whisperRecorderRef.current = null;
     if (recorder) { recorder.recorder.onstop = null; try { recorder.recorder.stop(); } catch { /* It may already have stopped. */ } recorder.stream.getTracks().forEach((track) => track.stop()); }
     if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+    if (voiceResumeTimerRef.current !== null) window.clearTimeout(voiceResumeTimerRef.current);
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     if (interimRecognitionRestartRef.current !== null) window.clearTimeout(interimRecognitionRestartRef.current);
@@ -553,6 +557,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       sawBusyRef.current = false;
       pendingBargeInTranscriptRef.current = null;
       setHandsFreeActive(false);
+      setVoiceSessionStatus("ready");
       stopNativeSpeech();
       if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
       recognitionRef.current?.stop();
@@ -567,6 +572,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     handsFreeRef.current = true;
     awaitingResponseRef.current = false;
     setHandsFreeActive(true);
+    setVoiceSessionStatus("ready");
     if (voiceInteractionMode === "hands-free") void startHandsFreeListening();
   };
 
@@ -595,6 +601,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     sawBusyRef.current = false;
     pendingBargeInTranscriptRef.current = null;
     setHandsFreeActive(false);
+    setVoiceSessionStatus("ready");
     stopNativeSpeech();
     if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
     recognitionRef.current?.stop();
@@ -618,6 +625,43 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       try { capture.recorder.stop(); } catch { /* It may already have stopped. */ }
     }
   };
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!handsFreeRef.current) return;
+      if (document.hidden) {
+        if (voiceResumeTimerRef.current !== null) window.clearTimeout(voiceResumeTimerRef.current);
+        voiceResumeTimerRef.current = null;
+        stopInterimTranscriptRecognition();
+        stopHandsFreeCapture(false);
+        setVoiceListening(false);
+        if (!voicePaused) setVoiceSessionStatus("suspended");
+        return;
+      }
+      if (voicePaused || voiceInteractionMode === "push-to-talk" || busyRef.current) {
+        setVoiceSessionStatus("ready");
+        return;
+      }
+      setVoiceSessionStatus("reconnecting");
+      if (voiceResumeTimerRef.current !== null) window.clearTimeout(voiceResumeTimerRef.current);
+      voiceResumeTimerRef.current = window.setTimeout(() => {
+        voiceResumeTimerRef.current = null;
+        if (!handsFreeRef.current || document.hidden || voicePaused || busyRef.current) {
+          if (handsFreeRef.current && !document.hidden) setVoiceSessionStatus("ready");
+          return;
+        }
+        void startHandsFreeListeningRef.current().finally(() => {
+          if (handsFreeRef.current) setVoiceSessionStatus("ready");
+        });
+      }, 250);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (voiceResumeTimerRef.current !== null) window.clearTimeout(voiceResumeTimerRef.current);
+      voiceResumeTimerRef.current = null;
+    };
+  }, [voiceInteractionMode, voicePaused]);
 
   const startHandsFreeListening = async (monitorDuringPlayback = false) => {
     if (!handsFreeRef.current || voicePaused || (!monitorDuringPlayback && (busyRef.current || awaitingResponseRef.current)) || (monitorDuringPlayback && !voicePlaybackActiveRef.current) || handsFreeCaptureRef.current || handsFreeAbortRef.current) return;
@@ -831,5 +875,5 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       setVoicePackInstalling(false);
     }
   };
-  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceAudioEvidence, voiceEvidenceRetention, updateVoiceEvidenceRetention, clearVoiceSessionEvidence, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight };
+  return { voiceListening, handsFreeActive, voiceSessionStatus, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceAudioEvidence, voiceEvidenceRetention, updateVoiceEvidenceRetention, clearVoiceSessionEvidence, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight };
 }
