@@ -1,0 +1,8 @@
+.visuals-generation-brief { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
+.visuals-generation-brief > summary { color: var(--skai-color-text); cursor: pointer; font-size: var(--skai-text-sm); }
+.visuals-generation-brief-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
+.visuals-generation-brief-grid label { display: grid; gap: 5px; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.visuals-generation-brief-grid textarea { width: 100%; min-height: 54px; padding: 8px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface); resize: vertical; }
+.visuals-generation-brief-help { margin: 9px 0 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+@media (max-width: 860px) { .visuals-generation-brief-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .visuals-generation-brief-grid { grid-template-columns: 1fr; } }
