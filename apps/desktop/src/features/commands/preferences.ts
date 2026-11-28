@@ -50,3 +50,12 @@ export function normalizeShortcut(event: KeyboardEvent) {
   return `Ctrl${event.shiftKey ? "+Shift" : ""}+${key}`;
 }
 
+export function formatShortcutLabel(shortcut: string, platform = typeof navigator === "undefined" ? "" : navigator.platform) {
+  if (!platform.toLowerCase().includes("mac")) return shortcut;
+  return shortcut.replace(/\bCtrl\b/g, "⌘").replace(/\bAlt\b/g, "Option");
+}
+
+export function formatShortcutForAssistiveTech(shortcut: string) {
+  return formatShortcutLabel(shortcut).replace(/⌘/g, "Meta").replace(/\bCtrl\b/g, "Control").replace(/\bOption\b/g, "Alt");
+}
+

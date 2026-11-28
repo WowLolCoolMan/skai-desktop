@@ -2311,10 +2311,10 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .app-menu-trigger { min-width: 40px; padding: 6px 9px; border: 0; border-radius: var(--skai-radius-sm); color: color-mix(in srgb, var(--skai-color-text) 72%, var(--skai-color-text-muted)); background: transparent; font: inherit; font-size: var(--skai-text-md); cursor: pointer; transition: color 140ms ease, background 140ms ease; }
 .app-menu-trigger:hover, .app-menu-trigger[aria-expanded="true"] { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
 .app-menu-popover { position: absolute; z-index: 80; top: calc(100% + 5px); left: 0; display: grid; min-width: 220px; padding: 5px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-raised); box-shadow: 0 14px 36px color-mix(in srgb, var(--skai-color-shadow) 35%, transparent); }
-.app-menu-item { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; padding: 8px 10px; border: 0; border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: transparent; text-align: left; font: inherit; font-size: var(--skai-text-base); cursor: pointer; }
+.app-menu-item { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 16px; width: 100%; padding: 8px 10px; border: 0; border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: transparent; text-align: left; font: inherit; font-size: var(--skai-text-base); cursor: pointer; }
 .app-menu-item:hover, .app-menu-item:focus-visible { outline: 0; background: color-mix(in srgb, var(--skai-color-accent) 12%, var(--skai-color-surface-raised)); }
 .app-menu-item.has-separator { margin-top: 5px; border-top: 1px solid var(--skai-color-border); border-radius: 0; padding-top: 11px; }
-.app-menu-item kbd { color: var(--skai-color-text-muted); font: inherit; font-size: var(--skai-text-sm); white-space: nowrap; }
+.app-menu-item kbd { display: inline-block; min-width: 9ch; color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .app-toolbar .toolbar-brand { display: grid; flex: 0 0 30px; place-items: center; width: 30px; height: 30px; margin: 0; overflow: hidden; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 30%, var(--skai-color-border)); border-radius: var(--skai-radius-lg); background: color-mix(in srgb, var(--skai-color-accent) 10%, var(--skai-color-surface-raised)); box-shadow: 0 2px 10px color-mix(in srgb, var(--skai-color-accent) 12%, transparent); }
 .app-toolbar .toolbar-brand img { width: 25px; height: 25px; }
 .app-toolbar .toolbar-history { margin-left: 2px; }
@@ -4671,7 +4671,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .workspace-tab-context-menu button { display: flex; min-width: 0; min-height: 32px; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 9px; border: 0; border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: transparent; text-align: left; cursor: pointer; }
 .workspace-tab-context-menu button:hover:not(:disabled) { background: var(--skai-color-surface-soft); }
 .workspace-tab-context-menu button:disabled { color: var(--skai-color-text-muted); opacity: .48; cursor: default; }
-.workspace-tab-context-menu kbd { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.workspace-tab-context-menu kbd { min-width: 9ch; color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-xs); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .workspace-tab-menu-divider { height: 1px; margin: 3px 5px; background: var(--skai-color-border); }
 
 /* Coding projects open as a single thread; the user opts into a second pane. */
