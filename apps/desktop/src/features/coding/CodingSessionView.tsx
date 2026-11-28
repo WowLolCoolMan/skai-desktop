@@ -36,6 +36,10 @@ function splitPaneRatioStorageKey(projectId: string) {
   return `skai.coding.threadPanePercent.${projectId}`;
 }
 
+function fileHistoryStorageKey(projectId: string, path: string) {
+  return `skai.coding.fileHistory.${projectId}:${path}`;
+}
+
 function readSplitPanePercent(projectId: string) {
   const stored = Number(localStorage.getItem(splitPaneRatioStorageKey(projectId)));
   // Start balanced so the first Coding viewport keeps the latest chat turn
@@ -58,6 +62,7 @@ function monacoFileModelPath(projectId: string, filePath: string) {
 
 type InlineDiffRow = { kind: "context" | "removed" | "added"; oldLine: number | null; newLine: number | null; text: string };
 type SplitDiffRow = { original: InlineDiffRow | null; working: InlineDiffRow | null };
+type FileHistorySnapshot = { id: string; savedAtUtc: string; content: string };
 
 function inlineDiffRows(original: string, working: string): InlineDiffRow[] {
   // Monaco normalizes edited text to LF while Windows files often use CRLF.
@@ -176,6 +181,7 @@ export function CodingSessionView({ workspaceTabId = "workspace-home", conversat
   const [fileExplorerProjectLoaded, setFileExplorerProjectLoaded] = useState(selectedProject.id);
   const [fileSaveNotice, setFileSaveNotice] = useState("");
   const [fileSaveNoticePath, setFileSaveNoticePath] = useState<string | null>(null);
+  const [fileHistory, setFileHistory] = useState<FileHistorySnapshot[]>([]);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [snapshotMode, setSnapshotMode] = useState(() => localStorage.getItem(`skai.coding.snapshot.${selectedProject.id}`) === "true");
   const [focusLayout, setFocusLayout] = useState(false);
@@ -281,6 +287,13 @@ export function CodingSessionView({ workspaceTabId = "workspace-home", conversat
   };
 
   useEffect(() => { setPanelMode("editor"); }, [selectedFile, fileOriginal]);
+  useEffect(() => {
+    if (!selectedFile) { setFileHistory([]); return; }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(fileHistoryStorageKey(selectedProject.id, selectedFile)) ?? "[]") as unknown;
+      setFileHistory(Array.isArray(parsed) ? parsed.filter((item): item is FileHistorySnapshot => Boolean(item && typeof item === "object" && typeof (item as FileHistorySnapshot).id === "string" && typeof (item as FileHistorySnapshot).savedAtUtc === "string" && typeof (item as FileHistorySnapshot).content === "string")).slice(0, 8) : []);
+    } catch { setFileHistory([]); }
+  }, [selectedFile, selectedProject.id]);
   useEffect(() => {
     if (!sideChatRequest || sideChatRequest === lastSideChatRequest.current) return;
     lastSideChatRequest.current = sideChatRequest;
@@ -411,7 +424,14 @@ export function CodingSessionView({ workspaceTabId = "workspace-home", conversat
     fileTabs.closeTab(path);
   };
   const saveFileWithConfirmation = async () => {
+    const previousContent = fileOriginal;
     if (!await onSaveFile()) return false;
+    if (selectedFile && previousContent !== fileDraft) {
+      const snapshot: FileHistorySnapshot = { id: typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`, savedAtUtc: new Date().toISOString(), content: previousContent };
+      const next = [snapshot, ...fileHistory.filter((item) => item.content !== previousContent)].slice(0, 8);
+      setFileHistory(next);
+      try { localStorage.setItem(fileHistoryStorageKey(selectedProject.id, selectedFile), JSON.stringify(next)); } catch { /* History is optional and never blocks a saved file. */ }
+    }
     setFileSaveNotice(`Saved ${selectedFile?.split(/[\\/]/).at(-1) ?? "file"}`);
     setFileSaveNoticePath(selectedFile);
     return true;
@@ -473,6 +493,7 @@ export function CodingSessionView({ workspaceTabId = "workspace-home", conversat
       {workspacePanel === "scratchpad" && <section id="coding-project-scratchpad" className="coding-project-scratchpad" aria-label={`Project scratchpad for ${selectedProject.name}`}><div className="coding-project-scratchpad-heading"><strong>Project scratchpad</strong><span>{scratchpadText.trim() ? "Saved locally" : "Notes stay on this device"}</span></div><textarea value={scratchpadText} onChange={(event) => setScratchpadText(event.target.value)} placeholder="Capture decisions, commands, links, or follow-ups…" aria-label="Project scratchpad" /></section>}
       {workspacePanel === "preview" && <section id="coding-local-preview" className="coding-local-preview" aria-label="Local project preview"><div className="coding-local-preview-heading"><div><strong>Local project preview</strong><span>Inspect the running project</span></div></div><BrowserPreview key={selectedProject.id} projectId={selectedProject.id} /></section>}
       {fileSummary && workspacePanel === "editor" && <p className="file-summary">{fileSummary}</p>}
+      {workspacePanel === "editor" && fileHistory.length > 0 && <section className="coding-file-history" aria-label="Local file history"><div><strong>Saved snapshots</strong><small>Previous versions stay on this device and restore into the editor as an unsaved draft.</small></div>{fileHistory.map((snapshot) => <article key={snapshot.id}><div><strong>{new Date(snapshot.savedAtUtc).toLocaleString()}</strong><small>{snapshot.content.length.toLocaleString()} characters</small></div><Button variant="secondary" type="button" disabled={fileBusy} onClick={() => { onDraftChange(snapshot.content); setPanelMode("editor"); }}>Restore to draft</Button></article>)}</section>}
       {workspacePanel === "side-chat" && <CodingSideChat projectId={selectedProject.id} conversationId={conversationId} tasks={tasks} busy={tasks.some((task) => task.projectId === selectedProject.id && task.conversationId === conversationId && task.title.startsWith("Side chat · ") && ["queued", "running", "verifying"].includes(task.status))} onStart={onStartSubagent} onCancel={onCancelTask} onOpenFile={openFilePage} />}
       {workspacePanel === "files-changes" && filesChangesView === "files" && renderFileExplorerPanel(openFilePage, false)}
       {workspacePanel === "files-changes" && filesChangesView === "changes" && gitStatus && <div className={`git-change-summary${gitStatus.hasConflicts ? " has-conflicts" : ""}`} aria-label="Local Git changes"><div><p className="section-kicker">LOCAL GIT REVIEW</p><strong>{gitStatus.changes.length ? `${gitStatus.changes.length} changed file${gitStatus.changes.length === 1 ? "" : "s"}` : "Working tree clean"}</strong><span>{gitStatus.commitsAhead} ahead · {gitStatus.commitsBehind} behind · {gitStatus.repository}</span></div>{gitStatus.changes.length > 0 && <ul className="git-change-list">{gitStatus.changes.map((change) => <li key={`${change.status}-${change.path}`}><label><input type="checkbox" checked={selectedGitPaths.includes(change.path)} onChange={(event) => setSelectedGitPaths((current) => event.target.checked ? [...current, change.path] : current.filter((path) => path !== change.path))} /><b>{change.status}</b><span>{change.path}</span></label></li>)}</ul>}{gitStatus.changes.length > 8 && <small>Showing all {gitStatus.changes.length} changes. Review and commit are bounded to 24 files per operation.</small>}{gitStatus.hasConflicts && <small role="alert">Conflicts need review before any commit workflow can proceed.</small>}{gitStatus.changes.length > 0 && <div className="git-review-actions"><Button variant="ghost" onClick={() => setSelectedGitPaths(gitStatus.changes.map((change) => change.path))}>Select all</Button><Button variant="ghost" onClick={() => setSelectedGitPaths([])}>Clear selection</Button><Button variant="secondary" disabled={gitDiffBusy || gitStatus.hasConflicts || !selectedGitPaths.length} onClick={() => onLoadGitDiff(selectedGitPaths)}>{gitDiffBusy ? "Loading diff…" : gitDiff ? "Refresh diff" : "Review diff"}</Button><input value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} aria-label="Local Git commit message" maxLength={256} placeholder="Commit message" /><Button variant="primary" disabled={gitCommitBusy || gitStatus.hasConflicts || !gitMessage.trim() || !commitSelection.paths.length} onClick={() => void onCommitGitChanges(gitMessage, commitSelection.paths, Object.keys(commitSelection.hunks).length ? commitSelection.hunks : undefined)}>{gitCommitBusy ? "Committing…" : `Commit ${commitSelection.paths.length} selected${Object.keys(commitSelection.hunks).length ? " · selected hunks" : ""}`}</Button></div>}{gitDiff && <GitDiffReview projectId={selectedProject.id} diff={gitDiff.text} changes={gitStatus?.changes ?? []} selectedPaths={selectedGitPaths} onTogglePath={(path, included) => setSelectedGitPaths((current) => included ? [...new Set([...current, path])] : current.filter((item) => item !== path))} selectedHunks={selectedGitHunks} onSelectedHunksChange={setSelectedGitHunks} onSendReview={onSendReview} projectChecks={projectChecks} onOpenFile={openFilePage} />}</div>}
