@@ -38,6 +38,12 @@ export type ConversationResponseBranch = {
   originalContent: string;
   alternateContent: string;
 };
+type ConversationSaveOverrides = {
+  mode?: "ChatBot" | "Coding Agent";
+  project?: { id: string; name: string; instructions?: string } | null;
+  title?: string;
+  responseMode?: ChatResponseMode;
+};
 const CHAT_RESPONSE_MODES: ChatResponseMode[] = ["think", "coding", "security"];
 function normalizeResponseMode(value: unknown): ChatResponseMode {
   return CHAT_RESPONSE_MODES.includes(value as ChatResponseMode) ? value as ChatResponseMode : "think";
@@ -191,11 +197,14 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     }).catch(() => onError("Chat workspace data could not be loaded."));
   }, [connection, onError, request]);
 
-  const saveConversation = async (nextMessages: Message[], id = conversationId, modelOverride?: string) => {
+  const saveConversation = async (nextMessages: Message[], id = conversationId, modelOverride?: string, overrides: ConversationSaveOverrides = {}) => {
     const conversationModel = modelOverride?.trim() || model;
+    const conversationMode = overrides.mode ?? mode;
+    const conversationProject = overrides.project === undefined ? project : overrides.project;
+    const conversationResponseMode = overrides.responseMode ?? responseMode;
     const existingTitle = id ? conversations.find((conversation) => conversation.id === id)?.title : undefined;
-    const title = existingTitle || nextMessages.find((item) => item.role === "user")?.content.slice(0, 80) || "New chat";
-    const payload = { id: id ?? undefined, title, mode, responseMode, model: conversationModel, modelProvider: provider, modelSizeBytes: modelMetadata?.sizeBytes ?? null, modelContextLength: modelOverride ? null : modelMetadata?.contextLength ?? null, messages: nextMessages, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) };
+    const title = overrides.title?.trim() || existingTitle || nextMessages.find((item) => item.role === "user")?.content.slice(0, 80) || (conversationMode === "Coding Agent" ? "New coding thread" : "New chat");
+    const payload = { id: id ?? undefined, title, mode: conversationMode, responseMode: conversationResponseMode, model: conversationModel, modelProvider: provider, modelSizeBytes: modelMetadata?.sizeBytes ?? null, modelContextLength: modelOverride ? null : modelMetadata?.contextLength ?? null, messages: nextMessages, ...(conversationMode === "Coding Agent" && conversationProject ? { projectId: conversationProject.id, projectName: conversationProject.name, projectInstructions: conversationProject.instructions ?? "" } : {}) };
     // Keep a bounded local recovery copy while the host write is in flight. This
     // mirrors the durable-draft behavior used by local-first chat clients and
     // prevents a transient host restart from losing the user's latest turn.
@@ -218,8 +227,8 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         ...existing,
         id: savedId,
         title,
-        mode,
-        responseMode,
+        mode: conversationMode,
+        responseMode: conversationResponseMode,
         model: conversationModel,
         modelProvider: provider,
         modelSizeBytes: modelMetadata?.sizeBytes ?? null,
@@ -229,12 +238,14 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         pinned: existing?.pinned ?? false,
         archived: existing?.archived ?? false,
         tags: existing?.tags ?? [],
-        ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name } : {}),
+        ...(conversationMode === "Coding Agent" && conversationProject ? { projectId: conversationProject.id, projectName: conversationProject.name } : {}),
       };
       return [saved, ...current.filter((conversation) => conversation.id !== savedId)];
     });
     return savedId;
   };
+
+  const createConversation = async (options: ConversationSaveOverrides = {}) => saveConversation([], null, undefined, options);
 
   const sendMessage = async (text: string, messageAttachments: ChatAttachment[], documentsOnly = false, speakReply = false, temporary = false, selectedToolIds: string[] = []) => {
     if (!isLocalEndpoint(endpoint)) { onError(LOCAL_ENDPOINT_ERROR); return; }
@@ -627,5 +638,5 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, cancelMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, updateQueuedMessage, moveQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, restoreConversationMessages, selectConversation };
+  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, cancelMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, updateQueuedMessage, moveQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, createConversation, startNewChat, restoreConversationMessages, selectConversation };
 }

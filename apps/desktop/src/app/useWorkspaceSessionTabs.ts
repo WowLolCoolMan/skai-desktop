@@ -29,6 +29,12 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
   const [closedWorkspaceTabs, setClosedWorkspaceTabs] = useState<WorkspaceSessionTab[]>(readClosedWorkspaceTabs);
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState(readActiveWorkspaceTabId);
   const workspaceSessionRestoreStartedRef = useRef(false);
+  const ensureProjectThread = useCallback((project: import("../../shared/contracts").DesktopProject, tabId: string) => {
+    void chat.createConversation({ mode: "Coding Agent", project, title: "New coding thread", responseMode: "coding" }).then((id) => {
+      if (!id) return;
+      setWorkspaceTabs((current) => current.map((tab) => tab.id === tabId ? { ...tab, title: "New coding thread", conversationId: id, route: "coding", projectId: project.id } : tab));
+    });
+  }, [chat]);
   const selectConversation = useCallback((id: string) => {
     const conversation = chat.conversations.find((item) => item.id === id);
     let destination: Route = "chat";
@@ -42,7 +48,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
         void coding.selectProject(project);
         const existingProjectTab = workspaceTabs.find((tab) => tab.projectId === project.id);
         const tabId = existingProjectTab?.id ?? createWorkspaceTabId();
-        const projectTab: WorkspaceSessionTab = { id: tabId, title: project.name, route: "coding", conversationId: id, projectId: project.id };
+        const projectTab: WorkspaceSessionTab = { id: tabId, title: conversation.title, route: "coding", conversationId: id, projectId: project.id };
         setWorkspaceTabs((current) => current.some((tab) => tab.id === tabId)
           ? current.map((tab) => tab.id === tabId ? projectTab : tab)
           : [...current, projectTab].slice(-16));
@@ -85,14 +91,15 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     chat.setResponseMode("coding");
     const existing = workspaceTabs.find((tab) => tab.projectId === project.id);
     const tabId = existing?.id ?? createWorkspaceTabId();
-    const tab: WorkspaceSessionTab = { id: tabId, title: project.name, route: "coding", conversationId: null, projectId: project.id };
+    const tab: WorkspaceSessionTab = { id: tabId, title: "New coding thread", route: "coding", conversationId: null, projectId: project.id };
     setWorkspaceTabs((current) => current.some((item) => item.id === tabId)
       ? current.map((item) => item.id === tabId ? tab : item)
       : [...current, tab].slice(-16));
     setActiveWorkspaceTabId(tabId);
+    ensureProjectThread(project, tabId);
     void coding.selectProject(project);
     onNavigate("coding");
-  }, [chat, coding, onNavigate, setAgentModeState, setEndpoint, setModel, setProvider, workspaceTabs]);
+  }, [chat, coding, ensureProjectThread, onNavigate, setAgentModeState, setEndpoint, setModel, setProvider, workspaceTabs]);
   const openSideChat = useCallback(() => {
     if (!coding.selectedProject || route !== "coding") {
       openNewWorkspaceTab();
@@ -116,9 +123,12 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       if (tab.route === "coding" || tab.title === "New coding thread") chat.setResponseMode("coding");
     }
     const project = tab.projectId ? coding.projects.find((item) => item.id === tab.projectId) : null;
-    if (project) void coding.selectProject(project);
+    if (project) {
+      void coding.selectProject(project);
+      if (!tab.conversationId && tab.route === "coding") ensureProjectThread(project, tab.id);
+    }
     onNavigate(tab.route);
-  }, [chat, coding, onNavigate]);
+  }, [chat, coding, ensureProjectThread, onNavigate]);
   const closeWorkspaceTabs = useCallback((tabIds: string[]) => {
     const closing = workspaceTabs.filter((item) => tabIds.includes(item.id));
     if (!closing.length) return;
@@ -172,12 +182,13 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       chat.startNewChat();
       chat.setResponseMode("coding");
     }
-    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: project.name, route: "coding", conversationId: projectThread?.id ?? null, projectId: project.id };
+    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: projectThread?.title ?? "New coding thread", route: "coding", conversationId: projectThread?.id ?? null, projectId: project.id };
     setWorkspaceTabs((current) => [...current, tab].slice(-16));
     setActiveWorkspaceTabId(tab.id);
+    if (!projectThread) ensureProjectThread(project, tab.id);
     void coding.selectProject(project);
     onNavigate("coding");
-  }, [chat, coding, onNavigate, selectWorkspaceTab, workspaceTabs]);
+  }, [chat, coding, ensureProjectThread, onNavigate, selectWorkspaceTab, setAgentModeState, setEndpoint, setModel, setProvider, workspaceTabs]);
   useEffect(() => {
     if (workspaceSessionRestored || workspaceSessionRestoreStartedRef.current || connection !== "ready" || !chat.conversationsLoaded || !coding.projectsLoaded) return;
     const activeTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId) ?? workspaceTabs[0];
@@ -214,6 +225,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     const project = restoredTab.projectId ? coding.projects.find((item) => item.id === restoredTab.projectId) : undefined;
     const shouldNavigateToWorkspace = route === "chat" || route === "coding";
     if (restoredTab.projectId && project) {
+      if (!conversation && restoredTab.route === "coding") ensureProjectThread(project, restoredTab.id);
       void coding.selectProject(project, shouldNavigateToWorkspace).catch(() => undefined).finally(() => setWorkspaceSessionRestored(true));
       return;
     }
@@ -222,7 +234,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       if (shouldNavigateToWorkspace) onNavigate("projects");
     } else if (route === "chat") onNavigate(restoredTab.route === "coding" ? "projects" : "chat");
     setWorkspaceSessionRestored(true);
-  }, [activeWorkspaceTabId, chat.conversationId, chat.conversations, chat.conversationsLoaded, chat.selectConversation, chat.setResponseMode, chat.startNewChat, coding.projects, coding.projectsLoaded, coding.selectProject, connection, hasStoredWorkspaceTabs, onNavigate, route, workspaceSessionRestored, workspaceTabs]);
+  }, [activeWorkspaceTabId, chat.conversationId, chat.conversations, chat.conversationsLoaded, chat.selectConversation, chat.setResponseMode, chat.startNewChat, coding.projects, coding.projectsLoaded, coding.selectProject, connection, ensureProjectThread, hasStoredWorkspaceTabs, onNavigate, route, workspaceSessionRestored, workspaceTabs]);
   useEffect(() => {
     saveWorkspaceTabs(workspaceTabs, activeWorkspaceTabId);
   }, [activeWorkspaceTabId, workspaceTabs]);
@@ -234,7 +246,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       route: route === "coding" && coding.selectedProject ? "coding" : "chat",
       conversationId: chat.conversationId,
       projectId: route === "coding" ? coding.selectedProject?.id ?? tab.projectId : null,
-      title: route === "coding" && coding.selectedProject ? coding.selectedProject.name : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
+      title: route === "coding" && coding.selectedProject ? chat.activeConversation?.title ?? "New coding thread" : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
     }));
   }, [activeWorkspaceTabId, agentMode, chat.activeConversation?.title, chat.conversationId, coding.selectedProject?.id, coding.selectedProject?.name, route, workspaceSessionRestored]);
   useEffect(() => {
