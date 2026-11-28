@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, StatusBadge } from "../../components/ui/Primitives";
-import { clearImageHistory, loadImageHistory, pruneImageHistoryBefore } from "../catalog/imageHistory";
+import { clearImageHistory, loadImageHistory, pruneImageHistoryBefore, saveImageHistory, type ImageHistoryEntry } from "../catalog/imageHistory";
 import { WorkspaceRetentionControls } from "./WorkspaceRetentionControls";
 import "./WorkspaceBackupManager.css";
 import "./WorkspaceMediaCleanupPreview.css";
@@ -28,6 +28,7 @@ export function WorkspaceBackupManager() {
   const [mediaHistoryBytes, setMediaHistoryBytes] = useState(0);
   const [mediaHistoryCount, setMediaHistoryCount] = useState(0);
   const [mediaCleanupAt, setMediaCleanupAt] = useState(() => window.localStorage.getItem("skai.media.lastCleanupUtc"));
+  const [clearedMediaHistory, setClearedMediaHistory] = useState<ImageHistoryEntry[]>([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -57,8 +58,15 @@ export function WorkspaceBackupManager() {
   const clearMediaHistory = async () => {
     if (!mediaHistoryCount || !window.confirm(`Remove ${mediaHistoryCount} saved generated media preview(s) from this device? This does not remove originals from other folders or services.`)) return;
     setBusy("clear-media"); setError(""); setNotice("");
-    try { await clearImageHistory(); const cleanupAt = new Date().toISOString(); window.localStorage.setItem("skai.media.lastCleanupUtc", cleanupAt); setMediaCleanupAt(cleanupAt); setMediaHistoryCount(0); setMediaHistoryBytes(0); setNotice("Generated media history was cleared from this device."); await refreshStorage(); }
+    try { const previous = await loadImageHistory(); await clearImageHistory(); setClearedMediaHistory(previous); const cleanupAt = new Date().toISOString(); window.localStorage.setItem("skai.media.lastCleanupUtc", cleanupAt); setMediaCleanupAt(cleanupAt); setMediaHistoryCount(0); setMediaHistoryBytes(0); setNotice(previous.length ? "Generated media history was cleared. You can undo this cleanup while this page remains open." : "Generated media history was cleared from this device."); await refreshStorage(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Generated media history could not be cleared."); }
+    finally { setBusy(""); }
+  };
+  const undoMediaCleanup = async () => {
+    if (!clearedMediaHistory.length || busy) return;
+    setBusy("undo-media"); setError(""); setNotice("");
+    try { await saveImageHistory(clearedMediaHistory); setClearedMediaHistory([]); setNotice("Generated media history was restored on this device."); await refreshStorage(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Generated media history could not be restored."); }
     finally { setBusy(""); }
   };
 
@@ -213,7 +221,7 @@ export function WorkspaceBackupManager() {
     {error && <p className="workspace-backup-message workspace-backup-error" role="alert">{error}</p>}{notice && <p className="workspace-backup-message workspace-backup-notice" role="status">{notice}</p>}
     <div className="workspace-backup-card workspace-storage-card">
       <div className="workspace-backup-card-heading"><div><p className="section-kicker">LOCAL STORAGE</p><h4>Where Skai keeps data</h4><p>{storage?.localRoot ?? "Reading local app storage…"}</p></div><Button variant="secondary" type="button" disabled={busy !== ""} onClick={() => void refreshStorage()}>Refresh</Button></div>
-      {storage && <><div className="workspace-storage-total"><strong>{formatBytes(storage.totalBytes + mediaHistoryBytes)}</strong><span>reported app-owned data · media estimate included</span></div><div className="workspace-storage-rows">{[...storage.rows, { label: "Generated media history (browser)", bytes: mediaHistoryBytes, exists: mediaHistoryCount > 0 }].map(row => <div key={row.label}><span>{row.label}</span><span>{formatBytes(row.bytes)}</span></div>)}</div><div className="workspace-backup-actions"><Button variant="secondary" type="button" disabled={!mediaHistoryCount || busy !== ""} onClick={() => void clearMediaHistory()}>{busy === "clear-media" ? "Clearing…" : `Clear generated media history (${mediaHistoryCount})`}</Button></div><p className="workspace-backup-help">Media size is estimated from the saved browser-history previews. Clearing this index removes previews stored by Skai, not files you downloaded.</p><p className="workspace-backup-help">{mediaCleanupAt ? `Last explicit media cleanup: ${new Date(mediaCleanupAt).toLocaleString()}.` : "No explicit media cleanup has been run on this device."}</p><p className="workspace-backup-help">{storage.retention}</p><p className="workspace-backup-help">{storage.cleanup}</p><div className="workspace-data-flows"><h5>What leaves this device</h5>{storage.privacy.map(item => <div key={item.integration}><strong>{item.integration}</strong><span>{item.data}. {item.route}</span></div>)}</div></>}
+      {storage && <><div className="workspace-storage-total"><strong>{formatBytes(storage.totalBytes + mediaHistoryBytes)}</strong><span>reported app-owned data · media estimate included</span></div><div className="workspace-storage-rows">{[...storage.rows, { label: "Generated media history (browser)", bytes: mediaHistoryBytes, exists: mediaHistoryCount > 0 }].map(row => <div key={row.label}><span>{row.label}</span><span>{formatBytes(row.bytes)}</span></div>)}</div><div className="workspace-backup-actions"><Button variant="secondary" type="button" disabled={!mediaHistoryCount || busy !== ""} onClick={() => void clearMediaHistory()}>{busy === "clear-media" ? "Clearing…" : `Clear generated media history (${mediaHistoryCount})`}</Button>{clearedMediaHistory.length > 0 && <Button variant="ghost" type="button" disabled={busy !== ""} onClick={() => void undoMediaCleanup()}>{busy === "undo-media" ? "Restoring…" : `Undo cleanup (${clearedMediaHistory.length})`}</Button>}</div><p className="workspace-backup-help">Media size is estimated from the saved browser-history previews. Clearing this index removes previews stored by Skai, not files you downloaded.</p><p className="workspace-backup-help">{mediaCleanupAt ? `Last explicit media cleanup: ${new Date(mediaCleanupAt).toLocaleString()}.` : "No explicit media cleanup has been run on this device."}</p><p className="workspace-backup-help">{storage.retention}</p><p className="workspace-backup-help">{storage.cleanup}</p><div className="workspace-data-flows"><h5>What leaves this device</h5>{storage.privacy.map(item => <div key={item.integration}><strong>{item.integration}</strong><span>{item.data}. {item.route}</span></div>)}</div></>}
     </div>
     <details className="workspace-media-cleanup-preview">
       <summary>Preview generated media cleanup</summary>
