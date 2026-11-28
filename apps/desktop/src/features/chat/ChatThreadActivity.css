@@ -31,3 +31,9 @@
 .thread-run-correlation { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
 .thread-run-correlation button { max-width: 100%; overflow: hidden; padding: 2px 5px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: var(--skai-color-canvas); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); text-overflow: ellipsis; cursor: pointer; }
 .thread-run-correlation button:hover, .thread-run-correlation button:focus-visible { border-color: var(--skai-color-accent); color: var(--skai-color-text); }
+.thread-run-report { margin-top: 8px; border-top: 1px solid var(--skai-color-border); padding-top: 7px; }
+.thread-run-report > summary { color: var(--skai-color-text); font-size: var(--skai-text-3xs); cursor: pointer; }
+.thread-run-report dl { display: grid; gap: 6px; margin: 7px 0 0; }
+.thread-run-report dl > div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 7px; }
+.thread-run-report dt { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.thread-run-report dd { margin: 0; overflow-wrap: anywhere; color: var(--skai-color-text); font-size: var(--skai-text-3xs); line-height: 1.35; }
