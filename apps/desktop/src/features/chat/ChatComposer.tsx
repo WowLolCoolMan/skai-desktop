@@ -575,6 +575,26 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
+  const downloadContextManifest = () => {
+    const manifest = {
+      format: "skai-context-manifest.v1",
+      capturedAt: new Date().toISOString(),
+      mode: modeLabel,
+      target,
+      policy: effectivePolicyLabel,
+      project: projectId ? projects.find((project) => project.id === projectId)?.name ?? projectId : null,
+      folders: projectId ? projects.find((project) => project.id === projectId)?.folderPaths ?? [] : [],
+      attachments: attachments.map((attachment) => ({ fileName: attachment.fileName, mediaType: attachment.mediaType, contentCharacters: attachment.content.length })),
+      selectedTools: selectedToolIds,
+      persistentTools: persistentToolIds,
+      memoryEnabled: localStorage.getItem("skai.memoryInjectionEnabled") === "true",
+      draftCharacters: draft.length,
+      contextCoverage: contextCoverageLabel,
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a"); link.href = url; link.download = `skai-context-manifest-${new Date().toISOString().replace(/[.:]/g, "-")}.json`; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
 
   return <section className={`composer-card${dragActive ? " is-drag-active" : ""}${workflowPreferences.toolbarLayout === "compact" ? " is-compact-toolbar" : ""}`} aria-busy={rewriteBusy} data-send-behavior={workflowPreferences.sendBehavior} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
@@ -639,7 +659,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
               <div><span>Computer use</span><span>Starts only from Add to message and requires a local vision model.</span></div>
             </div>
             {duplicateAttachmentCount > 0 && <div className="composer-context-dedup" role="status"><span>{duplicateAttachmentCount} duplicate attachment{duplicateAttachmentCount === 1 ? "" : "s"} will be sent more than once.</span><Button variant="ghost" type="button" onClick={removeDuplicateAttachments}>Remove duplicates</Button></div>}
-            <div className="composer-context-freeze-actions"><Button variant="ghost" type="button" onClick={freezeContext}>{contextSnapshot ? "Recapture context" : "Freeze context"}</Button>{contextSnapshot && <><Button variant="ghost" type="button" onClick={restoreContext}>Restore frozen context</Button><Button variant="ghost" type="button" onClick={() => setContextSnapshot(null)}>Clear</Button></>}</div>
+            <div className="composer-context-freeze-actions"><Button variant="ghost" type="button" onClick={freezeContext}>{contextSnapshot ? "Recapture context" : "Freeze context"}</Button>{contextSnapshot && <><Button variant="ghost" type="button" onClick={restoreContext}>Restore frozen context</Button><Button variant="ghost" type="button" onClick={() => setContextSnapshot(null)}>Clear</Button></>}<Button variant="ghost" type="button" onClick={downloadContextManifest}>Export manifest</Button></div>
             {projectId && <p className="composer-capability-footnote">Project context is limited to the connected folders shown above.</p>}
           </section>}
         </div>
