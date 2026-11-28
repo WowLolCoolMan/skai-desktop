@@ -3,6 +3,7 @@ import { Button, StatusBadge } from "../../components/ui/Primitives";
 import { clearImageHistory, loadImageHistory, pruneImageHistoryBefore } from "../catalog/imageHistory";
 import { WorkspaceRetentionControls } from "./WorkspaceRetentionControls";
 import "./WorkspaceBackupManager.css";
+import "./WorkspaceMediaCleanupPreview.css";
 
 type BackupCategory = "conversations" | "settings" | "personas" | "projects";
 type ExportPreview = { categories: Array<{ id: BackupCategory; label: string; count: number; description: string }>; sourcePlatform: string; portability: string; redaction: string; privacyNote: string; maxArchiveBytes: number };
@@ -151,6 +152,14 @@ export function WorkspaceBackupManager() {
       <div className="workspace-backup-card-heading"><div><p className="section-kicker">LOCAL STORAGE</p><h4>Where Skai keeps data</h4><p>{storage?.localRoot ?? "Reading local app storage…"}</p></div><Button variant="secondary" type="button" disabled={busy !== ""} onClick={() => void refreshStorage()}>Refresh</Button></div>
       {storage && <><div className="workspace-storage-total"><strong>{formatBytes(storage.totalBytes + mediaHistoryBytes)}</strong><span>reported app-owned data · media estimate included</span></div><div className="workspace-storage-rows">{[...storage.rows, { label: "Generated media history (browser)", bytes: mediaHistoryBytes, exists: mediaHistoryCount > 0 }].map(row => <div key={row.label}><span>{row.label}</span><span>{formatBytes(row.bytes)}</span></div>)}</div><div className="workspace-backup-actions"><Button variant="secondary" type="button" disabled={!mediaHistoryCount || busy !== ""} onClick={() => void clearMediaHistory()}>{busy === "clear-media" ? "Clearing…" : `Clear generated media history (${mediaHistoryCount})`}</Button></div><p className="workspace-backup-help">Media size is estimated from the saved browser-history previews. Clearing this index removes previews stored by Skai, not files you downloaded.</p><p className="workspace-backup-help">{storage.retention}</p><p className="workspace-backup-help">{storage.cleanup}</p><div className="workspace-data-flows"><h5>What leaves this device</h5>{storage.privacy.map(item => <div key={item.integration}><strong>{item.integration}</strong><span>{item.data}. {item.route}</span></div>)}</div></>}
     </div>
+    <details className="workspace-media-cleanup-preview">
+      <summary>Preview generated media cleanup</summary>
+      <div>
+        <strong>{mediaHistoryCount ? `${mediaHistoryCount} generated preview${mediaHistoryCount === 1 ? "" : "s"} · ${formatBytes(mediaHistoryBytes)}` : "No generated previews are indexed"}</strong>
+        <p>Clear generated media history removes only Skai’s local preview index and browser-stored previews. It does not delete originals in project folders, downloaded files, ComfyUI outputs, or assets in other applications.</p>
+        <p>Retention settings affect future cleanup checks; use the action above when you want to remove the indexed previews now.</p>
+      </div>
+    </details>
     <WorkspaceRetentionControls onMediaChange={() => void refreshStorage()} />
   </section>;
 }

@@ -281,11 +281,11 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
   const closeProjectFile = () => { persistCurrentProjectDraft(); fileReadRequestId.current += 1; setSelectedFile(null); setFileDraft(""); setFileOriginal(""); setFilePreview(null); setFilePreviewError(null); setFileHash(null); setFileUndoId(null); };
 
   const saveProjectFile = async () => {
-    if (!selectedProject || !selectedFile || !fileHash || fileBusy) return;
+    if (!selectedProject || !selectedFile || !fileHash || fileBusy) return false;
     setFileBusy(true);
     const response = await request("project.file.write", { id: selectedProject.id, relativePath: selectedFile, content: fileDraft, expectedHash: fileHash });
     setFileBusy(false);
-    if (!response.ok) { onError(response.error?.message ?? "File edit was rejected."); return; }
+    if (!response.ok) { onError(response.error?.message ?? "File edit was rejected."); return false; }
     const result = response.result as { hash: string; undoId: string };
     setFileHash(result.hash); setFileOriginal(fileDraft); setFileUndoId(result.undoId);
     if (selectedProject && selectedFile) {
@@ -295,6 +295,7 @@ export function useCodingWorkspace({ request, connection, onError, onNavigate }:
       void removeProjectEditorDraft(selectedProject.id, selectedFile);
     }
     onError(null);
+    return true;
   };
 
   const undoProjectFile = async () => {

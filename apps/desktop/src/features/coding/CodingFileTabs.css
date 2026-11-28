@@ -1,0 +1,30 @@
+.file-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-tabs-row .file-tabs {
+  flex: 1 1 auto;
+}
+
+.file-save-confirmation {
+  flex: 0 0 auto;
+  padding: 0 8px;
+  color: var(--skai-color-success);
+  font-size: var(--skai-text-essential);
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .file-tabs-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .file-tabs-row .file-tabs {
+    width: 100%;
+    flex-basis: auto;
+  }
+}
