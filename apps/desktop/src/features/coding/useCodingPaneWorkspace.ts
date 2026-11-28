@@ -1,26 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { reorderItem } from "../../app/reorderItem";
 
-export type CodingPanePanel = "editor" | "files" | "side-chat" | "changes" | "scratchpad" | "preview";
+export type CodingPanePanel = "editor" | "files-changes" | "side-chat" | "scratchpad" | "preview";
 export type CodingPanePage = { id: string; panel: CodingPanePanel; filePath?: string };
 export type CodingPanePreset = "single" | "chat-files" | "chat-terminal" | "review" | "research";
 
 const DEFAULT_PAGES: CodingPanePage[] = [
   { id: "coding-side-chat", panel: "side-chat" },
   { id: "coding-editor", panel: "editor" },
-  { id: "coding-files", panel: "files" },
-  { id: "coding-changes", panel: "changes" },
+  { id: "coding-files-changes", panel: "files-changes" },
 ];
 
-const pagePanels: CodingPanePanel[] = ["editor", "files", "side-chat", "changes", "scratchpad", "preview"];
+const pagePanels: CodingPanePanel[] = ["editor", "files-changes", "side-chat", "scratchpad", "preview"];
 const MAX_PAGES = 24;
 
 const PRESET_PAGES: Record<CodingPanePreset, CodingPanePage[]> = {
-  single: [{ id: "coding-editor", panel: "editor" }, { id: "coding-files", panel: "files" }, { id: "coding-changes", panel: "changes" }],
-  "chat-files": [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-files", panel: "files" }],
+  single: [{ id: "coding-editor", panel: "editor" }, { id: "coding-files-changes", panel: "files-changes" }],
+  "chat-files": [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-files-changes", panel: "files-changes" }],
   "chat-terminal": [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-editor", panel: "editor" }],
-  review: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-changes", panel: "changes" }, { id: "coding-editor", panel: "editor" }],
-  research: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-scratchpad", panel: "scratchpad" }, { id: "coding-files", panel: "files" }],
+  review: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-files-changes", panel: "files-changes" }, { id: "coding-editor", panel: "editor" }],
+  research: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-scratchpad", panel: "scratchpad" }, { id: "coding-files-changes", panel: "files-changes" }],
 };
 
 const pagesKey = (projectId: string) => `skai.coding.panePages.${projectId}`;
@@ -28,18 +27,22 @@ const versionKey = (projectId: string) => `skai.coding.panePagesVersion.${projec
 const activePageKey = (projectId: string) => `skai.coding.activePanePage.${projectId}`;
 const splitOpenKey = (projectId: string) => `skai.coding.splitOpen.${projectId}`;
 
-function isCodingPanePage(value: unknown): value is CodingPanePage {
-  if (!value || typeof value !== "object") return false;
+function normalizeCodingPanePage(value: unknown): CodingPanePage | null {
+  if (!value || typeof value !== "object") return null;
   const page = value as Partial<CodingPanePage>;
-  return typeof page.id === "string"
-    && typeof page.panel === "string"
-    && pagePanels.includes(page.panel as CodingPanePanel)
-    && (page.filePath === undefined || typeof page.filePath === "string");
+  if (typeof page.id !== "string" || typeof page.panel !== "string" || (page.filePath !== undefined && typeof page.filePath !== "string")) return null;
+  const panel = page.panel as string;
+  if (panel === "files" || panel === "changes" || panel === "files-changes") return { id: "coding-files-changes", panel: "files-changes" };
+  return pagePanels.includes(page.panel as CodingPanePanel) ? { ...page, panel: page.panel as CodingPanePanel } as CodingPanePage : null;
+}
+
+function normalizeCodingPanePageId(id: string | null) {
+  return id === "coding-files" || id === "coding-changes" ? "coding-files-changes" : id;
 }
 
 export function codingPanePageTitle(page: CodingPanePage) {
   if (page.filePath) return page.filePath.split(/[\\/]/).pop() ?? page.filePath;
-  return page.panel === "side-chat" ? "Side chat" : page.panel === "editor" ? "Editor" : page.panel === "files" ? "Files" : page.panel === "changes" ? "Changes" : page.panel === "scratchpad" ? "Scratchpad" : "Preview";
+  return page.panel === "side-chat" ? "Side chat" : page.panel === "editor" ? "Editor" : page.panel === "files-changes" ? "Files & Changes" : page.panel === "scratchpad" ? "Scratchpad" : "Preview";
 }
 
 export function useCodingPaneWorkspace(projectId: string) {
@@ -54,7 +57,8 @@ export function useCodingPaneWorkspace(projectId: string) {
     try {
       const stored = JSON.parse(localStorage.getItem(pagesKey(projectId)) ?? "null");
       if (Array.isArray(stored)) {
-        const valid = stored.filter(isCodingPanePage);
+        const valid = stored.map(normalizeCodingPanePage).filter((page): page is CodingPanePage => page !== null)
+          .filter((page, index, items) => items.findIndex((entry) => entry.id === page.id) === index);
         if (valid.length) restoredPages = valid.slice(0, MAX_PAGES);
       }
       localStorage.setItem(versionKey(projectId), "6");
@@ -62,8 +66,9 @@ export function useCodingPaneWorkspace(projectId: string) {
 
     const storedActiveId = localStorage.getItem(activePageKey(projectId));
     setPages(restoredPages);
-    setActivePageId(storedActiveId && restoredPages.some((page) => page.id === storedActiveId)
-      ? storedActiveId
+    const normalizedActiveId = normalizeCodingPanePageId(storedActiveId);
+    setActivePageId(normalizedActiveId && restoredPages.some((page) => page.id === normalizedActiveId)
+      ? normalizedActiveId
       : restoredPages.find((page) => page.panel === "editor")?.id ?? restoredPages[0].id);
     setIsSplitOpen(localStorage.getItem(splitOpenKey(projectId)) === "true");
     setLoadedProjectId(projectId);

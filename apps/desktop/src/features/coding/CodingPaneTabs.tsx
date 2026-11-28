@@ -21,8 +21,7 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
   const actions = [
     { label: "Side chat", onSelect: () => onOpenPanel("side-chat") },
     { label: selectedFile ? `Editor · ${selectedFile.split(/[\\/]/).pop()}` : "Editor", onSelect: () => onOpenPanel("editor", selectedFile ?? undefined) },
-    { label: "Files", onSelect: () => onOpenPanel("files") },
-    { label: "Changes", onSelect: () => onOpenPanel("changes") },
+    { label: "Files & Changes", onSelect: () => onOpenPanel("files-changes") },
     { label: "Scratchpad", onSelect: () => onOpenPanel("scratchpad") },
     { label: "Preview", onSelect: () => onOpenPanel("preview") },
   ];
@@ -41,7 +40,7 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
   return <div className="workspace-tab-strip coding-pane-tab-strip is-split-open" role="group" aria-label="Right workspace pages">
     <div className="workspace-tab-list">{pages.map((page) => {
       const title = codingPanePageTitle(page);
-      const icon = page.panel === "side-chat" ? "chat" : page.panel === "changes" ? "activity" : page.panel === "files" ? "project" : page.panel === "scratchpad" ? "document" : page.panel === "preview" ? "image" : "code";
+      const icon = page.panel === "side-chat" ? "chat" : page.panel === "files-changes" ? "project" : page.panel === "scratchpad" ? "document" : page.panel === "preview" ? "image" : "code";
       return <div className={`workspace-tab${page.id === activePageId ? " is-active" : ""}`} key={page.id} draggable
         onDragStart={(event) => { event.dataTransfer.setData("text/skai-coding-pane", page.id); event.dataTransfer.effectAllowed = "move"; }}
         onDragOver={(event) => event.preventDefault()}
@@ -49,7 +48,7 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
         onAuxClick={(event) => { if (event.button === 1) onClose(page.id); }}>
         <button className="workspace-tab-select" type="button" aria-current={page.id === activePageId ? "page" : undefined} title={title} onClick={() => onSelect(page)}>
           <NavIcon name={icon} />
-          <span>{page.panel === "changes" && changeCount ? `Changes · ${changeCount}` : title}</span>
+          <span>{page.panel === "files-changes" && changeCount ? `Files & Changes · ${changeCount}` : title}</span>
         </button>
         <button className="workspace-tab-close" type="button" aria-label={`Close ${title}`} title="Close page" disabled={pages.length <= 1} onClick={() => onClose(page.id)}><NavIcon name="close" /></button>
       </div>;

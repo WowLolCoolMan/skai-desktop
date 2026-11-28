@@ -469,7 +469,7 @@ html[data-pet-window="true"], body[data-pet-window="true"], body[data-pet-window
 .coding-project-scratchpad { overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
 .coding-project-scratchpad summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 35px; padding: 7px 9px; color: var(--skai-color-text); cursor: pointer; list-style: none; }
 .coding-project-scratchpad summary::-webkit-details-marker { display: none; }
-.coding-project-scratchpad summary::before { content: "＋"; color: var(--skai-color-accent-text); font-size: 14px; }
+.coding-project-scratchpad summary::before { content: "＋"; color: var(--skai-color-accent-text); font-size: var(--skai-text-lg); }
 .coding-project-scratchpad[open] summary::before { content: "−"; }
 .coding-project-scratchpad summary > span:first-of-type { display: grid; min-width: 0; gap: 2px; }
 .coding-project-scratchpad summary strong { font-size: var(--skai-text-xs); }
@@ -1443,7 +1443,7 @@ body:has(.coding-snapshot-notice) .coding-terminal-inspector { pointer-events: n
 .global-rail-extras-panel .global-rail-extra { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 58px; padding: 8px 9px; border: 1px solid transparent; border-radius: var(--skai-radius-xl); color: var(--skai-color-text); text-align: left; transition: background 140ms ease, border-color 140ms ease, transform 140ms ease; }
 .global-rail-extra-row { display: flex; align-items: stretch; gap: 4px; min-width: 0; }
 .global-rail-extra-row > .global-rail-extra { flex: 1; min-width: 0; }
-.global-rail-pin-toggle { align-self: center; flex: 0 0 28px; width: 28px; height: 28px; border: 1px solid transparent; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: transparent; font-size: 14px; opacity: .55; }
+.global-rail-pin-toggle { align-self: center; flex: 0 0 28px; width: 28px; height: 28px; border: 1px solid transparent; border-radius: var(--skai-radius-md); color: var(--skai-color-text-muted); background: transparent; font-size: var(--skai-text-lg); opacity: .55; }
 .global-rail-pin-toggle:hover, .global-rail-pin-toggle:focus-visible, .global-rail-pin-toggle.is-pinned { border-color: var(--skai-color-border); color: var(--skai-color-accent-text); background: var(--skai-color-surface-soft); opacity: 1; }
 .global-rail-extras-panel .global-rail-extra:hover, .global-rail-extras-panel .global-rail-extra:focus-visible { border-color: var(--skai-color-border); background: var(--skai-color-surface-soft); transform: translateX(2px); }
 .global-rail-extra-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid color-mix(in srgb, var(--skai-color-accent) 26%, var(--skai-color-border)); border-radius: var(--skai-radius-lg); color: var(--skai-color-accent-text); background: color-mix(in srgb, var(--skai-color-accent) 10%, var(--skai-color-surface)); }
@@ -3510,7 +3510,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-content-marketplace .plugins-browser { gap: 18px; }
 .app-content-marketplace .plugins-category { margin-bottom: 24px; }
 .app-content-marketplace .plugins-category > h3 { min-height: 24px; margin-bottom: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.app-content-marketplace .plugins-category-count { display: inline-grid; min-width: 20px; height: 20px; place-items: center; margin-left: 3px; padding-inline: 5px; border: 1px solid var(--skai-color-border); border-radius: 999px; color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-2xs); letter-spacing: 0; }
+.app-content-marketplace .plugins-category-count { display: inline-grid; min-width: 20px; height: 20px; place-items: center; margin-left: 3px; padding-inline: 5px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-2xs); letter-spacing: 0; }
 .app-content-marketplace .plugins-category > h3 .nav-icon { margin-left: auto; opacity: .55; }
 .app-content-marketplace .plugins-category-grid { gap: 8px; }
 .app-content-marketplace .plugins-catalog-item { min-height: 104px; padding: 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface); transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease; }
@@ -4118,8 +4118,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   overflow: hidden;
   padding: 12px;
 }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser:not(.is-changes-panel) > .git-change-summary,
-.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser:not(.is-changes-panel) > .git-review-actions,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser:not(.is-files-changes-panel.is-changes-view) > .git-change-summary,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser:not(.is-files-changes-panel.is-changes-view) > .git-review-actions,
 .app-content-coding .coding-page-active .coding-session-grid.is-chat > .coding-project-browser > .file-summary { display: none; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .project-file-layout {
   grid-template-columns: minmax(125px, 30%) minmax(0, 1fr);
@@ -4526,15 +4526,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 /* Keep the coding thread anchored while the right workspace pane changes. */
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-side-chat-panel,
-.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-changes-panel { grid-template-rows: auto minmax(0, 1fr) auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel { grid-template-rows: auto minmax(0, 1fr) auto; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-side-chat-panel .project-file-layout,
-.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-changes-panel .project-file-layout { display: none; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel .project-file-layout { display: none; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-side-chat-panel .git-change-summary { display: none; }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-changes-panel > .git-change-summary { display: grid; min-height: 0; max-height: none; overflow: auto; }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-changes-panel > .git-change-summary > .git-change-list { min-height: 46px; }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .project-file-explorer { display: grid; }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .project-file-layout { grid-template-columns: minmax(180px, .34fr) minmax(0, 1fr); }
-.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .file-editor-panel { display: flex; flex-direction: column; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel.is-changes-view > .git-change-summary { display: grid; min-height: 0; max-height: none; overflow: auto; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel.is-changes-view > .git-change-summary > .git-change-list { min-height: 46px; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel.is-files-view > .project-file-explorer { display: flex; min-height: 0; max-height: none; flex: 1 1 auto; flex-direction: column; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel.is-files-view > .project-file-explorer.is-standalone-files-page { padding: 0; border: 0; background: transparent; }
 .app-content-coding .coding-page-active .coding-project-browser.is-side-chat-panel .coding-side-chat { display: grid; min-height: 0; height: 100%; align-self: stretch; grid-row: 2 / -1; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; }
 .coding-side-chat-intro { padding: 2px 2px 8px; border-bottom: 1px solid var(--skai-color-border); }
 .coding-side-chat-intro > span { color: var(--skai-color-text); font-size: var(--skai-text-sm); font-weight: 600; }
@@ -4561,8 +4560,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .coding-side-chat-composer > div > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
 .coding-side-chat-composer [role="alert"] { margin: 0; color: var(--skai-color-danger); font-size: var(--skai-text-xs); }
 @media (max-width: 900px) {
-  .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .project-file-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(130px, .4fr) minmax(250px, 1fr); }
-  .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-panel .project-file-explorer { min-height: 130px; }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel.is-files-view .project-file-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(130px, .4fr) minmax(250px, 1fr); }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-files-changes-panel.is-files-view .project-file-explorer { min-height: 130px; }
 }
 
 /* Keep project files in a hideable right rail beside Monaco, with changed files first. */
@@ -4690,7 +4689,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .coding-pane-tab-strip .overflow-menu-trigger .nav-icon { width: 15px; height: 15px; }
 .coding-split-launcher .overflow-menu-trigger { display: inline-flex; width: auto; min-width: 96px; height: 30px; justify-content: center; padding-inline: 9px; white-space: nowrap; }
 .coding-project-browser.is-editor-panel .project-file-layout,
-.coding-project-browser.is-files-panel .project-file-layout { min-width: 0; }
+.coding-project-browser.is-files-changes-panel .project-file-layout { min-width: 0; }
 .app-shell:has(.app-sidebar.is-coding-agent) > .app-main { min-width: 0; }
 @media (max-width: 640px) {
   .app-shell:has(.app-sidebar.is-coding-agent) { grid-template-columns: 52px minmax(0, 1fr); }
@@ -4706,8 +4705,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .app-shell:has(.app-sidebar.is-coding-agent) .coding-project-browser.is-editor-panel .project-file-layout { grid-template-rows: minmax(230px, 1fr) minmax(190px, .75fr); }
   .app-shell:has(.app-sidebar.is-coding-agent) .coding-project-browser.is-editor-panel .project-file-explorer { min-height: 190px; }
 }
-.coding-project-browser.is-files-panel > .project-file-explorer.is-standalone-files-page { min-height: 0; max-height: none; flex: 1 1 auto; }
-.coding-project-browser.is-files-panel > .project-file-explorer.is-standalone-files-page { padding: 0; border: 0; background: transparent; }
+.coding-project-browser.is-files-changes-panel > .project-file-explorer.is-standalone-files-page { min-height: 0; max-height: none; flex: 1 1 auto; }
+.coding-project-browser.is-files-changes-panel > .project-file-explorer.is-standalone-files-page { padding: 0; border: 0; background: transparent; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat:not(.is-split-open) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "conversation"; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat:not(.is-split-open) > .coding-project-browser { display: none; }
 .app-content-coding .coding-page-active .coding-session-grid.is-chat:not(.is-split-open) > .project-thread-panel { grid-area: conversation; }
@@ -5297,7 +5296,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 .coding-local-preview .skai-browser-viewport,
 .coding-local-preview .skai-browser-guest { min-height: 100px; }
-.message-content-region.is-collapsed { max-height: min(440px, 52vh); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 88%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0%, #000 88%, transparent 100%); }
+.message-content-region.is-collapsed { max-height: min(440px, 52vh); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--skai-color-mask-solid) 0%, var(--skai-color-mask-solid) 88%, transparent 100%); mask-image: linear-gradient(to bottom, var(--skai-color-mask-solid) 0%, var(--skai-color-mask-solid) 88%, transparent 100%); }
 .message-content-toggle { min-height: 28px; margin-top: 6px; padding-inline: 8px; font-size: var(--skai-text-xs); }
 .workspace-tab { position: relative; }
 .workspace-tab-select { width: 100%; padding-right: 30px; }
