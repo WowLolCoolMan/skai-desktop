@@ -482,6 +482,19 @@ async function main() {
         await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
         const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
         if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
+        // Workspace tabs belong to active Chat/Coding workspaces only. Non-chat
+        // destinations should keep the Codex-style shell focused on the page,
+        // without leaving a stale current-thread tab above it.
+        if (!['chat', 'coding'].includes(renderedRoute)) {
+          const tabVisibility = await cdp.evaluate(`(() => {
+            const strip = document.querySelector('.workspace-tabs-hotkeys');
+            if (!strip) return { present: false, visible: false, tabs: 0 };
+            const rect = strip.getBoundingClientRect();
+            const style = getComputedStyle(strip);
+            return { present: true, visible: style.display !== 'none' && rect.width > 0 && rect.height > 0, tabs: strip.querySelectorAll('.workspace-tab').length };
+          })()`);
+          if (tabVisibility.visible || tabVisibility.tabs > 0) throw new Error(`Non-chat route #/${route} retained a workspace thread tab: ${JSON.stringify(tabVisibility)}`);
+        }
         if (route === "onboarding" && exerciseOnboarding && width === 1440 && height === 900) {
           const beforeCounts = await cdp.evaluateWith(async function () {
             const request = (method, params = {}) => window.skaiAgent.request(method, params);
