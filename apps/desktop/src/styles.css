@@ -4493,6 +4493,38 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .chat-page .composer-card .composer-voice-mode-button.is-active { background: var(--skai-color-danger); color: var(--skai-color-on-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--skai-color-danger) 24%, transparent); }
 .chat-page .composer-card .composer-send-button:disabled { opacity: .42; cursor: not-allowed; }
 .chat-page .composer-card .composer-send-button .nav-icon { width: 17px; height: 17px; }
+/* Coding side chat deliberately reuses the ChatComposer state machine.  Keep
+   its compact task variant visually identical to the main composer even
+   though it lives outside .chat-page. */
+.composer-task-card { display: grid; gap: 8px; width: 100%; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-2xl); background: var(--skai-color-surface-raised); box-shadow: 0 8px 24px color-mix(in srgb, var(--skai-color-shadow) 16%, transparent); }
+.composer-task-card > textarea { width: 100%; min-height: 76px; max-height: 180px; padding: 9px 10px; border: 0; outline: 0; color: var(--skai-color-text); background: transparent; font: inherit; font-size: var(--skai-text-sm); line-height: 1.45; resize: vertical; }
+.composer-task-card > textarea::placeholder { color: color-mix(in srgb, var(--skai-color-text-muted) 82%, white 18%); }
+.composer-task-card > textarea:focus-visible { outline: 2px solid color-mix(in srgb, var(--skai-color-accent) 58%, transparent); outline-offset: -2px; border-radius: var(--skai-radius-md); }
+.composer-task-card .composer-task-status { margin: 0 10px; color: var(--skai-color-danger-text, var(--skai-color-danger)); font-size: var(--skai-text-xs); line-height: 1.35; }
+.composer-task-card .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; margin: 0; padding: 7px 8px 0; border-top: 1px solid color-mix(in srgb, var(--skai-color-border) 55%, transparent); }
+.composer-task-card .composer-action-left,
+.composer-task-card .composer-action-right { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.composer-task-card .composer-action-left { flex: 1 1 auto; justify-content: flex-start; }
+.composer-task-card .composer-action-right { flex: 0 1 auto; justify-content: flex-end; }
+.composer-task-card .composer-access-static { display: inline-flex; min-height: 28px; align-items: center; padding: 0 8px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: var(--skai-color-surface-soft); font-size: var(--skai-text-xs); white-space: nowrap; }
+.composer-task-card .composer-tool-button { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; padding: 0; border: 0; border-radius: var(--skai-radius-pill); color: var(--skai-color-text-muted); background: transparent; cursor: pointer; }
+.composer-task-card .composer-tool-button:hover:not(:disabled),
+.composer-task-card .composer-tool-button.is-active { color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
+.composer-task-card .composer-stop-button { color: var(--skai-color-danger); }
+.composer-task-card .composer-stop-button:hover:not(:disabled) { color: var(--skai-color-on-danger); background: var(--skai-color-danger); }
+.composer-task-card .composer-tool-button:disabled { opacity: .45; cursor: not-allowed; }
+.composer-task-card .composer-tool-button .nav-icon { width: 18px; height: 18px; }
+.composer-task-card .composer-send-button { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; padding: 0; border: 0; border-radius: var(--skai-radius-pill); color: var(--skai-color-on-accent); background: var(--skai-color-accent); font-size: var(--skai-text-4xl); line-height: 1; cursor: pointer; }
+.composer-task-card .composer-send-button:hover:not(:disabled) { background: var(--skai-color-accent-strong); }
+.composer-task-card .composer-send-button:disabled { opacity: .42; cursor: not-allowed; }
+.composer-task-card .composer-send-button .nav-icon { width: 17px; height: 17px; }
+.composer-task-card .composer-voice-mode-button.is-active { background: var(--skai-color-danger); color: var(--skai-color-on-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--skai-color-danger) 24%, transparent); }
+@media (max-width: 640px) {
+  .composer-task-card .composer-actions { align-items: flex-start; flex-direction: column; }
+  .composer-task-card .composer-action-left,
+  .composer-task-card .composer-action-right { width: 100%; }
+  .composer-task-card .composer-action-right { justify-content: flex-end; }
+}
 @media (max-width: 1100px) {
   .chat-page .composer-card .composer-action-right .model-picker { min-width: 0; flex: 0 1 180px; }
   .chat-page .composer-card .composer-action-right .model-picker-trigger { min-width: 0; }

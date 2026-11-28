@@ -84,6 +84,8 @@ type ChatComposerProps = {
   target?: ComposerTarget;
   onTargetChange?: (target: ComposerTarget) => void;
   contextItems?: ComposerContextItem[];
+  taskMode?: boolean;
+  taskStatus?: string;
 };
 
 type PlannedComputerAction =
@@ -121,7 +123,7 @@ function parsePlannedComputerAction(value: Record<string, unknown>): PlannedComp
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onStop, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response", target = "answer", onTargetChange, contextItems = [] }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onStop, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response", target = "answer", onTargetChange, contextItems = [], taskMode = false, taskStatus = "" }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
@@ -613,6 +615,23 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
+  if (taskMode) {
+    const hasTaskDraft = Boolean(draft.trim());
+    const submitTask = () => { if (!hasTaskDraft || busy) return; onSubmit([]); };
+    return <section className={`composer-card composer-task-card${handsFreeActive ? " is-voice-active" : ""}`} aria-busy={busy}>
+      <textarea ref={draftTextareaRef} value={draft} disabled={busy} onChange={(event) => onDraftChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitTask(); } }} placeholder={busy ? "Side task is starting…" : placeholder} aria-label={placeholder.replace(/…$/, "")} rows={3} />
+      {taskStatus && <p className="composer-task-status" role="status">{taskStatus}</p>}
+      <div className="composer-actions">
+        <div className="composer-action-left"><span className="composer-mode-chip"><span className="composer-mode-chip-dot" aria-hidden="true" />Side chat</span><span className="composer-access-static">Project access</span></div>
+        <div className="composer-action-right">
+          {busy && <button className="composer-tool-button composer-stop-button" type="button" onClick={() => void onStop()} aria-label="Stop side task" title="Stop side task"><NavIcon name="stop" /><span className="composer-toolbar-label">Stop</span></button>}
+          <button className={`composer-tool-button composer-microphone-button${voiceListening ? " is-active" : ""}`} type="button" onClick={toggleVoiceInput} disabled={busy || handsFreeActive} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop dictation" : "Dictate a side-task prompt"} title={voiceListening ? "Stop dictation" : "Dictate a side-task prompt"}><NavIcon name={voiceListening ? "stop" : "microphone"} /><span className="composer-toolbar-label">{voiceListening ? "Stop" : "Dictate"}</span></button>
+          {!hasTaskDraft ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={busy || voiceListening} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-label={handsFreeActive ? "End side-chat voice mode" : "Start side-chat voice mode"} title={handsFreeActive ? "End side-chat voice mode" : "Start side-chat voice mode"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /><span className="composer-toolbar-label">{handsFreeActive ? "End voice" : "Voice"}</span></button> : <button className="composer-send-button" type="button" disabled={busy} onClick={submitTask} aria-label="Send side task" title="Send side task"><span aria-hidden="true">↑</span></button>}
+        </div>
+      </div>
+    </section>;
+  }
+
   return <section className={`composer-card${dragActive ? " is-drag-active" : ""}${workflowPreferences.toolbarLayout === "compact" ? " is-compact-toolbar" : ""}`} aria-busy={rewriteBusy || attachmentProcessingCount > 0} data-send-behavior={workflowPreferences.sendBehavior} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
     {commandQuery !== null ? <ComposerCommandMenu commands={commandMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectComposerCommand} /> : contextQuery !== null && <ComposerCommandMenu commands={contextMatches} activeIndex={commandIndex} onActiveIndexChange={setCommandIndex} onSelect={selectContextCommand} />}
@@ -774,4 +793,60 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       </div>
     </ModalDialog>
   </section>;
+}
+
+/**
+ * The project side-chat uses the same composer state machine and voice controls
+ * as the main chat surface, but sends a bounded instruction to a subagent
+ * instead of creating a normal conversation turn.
+ */
+export function TaskChatComposer({ draft, busy, onDraftChange, onSubmit, onStop, placeholder = "Ask the subagent to work on this project…", status = "Runs as a local project task" }: {
+  draft: string;
+  busy: boolean;
+  onDraftChange: (draft: string) => void;
+  onSubmit: (draftOverride?: string) => void;
+  onStop?: () => Promise<boolean>;
+  placeholder?: string;
+  status?: string;
+}) {
+  const appendTranscript = (transcript: string) => {
+    const next = `${draft.trimEnd()}${draft.trim() ? " " : ""}${transcript}`.trim();
+    onDraftChange(next);
+    // Hands-free voice submits the completed turn just like the main chat
+    // composer. Passing the resolved draft avoids racing the controlled state
+    // update when a transcript arrives from the local recognizer.
+    if (next) onSubmit(next);
+    return true;
+  };
+  return <ChatComposer
+    taskMode
+    taskStatus={status}
+    draft={draft}
+    busy={busy}
+    documentsOnly={false}
+    attachments={[]}
+    queuedMessages={[]}
+    onDraftChange={onDraftChange}
+    onSubmit={() => onSubmit()}
+    onStop={onStop ?? (async () => false)}
+    onQueueRemove={() => undefined}
+    onUpdateQueued={async () => false}
+    onMoveQueued={async () => false}
+    onAttach={() => undefined}
+    onFilesDropped={() => undefined}
+    onRemoveAttachment={() => undefined}
+    onNavigate={() => undefined}
+    onToggleDocumentsOnly={() => undefined}
+    onVoiceTranscript={appendTranscript}
+    onAudioTranscript={() => undefined}
+    onSetAttachments={() => undefined}
+    provider="Local task"
+    endpoint=""
+    model=""
+    models={[]}
+    placeholder={placeholder}
+    modeLabel="Side chat"
+    modeDescription="Delegated project task"
+    accessLabel="Project access"
+  />;
 }

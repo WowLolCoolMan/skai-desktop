@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useMemo, useState } from "react";
 import type { DesktopTask } from "../../../shared/contracts";
 import { Button } from "../../components/ui/Primitives";
+import { TaskChatComposer } from "../chat/ChatComposer";
 
 const SIDE_CHAT_PREFIX = "Side chat · ";
 
@@ -26,9 +27,8 @@ export function CodingSideChat({ projectId, conversationId, tasks, busy, onStart
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .slice(0, 8), [conversationId, projectId, tasks]);
 
-  const submit = async (event?: FormEvent) => {
-    event?.preventDefault();
-    const instruction = draft.trim();
+  const submit = async (draftOverride?: string) => {
+    const instruction = (draftOverride ?? draft).trim();
     if (!instruction || isBusy) return;
     setError("");
     setSubmitting(true);
@@ -41,9 +41,7 @@ export function CodingSideChat({ projectId, conversationId, tasks, busy, onStart
     }
   };
 
-  const onDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); }
-  };
+  const activeSideTask = sideTasks.find((task) => ["queued", "running", "verifying"].includes(task.status));
 
   return <section className="coding-side-chat" aria-label="Side chat subagent">
     <div className="coding-side-chat-intro"><span>Side chat · subagent</span><p>Delegate a focused project task. The main thread stays open while the subagent works.</p></div>
@@ -57,10 +55,6 @@ export function CodingSideChat({ projectId, conversationId, tasks, busy, onStart
         </div>
       </article>)}
     </div>
-    <form className="coding-side-chat-composer" onSubmit={(event) => void submit(event)}>
-      <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onDraftKeyDown} rows={3} maxLength={6000} placeholder="Ask the subagent to work on this project…" aria-label="Message the Coding side chat" />
-      {error && <p role="alert">{error}</p>}
-      <div><span>Runs as a local project task</span><Button variant="primary" type="submit" disabled={isBusy || !draft.trim()}>{isBusy ? "Starting…" : "Send task"}</Button></div>
-    </form>
+    <TaskChatComposer draft={draft} busy={isBusy} onDraftChange={(value) => setDraft(value.slice(0, 6000))} onSubmit={(value) => void submit(value)} onStop={async () => { if (!activeSideTask) return false; onCancel(activeSideTask.id); return true; }} status={error || (isBusy ? "Side task is starting…" : "Runs as a local project task")} />
   </section>;
 }
