@@ -1,0 +1,16 @@
+body .compare-page-header { grid-template-columns:minmax(125px,.8fr) minmax(150px,.8fr) minmax(320px,2.6fr) minmax(190px,auto) !important; }
+.compare-mode-select { display:flex; align-items:center; gap:8px; justify-self:end; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); white-space:nowrap; }
+.compare-mode-select select { max-width:230px; min-width:0; height:36px; padding:0 10px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-md); color:var(--skai-color-text); background:var(--skai-color-surface-soft); }
+.compare-weight-strip { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:8px 20px; border-bottom:1px solid var(--skai-color-border); color:var(--skai-color-text-muted); background:color-mix(in srgb,var(--skai-color-surface) 94%,transparent); font-size:var(--skai-text-xs); }
+.compare-weight-strip > span { color:var(--skai-color-text); font-weight:600; }
+.compare-weight-strip label { display:inline-flex; align-items:center; gap:4px; }
+.compare-weight-strip input { width:58px; padding:5px 6px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-sm); color:var(--skai-color-text); background:var(--skai-color-surface-soft); }
+.compare-weight-strip strong { margin-left:auto; color:var(--skai-color-accent-text); }
+.compare-rating-card { display:grid; gap:8px; max-width:460px; margin:28px auto 0; padding:12px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-md); background:var(--skai-color-surface-soft); }
+.compare-rating-card > div { display:grid; gap:3px; }
+.compare-rating-card span,.compare-rating-card small { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
+.compare-rating-card label { display:flex; align-items:center; gap:9px; }
+.compare-rating-card input { flex:1 1 auto; accent-color:var(--skai-color-accent); }
+.compare-rating-card label strong { min-width:30px; text-align:right; }
+@media (max-width:1120px) { body .compare-page-header { grid-template-columns:auto minmax(0,1fr) !important; }.compare-mode-select { grid-column:1 / -1; justify-self:start; } }
+@media (max-width:560px) { .compare-mode-select { grid-column:1 / -1; width:100%; }.compare-mode-select select { flex:1 1 auto; max-width:none; }.compare-weight-strip { padding-inline:12px; }.compare-weight-strip strong { width:100%; margin-left:0; }.compare-rating-card { margin-top:18px; } }
