@@ -8,6 +8,7 @@ type CodingPaneTabsProps = {
   activePageId: string;
   selectedFile: string | null;
   changeCount: number;
+  contextLabel: string;
   isSplitOpen: boolean;
   onSelect: (page: CodingPanePage) => void;
   onClose: (pageId: string) => void;
@@ -17,7 +18,7 @@ type CodingPaneTabsProps = {
   onCloseSplit: () => void;
 };
 
-export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount, isSplitOpen, onSelect, onClose, onReorder, onOpenPanel, onApplyPreset, onCloseSplit }: CodingPaneTabsProps) {
+export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount, contextLabel, isSplitOpen, onSelect, onClose, onReorder, onOpenPanel, onApplyPreset, onCloseSplit }: CodingPaneTabsProps) {
   const actions = [
     { label: "Side chat", onSelect: () => onOpenPanel("side-chat") },
     { label: selectedFile ? `Editor · ${selectedFile.split(/[\\/]/).pop()}` : "Editor", onSelect: () => onOpenPanel("editor", selectedFile ?? undefined) },
@@ -37,7 +38,7 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
     return <div className="coding-split-launcher"><OverflowMenu label="Add to split" items={actions} /><OverflowMenu label="Workspace layout" items={presets} /></div>;
   }
 
-  return <div className="workspace-tab-strip coding-pane-tab-strip is-split-open" role="group" aria-label="Right workspace pages">
+  return <div className="workspace-tab-strip coding-pane-tab-strip is-split-open" role="group" aria-label={contextLabel}>
     <div className="workspace-tab-list">{pages.map((page) => {
       const title = codingPanePageTitle(page);
       const icon = page.panel === "side-chat" ? "chat" : page.panel === "files-changes" ? "project" : page.panel === "scratchpad" ? "document" : page.panel === "preview" ? "image" : "code";

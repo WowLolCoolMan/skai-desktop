@@ -45,7 +45,8 @@ export function codingPanePageTitle(page: CodingPanePage) {
   return page.panel === "side-chat" ? "Side chat" : page.panel === "editor" ? "Editor" : page.panel === "files-changes" ? "Files & Changes" : page.panel === "scratchpad" ? "Scratchpad" : "Preview";
 }
 
-export function useCodingPaneWorkspace(projectId: string) {
+export function useCodingPaneWorkspace(projectId: string, legacyProjectId = projectId) {
+  const paneScopeId = projectId;
   const [pages, setPages] = useState<CodingPanePage[]>(DEFAULT_PAGES);
   const [activePageId, setActivePageId] = useState("coding-editor");
   const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
@@ -55,39 +56,43 @@ export function useCodingPaneWorkspace(projectId: string) {
   useEffect(() => {
     let restoredPages = DEFAULT_PAGES;
     try {
-      const stored = JSON.parse(localStorage.getItem(pagesKey(projectId)) ?? "null");
+      const scopedValue = localStorage.getItem(pagesKey(paneScopeId));
+      const legacyValue = paneScopeId !== legacyProjectId ? localStorage.getItem(pagesKey(legacyProjectId)) : null;
+      const stored = JSON.parse(scopedValue ?? legacyValue ?? "null");
       if (Array.isArray(stored)) {
         const valid = stored.map(normalizeCodingPanePage).filter((page): page is CodingPanePage => page !== null)
           .filter((page, index, items) => items.findIndex((entry) => entry.id === page.id) === index);
         if (valid.length) restoredPages = valid.slice(0, MAX_PAGES);
       }
-      localStorage.setItem(versionKey(projectId), "6");
+      localStorage.setItem(versionKey(paneScopeId), "7");
     } catch { /* use the standard project pages */ }
 
-    const storedActiveId = localStorage.getItem(activePageKey(projectId));
+    const storedActiveId = localStorage.getItem(activePageKey(paneScopeId))
+      ?? (paneScopeId !== legacyProjectId ? localStorage.getItem(activePageKey(legacyProjectId)) : null);
     setPages(restoredPages);
     const normalizedActiveId = normalizeCodingPanePageId(storedActiveId);
     setActivePageId(normalizedActiveId && restoredPages.some((page) => page.id === normalizedActiveId)
       ? normalizedActiveId
       : restoredPages.find((page) => page.panel === "editor")?.id ?? restoredPages[0].id);
-    setIsSplitOpen(localStorage.getItem(splitOpenKey(projectId)) === "true");
-    setLoadedProjectId(projectId);
-    setSplitLoadedProjectId(projectId);
-  }, [projectId]);
+    setIsSplitOpen((localStorage.getItem(splitOpenKey(paneScopeId))
+      ?? (paneScopeId !== legacyProjectId ? localStorage.getItem(splitOpenKey(legacyProjectId)) : null)) === "true");
+    setLoadedProjectId(paneScopeId);
+    setSplitLoadedProjectId(paneScopeId);
+  }, [legacyProjectId, paneScopeId]);
 
   useEffect(() => {
-    if (loadedProjectId !== projectId) return;
+    if (loadedProjectId !== paneScopeId) return;
     try {
-      localStorage.setItem(pagesKey(projectId), JSON.stringify(pages));
-      localStorage.setItem(activePageKey(projectId), activePageId);
+      localStorage.setItem(pagesKey(paneScopeId), JSON.stringify(pages));
+      localStorage.setItem(activePageKey(paneScopeId), activePageId);
     } catch { /* keep the in-memory workspace usable when storage is unavailable */ }
-  }, [activePageId, loadedProjectId, pages, projectId]);
+  }, [activePageId, loadedProjectId, pages, paneScopeId]);
 
   useEffect(() => {
-    if (splitLoadedProjectId !== projectId) return;
-    try { localStorage.setItem(splitOpenKey(projectId), String(isSplitOpen)); }
+    if (splitLoadedProjectId !== paneScopeId) return;
+    try { localStorage.setItem(splitOpenKey(paneScopeId), String(isSplitOpen)); }
     catch { /* split layout remains available for the current session */ }
-  }, [isSplitOpen, projectId, splitLoadedProjectId]);
+  }, [isSplitOpen, paneScopeId, splitLoadedProjectId]);
 
   const activePage = pages.find((page) => page.id === activePageId) ?? pages[0] ?? null;
 

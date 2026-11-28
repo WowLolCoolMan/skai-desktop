@@ -8,11 +8,12 @@ function statusLabel(status: string) {
   return status.replaceAll("_", " ");
 }
 
-export function CodingSideChat({ projectId, tasks, busy, onStart, onCancel, onOpenFile }: {
+export function CodingSideChat({ projectId, conversationId, tasks, busy, onStart, onCancel, onOpenFile }: {
   projectId: string;
+  conversationId?: string | null;
   tasks: DesktopTask[];
   busy: boolean;
-  onStart: (projectId: string, instruction: string) => Promise<string | null>;
+  onStart: (projectId: string, instruction: string, conversationId?: string | null) => Promise<string | null>;
   onCancel: (taskId: string) => void;
   onOpenFile: (path: string) => void;
 }) {
@@ -21,9 +22,9 @@ export function CodingSideChat({ projectId, tasks, busy, onStart, onCancel, onOp
   const [submitting, setSubmitting] = useState(false);
   const isBusy = busy || submitting;
   const sideTasks = useMemo(() => tasks
-    .filter((task) => task.projectId === projectId && task.title.startsWith(SIDE_CHAT_PREFIX))
+    .filter((task) => task.projectId === projectId && task.conversationId === (conversationId ?? null) && task.title.startsWith(SIDE_CHAT_PREFIX))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    .slice(0, 8), [projectId, tasks]);
+    .slice(0, 8), [conversationId, projectId, tasks]);
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -32,7 +33,7 @@ export function CodingSideChat({ projectId, tasks, busy, onStart, onCancel, onOp
     setError("");
     setSubmitting(true);
     try {
-      const taskId = await onStart(projectId, instruction);
+      const taskId = await onStart(projectId, instruction, conversationId ?? null);
       if (taskId) setDraft("");
       else setError("The side chat task could not start. Check the project and local model, then try again.");
     } finally {

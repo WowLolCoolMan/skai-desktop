@@ -282,7 +282,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       return false;
     }
   };
-  const startSubagentTask = async (projectId: string, instruction: string): Promise<string | null> => {
+  const startSubagentTask = async (projectId: string, instruction: string, conversationId: string | null = null): Promise<string | null> => {
     const project = coding.projects.find((item) => item.id === projectId);
     if (!project || !instruction.trim()) return null;
     setTaskBusy("planning");
@@ -297,7 +297,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
         instruction: project.instructions ? `${instruction.trim()}\n\nProject instructions:\n${project.instructions}` : instruction.trim(),
         environment: "local",
         projectId,
-        conversationId: null,
+        conversationId,
         responseMode: "coding",
         model: selectedModel?.model ?? model,
         modelProvider: selectedModel?.provider ?? provider,
