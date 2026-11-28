@@ -1173,24 +1173,27 @@ async function main() {
             if (!filesRestored) throw new Error("The file explorer could not be restored after hiding it.");
             await assertMainChat("Editor with Monaco and file tree");
             await capturePanel("monaco-with-files");
-            await selectPanel("Files");
-            const standaloneFilesReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-files-panel .is-standalone-files-page .coding-explorer-project-files'))`);
-            if (!standaloneFilesReady) throw new Error("Files did not open as its own right-pane page.");
-            await assertMainChat("Files");
-            await capturePanel("files");
-            await selectPanel("Changes");
-            const changesReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-changes-panel h3')?.textContent === 'Changes' && (document.querySelector('.coding-project-browser.is-changes-panel .git-change-summary') || document.querySelector('.coding-project-browser.is-changes-panel [role="alert"]') || document.querySelector('.coding-project-browser.is-changes-panel [role="status"]') || document.querySelector('.coding-project-browser.is-changes-panel .coding-change-empty')))`);
-            if (!changesReady) throw new Error("Changes panel did not show Git review status alongside the main chat.");
-            await capturePanel("changes");
-            const closeChanges = await cdp.evaluate(`Boolean(document.querySelector('.coding-secondary-tab-group .workspace-tab-close[aria-label="Close Changes"]'))`);
-            if (!closeChanges) throw new Error("The Changes page was missing its close control.");
-            await cdp.evaluate(`document.querySelector('.coding-secondary-tab-group .workspace-tab-close[aria-label="Close Changes"]')?.click()`);
-            const changesClosed = await cdp.evaluate(`![...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Changes'))`);
-            if (!changesClosed) throw new Error("Closing a right-side Changes page did not remove it from that tab group.");
+            await selectPanel("Files & Changes");
+            const filesChangesReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-files-changes-panel.is-files-view .is-standalone-files-page .coding-explorer-project-files'))`);
+            if (!filesChangesReady) throw new Error("Files & Changes did not open with its Files view selected.");
+            await assertMainChat("Files & Changes");
+            await capturePanel("files-changes-files");
+            const changesViewSelected = await cdp.evaluate(`(() => { const panel = document.querySelector('.coding-project-browser.is-files-changes-panel'); const button = [...(panel?.querySelectorAll('.coding-files-changes-switch button') ?? [])].find((item) => item.textContent?.trim().startsWith('Changes')); button?.click(); return Boolean(button); })()`);
+            if (!changesViewSelected) throw new Error("The unified Files & Changes pane did not expose its Changes view toggle.");
+            const changesReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const panel = document.querySelector('.coding-project-browser.is-files-changes-panel.is-changes-view'); if (panel && (panel.querySelector('.git-change-summary') || panel.querySelector('[role="alert"]') || panel.querySelector('[role="status"]') || panel.querySelector('.coding-change-empty'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!changesReady) throw new Error("Files & Changes did not show Git review status after selecting Changes.");
+            await capturePanel("files-changes-git");
+            const oneUnifiedPage = await cdp.evaluate(`(() => { const tabs = [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].map((button) => button.textContent?.trim() ?? ''); return tabs.filter((label) => label.startsWith('Files & Changes')).length === 1 && !tabs.some((label) => label === 'Files' || label === 'Changes'); })()`);
+            if (!oneUnifiedPage) throw new Error("Files and Changes should share one right-pane page tab.");
+            const closeFilesChanges = await cdp.evaluate(`Boolean(document.querySelector('.coding-secondary-tab-group .workspace-tab-close[aria-label="Close Files & Changes"]'))`);
+            if (!closeFilesChanges) throw new Error("The unified Files & Changes page was missing its close control.");
+            await cdp.evaluate(`document.querySelector('.coding-secondary-tab-group .workspace-tab-close[aria-label="Close Files & Changes"]')?.click()`);
+            const unifiedPageClosed = await cdp.evaluate(`![...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Files & Changes'))`);
+            if (!unifiedPageClosed) throw new Error("Closing Files & Changes did not remove its single right-pane tab.");
             await cdp.evaluate(`document.querySelector('.coding-pane-tab-strip button[aria-label="Add a page to the split view"]')?.click()`);
-            await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-item')].find((item) => item.textContent?.trim() === 'Changes')?.click(), 1)`);
-            const changesReopened = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Changes'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-            if (!changesReopened) throw new Error("The right-pane page menu did not reopen a closed Changes page.");
+            await cdp.evaluate(`([...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((item) => item.textContent?.trim() === 'Files & Changes')?.click(), 1)`);
+            const unifiedPageReopened = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim().startsWith('Files & Changes'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!unifiedPageReopened) throw new Error("The right-pane page menu did not reopen Files & Changes.");
             await selectPanel("Editor");
             await cdp.evaluate(`document.querySelector('.coding-pane-tab-strip button[aria-label="Add a page to the split view"]')?.click()`);
             const closeSplitChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const choice = [...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((item) => item.textContent.trim() === 'Close split view'); if (choice) { choice.click(); return true; } await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
@@ -1199,8 +1202,8 @@ async function main() {
             if (!splitClosed) throw new Error("Closing split view did not restore the full-width main chat.");
             await capturePanel("single-chat");
             await cdp.evaluate(`document.querySelector('.sidebar-project-new-thread')?.click(); true`);
-            const projectThreadCreated = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { const active = document.querySelector('.workspace-tab.is-active .workspace-tab-select')?.textContent?.trim(); const project = document.querySelector('.coding-project-heading strong')?.textContent?.trim(); if (project && (active === 'New coding thread' || active === project)) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-            if (!projectThreadCreated) throw new Error("The project New thread action did not open a new coding workspace tab.");
+            const projectThreadCreated = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { const tabs = [...document.querySelectorAll('.workspace-tabs-hotkeys > .workspace-tab-strip .workspace-tab')]; const active = document.querySelector('.workspace-tabs-hotkeys > .workspace-tab-strip .workspace-tab.is-active .workspace-tab-select')?.textContent?.trim(); const project = document.querySelector('.coding-project-heading strong')?.textContent?.trim(); const projectTabs = tabs.filter((tab) => tab.querySelector('.workspace-tab-select')?.textContent?.trim() === project); const duplicateProjectTab = tabs.some((tab) => tab.querySelector('.workspace-tab-select')?.textContent?.trim() === 'New coding thread'); if (project && active === project && projectTabs.length === 1 && !duplicateProjectTab) return { ok: true, project, count: projectTabs.length }; await new Promise((r) => setTimeout(r, 50)); } return { ok: false }; })()`);
+            if (!projectThreadCreated?.ok) throw new Error(`The project New thread action should reuse the single project workspace tab: ${JSON.stringify(projectThreadCreated)}`);
           }
           if (exerciseTaskProgress) {
             await taskProgressServerReady;
@@ -1774,6 +1777,8 @@ async function main() {
           console.log(`[chat-omnimodal] ${JSON.stringify({ menuItems: ["Files and folders", "Audio file", "Documents only", "Voice input", "Voice Mode"] })}`);
         }
         if (route === "usage" && process.env.UI_MATRIX_EXERCISE_SETTINGS_OVERLAY === "1" && width === 1440 && height === 900 && theme === "dark" && collapsed === "false") {
+          const routeShell = await cdp.evaluate(`(() => ({ usage: Boolean(document.querySelector('.usage-page')), tabs: Boolean(document.querySelector('.workspace-tabs-hotkeys')), threadTab: Boolean(document.querySelector('.workspace-tabs-hotkeys .workspace-tab')) }))()`);
+          if (!routeShell.usage || routeShell.tabs || routeShell.threadTab) throw new Error(`Usage should use the route shell without a current-thread tab: ${JSON.stringify(routeShell)}`);
           await clickInRenderer(cdp, '.global-rail button[aria-label="Settings"]');
           const settingsOverlayReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('.usage-page') && document.querySelector('.settings-overlay [role="dialog"]')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!settingsOverlayReady) throw new Error("Settings did not open as a modal over the Usage page.");
