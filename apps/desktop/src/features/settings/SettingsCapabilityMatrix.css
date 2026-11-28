@@ -1,0 +1,15 @@
+.settings-capability-matrix {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--skai-color-border);
+}
+
+.settings-capability-matrix .settings-subsection-heading {
+  margin: 0;
+}
+
+.settings-capability-matrix .settings-provider-list {
+  margin-top: 0;
+}
