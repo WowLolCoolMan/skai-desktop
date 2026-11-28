@@ -17,3 +17,22 @@
   padding: 4px 7px;
   font-size: var(--skai-text-2xs);
 }
+
+.voice-mode-retention {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--skai-color-text-muted);
+  font-size: var(--skai-text-2xs);
+}
+
+.voice-mode-retention select {
+  min-height: 28px;
+  padding: 3px 6px;
+  border: 1px solid var(--skai-color-border);
+  border-radius: var(--skai-radius-md);
+  color: var(--skai-color-text);
+  background: var(--skai-color-surface);
+  font: inherit;
+}
