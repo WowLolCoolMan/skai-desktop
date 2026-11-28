@@ -60,6 +60,7 @@ type ChatPageProps = {
   onFork: () => void;
   onForkFromMessage: (index: number) => void;
   onRetryMessage: (index: number, model?: string) => void;
+  onRestoreConversationMessages: (messages: Message[]) => Promise<boolean>;
   onEditMessage: (index: number, content: string) => Promise<boolean>;
   onTogglePinned: () => void;
   onArchive: () => void;
@@ -76,7 +77,17 @@ type ChatPageProps = {
   onOpenProject: (project: DesktopProject) => void;
 };
 
-export function ChatPage({ workspaceTabId, capacity, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onStop, onQueue, onRemoveQueued, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onTaskAction, onOpenFile, onExport, onPreviewImport, onApplyImport, onFork, onForkFromMessage, onRetryMessage, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onPreviewScheduledTask, onTransitionScheduledTask, workspaceMode = "conversation", projectId, worktreeAvailable = false, onNewWorkspaceTab, projects, onOpenProject }: ChatPageProps) {
+type ConversationCheckpoint = {
+  id: string;
+  label: string;
+  createdAtUtc: string;
+  messages: Message[];
+  attachmentCount: number;
+};
+
+const CHECKPOINT_STORAGE_PREFIX = "skai.conversation.checkpoints.v1:";
+
+export function ChatPage({ workspaceTabId, capacity, provider, model, responseMode, onResponseModeChange, endpoint, models, messages, busy, taskBusy, tasks, scheduledTasks, attachments, queuedMessages, conversationId, conversationTitle, pinned, archived, smartPromptRewritingEnabled, onRewritePrompt, onSend, onStop, onQueue, onRemoveQueued, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onSetAttachments, onModelChange, onStartTemporaryChat, onNavigate, onTaskAction, onOpenFile, onExport, onPreviewImport, onApplyImport, onFork, onForkFromMessage, onRetryMessage, onRestoreConversationMessages, onEditMessage, onTogglePinned, onArchive, onRenameConversation, onPlanTask, onScheduleTask, onPreviewScheduledTask, onTransitionScheduledTask, workspaceMode = "conversation", projectId, worktreeAvailable = false, onNewWorkspaceTab, projects, onOpenProject }: ChatPageProps) {
   const selectedModel = models.find((item) => item.model === model);
   const { draft, updateDraft, persistenceWarning: draftPersistenceWarning } = useChatDraft(workspaceTabId, conversationId, attachments, onSetAttachments);
   const [documentsOnly, setDocumentsOnly] = useState(false);
@@ -91,6 +102,12 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const [rewriteBusy, setRewriteBusy] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<{ original: string; candidate: string } | null>(null);
   const [rewriteToolIds, setRewriteToolIds] = useState<string[]>([]);
+  const [checkpoints, setCheckpoints] = useState<ConversationCheckpoint[]>([]);
+  const [checkpointOpen, setCheckpointOpen] = useState(false);
+  const [checkpointLabelDraft, setCheckpointLabelDraft] = useState("Before next change");
+  const [checkpointRestoreId, setCheckpointRestoreId] = useState<string | null>(null);
+  const [checkpointRestoreBusy, setCheckpointRestoreBusy] = useState(false);
+  const checkpointLabelRef = useRef<HTMLInputElement>(null);
   const [composerTarget, setComposerTarget] = useState<ComposerTarget>(() => {
     const stored = localStorage.getItem("skai.composer.target");
     return stored === "answer" || stored === "edit" || stored === "review" || stored === "research" || stored === "media"
@@ -102,6 +119,13 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const [showProjectTaskPlanner, setShowProjectTaskPlanner] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const threadTasks = tasks.filter((task) => task.conversationId === conversationId);
+  useEffect(() => {
+    if (!conversationId) { setCheckpoints([]); setCheckpointRestoreId(null); return; }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(`${CHECKPOINT_STORAGE_PREFIX}${conversationId}`) ?? "[]") as unknown;
+      setCheckpoints(Array.isArray(parsed) ? parsed.filter((item): item is ConversationCheckpoint => Boolean(item && typeof item === "object" && typeof (item as ConversationCheckpoint).id === "string" && typeof (item as ConversationCheckpoint).label === "string" && Array.isArray((item as ConversationCheckpoint).messages))).slice(0, 8) : []);
+    } catch { setCheckpoints([]); }
+  }, [conversationId]);
   useEffect(() => { if (!renameOpen) setRenameDraft(conversationTitle); }, [conversationTitle, renameOpen]);
   useEffect(() => { setDocumentsOnly(false); }, [conversationId]);
   useEffect(() => {
@@ -177,6 +201,43 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
     }
   };
 
+  const persistCheckpoints = (next: ConversationCheckpoint[]) => {
+    let bounded = next.slice(0, 8);
+    let serialized = JSON.stringify(bounded);
+    while (serialized.length > 900_000 && bounded.length > 1) {
+      bounded = bounded.slice(0, -1);
+      serialized = JSON.stringify(bounded);
+    }
+    setCheckpoints(bounded);
+    if (!conversationId) return;
+    try { localStorage.setItem(`${CHECKPOINT_STORAGE_PREFIX}${conversationId}`, serialized); } catch { /* Checkpoints remain visible for this session when storage is full. */ }
+  };
+  const createCheckpoint = () => {
+    if (!conversationId || messages.length === 0) return;
+    const snapshotMessages = messages.map((message) => ({ role: message.role, content: message.content, createdAtUtc: message.createdAtUtc }));
+    const checkpoint: ConversationCheckpoint = {
+      id: typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      label: checkpointLabelDraft.trim().slice(0, 120) || "Before next change",
+      createdAtUtc: new Date().toISOString(),
+      messages: snapshotMessages,
+      attachmentCount: messages.reduce((count, message) => count + (message.attachments?.length ?? 0), 0),
+    };
+    persistCheckpoints([checkpoint, ...checkpoints].slice(0, 8));
+    setCheckpointLabelDraft("Before next change");
+  };
+  const restoreCheckpoint = async (checkpoint: ConversationCheckpoint) => {
+    if (checkpointRestoreId !== checkpoint.id) { setCheckpointRestoreId(checkpoint.id); return; }
+    if (checkpointRestoreBusy || busy) return;
+    setCheckpointRestoreBusy(true);
+    const restored = await onRestoreConversationMessages(checkpoint.messages);
+    setCheckpointRestoreBusy(false);
+    if (restored) { setCheckpointRestoreId(null); setCheckpointOpen(false); }
+  };
+  const deleteCheckpoint = (id: string) => {
+    persistCheckpoints(checkpoints.filter((checkpoint) => checkpoint.id !== id));
+    if (checkpointRestoreId === id) setCheckpointRestoreId(null);
+  };
+
   const renameConversation = async () => {
     const title = renameDraft.trim();
     if (!title || !conversationId || renameBusy) return;
@@ -219,8 +280,9 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
         {isCodingAgent && workspaceMode !== "project" && <span className="coding-mode-badge">CODING AGENT</span>}
         {workspaceMode === "project" && <Button className="project-task-plan-trigger" variant={showProjectTaskPlanner ? "secondary" : "ghost"} type="button" aria-expanded={showProjectTaskPlanner} onClick={() => setShowProjectTaskPlanner((open) => !open)}>{showProjectTaskPlanner ? "Close planner" : "Plan task"}</Button>}
         {workspaceMode !== "project" && <Button variant={showConversationDetails ? "secondary" : "ghost"} type="button" aria-expanded={showConversationDetails} onClick={() => setShowConversationDetails((visible) => !visible)}>Details</Button>}
+        {conversationId && messages.length > 0 && <Button variant={checkpointOpen ? "secondary" : "ghost"} type="button" onClick={() => setCheckpointOpen(true)}>Checkpoint{checkpoints.length ? ` · ${checkpoints.length}` : ""}</Button>}
         <ChatCollaboration conversationId={conversationId} title={conversationTitle} messages={messages} onAddToDraft={(text) => updateDraft(`${draft.trimEnd()}${draft.trim() ? "\n\n" : ""}${text}`)} />
-        <OverflowMenu label="Chat options" items={[{ label: temporaryChat ? "End temporary chat" : "Make temporary chat", onSelect: () => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); } }, { label: "Rename chat…", disabled: temporaryChat || !conversationId, onSelect: () => setRenameOpen(true) }, { label: "Import conversations…", onSelect: () => void beginConversationImport() }, { label: "Export conversations", onSelect: onExport }, { label: showCodingWorkflowTools ? "Hide task tools" : "Show task tools", onSelect: () => setShowCodingWorkflowTools((value) => !value) }, { label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} />
+        <OverflowMenu label="Chat options" items={[{ label: temporaryChat ? "End temporary chat" : "Make temporary chat", onSelect: () => { if (!temporaryChat) onStartTemporaryChat(); setTemporaryChat((value) => !value); } }, { label: "Rename chat…", disabled: temporaryChat || !conversationId, onSelect: () => setRenameOpen(true) }, { label: "Save checkpoint…", disabled: temporaryChat || !conversationId || messages.length === 0, onSelect: () => setCheckpointOpen(true) }, { label: "Import conversations…", onSelect: () => void beginConversationImport() }, { label: "Export conversations", onSelect: onExport }, { label: showCodingWorkflowTools ? "Hide task tools" : "Show task tools", onSelect: () => setShowCodingWorkflowTools((value) => !value) }, { label: pinned ? "Unpin chat" : "Pin chat", disabled: temporaryChat || !conversationId, onSelect: onTogglePinned }, { label: "Fork chat", disabled: temporaryChat || !conversationId, onSelect: onFork }, { label: archived ? "Unarchive chat" : "Archive chat", disabled: temporaryChat || !conversationId, onSelect: onArchive }]} />
       </div>
     </div>
     <div className={`chat-layout${messages.length === 0 ? " is-start-screen" : ""}${showCodingWorkflowTools ? " has-chat-tools" : ""}${showConversationDetails ? " has-chat-details" : ""}${threadTasks.length ? " has-thread-activity" : ""}`}>
@@ -246,6 +308,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
       </aside>
     </div>
     {importSummary && <p className="chat-import-summary" role="status">{importSummary}</p>}
+    <ModalDialog open={checkpointOpen} onClose={() => { if (!checkpointRestoreBusy) { setCheckpointOpen(false); setCheckpointRestoreId(null); } }} titleId="conversation-checkpoints-title" className="ui-dialog conversation-checkpoints-dialog" initialFocusRef={checkpointLabelRef}><div className="dialog-heading"><div><p className="section-kicker">LOCAL RECOVERY</p><h3 id="conversation-checkpoints-title">Conversation checkpoints</h3><p>Save a named transcript before a major change. Checkpoints stay on this device and never call a model.</p></div><button type="button" disabled={checkpointRestoreBusy} onClick={() => { setCheckpointOpen(false); setCheckpointRestoreId(null); }} aria-label="Close checkpoints dialog">×</button></div><form className="conversation-checkpoint-form" onSubmit={(event) => { event.preventDefault(); createCheckpoint(); }}><label>Checkpoint name<input ref={checkpointLabelRef} value={checkpointLabelDraft} onChange={(event) => setCheckpointLabelDraft(event.target.value)} maxLength={120} autoComplete="off" /></label><Button variant="primary" type="submit" disabled={!conversationId || messages.length === 0}>Save current transcript</Button></form>{checkpoints.length === 0 ? <p className="conversation-checkpoints-empty">No checkpoints yet. Save one before retrying, editing, or changing direction.</p> : <div className="conversation-checkpoint-list" aria-label="Saved conversation checkpoints">{checkpoints.map((checkpoint) => <article className="conversation-checkpoint-card" key={checkpoint.id}><div><strong>{checkpoint.label}</strong><small>{new Date(checkpoint.createdAtUtc).toLocaleString()} · {checkpoint.messages.length} messages{checkpoint.attachmentCount ? ` · ${checkpoint.attachmentCount} attachment${checkpoint.attachmentCount === 1 ? "" : "s"} omitted from the snapshot` : ""}</small></div>{checkpointRestoreId === checkpoint.id ? <div className="conversation-checkpoint-actions"><Button variant="primary" type="button" disabled={checkpointRestoreBusy || busy} onClick={() => void restoreCheckpoint(checkpoint)}>{checkpointRestoreBusy ? "Restoring…" : "Confirm restore"}</Button><Button variant="ghost" type="button" disabled={checkpointRestoreBusy} onClick={() => setCheckpointRestoreId(null)}>Cancel</Button></div> : <div className="conversation-checkpoint-actions"><Button variant="secondary" type="button" disabled={checkpointRestoreBusy || busy} onClick={() => void restoreCheckpoint(checkpoint)}>Restore</Button><Button variant="ghost" type="button" disabled={checkpointRestoreBusy} onClick={() => deleteCheckpoint(checkpoint.id)}>Delete</Button></div>}</article>)}</div>}</ModalDialog>
     <ModalDialog open={renameOpen} onClose={() => setRenameOpen(false)} titleId="rename-conversation-title" initialFocusRef={renameInputRef}><form onSubmit={(event) => { event.preventDefault(); void renameConversation(); }}><div className="dialog-heading"><div><p className="section-kicker">CONVERSATION</p><h3 id="rename-conversation-title">Rename chat</h3><p>Use a short name that makes this thread easy to find later.</p></div><button type="button" onClick={() => setRenameOpen(false)} aria-label="Close rename dialog">×</button></div><label>Conversation name<input ref={renameInputRef} value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} maxLength={200} autoComplete="off" /></label><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setRenameOpen(false)}>Cancel</Button><Button variant="primary" type="submit" disabled={renameBusy || !renameDraft.trim()}>{renameBusy ? "Saving…" : "Save name"}</Button></div></form></ModalDialog>
     <ModalDialog open={Boolean(importPreview)} onClose={() => { if (!importBusy) setImportPreview(null); }} titleId="conversation-import-title" className="ui-dialog conversation-import-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL ARCHIVE · PREVIEW</p><h3 id="conversation-import-title">Import conversations</h3><p>Review the merge plan before anything is written to this device.</p></div><button type="button" disabled={importBusy} onClick={() => setImportPreview(null)} aria-label="Close conversation import preview">×</button></div>{importPreview && <><div className="conversation-import-summary"><strong>{importPreview.fileName}</strong><dl><div><dt>Conversations in archive</dt><dd>{importPreview.total}</dd></div><div><dt>New conversations</dt><dd>{importPreview.importCount}</dd></div><div><dt>Duplicates skipped</dt><dd>{importPreview.skippedDuplicates}</dd></div><div><dt>Conflicting IDs reassigned</dt><dd>{importPreview.reassignedIds}</dd></div></dl>{importPreview.sampleTitles.length > 0 && <div><span>Examples to import</span><ul>{importPreview.sampleTitles.map((title, index) => <li key={`${title}-${index}`}>{title}</li>)}</ul></div>}{importPreview.importCount === 0 && <p>Everything in this archive already exists here. No changes are needed.</p>}<small>Imported conversations are merged into local history. Existing conversations are never overwritten; repeat imports skip duplicates.</small></div><div className="dialog-actions"><Button variant="ghost" type="button" disabled={importBusy} onClick={() => setImportPreview(null)}>Cancel</Button><Button variant="primary" type="button" disabled={importBusy || importPreview.importCount === 0} onClick={() => void confirmConversationImport()}>{importBusy ? "Importing…" : `Import ${importPreview.importCount} conversation${importPreview.importCount === 1 ? "" : "s"}`}</Button></div></>}</ModalDialog>
     <ModalDialog open={Boolean(rewritePreview)} onClose={() => setRewritePreview(null)} titleId="rewrite-prompt-title" className="ui-dialog rewrite-prompt-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL MODEL · REVIEW BEFORE SEND</p><h3 id="rewrite-prompt-title">Smart prompt rewrite</h3><p>Edit the suggestion, use your original draft, or cancel. Nothing is sent until you choose.</p></div><button type="button" onClick={() => setRewritePreview(null)} aria-label="Close prompt rewrite preview">×</button></div><div className="rewrite-prompt-fields"><label>Original draft<textarea value={rewritePreview?.original ?? ""} readOnly rows={4} /></label><label>Rewritten prompt<textarea value={rewritePreview?.candidate ?? ""} onChange={(event) => setRewritePreview((current) => current ? { ...current, candidate: event.target.value } : current)} maxLength={24_000} rows={7} /></label></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setRewritePreview(null)}>Cancel</Button><Button variant="secondary" type="button" onClick={() => rewritePreview && sendDraft(rewritePreview.original, rewriteToolIds)}>Use original</Button><Button variant="primary" type="button" disabled={!rewritePreview?.candidate.trim()} onClick={() => rewritePreview && sendDraft(rewritePreview.candidate.trim(), rewriteToolIds)}>Use rewritten prompt</Button></div></ModalDialog>

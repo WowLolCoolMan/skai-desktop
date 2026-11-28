@@ -573,6 +573,15 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   };
 
   const startNewChat = () => { setConversationId(null); localStorage.removeItem("skai.conversation.active"); setMessages([]); setAttachments([]); onError(null); };
+  const restoreConversationMessages = async (nextMessages: Message[]) => {
+    if (!conversationId || busy) return false;
+    const bounded = nextMessages.filter((message) => message.role === "user" || message.role === "assistant").slice(0, 200);
+    setMessages(bounded);
+    setAttachments([]);
+    onError(null);
+    await saveConversation(bounded, conversationId);
+    return true;
+  };
   const selectConversation = (id: string) => {
     const selected = conversations.find((conversation) => conversation.id === id);
     if (!selected) return;
@@ -598,5 +607,5 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
   };
   const activeConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
-  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, cancelMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, updateQueuedMessage, moveQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, selectConversation };
+  return { messages, conversationId, attachments, conversations, conversationsLoaded, queuedMessages, busy, activeConversation, responseMode, setResponseMode, setAttachments, sendMessage, cancelMessage, rewritePrompt, retryMessage, editMessage, pickAttachments, importDroppedFiles, queueMessage, removeQueuedMessage, updateQueuedMessage, moveQueuedMessage, exportConversations, previewConversationImport, applyConversationImport, updateConversationMetadata, forkConversation, startNewChat, restoreConversationMessages, selectConversation };
 }
