@@ -44,6 +44,11 @@
 .model-capability-test-result.is-success { color:var(--skai-color-success); }
 .model-capability-test-result.is-error { color:var(--skai-color-danger); }
 .model-capability-test-preview { display:block; max-height:80px; overflow:auto; padding:8px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-sm); color:var(--skai-color-text-muted); background:var(--skai-color-surface-soft); font-size:var(--skai-text-3xs); white-space:pre-wrap; overflow-wrap:anywhere; }
+.model-benchmark-card { display:grid; gap:8px; padding-top:9px; border-top:1px solid var(--skai-color-border); }
+.model-benchmark-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; }
+.model-benchmark-grid span { display:grid; gap:3px; min-width:0; padding:8px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-sm); background:var(--skai-color-surface-soft); }
+.model-benchmark-grid small { color:var(--skai-color-text-muted); font-size:var(--skai-text-3xs); }
+.model-benchmark-grid strong { overflow:hidden; font-size:var(--skai-text-xs); text-overflow:ellipsis; white-space:nowrap; }
 .model-capability-suite { display:grid; gap:10px; padding-top:10px; border-top:1px solid var(--skai-color-border); }
 .model-capability-suite-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .model-capability-suite-heading > div { display:grid; gap:4px; min-width:0; }
@@ -54,7 +59,8 @@
 .model-capability-row > span { display:grid; min-width:0; gap:3px; }
 .model-capability-row strong { font-size:var(--skai-text-xs); }
 .model-capability-row small { overflow:hidden; color:var(--skai-color-text-muted); font-size:var(--skai-text-3xs); line-height:1.35; text-overflow:ellipsis; white-space:nowrap; }
-@media (max-width:560px) { .model-capability-suite-heading { flex-direction:column; }.model-capability-grid { grid-template-columns:1fr; } }
+@media (max-width:760px) { .model-benchmark-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:560px) { .model-capability-suite-heading { flex-direction:column; }.model-capability-grid { grid-template-columns:1fr; }.model-benchmark-grid { grid-template-columns:1fr 1fr; } }
 @media (max-width:900px) { .models-page-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }.models-library-layout { grid-template-columns:1fr; }.model-inspector { order:-1; }.catalog-discovery-status { margin-left:0; } }
 @media (max-width:560px) { .models-page-overview { grid-template-columns:1fr 1fr; }.models-library-layout .catalog-row { grid-template-columns:auto minmax(0,1fr); }.catalog-row-meta { grid-column:2; justify-content:flex-start; }.model-install-review-actions { justify-content:flex-start; flex-wrap:wrap; } }
 
