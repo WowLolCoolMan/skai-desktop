@@ -1,4 +1,4 @@
-import type { CodingPanePage, CodingPanePanel } from "./useCodingPaneWorkspace";
+import type { CodingPanePage, CodingPanePanel, CodingPanePreset } from "./useCodingPaneWorkspace";
 import { codingPanePageTitle } from "./useCodingPaneWorkspace";
 import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { NavIcon } from "../../components/ui/NavIcon";
@@ -13,10 +13,11 @@ type CodingPaneTabsProps = {
   onClose: (pageId: string) => void;
   onReorder: (sourceId: string, targetId: string) => void;
   onOpenPanel: (panel: CodingPanePanel, filePath?: string) => void;
+  onApplyPreset: (preset: CodingPanePreset) => void;
   onCloseSplit: () => void;
 };
 
-export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount, isSplitOpen, onSelect, onClose, onReorder, onOpenPanel, onCloseSplit }: CodingPaneTabsProps) {
+export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount, isSplitOpen, onSelect, onClose, onReorder, onOpenPanel, onApplyPreset, onCloseSplit }: CodingPaneTabsProps) {
   const actions = [
     { label: "Side chat", onSelect: () => onOpenPanel("side-chat") },
     { label: selectedFile ? `Editor · ${selectedFile.split(/[\\/]/).pop()}` : "Editor", onSelect: () => onOpenPanel("editor", selectedFile ?? undefined) },
@@ -25,9 +26,16 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
     { label: "Scratchpad", onSelect: () => onOpenPanel("scratchpad") },
     { label: "Preview", onSelect: () => onOpenPanel("preview") },
   ];
+  const presets = [
+    { label: "Single pane", onSelect: () => onApplyPreset("single") },
+    { label: "Chat + files", onSelect: () => onApplyPreset("chat-files") },
+    { label: "Chat + terminal", onSelect: () => onApplyPreset("chat-terminal") },
+    { label: "Review changes", onSelect: () => onApplyPreset("review") },
+    { label: "Research notes", onSelect: () => onApplyPreset("research") },
+  ];
 
   if (!isSplitOpen) {
-    return <div className="coding-split-launcher"><OverflowMenu label="Add to split" items={actions} /></div>;
+    return <div className="coding-split-launcher"><OverflowMenu label="Add to split" items={actions} /><OverflowMenu label="Workspace layout" items={presets} /></div>;
   }
 
   return <div className="workspace-tab-strip coding-pane-tab-strip is-split-open" role="group" aria-label="Right workspace pages">
@@ -46,6 +54,6 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
         <button className="workspace-tab-close" type="button" aria-label={`Close ${title}`} title="Close page" disabled={pages.length <= 1} onClick={() => onClose(page.id)}><NavIcon name="close" /></button>
       </div>;
     })}</div>
-    <OverflowMenu label="Add a page to the split view" icon={<NavIcon name="plus" />} items={[...actions, { label: "Close split view", onSelect: onCloseSplit }]} />
+    <OverflowMenu label="Workspace layout" items={presets} /><OverflowMenu label="Add a page to the split view" icon={<NavIcon name="plus" />} items={[...actions, { label: "Close split view", onSelect: onCloseSplit }]} />
   </div>;
 }

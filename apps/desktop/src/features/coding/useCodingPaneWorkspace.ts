@@ -3,6 +3,7 @@ import { reorderItem } from "../../app/reorderItem";
 
 export type CodingPanePanel = "editor" | "files" | "side-chat" | "changes" | "scratchpad" | "preview";
 export type CodingPanePage = { id: string; panel: CodingPanePanel; filePath?: string };
+export type CodingPanePreset = "single" | "chat-files" | "chat-terminal" | "review" | "research";
 
 const DEFAULT_PAGES: CodingPanePage[] = [
   { id: "coding-side-chat", panel: "side-chat" },
@@ -13,6 +14,14 @@ const DEFAULT_PAGES: CodingPanePage[] = [
 
 const pagePanels: CodingPanePanel[] = ["editor", "files", "side-chat", "changes", "scratchpad", "preview"];
 const MAX_PAGES = 24;
+
+const PRESET_PAGES: Record<CodingPanePreset, CodingPanePage[]> = {
+  single: [{ id: "coding-editor", panel: "editor" }, { id: "coding-files", panel: "files" }, { id: "coding-changes", panel: "changes" }],
+  "chat-files": [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-files", panel: "files" }],
+  "chat-terminal": [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-editor", panel: "editor" }],
+  review: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-changes", panel: "changes" }, { id: "coding-editor", panel: "editor" }],
+  research: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-scratchpad", panel: "scratchpad" }, { id: "coding-files", panel: "files" }],
+};
 
 const pagesKey = (projectId: string) => `skai.coding.panePages.${projectId}`;
 const versionKey = (projectId: string) => `skai.coding.panePagesVersion.${projectId}`;
@@ -99,8 +108,14 @@ export function useCodingPaneWorkspace(projectId: string) {
   }, []);
 
   const selectPage = useCallback((page: CodingPanePage) => setActivePageId(page.id), []);
+  const applyPreset = useCallback((preset: CodingPanePreset) => {
+    const nextPages = PRESET_PAGES[preset].map((page) => ({ ...page }));
+    setPages(nextPages);
+    setIsSplitOpen(preset !== "single");
+    setActivePageId(nextPages[preset === "single" ? 0 : 1]?.id ?? nextPages[0].id);
+  }, []);
   const ensureSplitOpen = useCallback(() => setIsSplitOpen(true), []);
   const closeSplitView = useCallback(() => setIsSplitOpen(false), []);
 
-  return { pages, activePageId, activePage, panel: activePage?.panel ?? null, isSplitOpen, openPanel, closePage, reorderPage, selectPage, ensureSplitOpen, closeSplitView };
+  return { pages, activePageId, activePage, panel: activePage?.panel ?? null, isSplitOpen, openPanel, closePage, reorderPage, selectPage, applyPreset, ensureSplitOpen, closeSplitView };
 }

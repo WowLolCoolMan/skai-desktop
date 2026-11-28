@@ -15,7 +15,7 @@ import { BrowserPreview } from "./BrowserPreview";
 import { CodingSideChat } from "./CodingSideChat";
 import { ProjectScratchpad } from "./ProjectScratchpad";
 import { CodingPaneTabs } from "./CodingPaneTabs";
-import { useCodingPaneWorkspace, type CodingPanePanel } from "./useCodingPaneWorkspace";
+import { useCodingPaneWorkspace, type CodingPanePanel, type CodingPanePreset } from "./useCodingPaneWorkspace";
 import { useCodingFileTabs } from "./useCodingFileTabs";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { ReviewChecklist } from "./ReviewChecklist";
@@ -248,6 +248,12 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
     codingPane.openPanel(panel, filePath ?? (panel === "editor" ? selectedFile ?? undefined : undefined));
     setTaskInspectorOpen(false);
   };
+  const applyCodingPanePreset = (preset: CodingPanePreset) => {
+    codingPane.applyPreset(preset);
+    setTerminalOpen(preset === "chat-terminal");
+    setWorkspaceView("chat");
+    setTaskInspectorOpen(false);
+  };
 
   const runPreflight = async () => {
     if (preflightBusy) return;
@@ -426,7 +432,7 @@ export function CodingSessionView({ conversation, messages, sideChatRequest, onN
   const paneTabHost = document.getElementById("coding-secondary-tab-group");
 
   return <>
-    {paneTabHost ? createPortal(<CodingPaneTabs pages={codingPanePages} activePageId={activeCodingPanePageId} selectedFile={selectedFile} changeCount={gitStatus?.changes.length ?? 0} isSplitOpen={codingSplitOpen} onSelect={(page) => { codingPane.selectPage(page); if (page.filePath) openFile(page.filePath); }} onClose={codingPane.closePage} onReorder={codingPane.reorderPage} onOpenPanel={openCodingPanePanel} onCloseSplit={codingPane.closeSplitView} />, paneTabHost) : null}
+    {paneTabHost ? createPortal(<CodingPaneTabs pages={codingPanePages} activePageId={activeCodingPanePageId} selectedFile={selectedFile} changeCount={gitStatus?.changes.length ?? 0} isSplitOpen={codingSplitOpen} onSelect={(page) => { codingPane.selectPage(page); if (page.filePath) openFile(page.filePath); }} onClose={codingPane.closePage} onReorder={codingPane.reorderPage} onOpenPanel={openCodingPanePanel} onApplyPreset={applyCodingPanePreset} onCloseSplit={codingPane.closeSplitView} />, paneTabHost) : null}
     <div className="coding-project-context" aria-label="Project status"><div className={`git-summary${gitStatus?.hasConflicts ? " has-conflicts" : ""}`} aria-live="polite"><strong>{gitStatus ? gitStatus.branch : "Git status unavailable"}</strong><span>{gitStatus ? `${gitStatus.changes.length} change${gitStatus.changes.length === 1 ? "" : "s"}${gitStatus.hasConflicts ? " · conflicts" : ""}` : "Connect a Git repository to inspect changes"}</span></div><div className="coding-project-context-actions"><OverflowMenu label="Project actions" icon={<NavIcon name="more" />} items={[{ label: "Open activity", onSelect: () => { setInspectorTab("activity"); setWorkspaceView("chat"); setTaskInspectorOpen(true); } }, { label: "Open terminal", onSelect: () => { setInspectorTab("terminal"); setWorkspaceView("chat"); setTaskInspectorOpen(true); } }, { label: "New coding thread", onSelect: onNewWorkspaceTab }, { label: preflightBusy ? "Scanning project…" : "Run preflight", disabled: preflightBusy, onSelect: () => void runPreflight() }, { label: gitBusy ? "Refreshing Git…" : "Refresh Git status", disabled: gitBusy, onSelect: onRefreshGitStatus }]} /></div></div>
     <div className={`coding-health-banner is-${health.tone}`} role={health.tone === "danger" ? "alert" : "status"}><NavIcon name="activity" /><div><strong>{health.title}</strong><span>{health.detail}</span></div>{health.tone === "warning" && !gitStatus && selectedProject.folderPaths.length > 0 && <Button variant="secondary" type="button" disabled={gitBusy} onClick={onRefreshGitStatus}>{gitBusy ? "Checking…" : "Check Git"}</Button>}{health.tone === "danger" && gitStatus?.hasConflicts && <Button variant="secondary" type="button" onClick={() => { setInspectorTab("changes"); setWorkspaceView("files"); setTaskInspectorOpen(true); }}>Open changes</Button>}{health.tone === "danger" && !gitStatus?.hasConflicts && <Button variant="secondary" type="button" onClick={() => { setInspectorTab("activity"); setWorkspaceView("chat"); setTaskInspectorOpen(true); }}>Open activity</Button>}</div>
     {(preflight || preflightMessage) && <Card className="project-preflight" aria-label="Project preflight results"><div className="panel-heading"><div><p className="section-kicker">LOCAL PREFLIGHT</p><h3>{preflight ? "Project setup" : "Preflight status"}</h3></div><Button variant="ghost" onClick={() => { setPreflight(null); setPreflightMessage(""); }}>Dismiss</Button></div>{preflightMessage && <p role="status">{preflightMessage}</p>}{preflight && <><p>{preflight.manifests.length ? `Detected ${preflight.manifests.join(", ")}.` : "No supported dependency manifest was detected at the selected folder roots."}</p>{preflight.runtimes.length > 0 && <ul className="project-preflight-runtimes">{preflight.runtimes.map((runtime) => <li key={runtime.name}><strong>{runtime.name}</strong><span>{runtime.available ? "Available" : "Required runtime not found on PATH"}</span></li>)}</ul>}{preflight.suggestedChecks.length > 0 && <><strong>Suggested checks (not run)</strong><ul className="project-preflight-checks">{preflight.suggestedChecks.map((command) => <li key={command}><code>{command}</code></li>)}</ul></>}<small>{preflight.executionNote}</small></>}</Card>}
