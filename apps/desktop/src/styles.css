@@ -2855,6 +2855,12 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .terminal-profile-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 10px 0; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
 .terminal-profile-row label { display: grid; gap: 4px; min-width: 210px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .terminal-profile-row input { min-width: 150px; }
+.terminal-ssh-preflight { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.terminal-ssh-preflight .terminal-safety-note { flex: 1 1 320px; }
+.terminal-ssh-preflight-result { display: grid; gap: 2px; flex: 1 1 240px; min-width: 220px; font-size: var(--skai-text-xs); }
+.terminal-ssh-preflight-result small { color: var(--skai-color-text-muted); }
+.terminal-ssh-preflight-result.is-ready strong { color: var(--skai-color-success-text); }
+.terminal-ssh-preflight-result.is-blocked strong { color: var(--skai-color-danger-text); }
 @media (max-width: 760px) { .response-branch-columns { grid-template-columns: 1fr; } }
 
 

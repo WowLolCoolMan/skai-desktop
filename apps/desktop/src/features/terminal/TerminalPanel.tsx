@@ -30,6 +30,7 @@ function TerminalOutput({ text, exitCode, label, className = "" }: { text: strin
 }
 
 type TerminalProfile = { id: string; name: string; command: string; cwd: string; targetMode: "local" | "ssh"; host: string; username: string; port: string };
+type SshPreflight = { status: "ready" | "blocked"; message: string; checkedAt: string };
 
 type TerminalPanelProps = {
   projects: DesktopProject[];
@@ -63,6 +64,8 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
   const [sshOutput, setSshOutput] = useState<string | null>(null);
   const [sshExitCode, setSshExitCode] = useState<number | null>(null);
   const [sshError, setSshError] = useState("");
+  const [sshPreflight, setSshPreflight] = useState<SshPreflight | null>(null);
+  const [sshPreflightBusy, setSshPreflightBusy] = useState(false);
   const [profiles, setProfiles] = useState<TerminalProfile[]>([]);
   const [profileName, setProfileName] = useState("");
   const [profileSelection, setProfileSelection] = useState("");
@@ -82,7 +85,8 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
       setSshHost(saved?.host ?? "");
       setSshUsername(saved?.username ?? "");
       setSshPort(saved?.port ?? "22");
-    } catch { setSshHost(""); setSshUsername(""); setSshPort("22"); }
+      setSshPreflight(null);
+    } catch { setSshHost(""); setSshUsername(""); setSshPort("22"); setSshPreflight(null); }
     setLoadedProfileKey(profileKey);
   }, [profileKey]);
 
@@ -137,6 +141,24 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
     } catch (error) { setSshError(error instanceof Error ? error.message : "Remote SSH command failed."); }
     finally { setSshBusy(false); }
   };
+  const checkSshConnection = async () => {
+    const port = Number(sshPort);
+    if (!sshHost.trim() || !sshUsername.trim() || !Number.isInteger(port) || port < 1 || port > 65535 || sshPreflightBusy) return;
+    setSshPreflightBusy(true);
+    setSshPreflight(null);
+    setSshError("");
+    try {
+      // A harmless echo validates DNS/network reachability, known_hosts trust, and
+      // the configured key/agent without running the user's command.
+      const response = await window.skaiAgent.request("project.ssh.run", { host: sshHost.trim(), username: sshUsername.trim(), port, command: "echo skai-ssh-preflight-ok", timeoutSeconds: 15 });
+      if (!response.ok) throw new Error(response.error?.message ?? "SSH connection check failed.");
+      const result = response.result as { output?: string; exitCode?: number; timedOut?: boolean; target?: string };
+      if (result.timedOut || result.exitCode !== 0 || !(result.output ?? "").includes("skai-ssh-preflight-ok")) throw new Error("The host connected but did not complete the preflight check.");
+      setSshPreflight({ status: "ready", message: `${result.target ?? `${sshUsername}@${sshHost}`} is ready for SSH commands.`, checkedAt: new Date().toISOString() });
+    } catch (error) {
+      setSshPreflight({ status: "blocked", message: error instanceof Error ? error.message : "SSH connection check failed.", checkedAt: new Date().toISOString() });
+    } finally { setSshPreflightBusy(false); }
+  };
   const startSession = () => { if (projectId && onStartSession) void onStartSession(projectId, cwd.trim() || "."); };
   const sendSessionInput = async () => { if (!sessionInput || !sessionId || !onWriteSession) return; if (await onWriteSession(sessionInput + (sessionInput.endsWith("\n") ? "" : "\r\n"))) setSessionInput(""); };
 
@@ -148,7 +170,7 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
     {projects.length === 0 ? <EmptyState title="Select a project first" description="Terminal commands are bounded to a project. Open Coding Workspace to connect a folder before running anything." action={onOpenCoding ? <Button variant="secondary" onClick={onOpenCoding}>Open Coding Workspace</Button> : undefined} /> : <>
     <div className="terminal-controls">
       <label>Project<select value={projectId} onChange={(event) => { setProjectId(event.target.value); onProjectChange?.(event.target.value); }}><option value="">Select a project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-      <label>Run on<select value={targetMode} onChange={(event) => { setTargetMode(event.target.value as "local" | "ssh"); setSshOutput(null); setSshError(""); }}><option value="local">Local project</option><option value="ssh">SSH devbox</option></select></label>
+      <label>Run on<select value={targetMode} onChange={(event) => { setTargetMode(event.target.value as "local" | "ssh"); setSshOutput(null); setSshError(""); setSshPreflight(null); }}><option value="local">Local project</option><option value="ssh">SSH devbox</option></select></label>
       {targetMode === "local" ? <label>Working directory<input value={cwd} onChange={(event) => setCwd(event.target.value)} aria-label="Working directory" /></label> : <>
         <label>Host<input value={sshHost} onChange={(event) => setSshHost(event.target.value)} placeholder="devbox.example.com" aria-label="SSH host" autoComplete="off" /></label>
         <label>Username<input value={sshUsername} onChange={(event) => setSshUsername(event.target.value)} placeholder="developer" aria-label="SSH username" autoComplete="username" /></label>
@@ -156,7 +178,7 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
       </>}
     </div>
     <div className="terminal-profile-row" aria-label="Saved terminal profiles"><label>Saved environment<select value={profileSelection} onChange={(event) => applyProfile(event.target.value)}><option value="">Choose a saved profile…</option>{profiles.map((profile) => <option value={profile.id} key={profile.id}>{profile.name}</option>)}</select></label><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Profile name" aria-label="New terminal profile name" maxLength={80} /><Button variant="secondary" type="button" disabled={!profileName.trim() || !command.trim()} onClick={saveProfile}>Save profile</Button>{profileSelection && <Button variant="ghost" type="button" onClick={() => deleteProfile(profileSelection)}>Remove profile</Button>}</div>
-    {targetMode === "ssh" && <p className="terminal-safety-note">Uses system OpenSSH keys or agent. The host must already be trusted in known_hosts. Password prompts and forwarding are disabled.</p>}
+    {targetMode === "ssh" && <div className="terminal-ssh-preflight"><p className="terminal-safety-note">Uses system OpenSSH keys or agent. The host must already be trusted in known_hosts. Password prompts and forwarding are disabled.</p><Button variant="secondary" type="button" disabled={sshPreflightBusy || !sshHost.trim() || !sshUsername.trim()} onClick={() => void checkSshConnection()}>{sshPreflightBusy ? "Checking connection…" : "Check connection"}</Button>{sshPreflight && <span className={`terminal-ssh-preflight-result is-${sshPreflight.status}`} role="status" aria-live="polite"><strong>{sshPreflight.status === "ready" ? "Connection ready" : "Connection blocked"}</strong><small>{sshPreflight.message} · checked {new Date(sshPreflight.checkedAt).toLocaleTimeString()}</small></span>}</div>}
     <div className="terminal-command-row">
       <input value={command} onChange={(event) => setCommand(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") run(); }} placeholder={targetMode === "ssh" ? "git status" : "git status"} aria-label={targetMode === "ssh" ? "Remote SSH command" : "Terminal command"} />
       <Button variant="primary" disabled={busy || sshBusy || !command.trim() || !projectId || targetMode === "ssh" && (!sshHost.trim() || !sshUsername.trim())} onClick={run}>{busy || sshBusy ? "Running…" : targetMode === "ssh" ? "Run on devbox" : "Run command"}</Button>
