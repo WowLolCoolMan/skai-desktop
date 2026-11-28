@@ -15,6 +15,8 @@ export type VoiceSource = "local" | "cloud";
 export type CloudVoiceProviderId = "elevenlabs" | "inworld" | "cartesia";
 export type VoiceSettings = ReturnType<typeof selectedVoiceSettings>;
 export type SavedVoicePreset = { id: string; name: string; settings: VoiceSettings; updatedAt: string };
+export type VoicePronunciationScope = "global" | "project" | "persona";
+export type VoicePronunciation = { id: string; phrase: string; pronunciation: string; scope: VoicePronunciationScope; scopeId?: string; updatedAt: string };
 
 /**
  * Speech controls are deliberately structured tags, not free-form prompts for
@@ -109,6 +111,7 @@ const expressivenessKey = "skai.voice.expressiveness";
 const playbackRateKey = "skai.voice.playbackRate";
 const voiceActivitySensitivityKey = "skai.voice.activitySensitivity";
 const savedVoicePresetsKey = "skai.voice.presets.v1";
+const voicePronunciationsKey = "skai.voice.pronunciations.v1";
 let activeCloudAudio: HTMLAudioElement | null = null;
 let speechGeneration = 0;
 function setVoicePlaybackActive(active: boolean) {
@@ -192,6 +195,42 @@ export function applyVoicePreset(preset: SavedVoicePreset) {
   }
 }
 
+export function listVoicePronunciations(): VoicePronunciation[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(voicePronunciationsKey) ?? "[]");
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is VoicePronunciation => Boolean(entry && typeof entry === "object"
+      && typeof entry.id === "string" && typeof entry.phrase === "string" && entry.phrase.trim()
+      && typeof entry.pronunciation === "string" && entry.pronunciation.trim()
+      && ["global", "project", "persona"].includes(String(entry.scope))
+      && typeof entry.updatedAt === "string"))
+      .slice(0, 64);
+  } catch { return []; }
+}
+
+export function saveVoicePronunciation(phrase: string, pronunciation: string, scope: VoicePronunciationScope = "global", scopeId?: string) {
+  const normalizedPhrase = phrase.trim().replace(/\s+/g, " ").slice(0, 120);
+  const normalizedPronunciation = pronunciation.trim().replace(/\s+/g, " ").slice(0, 160);
+  if (!normalizedPhrase || !normalizedPronunciation) throw new Error("Enter both a phrase and how it should be spoken.");
+  const entries = listVoicePronunciations();
+  const existing = entries.find((entry) => entry.phrase.localeCompare(normalizedPhrase, undefined, { sensitivity: "accent" }) === 0 && entry.scope === scope && entry.scopeId === scopeId);
+  const entry: VoicePronunciation = { id: existing?.id ?? crypto.randomUUID(), phrase: normalizedPhrase, pronunciation: normalizedPronunciation, scope, ...(scopeId ? { scopeId } : {}), updatedAt: new Date().toISOString() };
+  localStorage.setItem(voicePronunciationsKey, JSON.stringify([entry, ...entries.filter((item) => item.id !== entry.id)].slice(0, 64)));
+  window.dispatchEvent(new CustomEvent("skai:voice-pronunciations-updated"));
+  return entry;
+}
+
+export function removeVoicePronunciation(id: string) {
+  const next = listVoicePronunciations().filter((entry) => entry.id !== id);
+  localStorage.setItem(voicePronunciationsKey, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent("skai:voice-pronunciations-updated"));
+  return next;
+}
+
+export function applyPronunciationDictionary(text: string) {
+  return listVoicePronunciations().filter((entry) => entry.scope === "global").sort((a, b) => b.phrase.length - a.phrase.length).reduce((value, entry) => value.replace(new RegExp(entry.phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), entry.pronunciation), text);
+}
+
 export function stopNativeSpeech() {
   speechGeneration += 1;
   void window.skaiAgent?.request("voice.stop");
@@ -230,7 +269,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const generation = speechGeneration;
   const runtimeId = settings.lowResourceMode ? settings.lowResourceModelId : settings.primaryModelId;
   const runtime = installedVoiceModels.find((voice) => voice.id === runtimeId);
-  const safeText = removeUnsupportedSpeechCues(text, runtime);
+  const safeText = removeUnsupportedSpeechCues(applyPronunciationDictionary(text), runtime);
   if (!safeText) return false;
   const expressiveness = settings.expressiveness;
   // Skai profiles control pacing on every engine. Pitch is applied only by the
