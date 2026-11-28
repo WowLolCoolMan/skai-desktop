@@ -113,7 +113,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const [responseBranchesOpen, setResponseBranchesOpen] = useState(false);
   const [composerTarget, setComposerTarget] = useState<ComposerTarget>(() => {
     const stored = localStorage.getItem("skai.composer.target");
-    return stored === "answer" || stored === "edit" || stored === "review" || stored === "research" || stored === "media"
+    return stored === "answer" || stored === "plan" || stored === "edit" || stored === "review" || stored === "research" || stored === "media"
       ? stored
       : responseMode === "coding" ? "edit" : responseMode === "security" ? "review" : "answer";
   });
@@ -156,7 +156,8 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
       return;
     }
     if (workspaceMode === "project") return;
-    if (target === "edit") onResponseModeChange("coding");
+    if (target === "plan") onResponseModeChange("think");
+    else if (target === "edit") onResponseModeChange("coding");
     else if (target === "review") onResponseModeChange("security");
     else if (target === "answer" || target === "research") onResponseModeChange("think");
   };
@@ -282,8 +283,8 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
 
   const isCodingAgent = workspaceMode === "project" || responseMode === "coding";
   const activeProject = projectId ? projects.find((project) => project.id === projectId) : null;
-  const modeLabel = workspaceMode === "project" ? "Agent" : responseMode === "coding" ? "Coding" : responseMode === "security" ? "Review" : "Chat";
-  const modeDescription = workspaceMode === "project" ? "Project tools are available with approval" : responseMode === "coding" ? "Implementation-focused response" : responseMode === "security" ? "Risk-focused read-only review" : "Local conversation";
+  const modeLabel = composerTarget === "plan" ? "Plan" : workspaceMode === "project" ? "Agent" : responseMode === "coding" ? "Coding" : responseMode === "security" ? "Review" : "Chat";
+  const modeDescription = composerTarget === "plan" ? "Read-only planning · no file writes or commands" : workspaceMode === "project" ? "Project tools are available with approval" : responseMode === "coding" ? "Implementation-focused response" : responseMode === "security" ? "Risk-focused read-only review" : "Local conversation";
   const activeTaskCount = threadTasks.filter((task) => task.status === "running" || task.status === "verifying").length;
   const queuedTaskCount = threadTasks.filter((task) => task.status === "queued").length;
   const changedFileCount = new Set(threadTasks.flatMap((task) => task.changedFiles ?? [])).size;

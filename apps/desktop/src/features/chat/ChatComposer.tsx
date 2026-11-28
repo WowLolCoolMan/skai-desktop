@@ -15,10 +15,11 @@ import "./VoiceTranscriptControls.css";
 import "./ComposerIntentControls.css";
 import "./VoiceTimeline.css";
 
-export type ComposerTarget = "answer" | "edit" | "review" | "research" | "media";
+export type ComposerTarget = "answer" | "plan" | "edit" | "review" | "research" | "media";
 
 const composerTargetLabels: Record<ComposerTarget, string> = {
   answer: "Answer",
+  plan: "Plan",
   edit: "Edit",
   review: "Review",
   research: "Research",
@@ -27,6 +28,7 @@ const composerTargetLabels: Record<ComposerTarget, string> = {
 
 const composerTargetDescriptions: Record<ComposerTarget, string> = {
   answer: "Explain or solve without changing project files.",
+  plan: "Read-only planning: inspect context and propose changes without writing files or running commands.",
   edit: "Work toward an approved implementation or file change.",
   review: "Inspect for risks and findings without writing changes.",
   research: "Collect and synthesize evidence before recommending a path.",
@@ -534,7 +536,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     else { setOmniOpen(false); onNavigate("marketplace"); }
   };
   const selectedToolIds = [...new Set([...persistentToolIds, ...oneTurnToolIds])];
-  const effectivePolicyLabel = `${projectId ? "Connected project folders" : "Attached sources only"} · ${modeLabel === "Review" || target === "review" || target === "research" ? "read-only" : "approval-gated changes"} · ${selectedToolIds.length ? `${selectedToolIds.length} selected tool${selectedToolIds.length === 1 ? "" : "s"}` : "no extra tools"}`;
+  const effectivePolicyLabel = `${projectId ? "Connected project folders" : "Attached sources only"} · ${modeLabel === "Review" || target === "plan" || target === "review" || target === "research" ? "read-only" : "approval-gated changes"} · ${selectedToolIds.length ? `${selectedToolIds.length} selected tool${selectedToolIds.length === 1 ? "" : "s"}` : "no extra tools"}`;
   const freezeContext = () => setContextSnapshot({ draft, attachments: attachments.map((attachment) => ({ ...attachment })), toolIds: selectedToolIds, persistentToolIds: [...persistentToolIds], capturedAt: new Date().toISOString() });
   const restoreContext = () => {
     if (!contextSnapshot) return;
@@ -544,8 +546,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     setOneTurnToolIds(contextSnapshot.toolIds.filter((id) => !contextSnapshot.persistentToolIds.includes(id)));
   };
   const filteredSkills = availableSkills.filter((skill) => `${skill.name} ${skill.id} ${skill.description ?? ""} ${skill.category ?? ""}`.toLowerCase().includes(toolQuery.trim().toLowerCase()));
-  const toolPolicyLabel = target === "review" || target === "research" || modeLabel === "Review" ? "Read-only skills only" : target === "edit" || modeLabel === "Coding" || modeLabel === "Agent" ? "Mutating skills require approval" : "Conversation skills stay local";
-  const skillBlockedByMode = (skill: ComposerSkill) => (target === "review" || target === "research" || modeLabel === "Review") && (skill.permissions ?? []).some((permission) => /write|execute|shell|desktop|network|mutat/i.test(permission));
+  const toolPolicyLabel = target === "plan" ? "Read-only planning skills only" : target === "review" || target === "research" || modeLabel === "Review" ? "Read-only skills only" : target === "edit" || modeLabel === "Coding" || modeLabel === "Agent" ? "Mutating skills require approval" : "Conversation skills stay local";
+  const skillBlockedByMode = (skill: ComposerSkill) => (target === "plan" || target === "review" || target === "research" || modeLabel === "Review") && (skill.permissions ?? []).some((permission) => /write|execute|shell|desktop|network|mutat/i.test(permission));
   const toggleComposerSkill = (skillId: string) => {
     if (toolScope === "persistent") {
       setPersistentToolIds((current) => {
@@ -690,7 +692,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
               <div><span>Context freeze</span><span>{contextSnapshot ? `Captured ${new Date(contextSnapshot.capturedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · restore available` : "Not captured"}</span></div>
               <div><span>Skills and tools</span><span>{selectedToolIds.length ? `${selectedToolIds.length} selected for ${toolScope === "persistent" ? "future turns" : "this turn"}` : ([...new Set(draft.match(/\$([A-Za-z0-9._-]{1,80})\b/g) ?? [])].slice(0, 4).join(", ").replaceAll("$", "") || "Add a $skill-id or choose Skills and tools")}</span></div>
               <div><span>Memory</span><span>{localStorage.getItem("skai.memoryInjectionEnabled") === "true" ? "Enabled · approved local notes only" : "Off for this workspace"}</span></div>
-              <div><span>Mode policy</span><span>{modeLabel === "Agent" || modeLabel === "Coding" ? "Mutating tools require approval" : modeLabel === "Review" ? "Read-only review · no writes" : "Conversation tools stay local and explicit"}</span></div>
+              <div><span>Mode policy</span><span>{target === "plan" ? "Read-only planning · no writes or commands" : modeLabel === "Agent" || modeLabel === "Coding" ? "Mutating tools require approval" : modeLabel === "Review" ? "Read-only review · no writes" : "Conversation tools stay local and explicit"}</span></div>
               <div><span>Effective policy</span><span>{effectivePolicyLabel}</span></div>
               <div><span>Connected tools</span><span>MCP tools require explicit review in Marketplace; they are not silently called from chat.</span></div>
               <div><span>Computer use</span><span>Starts only from Add to message and requires a local vision model.</span></div>
