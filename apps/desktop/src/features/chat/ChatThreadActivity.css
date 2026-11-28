@@ -28,3 +28,6 @@
 .thread-activity-event.is-chat-user .thread-activity-dot { background: var(--skai-color-accent); }
 .thread-activity-event.is-chat-agent .thread-activity-dot { background: var(--skai-color-success); }
 .thread-activity-event.is-task-event .thread-activity-dot { background: var(--skai-color-warning); }
+.thread-run-correlation { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.thread-run-correlation button { max-width: 100%; overflow: hidden; padding: 2px 5px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: var(--skai-color-canvas); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); text-overflow: ellipsis; cursor: pointer; }
+.thread-run-correlation button:hover, .thread-run-correlation button:focus-visible { border-color: var(--skai-color-accent); color: var(--skai-color-text); }

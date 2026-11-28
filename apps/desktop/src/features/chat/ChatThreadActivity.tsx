@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { DesktopTask } from "../../../shared/contracts";
 import type { Message } from "../../app/types";
 import type { Route } from "../../app/types";
@@ -17,6 +18,7 @@ type ChatThreadActivityProps = {
 const activeStatuses = ["queued", "running", "verifying", "awaiting_approval", "failed", "blocked"];
 
 export function ChatThreadActivity({ tasks, messages, taskBusy, workspaceMode, onTaskAction, onOpenFile, onNavigate }: ChatThreadActivityProps) {
+  const [copiedCorrelationId, setCopiedCorrelationId] = useState<string | null>(null);
   const activeCount = tasks.filter((task) => task.status === "running" || task.status === "verifying").length;
   const queuedCount = tasks.filter((task) => task.status === "queued").length;
   const approvalCount = tasks.filter((task) => task.status === "awaiting_approval").length;
@@ -44,8 +46,21 @@ export function ChatThreadActivity({ tasks, messages, taskBusy, workspaceMode, o
 
   if (!tasks.length) return null;
 
+  const copyCorrelationId = async (taskId: string) => {
+    let copied = false;
+    try { if (navigator.clipboard) { await navigator.clipboard.writeText(taskId); copied = true; } } catch { /* Try the protected Electron bridge below. */ }
+    if (!copied) {
+      try { copied = await window.skaiAgent?.clipboard?.writeText(taskId) ?? false; } catch { /* Clipboard access may be unavailable in this runtime. */ }
+    }
+    if (copied) {
+      setCopiedCorrelationId(taskId);
+      window.setTimeout(() => setCopiedCorrelationId((current) => current === taskId ? null : current), 1400);
+    }
+  };
+
   const renderTask = (task: DesktopTask) => <article className={`thread-run-card thread-run-${task.status}`} key={task.id}>
     <div className="thread-run-heading"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>
+    <div className="thread-run-correlation"><span>Run ID</span><button type="button" title={`Copy correlation ID ${task.id}`} aria-label={`Copy correlation ID ${task.id}`} onClick={() => void copyCorrelationId(task.id)}>{copiedCorrelationId === task.id ? "Copied" : task.id.slice(0, 16)}</button></div>
     {task.resultSummary && <p>{task.resultSummary}</p>}
     {(task.changedFiles?.length || task.artifactLabels?.length) ? <div className="thread-run-files">{(task.changedFiles?.length ? task.changedFiles : task.artifactLabels ?? []).map((file) => <code key={file}>{file}</code>)}</div> : null}
     <div className="thread-run-actions">
