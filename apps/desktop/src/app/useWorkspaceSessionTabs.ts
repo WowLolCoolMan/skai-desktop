@@ -249,14 +249,19 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
   useEffect(() => { saveClosedWorkspaceTabs(closedWorkspaceTabs); }, [closedWorkspaceTabs]);
   useEffect(() => {
     if (!workspaceSessionRestored || (route !== "chat" && route !== "coding")) return;
+    const codingRoute = route === "coding";
+    const codingConversation = coding.selectedProject && chat.conversationId && chat.activeConversation?.id === chat.conversationId
+      && chat.activeConversation.projectId === coding.selectedProject.id
+      ? chat.activeConversation
+      : undefined;
     setWorkspaceTabs((current) => current.map((tab) => tab.id !== activeWorkspaceTabId ? tab : {
       ...tab,
-      route: route === "coding" && coding.selectedProject ? "coding" : "chat",
-      conversationId: chat.conversationId,
-      projectId: route === "coding" ? coding.selectedProject?.id ?? tab.projectId : null,
-      title: route === "coding" && coding.selectedProject ? (chat.conversationId && chat.activeConversation?.id === chat.conversationId ? chat.activeConversation.title : "New coding thread") : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
+      route: codingRoute ? "coding" : "chat",
+      conversationId: codingRoute ? codingConversation?.id ?? null : chat.conversationId,
+      projectId: codingRoute ? coding.selectedProject?.id ?? null : null,
+      title: codingRoute ? codingConversation?.title ?? "New coding thread" : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
     }));
-  }, [activeWorkspaceTabId, agentMode, chat.activeConversation?.title, chat.conversationId, coding.selectedProject?.id, coding.selectedProject?.name, route, workspaceSessionRestored]);
+  }, [activeWorkspaceTabId, agentMode, chat.activeConversation?.id, chat.activeConversation?.projectId, chat.activeConversation?.title, chat.conversationId, coding.selectedProject?.id, route, workspaceSessionRestored]);
   useEffect(() => {
     const selectedProject = route === "coding" ? coding.selectedProject : null;
     if (!selectedProject) return;
