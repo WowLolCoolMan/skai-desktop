@@ -271,7 +271,15 @@ export function SettingsPage(props: SettingsProps) {
     const response = await window.skaiAgent?.request("airllm.install.cancel", { id: airLlmInstall.id });
     if (response?.ok) setAirLlmInstall(response.result as AirLlmInstallSession);
   };
-  const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness" | "voiceActivitySensitivity", value: string | boolean | number) => { if (key === "source" && value !== "cloud" || key === "cloudProvider") { setCloudApiKey(""); setCloudCredentialError(null); } saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings()); };
+  const updateVoice = (key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness" | "voiceActivitySensitivity", value: string | boolean | number) => {
+    if (key === "source" && value === "cloud" && localStorage.getItem("skai.voice.hostedConsent") !== "true") {
+      const approved = window.confirm("Hosted voice sends spoken reply text to the provider you choose. Continue and enable remote voice? You can switch back to Local at any time.");
+      if (!approved) return;
+      localStorage.setItem("skai.voice.hostedConsent", "true");
+    }
+    if (key === "source" && value !== "cloud" || key === "cloudProvider") { setCloudApiKey(""); setCloudCredentialError(null); }
+    saveVoiceSetting(key, value); setVoiceSettings(selectedVoiceSettings());
+  };
   const activeVoiceRuntime = installedVoiceModels.find((voice) => voice.id === (voiceSettings.lowResourceMode ? voiceSettings.lowResourceModelId : voiceSettings.primaryModelId));
   const checkUpdates = async () => {
     if (checkingUpdates || !window.skaiAgent?.updates) return;
