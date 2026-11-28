@@ -103,6 +103,28 @@ async function deleteVoiceClip(key: string): Promise<boolean> {
   });
 }
 
+async function renameVoiceClip(key: string, name: string): Promise<boolean> {
+  const database = await openVoiceClipStore();
+  if (!database) return false;
+  return new Promise((resolve) => {
+    const transaction = database.transaction(VOICE_CLIPS_STORE, "readwrite");
+    const store = transaction.objectStore(VOICE_CLIPS_STORE);
+    const lookup = store.get(key);
+    lookup.onsuccess = () => {
+      const clip = lookup.result as StoredVoiceClip | undefined;
+      if (!clip) {
+        transaction.abort();
+        return;
+      }
+      store.put({ ...clip, name, storedAt: new Date().toISOString() });
+    };
+    lookup.onerror = () => transaction.abort();
+    transaction.oncomplete = () => { database.close(); resolve(true); };
+    transaction.onerror = () => { database.close(); resolve(false); };
+    transaction.onabort = () => { database.close(); resolve(false); };
+  });
+}
+
 function loadWorkbenchProfiles(): WorkbenchVoiceProfile[] {
   try {
     const value = JSON.parse(localStorage.getItem(WORKBENCH_PROFILES_KEY) ?? "[]") as unknown;
@@ -126,6 +148,8 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   const [storedClips, setStoredClips] = useState<PreviewableVoiceClip[]>([]);
   const [clipsLoading, setClipsLoading] = useState(false);
   const [clipQuery, setClipQuery] = useState("");
+  const [renamingClipKey, setRenamingClipKey] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const [voicePreflight, setVoicePreflight] = useState<VoicePreflightCheck[]>([
     { label: "Microphone", status: "idle", detail: "Not checked; the test asks only when you start it." },
     { label: "Speaker output", status: "idle", detail: "Not checked." },
@@ -249,6 +273,41 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
       return updated;
     });
     setClipStorageNotice(`Removed ${clip.name} from this voice profile.`);
+  };
+  const beginRenameClip = (clip: PreviewableVoiceClip) => {
+    setRenamingClipKey(clip.key);
+    setRenameDraft(clip.name);
+    setClipStorageNotice(null);
+  };
+  const cancelRenameClip = () => {
+    setRenamingClipKey(null);
+    setRenameDraft("");
+  };
+  const commitRenameClip = async (clip: PreviewableVoiceClip) => {
+    const name = renameDraft.trim().replace(/[\\/:*?"<>|]/g, "-").slice(0, 120);
+    if (!name) {
+      setClipStorageNotice("Give this clip a name before saving.");
+      return;
+    }
+    if (name === clip.name) {
+      cancelRenameClip();
+      return;
+    }
+    if (!(await renameVoiceClip(clip.key, name))) {
+      setClipStorageNotice("Could not rename this clip in local storage. Try again.");
+      return;
+    }
+    const next = storedClips.map((item) => item.key === clip.key ? { ...item, name } : item);
+    setStoredClips(next);
+    setWorkbenchProfiles((profiles) => {
+      const updated = profiles.map((item) => item.id === activeWorkbench?.id
+        ? { ...item, clipNames: next.map((item) => item.name), status: "Changes pending" as const, updatedAt: new Date().toISOString() }
+        : item);
+      saveWorkbenchProfiles(updated);
+      return updated;
+    });
+    setClipStorageNotice(`Renamed clip to ${name}.`);
+    cancelRenameClip();
   };
   const acknowledgeRightsNotice = () => { localStorage.setItem(WORKBENCH_NOTICE_KEY, "true"); setRightsNoticeOpen(false); };
   const runVoicePreflight = async () => {
@@ -414,7 +473,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
         <Card>
           <p className="section-kicker">CLIPS</p>
           <h3>{activeWorkbench?.name ?? "Choose a profile"}</h3>
-          {activeWorkbench ? <><p className="marketplace-muted">Add recordings over time. Clips stay on this device and can be previewed or removed here. Voice cloning is unavailable until a compatible engine is installed.</p><div className="voice-workbench-clip-toolbar"><label>Voice profile<select value={activeWorkbenchId} onChange={(event) => setActiveWorkbenchId(event.target.value)} aria-label="Voice profile">{workbenchProfiles.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><input value={clipQuery} onChange={(event) => setClipQuery(event.target.value)} placeholder="Search clips…" aria-label="Search clips" /><label className="voice-workbench-add-clips"><span>Add audio clips</span><input type="file" accept=".wav,.mp3,.m4a,.ogg,.flac,audio/wav,audio/mpeg,audio/mp4,audio/ogg,audio/flac" multiple onChange={(event) => { void addClips(event.target.files); event.currentTarget.value = ""; }} aria-label="Add voice clips" /></label></div><p className="settings-help">{storedClips.length} of {MAX_CLIPS_PER_PROFILE} clips · Up to 12 at once · 50 MB per clip</p><div className="voice-workbench-clip-list" aria-live="polite">{clipsLoading ? <p className="settings-help">Loading saved clips…</p> : storedClips.length === 0 ? <p className="settings-help">No clips attached.</p> : visibleClips.length === 0 ? <p className="settings-help">No clips match that name.</p> : visibleClips.map((clip) => <div className="voice-workbench-clip" key={clip.key}><div className="voice-workbench-clip-heading"><strong>{clip.name}</strong><span>{clip.blob.size >= 1024 * 1024 ? `${(clip.blob.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(clip.blob.size / 1024))} KB`}</span><Button variant="ghost" type="button" onClick={() => void removeClip(clip)} aria-label={`Remove ${clip.name}`}>Remove</Button></div><audio controls preload="none" src={clip.previewUrl} aria-label={`Preview ${clip.name}`} /></div>)}</div>{clipStorageNotice && <p className="settings-help" role="status">{clipStorageNotice}</p>}<div className="voice-workbench-status" role="status"><strong>{storedClips.length > 0 ? "Changes pending" : activeWorkbench.status}</strong><small>{storedClips.length > 0 ? "Clips are saved locally. Clone building will be enabled when a compatible adapter is installed." : "Profile metadata is stored locally on this device."}</small></div></> : <p className="settings-help">Create or choose a profile to add clips.</p>}
+          {activeWorkbench ? <><p className="marketplace-muted">Add recordings over time. Clips stay on this device and can be previewed or removed here. Voice cloning is unavailable until a compatible engine is installed.</p><div className="voice-workbench-clip-toolbar"><label>Voice profile<select value={activeWorkbenchId} onChange={(event) => setActiveWorkbenchId(event.target.value)} aria-label="Voice profile">{workbenchProfiles.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><input value={clipQuery} onChange={(event) => setClipQuery(event.target.value)} placeholder="Search clips…" aria-label="Search clips" /><label className="voice-workbench-add-clips"><span>Add audio clips</span><input type="file" accept=".wav,.mp3,.m4a,.ogg,.flac,audio/wav,audio/mpeg,audio/mp4,audio/ogg,audio/flac" multiple onChange={(event) => { void addClips(event.target.files); event.currentTarget.value = ""; }} aria-label="Add voice clips" /></label></div><p className="settings-help">{storedClips.length} of {MAX_CLIPS_PER_PROFILE} clips · Up to 12 at once · 50 MB per clip</p><div className="voice-workbench-clip-list" aria-live="polite">{clipsLoading ? <p className="settings-help">Loading saved clips…</p> : storedClips.length === 0 ? <p className="settings-help">No clips attached.</p> : visibleClips.length === 0 ? <p className="settings-help">No clips match that name.</p> : visibleClips.map((clip) => <div className="voice-workbench-clip" key={clip.key}><div className="voice-workbench-clip-heading">{renamingClipKey === clip.key ? <input className="voice-workbench-clip-name-input" value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void commitRenameClip(clip); if (event.key === "Escape") cancelRenameClip(); }} aria-label={`New name for ${clip.name}`} autoFocus /> : <strong title={clip.name}>{clip.name}</strong>}<span>{clip.blob.size >= 1024 * 1024 ? `${(clip.blob.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(clip.blob.size / 1024))} KB`}</span>{renamingClipKey === clip.key ? <><Button variant="ghost" type="button" onClick={() => void commitRenameClip(clip)}>Save</Button><Button variant="ghost" type="button" onClick={cancelRenameClip}>Cancel</Button></> : <><Button variant="ghost" type="button" onClick={() => beginRenameClip(clip)} aria-label={`Rename ${clip.name}`}>Rename</Button><Button variant="ghost" type="button" onClick={() => void removeClip(clip)} aria-label={`Remove ${clip.name}`}>Remove</Button></>}</div><audio controls preload="none" src={clip.previewUrl} aria-label={`Preview ${clip.name}`} /></div>)}</div>{clipStorageNotice && <p className="settings-help" role="status">{clipStorageNotice}</p>}<div className="voice-workbench-status" role="status"><strong>{storedClips.length > 0 ? "Changes pending" : activeWorkbench.status}</strong><small>{storedClips.length > 0 ? "Clips are saved locally. Rename, preview, or remove clips before connecting a compatible clone adapter." : "Profile metadata is stored locally on this device."}</small></div></> : <p className="settings-help">Create or choose a profile to add clips.</p>}
         </Card>
       </div>
     </div>

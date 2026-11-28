@@ -2066,6 +2066,7 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .voice-workbench-clip { display: grid; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-raised); }
 .voice-workbench-clip-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .voice-workbench-clip-heading strong { min-width: 0; overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.voice-workbench-clip-name-input { min-width: 0; flex: 1 1 auto; height: 32px; padding: 6px 8px; border: 1px solid var(--skai-color-accent); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font: inherit; }
 .voice-workbench-clip-heading span { flex: 0 0 auto; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .voice-workbench-clip-heading .ui-button { margin-left: auto; flex: 0 0 auto; }
 .voice-workbench-clip audio { width: 100%; min-width: 0; height: 36px; }
