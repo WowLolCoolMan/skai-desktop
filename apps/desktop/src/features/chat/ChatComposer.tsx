@@ -475,6 +475,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const estimatedContextTokens = Math.max(0, Math.ceil((draft.length + attachments.reduce((total, attachment) => total + attachment.content.length, 0)) / 4));
   const contextBudgetPercent = Math.min(100, Math.round((estimatedContextTokens / contextBudget) * 100));
   const contextBudgetLabel = estimatedContextTokens > 0 ? `Context · ~${estimatedContextTokens.toLocaleString()} / ${contextBudget.toLocaleString()}` : `Context · ${contextBudget.toLocaleString()} available`;
+  const contextCoverageLabel = projectId ? `Project workspace${attachments.length ? ` + ${attachments.length} attachment${attachments.length === 1 ? "" : "s"}` : ""}` : attachments.length ? `${attachments.length} attached source${attachments.length === 1 ? "" : "s"}` : "Prompt only";
   const duplicateAttachmentCount = attachments.length - new Set(attachments.map((attachment) => `${attachment.fileName}\u0000${attachment.mediaType}`)).size;
   const recommendedTools = useMemo<RecommendedComposerTool[]>(() => {
     const text = draft.trim().toLowerCase();
@@ -618,6 +619,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
             <div className="composer-capability-list" aria-label="Current context and tool availability">
               <div><span>Workspace files</span><span>{projectId ? (projects.find((project) => project.id === projectId)?.folderPaths.join(" · ") || "No folders connected") : "Only files you attach"}</span></div>
               <div><span>Attached context</span><span>{attachments.length ? `${attachments.length} user-provided source${attachments.length === 1 ? "" : "s"} · ${attachments.map((attachment) => attachment.fileName).join(" · ")}` : "No attachments in this turn"}</span></div>
+              <div><span>Context coverage</span><span>{contextCoverageLabel}</span></div>
               <div><span>Skills and tools</span><span>{selectedToolIds.length ? `${selectedToolIds.length} selected for ${toolScope === "persistent" ? "future turns" : "this turn"}` : ([...new Set(draft.match(/\$([A-Za-z0-9._-]{1,80})\b/g) ?? [])].slice(0, 4).join(", ").replaceAll("$", "") || "Add a $skill-id or choose Skills and tools")}</span></div>
               <div><span>Memory</span><span>{localStorage.getItem("skai.memoryInjectionEnabled") === "true" ? "Enabled · approved local notes only" : "Off for this workspace"}</span></div>
               <div><span>Mode policy</span><span>{modeLabel === "Agent" || modeLabel === "Coding" ? "Mutating tools require approval" : modeLabel === "Review" ? "Read-only review · no writes" : "Conversation tools stay local and explicit"}</span></div>
