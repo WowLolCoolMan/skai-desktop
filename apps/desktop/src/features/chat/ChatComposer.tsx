@@ -421,6 +421,16 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       setQueueUpdateBusy(false);
     }
   };
+  const downloadVoiceTranscript = () => {
+    if (!voiceSessionTranscript.length) return;
+    const content = voiceSessionTranscript.map((line) => `${line.speaker === "you" ? "You" : "Skai"}: ${line.text}`).join("\n\n");
+    const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `skai-voice-transcript-${new Date().toISOString().replace(/[.:]/g, "-")}.txt`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
 
   return <section className={`composer-card${dragActive ? " is-drag-active" : ""}${workflowPreferences.toolbarLayout === "compact" ? " is-compact-toolbar" : ""}`} aria-busy={rewriteBusy} data-send-behavior={workflowPreferences.sendBehavior} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
     {dragActive && <div className="composer-drop-overlay" role="status">Drop files to attach</div>}
@@ -551,7 +561,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         <p className="voice-mode-detail" role="status" aria-live="polite">{voiceCalibration === "ready" ? "Microphone check passed." : voiceCalibration === "quiet" ? "Microphone signal is very quiet." : voiceCalibration === "noisy" ? "Background noise is high." : voiceCalibration === "permission-denied" ? "Microphone permission is needed to calibrate." : "Calibration checks permission and ambient input; no audio is saved."}</p>
         <label className="voice-mode-review"><input type="checkbox" checked={voiceReviewBeforeSend} onChange={(event) => setVoiceReview(event.target.checked)} />Review transcript before sending</label>
         {pendingVoiceTranscript && <section className="voice-mode-transcript-review" aria-label="Transcript awaiting confirmation"><strong>Transcript to send</strong><p>{pendingVoiceTranscript}</p><div><Button variant="primary" type="button" onClick={submitReviewedVoiceTranscript}>Send transcript</Button><Button variant="secondary" type="button" onClick={discardReviewedVoiceTranscript}>Discard</Button></div></section>}
-        <section className="voice-mode-transcript" aria-label="Voice session transcript" aria-live="polite"><strong>Session transcript</strong>{voiceSessionTranscript.length ? voiceSessionTranscript.map((line) => <p key={line.id}><b>{line.speaker === "you" ? "You" : "Skai"}</b>{line.text}</p>) : <p className="voice-mode-detail">Your voice turns and Skai’s spoken replies will appear here.</p>}{voiceTranscriptPreview && !pendingVoiceTranscript && <p className="voice-mode-transcript-preview" data-live-transcript={voiceListening ? "true" : "false"} aria-live="polite"><b>{voiceListening ? "Live transcript" : "Latest transcript"}</b>{voiceTranscriptPreview}</p>}</section>
+        <section className="voice-mode-transcript" aria-label="Voice session transcript" aria-live="polite"><div className="voice-mode-transcript-heading"><strong>Session transcript</strong><Button variant="ghost" type="button" disabled={!voiceSessionTranscript.length} onClick={downloadVoiceTranscript}>Download transcript</Button></div>{voiceSessionTranscript.length ? voiceSessionTranscript.map((line) => <p key={line.id}><b>{line.speaker === "you" ? "You" : "Skai"}</b>{line.text}</p>) : <p className="voice-mode-detail">Your voice turns and Skai’s spoken replies will appear here.</p>}{voiceTranscriptPreview && !pendingVoiceTranscript && <p className="voice-mode-transcript-preview" data-live-transcript={voiceListening ? "true" : "false"} aria-live="polite"><b>{voiceListening ? "Live transcript" : "Latest transcript"}</b>{voiceTranscriptPreview}</p>}</section>
         <label className="voice-mode-expressiveness">Expressiveness <span>{voiceExpressiveness}%</span><input type="range" min="0" max="100" step="5" value={voiceExpressiveness} onChange={(event) => { const next = Number(event.target.value); setVoiceExpressiveness(next); saveVoiceSetting("expressiveness", next); }} /></label>
         <label className="voice-mode-expressiveness">Mic sensitivity <span>{voiceActivitySensitivity}%</span><input type="range" min="0" max="100" step="5" value={voiceActivitySensitivity} onChange={(event) => saveVoiceSetting("voiceActivitySensitivity", Number(event.target.value))} /></label>
         <p className="voice-mode-detail">Higher sensitivity detects quieter speech. Applies to voice turns and interruption detection.</p>
