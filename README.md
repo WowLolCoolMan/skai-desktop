@@ -60,7 +60,23 @@ The best way to back Skai is to try it and tell us what feels useful, confusing,
 - [Find active work](docs/planning/TO_DO_NEXT.md)
 - [Read the contributor guide](CONTRIBUTING.md)
 
-Skai Desktop is source-available under the [Skai Desktop Source Reference License](LICENSE); review the license and [contribution terms](CONTRIBUTING.md) before contributing.
+## License and reference use
+
+Skai Desktop is published under a modified MIT-style license. The repository
+is open for research, evaluation, learning, and independent implementation.
+
+- You may study how Skai works and use its ideas, workflows, and general
+  concepts as reference for your own implementation.
+- Please do not copy and paste, adapt, or incorporate Skai source code or
+  substantial portions of it into another project without written permission.
+- Skai names, logos, and other branding are not licensed for reuse or implied
+  endorsement.
+- Third-party components and earlier versions that were released under MIT or
+  another license remain governed by those original terms.
+
+Read the complete [Skai Desktop Modified MIT License](LICENSE),
+[contribution terms](CONTRIBUTING.md), and [third-party notices](THIRD_PARTY_NOTICES.md)
+before reusing anything from the repository.
 
 ## Local-first, with clear boundaries
 
@@ -136,7 +152,11 @@ docs/                      Guides, plans, release evidence, and research
 
 Keep changes incremental and verifiable. Preserve the Electron → isolated IPC → .NET Agent Host boundary, keep provider secrets out of the renderer, and include evidence for user-facing changes. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Skai Desktop is source-available for reference under the [Skai Desktop Source Reference License](LICENSE). Existing snapshots published under MIT remain under their original terms. Third-party components retain their own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md). Also read the [Code of Conduct](CODE_OF_CONDUCT.md), [Security Policy](SECURITY.md), and [Accessibility statement](ACCESSIBILITY.md).
+Contributions are welcome when you have the rights to submit the work and have
+documented any third-party source, assets, models, or documentation. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the review process and
+[CONTRIBUTOR_LICENSE_AGREEMENT.md](CONTRIBUTOR_LICENSE_AGREEMENT.md) for the
+contribution terms.
 
 ## Development checks
 

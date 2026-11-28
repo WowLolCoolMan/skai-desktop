@@ -20,12 +20,14 @@ issue or pull request.
   have the rights to contribute them and have documented their source and
   license.
 
-## Source and contribution terms
+## License and contribution terms
 
-The Skai-owned source is published for reference under the
-[Skai Desktop Source Reference License](LICENSE). It is not an open-source
-license and does not permit reusing or incorporating Skai code into another
-project. Third-party components retain their own licenses; see
+The Skai-owned source is published under the [Skai Desktop Modified MIT
+License](LICENSE). Research, evaluation, learning, and independent
+implementations of ideas and workflows are welcome. Please do not copy and
+paste, adapt, or incorporate Skai source code or substantial portions of it
+into another project without written permission. Skai branding is not licensed
+for reuse. Third-party components retain their own licenses; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Before a pull request can be merged, each contributor must agree to the

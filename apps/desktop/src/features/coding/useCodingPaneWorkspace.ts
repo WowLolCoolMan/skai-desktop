@@ -55,6 +55,7 @@ export function useCodingPaneWorkspace(projectId: string, legacyProjectId = proj
 
   useEffect(() => {
     let restoredPages = DEFAULT_PAGES;
+    let legacyEditorPageIds: string[] = [];
     try {
       const scopedValue = localStorage.getItem(pagesKey(paneScopeId));
       const legacyValue = paneScopeId !== legacyProjectId ? localStorage.getItem(pagesKey(legacyProjectId)) : null;
@@ -62,15 +63,24 @@ export function useCodingPaneWorkspace(projectId: string, legacyProjectId = proj
       if (Array.isArray(stored)) {
         const valid = stored.map(normalizeCodingPanePage).filter((page): page is CodingPanePage => page !== null)
           .filter((page, index, items) => items.findIndex((entry) => entry.id === page.id) === index);
-        if (valid.length) restoredPages = valid.slice(0, MAX_PAGES);
+        if (valid.length) {
+          const editorPages = valid.filter((page) => page.panel === "editor");
+          legacyEditorPageIds = editorPages.map((page) => page.id);
+          const primaryEditor = editorPages.find((page) => page.id === "coding-editor") ?? editorPages[0];
+          restoredPages = valid
+            .filter((page) => page.panel !== "editor" || page === primaryEditor)
+            .map((page) => page === primaryEditor ? { id: "coding-editor", panel: "editor" as const } : page)
+            .slice(0, MAX_PAGES);
+        }
       }
-      localStorage.setItem(versionKey(paneScopeId), "7");
+      localStorage.setItem(versionKey(paneScopeId), "8");
     } catch { /* use the standard project pages */ }
 
     const storedActiveId = localStorage.getItem(activePageKey(paneScopeId))
       ?? (paneScopeId !== legacyProjectId ? localStorage.getItem(activePageKey(legacyProjectId)) : null);
     setPages(restoredPages);
-    const normalizedActiveId = normalizeCodingPanePageId(storedActiveId);
+    const storedPageId = normalizeCodingPanePageId(storedActiveId);
+    const normalizedActiveId = storedPageId && legacyEditorPageIds.includes(storedPageId) ? "coding-editor" : storedPageId;
     setActivePageId(normalizedActiveId && restoredPages.some((page) => page.id === normalizedActiveId)
       ? normalizedActiveId
       : restoredPages.find((page) => page.panel === "editor")?.id ?? restoredPages[0].id);
@@ -97,13 +107,17 @@ export function useCodingPaneWorkspace(projectId: string, legacyProjectId = proj
   const activePage = pages.find((page) => page.id === activePageId) ?? pages[0] ?? null;
 
   const openPanel = useCallback((panel: CodingPanePanel, filePath?: string) => {
-    const id = filePath ? `coding-file-${filePath}` : `coding-${panel}`;
+    // Keep one Editor page in the project tools strip. Open files as Editor
+    // tabs inside it instead of adding a second page tab for every file.
+    const id = panel === "editor"
+      ? pages.find((page) => page.panel === "editor")?.id ?? "coding-editor"
+      : filePath ? `coding-file-${filePath}` : `coding-${panel}`;
     setIsSplitOpen(true);
     setPages((current) => current.some((page) => page.id === id)
       ? current
-      : [...current, { id, panel, ...(filePath ? { filePath } : {}) }].slice(-MAX_PAGES));
+      : [...current, { id, panel }].slice(-MAX_PAGES));
     setActivePageId(id);
-  }, []);
+  }, [pages]);
 
   const closePage = useCallback((pageId: string) => {
     if (pages.length <= 1) return;

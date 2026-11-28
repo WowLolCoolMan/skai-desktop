@@ -28,6 +28,7 @@ const { createPetStateStore } = require("./pet-state-store.cjs");
 const { createTrayController } = require("./tray-controller.cjs");
 const { createPetWindowController } = require("./pet-window.cjs");
 const { createSingleInstanceLease } = require("./single-instance-lease.cjs");
+const { readWindowState, restoreWindowBounds, writeWindowState } = require("./window-state.cjs");
 
 // Packaged smoke tests need an isolated cross-build instance lease as well as an
 // isolated Chromium profile, so they never collide with the user's open app.
@@ -1209,9 +1210,15 @@ const trayController = createTrayController({
 });
 
 function createWindow() {
+  const windowStatePath = path.join(app.getPath("userData"), "main-window-state.json");
+  const storedWindowState = readWindowState(fsSync, windowStatePath);
+  const windowBounds = restoreWindowBounds(
+    storedWindowState?.bounds,
+    screen.getAllDisplays(),
+    screen.getPrimaryDisplay().id,
+  );
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    ...windowBounds,
     minWidth: 960,
     minHeight: 640,
     autoHideMenuBar: true,
@@ -1230,6 +1237,32 @@ function createWindow() {
     },
   });
   mainWindow.setMenuBarVisibility(false);
+
+  let persistWindowStateTimer;
+  const persistWindowState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (persistWindowStateTimer) clearTimeout(persistWindowStateTimer);
+    persistWindowStateTimer = setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) return;
+      writeWindowState(fsSync, windowStatePath, {
+        bounds: mainWindow.getNormalBounds(),
+        maximized: mainWindow.isMaximized(),
+      });
+    }, 250);
+  };
+  mainWindow.on("move", persistWindowState);
+  mainWindow.on("resize", persistWindowState);
+  mainWindow.on("maximize", persistWindowState);
+  mainWindow.on("unmaximize", persistWindowState);
+  const onDisplayRemoved = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const bounds = mainWindow.getNormalBounds();
+    const clamped = restoreWindowBounds(bounds, screen.getAllDisplays(), screen.getPrimaryDisplay().id);
+    mainWindow.setBounds(clamped);
+    persistWindowState();
+  };
+  screen.on("display-removed", onDisplayRemoved);
+  if (storedWindowState?.maximized) mainWindow.maximize();
 
   mainWindow.webContents.on("will-attach-webview", (event, webPreferences, params) => {
     if (!isAllowedPreviewUrl(params.src || "about:blank")) {
@@ -1256,11 +1289,20 @@ function createWindow() {
   if (devUrl) mainWindow.loadURL(devUrl);
   else mainWindow.loadFile(path.join(rendererRoot, "dist", "index.html"));
   mainWindow.on("close", (event) => {
+    writeWindowState(fsSync, windowStatePath, {
+      bounds: mainWindow.getNormalBounds(),
+      maximized: mainWindow.isMaximized(),
+    });
     if (isQuitting) return;
     event.preventDefault();
     void handleMainWindowClose();
   });
-  mainWindow.on("closed", () => { mainWindow = undefined; closePromptOpen = false; });
+  mainWindow.on("closed", () => {
+    if (persistWindowStateTimer) clearTimeout(persistWindowStateTimer);
+    screen.removeListener("display-removed", onDisplayRemoved);
+    mainWindow = undefined;
+    closePromptOpen = false;
+  });
   // A reload or renderer crash drops any open close prompt; let the next close ask again.
   mainWindow.webContents.on("did-start-loading", () => { closePromptOpen = false; });
   mainWindow.webContents.on("render-process-gone", () => { closePromptOpen = false; });

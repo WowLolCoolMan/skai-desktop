@@ -20,7 +20,9 @@ if (!fs.existsSync(executable)) {
   console.error(`Packaged Electron executable not found: ${executable}. Run npm run package:electron first.`);
   process.exit(1);
 }
-const port = 19331;
+let port = 0;
+let child = null;
+let appLog = "";
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "skai-ui-matrix-"));
 const exerciseTaskProgress = process.env.UI_MATRIX_EXERCISE_TASK_PROGRESS === "1";
 const exerciseGitReview = process.env.UI_MATRIX_EXERCISE_GIT_REVIEW === "1";
@@ -170,11 +172,15 @@ Object.assign(env, {
 fs.writeFileSync(env.SRAI_SETTINGS_PATH, JSON.stringify({ themeMode: "dark" }));
 const displayBackendArgs = ((decision) => decision.switchValue ? [`--ozone-platform=${decision.switchValue}`] : [])(resolveDisplayBackend({ argv: [] }));
 const voiceFixtureArgs = process.env.UI_MATRIX_EXERCISE_VOICE === "1" ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] : [];
-const child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${path.join(temp, "electron")}`, `--skai-isolated-smoke-app-data=${path.join(temp, "appdata")}`, "--disable-gpu", ...voiceFixtureArgs, ...displayBackendArgs], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
-let appLog = "";
-child.stdout.on("data", (chunk) => { appLog = (appLog + chunk).slice(-20000); });
-child.stderr.on("data", (chunk) => { appLog = (appLog + chunk).slice(-20000); });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function findAvailablePort() {
+  const probe = http.createServer();
+  await new Promise((resolve, reject) => { probe.once("error", reject); probe.listen(0, "127.0.0.1", resolve); });
+  const availablePort = probe.address().port;
+  await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
+  return availablePort;
+}
 
 function connect(url) {
   const socket = new WebSocket(url);
@@ -354,6 +360,10 @@ const requestedVariant = variantParts?.length === 2 && ["dark", "light"].include
 const variants = requestedVariant ? [[requestedVariant[0], requestedVariant[1]]] : process.env.UI_MATRIX_QUICK === "1" ? [["dark", "false"]] : [["dark", "false"], ["light", "false"], ["dark", "true"], ["light", "true"]];
 
 async function main() {
+  port = await findAvailablePort();
+  child = spawn(executable, [`--remote-debugging-port=${port}`, `--user-data-dir=${path.join(temp, "electron")}`, `--skai-isolated-smoke-app-data=${path.join(temp, "appdata")}`, "--disable-gpu", ...voiceFixtureArgs, ...displayBackendArgs], { cwd: path.dirname(executable), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  child.stdout.on("data", (chunk) => { appLog = (appLog + chunk).slice(-20000); });
+  child.stderr.on("data", (chunk) => { appLog = (appLog + chunk).slice(-20000); });
   let target;
   for (let attempt = 0; attempt < 200 && !target; attempt += 1) {
     try { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((item) => item.type === "page" && !item.url.includes("pet=1") && item.title.includes("Skai")); } catch { /* still starting */ }
@@ -1083,7 +1093,7 @@ async function main() {
             const splitterAdjusted = splitterStart && await cdp.evaluate(`(async (start, projectId) => { for (let i = 0; i < 40; i++) { const splitter = document.querySelector('.coding-split-resizer'); const value = Number(splitter?.getAttribute('aria-valuenow')); const saved = Number(localStorage.getItem('skai.coding.threadPanePercent.' + projectId)); if (value !== start && saved === value) { splitter.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); return { adjusted: true, value, saved }; } await new Promise((r) => setTimeout(r, 25)); } return { adjusted: false, value: Number(document.querySelector('.coding-split-resizer')?.getAttribute('aria-valuenow')) }; })(${splitterStart.start}, ${JSON.stringify(splitterStart.projectId)})`);
             if (!splitterAdjusted?.adjusted) throw new Error(`The split divider did not resize and persist its per-project width: ${JSON.stringify({ splitterStart, splitterAdjusted })}`);
             const panelTabs = await cdp.evaluate(`([...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].map((button) => button.textContent?.trim()))`);
-            if (!['Editor', 'Files & Changes', 'Side chat'].every((tab) => panelTabs.some((label) => label.startsWith(tab))) || panelTabs.some((label) => label === 'Files' || label === 'Changes')) throw new Error(`The split should expose one project-scoped Files & Changes page beside Side chat and Editor: ${JSON.stringify(panelTabs)}`);
+            if (!['Editor', 'Files & Changes', 'Side chat'].every((tab) => panelTabs.filter((label) => label.startsWith(tab)).length === 1) || panelTabs.some((label) => label === 'Files' || label === 'Changes')) throw new Error(`The split should expose one Editor, one Side chat, and one unified Files & Changes page, without file-by-file duplicates: ${JSON.stringify(panelTabs)}`);
             const pageGroups = await cdp.evaluate(`(() => { const shell = document.querySelector('.workspace-tabs-hotkeys.is-coding-split'); const main = shell?.querySelector(':scope > .workspace-tab-strip')?.getBoundingClientRect(); const side = shell?.querySelector(':scope > .coding-secondary-tab-group')?.getBoundingClientRect(); const rect = (value) => value && ({ x: value.x, y: value.y, width: value.width, height: value.height, right: value.right }); return { shellClass: shell?.className, display: shell && getComputedStyle(shell).display, columns: shell && getComputedStyle(shell).gridTemplateColumns, main: rect(main), side: rect(side), sideTabs: shell?.querySelectorAll('.coding-secondary-tab-group .workspace-tab').length ?? 0 }; })()`);
             const pageGroupMinimum = compactCodingPanels ? 95 : 250;
             const pageGroupsReady = pageGroups.main && pageGroups.side && pageGroups.main.width > pageGroupMinimum && pageGroups.side.width > pageGroupMinimum && Math.abs(pageGroups.main.y - pageGroups.side.y) < 2 && pageGroups.main.right <= pageGroups.side.x + 2;
@@ -1133,6 +1143,23 @@ async function main() {
                   thread: rect(thread),
                   files: rect(files),
                   composerBounds: rect(composer),
+                  threadContainerType: thread ? getComputedStyle(thread).containerType : null,
+                  composerActionsDisplay: getComputedStyle(thread?.querySelector('.composer-actions')).display,
+                  composerControlOverlaps: (() => {
+                    const groups = [...(thread?.querySelectorAll('.composer-action-left, .composer-action-right') ?? [])];
+                    const overlaps = [];
+                    for (const group of groups) {
+                      const items = [...group.children].filter((item) => getComputedStyle(item).display !== 'none');
+                      for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+                        const a = items[i].getBoundingClientRect(), b = items[j].getBoundingClientRect();
+                        if (a.width && a.height && b.width && b.height && a.left < b.right - 2 && a.right > b.left + 2 && a.top < b.bottom - 2 && a.bottom > b.top + 2) overlaps.push([items[i].className, items[j].className]);
+                      }
+                    }
+                    return overlaps;
+                  })(),
+                  editorContainer: (() => { const element = files; const style = element && getComputedStyle(element); const bounds = element?.getBoundingClientRect(); return { type: style?.containerType ?? null, name: style?.containerName ?? null, width: bounds?.width ?? null }; })(),
+                  editorTreeDisplay: getComputedStyle(files?.querySelector('.project-file-explorer')).display,
+                  editorHeadingOverflows: (() => { const heading = files?.querySelector('.file-editor-heading'); if (!heading) return false; const box = heading.getBoundingClientRect(); return [...heading.querySelectorAll('button')].some((button) => { const rect = button.getBoundingClientRect(); return rect.width > 0 && (rect.left < box.left - 2 || rect.right > box.right + 2); }); })(),
                   viewportHeight: innerHeight,
                   composer: Boolean(composer),
                   documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
@@ -1148,6 +1175,8 @@ async function main() {
                 && firstViewport.composerBounds?.bottom <= firstViewport.viewportHeight + 2
                 && !firstViewport.documentOverflow;
               if (!aligned) throw new Error(`Coding split did not keep the chat composer and workbench aligned in the first viewport: ${JSON.stringify(firstViewport)}`);
+              if (firstViewport.thread.width <= 700 && (firstViewport.composerActionsDisplay !== 'grid' || firstViewport.composerControlOverlaps.length || firstViewport.editorHeadingOverflows)) throw new Error(`Narrow coding panes must stack composer controls and keep editor actions inside their card: ${JSON.stringify(firstViewport)}`);
+              if (firstViewport.editorContainer.width <= 620 && firstViewport.editorTreeDisplay !== 'none') throw new Error(`A compact Editor pane should leave file browsing to the unified Files & Changes page: ${JSON.stringify(firstViewport)}`);
               console.log(`[coding-first-viewport] ${JSON.stringify(firstViewport)}`);
             }
             if (exerciseFocusLayout && width === 1440 && height === 900) {
@@ -1161,7 +1190,7 @@ async function main() {
               console.log("[coding-focus-layout] preview page ready");
               await selectPanel("Editor");
               const focusToggle = await cdp.evaluateWith(function () { const root = document.querySelector('.coding-project-browser.is-editor-panel'); const button = [...(root?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.trim() === 'Focus layout'); if (!button) return false; button.click(); return true; });
-              const focusedState = await cdp.evaluate(`(() => { const composer = document.querySelector('.project-thread-panel .composer-card')?.getBoundingClientRect(); const emptyEditor = document.querySelector('.coding-editor-empty-state')?.getBoundingClientRect(); return { active: document.querySelector('.coding-session-grid')?.classList.contains('is-focus-layout'), metadata: getComputedStyle(document.querySelector('.coding-project-context')).display, projectHeading: getComputedStyle(document.querySelector('.coding-project-heading')).display, projectOverview: getComputedStyle(document.querySelector('.coding-project-overview')).display, contextStrip: getComputedStyle(document.querySelector('.coding-context-strip')).display, harnessCatalog: getComputedStyle(document.querySelector('.coding-harness-adapters')).display, tree: getComputedStyle(document.querySelector('.coding-project-browser .project-file-explorer')).display, activePanel: document.querySelector('.coding-project-browser')?.className, emptyEditorHeight: emptyEditor?.height ?? null, composerTop: composer?.top ?? null, composerBottom: composer?.bottom ?? null, viewportHeight: innerHeight, composerReachable: Boolean(composer && composer.top >= 0 && composer.bottom <= innerHeight) }; })()`);
+              const focusedState = await cdp.evaluate(`(() => { const composer = document.querySelector('.project-thread-panel .composer-card')?.getBoundingClientRect(); const emptyEditor = document.querySelector('.coding-editor-empty-state')?.getBoundingClientRect(); const editor = document.querySelector('.coding-project-browser.is-editor-panel'); return { active: document.querySelector('.coding-session-grid')?.classList.contains('is-focus-layout'), metadata: getComputedStyle(document.querySelector('.coding-project-context')).display, projectHeading: getComputedStyle(document.querySelector('.coding-project-heading')).display, projectOverview: getComputedStyle(document.querySelector('.coding-project-overview')).display, contextStrip: getComputedStyle(document.querySelector('.coding-context-strip')).display, harnessCatalog: getComputedStyle(document.querySelector('.coding-harness-adapters')).display, tree: getComputedStyle(editor?.querySelector('.project-file-explorer')).display, editorWidth: editor?.getBoundingClientRect().width ?? 0, activePanel: document.querySelector('.coding-project-browser')?.className, emptyEditorHeight: emptyEditor?.height ?? null, composerTop: composer?.top ?? null, composerBottom: composer?.bottom ?? null, viewportHeight: innerHeight, composerReachable: Boolean(composer && composer.top >= 0 && composer.bottom <= innerHeight) }; })()`);
               if (!focusToggle || !focusedState.active || focusedState.metadata !== 'none' || focusedState.projectHeading !== 'none' || focusedState.projectOverview !== 'none' || focusedState.contextStrip !== 'none' || focusedState.harnessCatalog !== 'none' || focusedState.tree !== 'none' || !focusedState.activePanel?.includes('is-editor-panel') || !focusedState.composerReachable || focusedState.emptyEditorHeight > 220) throw new Error(`Focus layout did not hide secondary UI, compact the empty editor, and keep the active composer in the viewport: ${JSON.stringify(focusedState)}`);
               if (process.env.UI_MATRIX_CAPTURE === "1") {
                 fs.mkdirSync(captureDirectory, { recursive: true });
@@ -1169,13 +1198,13 @@ async function main() {
                 fs.writeFileSync(path.join(captureDirectory, "coding-focus-layout-1440.png"), Buffer.from(screenshot.data, "base64"));
               }
               await clickButtonText(cdp, "Exit focus", ".coding-project-browser.is-editor-panel");
-              const restoredState = await cdp.evaluate(`(() => ({ active: document.querySelector('.coding-session-grid')?.classList.contains('is-focus-layout'), metadata: getComputedStyle(document.querySelector('.coding-project-context')).display, tree: getComputedStyle(document.querySelector('.coding-project-browser .project-file-explorer')).display, scratchpadTab: [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim() === 'Scratchpad'), previewTab: [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim() === 'Preview') }))()`);
-              if (restoredState.active || restoredState.metadata === 'none' || restoredState.tree === 'none' || !restoredState.scratchpadTab || !restoredState.previewTab) throw new Error(`Exiting focus layout did not restore the workspace pages: ${JSON.stringify(restoredState)}`);
+              const restoredState = await cdp.evaluate(`(() => { const editor = document.querySelector('.coding-project-browser.is-editor-panel'); const tree = editor?.querySelector('.project-file-explorer'); const width = editor?.getBoundingClientRect().width ?? 0; const display = tree ? getComputedStyle(tree).display : null; return { active: document.querySelector('.coding-session-grid')?.classList.contains('is-focus-layout'), metadata: getComputedStyle(document.querySelector('.coding-project-context')).display, tree: display, editorWidth: width, treeSuppressionMismatch: tree && (width <= 620 ? display !== 'none' : display === 'none'), scratchpadTab: [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim() === 'Scratchpad'), previewTab: [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].some((button) => button.textContent?.trim() === 'Preview') }; })()`);
+              if (restoredState.active || restoredState.metadata === 'none' || restoredState.treeSuppressionMismatch || !restoredState.scratchpadTab || !restoredState.previewTab) throw new Error(`Exiting focus layout did not restore the workspace pages: ${JSON.stringify(restoredState)}`);
               console.log(`[coding-focus-layout] ${JSON.stringify({ focusedState, restoredState })}`);
             }
             if (exerciseFocusLayout) continue;
-            const editorExplorerReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel .project-file-layout .project-file-explorer') && document.querySelector('.coding-project-browser.is-editor-panel .coding-explorer-project-files'))`);
-            if (!editorExplorerReady) throw new Error("Editor did not show the project file tree on its right side.");
+            const editorExplorerReady = await cdp.evaluate(`(() => { const editor = document.querySelector('.coding-project-browser.is-editor-panel'); const tree = editor?.querySelector('.project-file-explorer'); const width = editor?.getBoundingClientRect().width ?? 0; return { exists: Boolean(tree && editor?.querySelector('.coding-explorer-project-files')), width, display: tree ? getComputedStyle(tree).display : null }; })()`);
+            if (!editorExplorerReady.exists || (editorExplorerReady.width <= 620 ? editorExplorerReady.display !== 'none' : editorExplorerReady.display === 'none')) throw new Error(`Editor file navigation did not match its compact pane width: ${JSON.stringify(editorExplorerReady)}`);
             await capturePanel("editor-with-files");
             await selectPanel("Side chat");
             const sideChatReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-side-chat') && document.querySelector('.coding-side-chat textarea[aria-label="Message the Coding side chat"]'))`);
@@ -1204,16 +1233,20 @@ async function main() {
               const sideTask = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const response = await window.skaiAgent.request('tasks.list'); const task = response.ok ? response.result.find((item) => item.title === 'Side chat · Inspect README.md and report what the starter project is for.') : null; if (task && task.status !== 'draft') return { id: task.id, status: task.status }; await new Promise((resolve) => setTimeout(resolve, 100)); } const response = await window.skaiAgent.request('tasks.list'); const settings = await window.skaiAgent.request('settings.get'); return { error: true, tasks: response.ok ? response.result.map((item) => ({ title: item.title, status: item.status, error: item.resultSummary })) : response, settings: settings.ok ? settings.result : settings, panel: document.querySelector('.coding-side-chat')?.innerText, draft: document.querySelector('.coding-side-chat textarea')?.value, composer: document.querySelector('.project-thread-panel .chat-composer')?.innerText ?? null, alerts: [...document.querySelectorAll('[role="alert"]')].map((item) => item.innerText) }; })()`);
               if (sideTask?.error || !sideTask?.id) throw new Error(`Submitting the Side chat composer did not create and queue its project-scoped task: ${JSON.stringify(sideTask)}`);
               const completedSideTask = await cdp.evaluateWith(async function (taskId) {
-                for (let i = 0; i < 200; i++) {
+                // Keep this probe below the CDP evaluation deadline so a slow
+                // local fixture returns a useful task snapshot instead of a
+                // transport timeout.
+                for (let i = 0; i < 140; i++) {
                   const response = await window.skaiAgent.request("tasks.list");
                   const task = response.ok ? response.result.find((item) => item.id === taskId) : null;
                   if (task && ["completed", "failed", "blocked", "cancelled"].includes(task.status)) return task;
                   await new Promise((resolve) => setTimeout(resolve, 100));
                 }
-                return null;
+                const response = await window.skaiAgent.request("tasks.list");
+                return response.ok ? response.result.find((item) => item.id === taskId) ?? null : null;
               }, sideTask.id);
               if (completedSideTask?.status !== "completed" || !completedSideTask.resultSummary?.includes("inspected README.md successfully")) throw new Error(`The isolated Side chat task did not complete with its model result: ${JSON.stringify(completedSideTask)}`);
-              const announcedSideTaskStatus = await cdp.evaluate(`(() => { const status = document.querySelector('.coding-side-chat-status'); return { role: status?.getAttribute('role'), live: status?.getAttribute('aria-live'), text: status?.textContent?.trim() }; })()`);
+              const announcedSideTaskStatus = await cdp.evaluate(`(async () => { for (let i = 0; i < 50; i++) { const status = document.querySelector('.coding-side-chat-status'); const result = { role: status?.getAttribute('role'), live: status?.getAttribute('aria-live'), text: status?.textContent?.trim() }; if (result.text === 'completed') return result; await new Promise((resolve) => setTimeout(resolve, 100)); } const status = document.querySelector('.coding-side-chat-status'); return { role: status?.getAttribute('role'), live: status?.getAttribute('aria-live'), text: status?.textContent?.trim() }; })()`);
               if (announcedSideTaskStatus.role !== "status" || announcedSideTaskStatus.live !== "polite" || announcedSideTaskStatus.text !== "completed") throw new Error(`Side chat completion must expose a readable live status independent of color or motion: ${JSON.stringify(announcedSideTaskStatus)}`);
               if (!completedSideTask.conversationId) throw new Error(`The Side chat task was not linked to the active project thread: ${JSON.stringify({ id: completedSideTask.id, projectId: completedSideTask.projectId, conversationId: completedSideTask.conversationId })}`);
               if (sideChatRequests !== 2 || sideChatServerProblem) throw new Error(`The isolated Side chat fixture did not complete the read-then-summary workflow: ${JSON.stringify({ requests: sideChatRequests, problem: sideChatServerProblem })}`);
@@ -1227,21 +1260,31 @@ async function main() {
                 const response = await window.skaiAgent.request("tasks.list");
                 return { visible: false, projectId: document.querySelector('.coding-project-heading-actions select')?.value, panel: document.querySelector('.coding-side-chat')?.innerText ?? null, mainThreadFound: Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent')), mainThread: document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText?.slice(0, 240) ?? null, task: response.ok ? response.result.find((item) => item.id === taskId) ?? null : response };
               }, completedSideTask.resultSummary, sideTask.id, completedSideTask.conversationId);
+              if (sideTaskState) sideTaskState.contextStrip = await cdp.evaluate("getComputedStyle(document.querySelector('.coding-context-strip')).display");
               if (!sideTaskState?.visible || sideTaskState.overview !== "none" || !sideTaskState.split) throw new Error(`The completed Side chat result did not appear in the Codex-style split beside the still-visible main Coding Agent thread: ${JSON.stringify(sideTaskState)}`);
               if (sideTaskState.primaryTabs?.some((label) => /^(Side chat|Editor|Files & Changes)/.test(label)) || !sideTaskState.projectPaneTabs?.some((label) => label.startsWith("Side chat")) || !sideTaskState.projectPaneTabs?.some((label) => label.startsWith("Files & Changes"))) throw new Error(`Project editor, side chat, and unified Files & Changes tabs must stay in the right pane, separate from the project-thread tab strip: ${JSON.stringify(sideTaskState)}`);
-              if (sideTaskState.primaryTabs?.length !== sideTaskState.expectedPrimaryTabCount || !sideTaskState.activeProjectTab || sideTaskState.workspaceTabId !== sideTaskState.activeProjectTab || sideTaskState.scopedProjectId !== sideTaskState.projectId || sideTaskState.scopedConversationId !== sideTaskState.conversationId || !sideTaskState.projectPaneLabel?.includes(sideTaskState.projectId) || !sideTaskState.projectPaneLabel?.includes("current thread")) throw new Error(`The top strip must contain only this project's threads, while the secondary strip identifies its project-thread context: ${JSON.stringify(sideTaskState)}`);
+              if (sideTaskState.primaryTabs?.length !== sideTaskState.expectedPrimaryTabCount || !sideTaskState.activeProjectTab || sideTaskState.workspaceTabId !== sideTaskState.activeProjectTab || sideTaskState.scopedProjectId !== sideTaskState.projectId || sideTaskState.scopedConversationId !== sideTaskState.conversationId || !sideTaskState.projectPaneLabel?.startsWith("Project tools for ") || !sideTaskState.projectPaneLabel?.includes("current thread")) throw new Error(`The top strip must contain only this project's threads, while the secondary strip identifies its project-thread context: ${JSON.stringify(sideTaskState)}`);
               if (width >= 761 && (sideTaskState.mainX >= sideTaskState.sideX || sideTaskState.mainWidth < 300 || sideTaskState.sideWidth < 300)) throw new Error(`The main Coding Agent thread and subagent must occupy usable left and right panes: ${JSON.stringify(sideTaskState)}`);
               if (sideTaskState.projectHeading !== "none" || sideTaskState.projectContext !== "none" || sideTaskState.contextStrip !== "none" || sideTaskState.harness !== "none") throw new Error(`Side chat split retained secondary project chrome: ${JSON.stringify(sideTaskState)}`);
               await capturePanel("side-chat");
               console.log(`[coding-side-chat] ${JSON.stringify({ status: completedSideTask.status, requests: sideChatRequests, changedFiles: completedSideTask.changedFiles, summary: completedSideTask.resultSummary })}`);
             }
             if (exerciseSideChat) continue;
+            await selectPanel("Files & Changes");
+            await clickButtonText(cdp, "Files", ".coding-project-browser.is-files-changes-panel .coding-files-changes-switch");
+            const readmeButton = await cdp.evaluate(`([...document.querySelectorAll('.coding-project-browser.is-files-changes-panel .project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)`);
+            if (!readmeButton) throw new Error("Files & Changes did not show the seeded README.md.");
+            await cdp.evaluateWith(function (fileName) { [...document.querySelectorAll('.coding-project-browser.is-files-changes-panel .project-file-item')].find((item) => item.title === fileName)?.click(); return 1; }, readmeButton);
             await selectPanel("Editor");
-            const readmeButton = await cdp.evaluate(`([...document.querySelectorAll('.coding-project-browser.is-editor-panel .project-file-item')].find((button) => button.innerText.includes('README.md'))?.getAttribute('title') ?? null)`);
-            if (!readmeButton) throw new Error("The inline project file tree did not show the seeded README.md.");
-            await cdp.evaluateWith(function (fileName) { [...document.querySelectorAll('.coding-project-browser.is-editor-panel .project-file-item')].find((item) => item.title === fileName)?.click(); return 1; }, readmeButton);
-            const monacoReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-browser.is-editor-panel .monaco-editor') && document.querySelector('.coding-project-browser.is-editor-panel .file-editor-heading')?.innerText.includes('README.md') && document.querySelector('.coding-project-browser.is-editor-panel .project-file-explorer')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-            if (!monacoReady) throw new Error("Selecting a project file did not open Monaco beside the file tree in the Editor pane.");
+            const monacoReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const editor = document.querySelector('.coding-project-browser.is-editor-panel'); const tree = editor?.querySelector('.project-file-explorer'); const width = editor?.getBoundingClientRect().width ?? 0; if (editor?.querySelector('.monaco-editor') && editor.querySelector('.file-editor-heading')?.innerText.includes('README.md') && tree && (width <= 620 ? getComputedStyle(tree).display === 'none' : getComputedStyle(tree).display !== 'none')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+            if (!monacoReady) throw new Error("Selecting README.md from Files & Changes did not open it in the Editor pane.");
+            const narrowEditor = await cdp.evaluate(`(document.querySelector('.coding-project-browser.is-editor-panel')?.getBoundingClientRect().width ?? 0) <= 620`);
+            if (narrowEditor) {
+              await clickButtonText(cdp, "Reveal in tree", ".coding-project-browser.is-editor-panel .file-editor-heading-copy");
+              const revealedInUnifiedFiles = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const panel = document.querySelector('.coding-project-browser.is-files-changes-panel.is-files-view'); const input = panel?.querySelector('input[aria-label="Filter project files"]'); if (panel && input?.value === 'README.md' && document.activeElement === input && [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab')].some((tab) => tab.classList.contains('is-active') && tab.querySelector('.workspace-tab-select')?.textContent?.trim().startsWith('Files & Changes'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+              if (!revealedInUnifiedFiles) throw new Error("Reveal in tree did not route a compact Editor pane to the README.md entry in Files & Changes.");
+              await selectPanel("Editor");
+            }
             const markdownPreviewButton = await cdp.evaluate(`Boolean([...document.querySelectorAll('.coding-project-browser.is-editor-panel .file-editor-heading button')].find((button) => button.textContent?.trim() === 'Preview'))`);
             if (!markdownPreviewButton) throw new Error("The Markdown editor did not expose its source/preview toggle.");
             await clickButtonText(cdp, "Preview", ".coding-project-browser.is-editor-panel .file-editor-heading");
@@ -1251,14 +1294,17 @@ async function main() {
             await clickButtonText(cdp, "Editor", ".coding-project-browser.is-editor-panel .file-editor-heading");
             const markdownSourceRestored = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-project-browser.is-editor-panel .monaco-editor')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!markdownSourceRestored) throw new Error("Returning from Markdown preview did not restore its editable source.");
-            const hideFiles = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Hide file explorer"]'))`);
-            if (!hideFiles) throw new Error("The editor did not expose a hide control for the file tree.");
-            await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Hide file explorer"]')?.click()`);
-            const filesHidden = await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel')?.classList.contains('is-file-explorer-hidden') && !document.querySelector('.coding-project-browser.is-editor-panel .project-file-explorer')`);
-            if (!filesHidden) throw new Error("Hiding the file explorer did not expand the editor pane.");
-            await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Show file explorer"]')?.click()`);
-            const filesRestored = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { const panel = document.querySelector('.coding-project-browser.is-editor-panel'); if (panel && !panel.classList.contains('is-file-explorer-hidden') && getComputedStyle(panel.querySelector('.project-file-explorer')).display !== 'none') return true; await new Promise((r) => setTimeout(r, 40)); } return false; })()`);
-            if (!filesRestored) throw new Error("The file explorer could not be restored after hiding it.");
+            const explorerMode = await cdp.evaluate(`(() => { const panel = document.querySelector('.coding-project-browser.is-editor-panel'); const tree = panel?.querySelector('.project-file-explorer'); return { width: panel?.getBoundingClientRect().width ?? 0, display: tree ? getComputedStyle(tree).display : null }; })()`);
+            if (explorerMode.width > 620) {
+              const hideFiles = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Hide file explorer"]'))`);
+              if (!hideFiles) throw new Error("The editor did not expose a hide control for the file tree.");
+              await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Hide file explorer"]')?.click()`);
+              const filesHidden = await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel')?.classList.contains('is-file-explorer-hidden') && !document.querySelector('.coding-project-browser.is-editor-panel .project-file-explorer')`);
+              if (!filesHidden) throw new Error("Hiding the file explorer did not expand the editor pane.");
+              await cdp.evaluate(`document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Show file explorer"]')?.click()`);
+              const filesRestored = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { const panel = document.querySelector('.coding-project-browser.is-editor-panel'); if (panel && !panel.classList.contains('is-file-explorer-hidden') && getComputedStyle(panel.querySelector('.project-file-explorer')).display !== 'none') return true; await new Promise((r) => setTimeout(r, 40)); } return false; })()`);
+              if (!filesRestored) throw new Error("The file explorer could not be restored after hiding it.");
+            } else if (explorerMode.display !== 'none') throw new Error(`Compact Editor pane unexpectedly displayed a duplicate file explorer: ${JSON.stringify(explorerMode)}`);
             await assertMainChat("Editor with Monaco and file tree");
             await capturePanel("monaco-with-files");
             await selectPanel("Files & Changes");
@@ -2214,7 +2260,10 @@ async function main() {
   console.log(`Packaged UI matrix smoke passed: ${testedRoutes.length} routes x ${testedViewports.length} window sizes x ${variants.length} theme/sidebar variants, including ${settingsCategories.length} settings categories; no runtime errors.`);
 }
 
-main().catch((error) => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
+main().catch((error) => {
+  console.error(`${error.message}\nElectron output:\n${appLog.slice(-4000) || "(no stdout or stderr captured)"}`);
+  process.exitCode = 1;
+}).finally(async () => {
   if (taskProgressServer) {
     taskProgressServer.closeAllConnections();
     await new Promise((resolve) => taskProgressServer.close(() => resolve()));
@@ -2227,14 +2276,14 @@ main().catch((error) => { console.error(error.message); process.exitCode = 1; })
     mcpReviewServer.closeAllConnections();
     await new Promise((resolve) => mcpReviewServer.close(() => resolve()));
   }
-  if (process.platform === "win32" && child.pid) {
+  if (process.platform === "win32" && child?.pid) {
     const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
     await Promise.race([
       new Promise((resolve) => { killer.once("close", resolve); killer.once("error", resolve); }),
       sleep(5000),
     ]);
     if (killer.exitCode === null && !killer.killed) killer.kill();
-  } else if (!child.killed) child.kill("SIGTERM");
+  } else if (child && !child.killed) child.kill("SIGTERM");
   await sleep(1500);
   try { fs.rmSync(temp, { recursive: true, force: true }); } catch { /* the app may release files shortly after exit */ }
 });

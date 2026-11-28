@@ -27,14 +27,14 @@ export function NavIcon({ name, ...props }: { name: NavIconName } & SVGProps<SVG
     case "clock": content = <><circle {...common} cx="12" cy="12" r="8.5" /><path {...common} d="M12 7v5l3.5 2" /></>; break;
     case "microphone": content = <><rect {...common} x="9" y="3" width="6" height="12" rx="3" /><path {...common} d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" /></>; break;
     case "headset": content = <><path {...common} d="M4 13v-1a8 8 0 0 1 16 0v1" /><rect {...common} x="3.5" y="12" width="4" height="7" rx="1.6" /><rect {...common} x="16.5" y="12" width="4" height="7" rx="1.6" /><path {...common} d="M20.5 18a4 4 0 0 1-4 3H14" /></>; break;
-    case "stop": content = <rect fill="currentColor" x="6" y="6" width="12" height="12" rx="2" />; break;
+    case "stop": content = <rect fill="currentColor" x="5" y="5" width="14" height="14" rx="2.5" />; break;
     case "arrow-right": content = <><path {...common} d="M4 12h15" /><path {...common} d="m13 6 6 6-6 6" /></> ; break;
-    case "arrow-up-right": content = <><path {...common} d="M6 18 18 6" /><path {...common} d="M9 6h9v9" /></> ; break;
-    case "chevron-left": content = <path {...common} d="m15 5-7 7 7 7" />; break;
-    case "chevron-right": content = <path {...common} d="m9 5 7 7-7 7" />; break;
+    case "arrow-up-right": content = <><path {...common} d="M5 19 19 5" /><path {...common} d="M8 5h11v11" /></> ; break;
+    case "chevron-left": content = <path {...common} d="m16 5-9 7 9 7" />; break;
+    case "chevron-right": content = <path {...common} d="m8 5 9 7-9 7" />; break;
     case "refresh": content = <><path {...common} d="M20 11a8 8 0 0 0-14.8-4L3 10" /><path {...common} d="M3 5v5h5" /><path {...common} d="M4 13a8 8 0 0 0 14.8 4L21 14" /><path {...common} d="M21 19v-5h-5" /></>; break;
-    case "close": content = <><path {...common} d="m6 6 12 12" /><path {...common} d="m18 6-12 12" /></>; break;
-    case "more": content = <><circle fill="currentColor" cx="5" cy="12" r="1.4" /><circle fill="currentColor" cx="12" cy="12" r="1.4" /><circle fill="currentColor" cx="19" cy="12" r="1.4" /></>; break;
+    case "close": content = <><path {...common} d="m5 5 14 14" /><path {...common} d="m19 5-14 14" /></>; break;
+    case "more": content = <><circle fill="currentColor" cx="4.5" cy="12" r="1.65" /><circle fill="currentColor" cx="12" cy="12" r="1.65" /><circle fill="currentColor" cx="19.5" cy="12" r="1.65" /></>; break;
     case "sidebar": content = <><rect {...common} x="3" y="4" width="18" height="16" rx="2" /><path {...common} d="M9 4v16" /></>; break;
   }
   return <svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...props}>{content}</svg>;

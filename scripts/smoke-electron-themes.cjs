@@ -369,8 +369,13 @@ async function main() {
   // accessible menu action a user sees, then select the Files page.
   await devtools.evaluate("[...document.querySelectorAll('button[aria-label=\"Add to split\"]')][0]?.click(); 1");
   await waitFor(devtools.evaluate, "Boolean(document.querySelector('[role=menuitem]'))", Boolean, "coding split actions");
-  await devtools.evaluate("[...document.querySelectorAll('[role=menuitem]')].find((item) => item.textContent?.trim() === 'Files')?.click(); 1");
-  await waitFor(devtools.evaluate, "document.querySelector('.coding-pane-tab-strip .workspace-tab-select[aria-current=page]')?.textContent?.trim()", (value) => value === "Files", "project Files page");
+  await devtools.evaluate("[...document.querySelectorAll('[role=menuitem]')].find((item) => item.textContent?.trim() === 'Files & Changes')?.click(); 1");
+  try {
+    await waitFor(devtools.evaluate, "document.querySelector('.coding-pane-tab-strip .workspace-tab-select[aria-current=page]')?.textContent?.trim()", (value) => typeof value === "string" && value.startsWith("Files & Changes"), "project Files & Changes page");
+  } catch (error) {
+    const debug = await devtools.evaluate("JSON.stringify({ hash: location.hash, title: document.title, activeProject: document.querySelector('.coding-project-heading strong')?.textContent?.trim() ?? null, selectedProject: document.querySelector('.coding-project-heading-actions select')?.value ?? null, split: document.querySelector('.coding-session-grid')?.className ?? null, tabs: [...document.querySelectorAll('.coding-secondary-tab-group .workspace-tab-select')].map((item) => item.textContent?.trim()), body: document.body.innerText.slice(0, 1200) })");
+    throw new Error(`${error.message}; project navigation state: ${debug}`);
+  }
   await waitFor(devtools.evaluate, "Boolean([...document.querySelectorAll('button')].find((item) => item.textContent?.includes('hello.ts'))?.click() ?? false) || Boolean(document.querySelector('.monaco-editor'))", Boolean, "smoke project file");
   const monacoState = JSON.parse(await waitFor(devtools.evaluate, "JSON.stringify({ editor: Boolean(document.querySelector('.monaco-editor .view-lines')), background: document.querySelector('.monaco-editor .monaco-editor-background') ? getComputedStyle(document.querySelector('.monaco-editor .monaco-editor-background')).backgroundColor : '', height: Math.round(document.querySelector('.monaco-editor-shell')?.getBoundingClientRect().height ?? 0), codeSurface: getComputedStyle(document.documentElement).getPropertyValue('--skai-color-code-surface').trim() })", (value) => JSON.parse(value).editor, "bundled Monaco editor to load"));
   const toRgb = (hex) => { const digits = hex.replace("#", ""); return `rgb(${[0, 2, 4].map((i) => parseInt(digits.slice(i, i + 2), 16)).join(", ")})`; };

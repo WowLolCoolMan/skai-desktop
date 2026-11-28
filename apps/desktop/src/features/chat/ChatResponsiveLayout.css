@@ -1,0 +1,43 @@
+/* Keep thread context beside the conversation only while both columns have
+   enough room for their controls. On compact desktop windows the rail moves
+   below the transcript so it cannot squeeze the composer into collisions. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .app-content-chat .chat-layout.has-thread-activity,
+  .app-content-chat .chat-layout.has-chat-details,
+  .app-content-chat .chat-layout.has-chat-tools {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .app-content-chat .chat-layout.has-thread-activity .chat-rail,
+  .app-content-chat .chat-layout.has-chat-details .chat-rail,
+  .app-content-chat .chat-layout.has-chat-tools .chat-rail {
+    display: grid;
+    order: 2;
+    max-height: 34vh;
+    overflow: auto;
+  }
+
+  .app-content-chat .chat-page .composer-card .composer-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .app-content-chat .chat-page .composer-card .composer-action-left,
+  .app-content-chat .chat-page .composer-card .composer-action-right {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .app-content-chat .chat-page .composer-card .composer-action-right .model-picker {
+    min-width: 120px;
+    max-width: none;
+    flex: 1 1 140px;
+  }
+
+  .app-content-chat .chat-page .composer-card .composer-hint {
+    display: none;
+  }
+}

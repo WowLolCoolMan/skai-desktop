@@ -16,6 +16,7 @@
     "test:update-policy": "node scripts/test-update-policy.cjs && node scripts/test-update-manager.cjs",
     "test:agent-host-client": "node scripts/test-agent-host-client.cjs",
     "test:linux-windowing": "node scripts/test-linux-windowing.cjs",
+    "test:window-state": "node scripts/test-window-state.cjs",
     "audit:future-features": "node scripts/audit-future-features.cjs",
     "audit:electron-runtime": "node scripts/audit-electron-runtime.cjs",
     "audit:electron-tray": "node scripts/audit-electron-tray.cjs",

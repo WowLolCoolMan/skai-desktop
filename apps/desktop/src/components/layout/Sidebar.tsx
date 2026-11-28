@@ -4,6 +4,7 @@ import type { DesktopConversation, DesktopProject } from "../../../shared/contra
 import { NavIcon } from "../ui/NavIcon";
 import { formatShortcutForAssistiveTech, formatShortcutLabel } from "../../features/commands/preferences";
 import { Button } from "../ui/Primitives";
+import "./LongLabelLayout.css";
 
 type ConversationPatch = { pinned?: boolean; archived?: boolean; title?: string };
 type AgentMode = "ChatBot" | "Coding Agent";

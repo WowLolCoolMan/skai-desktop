@@ -52,36 +52,36 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px 0;
-  color: var(--text-muted, #a8a0b5);
-  font-size: 11px;
+  color: var(--skai-color-text-muted);
+  font-size: var(--skai-text-essential);
 }
 
 .composer-draft-hints-label {
-  color: var(--accent, #f6a04d);
+  color: var(--skai-color-accent-text);
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
 }
 
 .composer-draft-hint {
-  border: 1px solid color-mix(in srgb, var(--accent, #f6a04d) 24%, transparent);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--skai-color-accent) 24%, transparent);
+  border-radius: var(--skai-radius-pill);
   padding: 3px 8px;
 }
 
 .composer-plan-first {
-  border: 1px solid color-mix(in srgb, var(--accent, #f6a04d) 42%, transparent);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--skai-color-accent) 42%, transparent);
+  border-radius: var(--skai-radius-pill);
   padding: 5px 9px;
-  color: var(--accent-text, #ffc078);
-  background: color-mix(in srgb, var(--accent, #f6a04d) 8%, transparent);
-  font-size: 11px;
+  color: var(--skai-color-accent-text);
+  background: color-mix(in srgb, var(--skai-color-accent) 8%, transparent);
+  font-size: var(--skai-text-essential);
   font-weight: 650;
 }
 
 .composer-plan-first:hover,
 .composer-plan-first:focus-visible {
-  background: color-mix(in srgb, var(--accent, #f6a04d) 16%, transparent);
+  background: color-mix(in srgb, var(--skai-color-accent) 16%, transparent);
 }
 
 .composer-tool-recommendations > span {
@@ -117,7 +117,7 @@
 .composer-tool-picker-heading > div { display: grid; gap: 2px; min-width: 0; }
 .composer-tool-picker-heading strong { color: var(--skai-color-text); font-size: var(--skai-text-xs); }
 .composer-tool-picker-heading small, .composer-tool-row small { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
-.composer-tool-picker-back { width: 24px; height: 24px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: transparent; font-size: 18px; }
+.composer-tool-picker-back { width: 24px; height: 24px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: transparent; font-size: var(--skai-text-xl); }
 .composer-tool-search { width: 100%; min-height: 30px; padding: 6px 8px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
 .composer-tool-scope { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
 .composer-tool-scope select { max-width: 190px; padding: 4px 6px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font-size: var(--skai-text-3xs); }

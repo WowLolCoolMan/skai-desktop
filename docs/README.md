@@ -95,6 +95,6 @@ is a short introduction; this repository is the detailed source of truth.
 - [Accessibility statement](../ACCESSIBILITY.md)
 - [Support](../SUPPORT.md)
 - [Security policy](../SECURITY.md)
-- [Source Reference License](../LICENSE)
+- [Modified MIT License](../LICENSE)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md)
 - [Contributor License Agreement](../CONTRIBUTOR_LICENSE_AGREEMENT.md)

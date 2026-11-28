@@ -6,6 +6,7 @@ import { ModalDialog } from "../../components/ui/ModalDialog";
 import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { ModelPicker } from "../../components/ui/ModelPicker";
 import { ChatMessageList } from "./ChatMessageList";
+import "./ChatResponsiveLayout.css";
 import { ChatThreadActivity } from "./ChatThreadActivity";
 import { ChatComposer, type ComposerTarget } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";

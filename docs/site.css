@@ -9,3 +9,21 @@
 .read-progress{position:fixed;top:77px;left:0;width:100%;height:2px;z-index:6;pointer-events:none;background:var(--lime);transform:scaleX(0);transform-origin:left}
 @supports(animation-timeline:scroll()){.read-progress{animation:reading-progress linear both;animation-timeline:scroll(root block)}@keyframes reading-progress{to{transform:scaleX(1)}}}
 @media(max-width:680px){.read-progress{top:65px}}
+
+.license-section{border-top:1px solid var(--line)}
+.license-section .section-heading{max-width:760px}
+.license-section .section-heading h2{margin-bottom:20px}
+.license-board{border:1px solid var(--line);background:#0d121a}
+.license-row{display:grid;grid-template-columns:20px 1fr auto;gap:15px;align-items:start;padding:20px;border-bottom:1px solid var(--line)}
+.license-signal{display:grid;place-items:center;width:16px;height:16px;margin-top:4px;border:1px solid;border-radius:50%;font:10px var(--mono)}
+.license-signal-good{color:#9ee39d;border-color:#587b56}
+.license-signal-warn{color:#ffd16a;border-color:#806d45}
+.license-signal-muted{color:var(--blue);border-color:#506d99}
+.license-row b{font-size:13px}
+.license-row p{margin:4px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+.license-state{padding-top:4px;color:#a5d6a0;font:8px var(--mono);white-space:nowrap}
+.license-state-warn{color:#edcd83}
+.license-state-muted{color:#9ebbf2}
+.license-actions{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:3px 20px 15px}
+.license-actions .text-link{margin-top:12px;font-size:11px}
+@media(max-width:680px){.license-row{grid-template-columns:20px 1fr;gap:11px;padding:16px}.license-state{grid-column:2;padding-top:0}.license-actions{display:grid;gap:0;padding-inline:16px}}

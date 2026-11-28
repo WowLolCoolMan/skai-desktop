@@ -48,6 +48,7 @@ export function AppearanceOptions() {
   const options = state.options;
   const set = <K extends keyof Options>(key: K, value: Options[K]) => void themeEngine.setOption(key, value);
   const [textScale, setTextScale] = useState(options.textScale);
+  const setTextScaleOption = (value: number) => { setTextScale(value); void themeEngine.setOption("textScale", value); };
   useEffect(() => setTextScale(options.textScale), [options.textScale]);
   // Accent choices come from the active theme's own palette (ANSI colors), plus a picker.
   const [swatches, setSwatches] = useState<string[]>([]);
@@ -63,7 +64,7 @@ export function AppearanceOptions() {
       <div className="appearance-option">
         <span>Text size</span>
         <div className="appearance-range">
-          <input type="range" min={80} max={200} step={5} value={Math.round(textScale * 100)} onChange={(event) => setTextScale(Number(event.target.value) / 100)} onPointerUp={() => set("textScale", textScale)} onKeyUp={() => set("textScale", textScale)} aria-label="Text size" />
+          <input type="range" min={80} max={200} step={5} value={Math.round(textScale * 100)} onChange={(event) => setTextScaleOption(Number(event.target.value) / 100)} aria-label="Text size" />
           <output>{Math.round(textScale * 100)}%</output>
           {options.textScale !== 1 && <Button type="button" variant="ghost" onClick={() => set("textScale", 1)}>100%</Button>}
         </div>

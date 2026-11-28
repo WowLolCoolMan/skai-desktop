@@ -1,0 +1,163 @@
+/* Keep project metrics and quick actions available without letting the
+   overview push the active conversation/editor split below the first screen. */
+.app-content-coding .coding-page-active .coding-project-overview-disclosure {
+  min-width: 0;
+  flex: 0 0 auto;
+  margin: 2px 0 4px;
+  border: 1px solid var(--skai-color-border);
+  border-radius: var(--skai-radius-md);
+  background: var(--skai-color-surface);
+}
+
+.app-content-coding .coding-project-overview-disclosure > summary {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  color: var(--skai-color-text);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.app-content-coding .coding-project-overview-disclosure > summary strong {
+  flex: 0 0 auto;
+  font-size: var(--skai-text-xs);
+  font-weight: 600;
+}
+
+.app-content-coding .coding-project-overview-disclosure > summary span {
+  overflow: hidden;
+  color: var(--skai-color-text-muted);
+  font-size: var(--skai-text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-content-coding .coding-project-overview-disclosure[open] {
+  max-height: min(44vh, 440px);
+  overflow: auto;
+}
+
+.app-content-coding .coding-project-overview-disclosure[open] > .coding-project-overview {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--skai-color-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-content-coding .coding-page-active .coding-health-banner {
+  width: 100%;
+  max-width: 100%;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.app-content-coding .coding-page-active .coding-health-banner > .nav-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.app-content-coding .coding-page-active .coding-health-banner > div {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.app-content-coding .coding-page-active .coding-health-banner strong,
+.app-content-coding .coding-page-active .coding-health-banner span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1101px) {
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open {
+    min-height: min(720px, calc(100dvh - 460px));
+  }
+}
+
+.app-content-coding .project-thread-panel {
+  container: coding-thread / inline-size;
+}
+
+@container coding-thread (max-width: 700px) {
+  body .app-content-coding .coding-page-active .project-thread-panel .chat-page .composer-card .composer-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  body .app-content-coding .coding-page-active .project-thread-panel .chat-page .composer-card .composer-action-left,
+  body .app-content-coding .coding-page-active .project-thread-panel .chat-page .composer-card .composer-action-right {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  body .app-content-coding .coding-page-active .project-thread-panel .chat-page .composer-card .composer-action-right .model-picker {
+    min-width: 120px;
+    max-width: none;
+    flex: 1 1 140px;
+  }
+
+  body .app-content-coding .coding-page-active .project-thread-panel .chat-page .composer-card .composer-hint {
+    display: none;
+  }
+}
+
+.app-content-coding .coding-project-browser.is-editor-panel {
+  container: coding-editor-panel / inline-size;
+}
+
+@container coding-editor-panel (max-width: 620px) {
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading > .file-editor-heading-copy,
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading > div:not(.file-editor-heading-copy) {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .file-editor-heading > div:not(.file-editor-heading-copy) {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  /* The split pane already has a dedicated Files & Changes page. Keep the
+     editor's actions usable instead of forcing a second tree beside Monaco. */
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-file-explorer {
+    display: none;
+  }
+
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-file-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-browser-actions > button[aria-label="Hide file explorer"],
+  body .app-content-coding .coding-page-active .coding-session-grid.is-chat .coding-project-browser.is-editor-panel .project-browser-actions > button[aria-label="Show file explorer"] {
+    display: none;
+  }
+}
+
+.app-content-coding .coding-harness-adapters[open] {
+  display: grid;
+  max-height: min(36vh, 340px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.app-content-coding .coding-harness-adapters[open] > ul {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+body:has(.coding-session-grid.is-split-open) .app-content-coding .coding-project-overview-disclosure,
+body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-project-overview-disclosure {
+  display: none !important;
+}

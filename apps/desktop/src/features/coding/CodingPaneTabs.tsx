@@ -6,7 +6,6 @@ import { NavIcon } from "../../components/ui/NavIcon";
 type CodingPaneTabsProps = {
   pages: CodingPanePage[];
   activePageId: string;
-  selectedFile: string | null;
   changeCount: number;
   contextLabel: string;
   isSplitOpen: boolean;
@@ -18,10 +17,10 @@ type CodingPaneTabsProps = {
   onCloseSplit: () => void;
 };
 
-export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount, contextLabel, isSplitOpen, onSelect, onClose, onReorder, onOpenPanel, onApplyPreset, onCloseSplit }: CodingPaneTabsProps) {
+export function CodingPaneTabs({ pages, activePageId, changeCount, contextLabel, isSplitOpen, onSelect, onClose, onReorder, onOpenPanel, onApplyPreset, onCloseSplit }: CodingPaneTabsProps) {
   const actions = [
     { label: "Side chat", onSelect: () => onOpenPanel("side-chat") },
-    { label: selectedFile ? `Editor · ${selectedFile.split(/[\\/]/).pop()}` : "Editor", onSelect: () => onOpenPanel("editor", selectedFile ?? undefined) },
+    { label: "Editor", onSelect: () => onOpenPanel("editor") },
     { label: "Files & Changes", onSelect: () => onOpenPanel("files-changes") },
     { label: "Scratchpad", onSelect: () => onOpenPanel("scratchpad") },
     { label: "Preview", onSelect: () => onOpenPanel("preview") },
@@ -54,6 +53,6 @@ export function CodingPaneTabs({ pages, activePageId, selectedFile, changeCount,
         <button className="workspace-tab-close" type="button" aria-label={`Close ${title}`} title="Close page" disabled={pages.length <= 1} onClick={() => onClose(page.id)}><NavIcon name="close" /></button>
       </div>;
     })}</div>
-    <OverflowMenu label="Workspace layout" items={presets} /><OverflowMenu label="Add a page to the split view" icon={<NavIcon name="plus" />} items={[...actions, { label: "Close split view", onSelect: onCloseSplit }]} />
+    <OverflowMenu label="Workspace layout" icon={<NavIcon name="more" />} items={presets} /><OverflowMenu label="Add a page to the split view" icon={<NavIcon name="plus" />} items={[...actions, { label: "Close split view", onSelect: onCloseSplit }]} />
   </div>;
 }

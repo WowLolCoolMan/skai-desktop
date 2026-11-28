@@ -1,0 +1,80 @@
+/* Keep text flexible while reserving stable slots for adjacent controls. This
+   lets long words and mixed scripts wrap instead of pushing icons or shortcuts
+   outside their button. */
+.sidebar-agent-trigger > span,
+.sidebar-agent-menu > button > span:nth-of-type(1),
+.new-chat-button > span,
+.toolbar-route-context-copy {
+  min-width: 0;
+}
+
+.sidebar-agent-trigger > span,
+.new-chat-button > span {
+  overflow: hidden;
+}
+
+.sidebar-agent-switcher,
+.new-chat-button {
+  flex: 0 0 auto;
+}
+
+.sidebar-agent-trigger > .nav-icon:first-child {
+  flex: 0 0 30px;
+}
+
+.sidebar-agent-trigger > .nav-icon:last-child {
+  flex: 0 0 14px;
+}
+
+.sidebar-agent-menu > button > .nav-icon,
+.new-chat-button > .nav-icon,
+.new-chat-button > kbd,
+.toolbar-route-context > .nav-icon,
+.toolbar-mode-chip {
+  flex: 0 0 auto;
+}
+
+.sidebar-agent-trigger strong,
+.sidebar-agent-menu strong,
+.sidebar-agent-menu small,
+.new-chat-button > span,
+.toolbar-route-context-copy strong,
+.toolbar-route-context-copy small,
+.toolbar-mode-chip {
+  overflow-wrap: anywhere;
+}
+
+.toolbar-route-context-copy strong,
+.toolbar-route-context-copy small {
+  min-width: 0;
+}
+
+.toolbar-route-context {
+  flex: 0 1 auto;
+  max-width: min(48vw, 560px);
+  overflow: hidden;
+}
+
+.toolbar-route-context-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.toolbar-route-context-copy strong {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-agent-trigger strong,
+.new-chat-button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

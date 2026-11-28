@@ -17,6 +17,37 @@ const packagedBinary = process.platform === "win32" ? "Skai Desktop.exe" : "Skai
 const hostBinary = process.platform === "win32" ? "SkaiDesktop.AgentHost.exe" : "SkaiDesktop.AgentHost";
 const desktopPackage = JSON.parse(fs.readFileSync(path.join(desktopRoot, "package.json"), "utf8"));
 let committed = false;
+
+function sleepSync(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function removeDirectoryBestEffort(target) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      if (!fs.existsSync(target)) return true;
+      fs.rmSync(target, { recursive: true, force: true, maxRetries: 2, retryDelay: 150 });
+      return !fs.existsSync(target);
+    } catch (error) {
+      if (!(["EPERM", "EBUSY", "ENOTEMPTY", "EACCES"].includes(error?.code))) throw error;
+      sleepSync(250);
+    }
+  }
+  return !fs.existsSync(target);
+}
+
+function cleanupPreviousOutputs() {
+  const parent = path.dirname(finalOutputRoot);
+  const prefix = `${path.basename(finalOutputRoot)}.previous-`;
+  try {
+    for (const entry of fs.readdirSync(parent, { withFileTypes: true })) {
+      if (!entry.name.startsWith(prefix)) continue;
+      const target = path.join(parent, entry.name);
+      if (!removeDirectoryBestEffort(target)) console.warn(`Keeping locked previous Electron artifact for a later cleanup: ${target}`);
+    }
+  } catch { /* cleanup must never hide a successfully staged artifact */ }
+}
+
 process.on("exit", () => {
   if (!committed) {
     try { fs.rmSync(outputRoot, { recursive: true, force: true }); } catch { /* preserve the original failure */ }
@@ -169,7 +200,7 @@ if (fs.existsSync(finalOutputRoot)) fs.renameSync(finalOutputRoot, previousOutpu
 try {
   fs.renameSync(outputRoot, finalOutputRoot);
   committed = true;
-  if (fs.existsSync(previousOutputRoot)) fs.rmSync(previousOutputRoot, { recursive: true, force: true });
+  cleanupPreviousOutputs();
 } catch (error) {
   if (!fs.existsSync(finalOutputRoot) && fs.existsSync(previousOutputRoot)) fs.renameSync(previousOutputRoot, finalOutputRoot);
   throw error;
