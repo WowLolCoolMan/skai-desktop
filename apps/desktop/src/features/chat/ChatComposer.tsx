@@ -515,6 +515,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     else { setOmniOpen(false); onNavigate("marketplace"); }
   };
   const selectedToolIds = [...new Set([...persistentToolIds, ...oneTurnToolIds])];
+  const effectivePolicyLabel = `${projectId ? "Connected project folders" : "Attached sources only"} · ${modeLabel === "Review" || target === "review" || target === "research" ? "read-only" : "approval-gated changes"} · ${selectedToolIds.length ? `${selectedToolIds.length} selected tool${selectedToolIds.length === 1 ? "" : "s"}` : "no extra tools"}`;
   const freezeContext = () => setContextSnapshot({ draft, attachments: attachments.map((attachment) => ({ ...attachment })), toolIds: selectedToolIds, persistentToolIds: [...persistentToolIds], capturedAt: new Date().toISOString() });
   const restoreContext = () => {
     if (!contextSnapshot) return;
@@ -633,6 +634,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
               <div><span>Skills and tools</span><span>{selectedToolIds.length ? `${selectedToolIds.length} selected for ${toolScope === "persistent" ? "future turns" : "this turn"}` : ([...new Set(draft.match(/\$([A-Za-z0-9._-]{1,80})\b/g) ?? [])].slice(0, 4).join(", ").replaceAll("$", "") || "Add a $skill-id or choose Skills and tools")}</span></div>
               <div><span>Memory</span><span>{localStorage.getItem("skai.memoryInjectionEnabled") === "true" ? "Enabled · approved local notes only" : "Off for this workspace"}</span></div>
               <div><span>Mode policy</span><span>{modeLabel === "Agent" || modeLabel === "Coding" ? "Mutating tools require approval" : modeLabel === "Review" ? "Read-only review · no writes" : "Conversation tools stay local and explicit"}</span></div>
+              <div><span>Effective policy</span><span>{effectivePolicyLabel}</span></div>
               <div><span>Connected tools</span><span>MCP tools require explicit review in Marketplace; they are not silently called from chat.</span></div>
               <div><span>Computer use</span><span>Starts only from Add to message and requires a local vision model.</span></div>
             </div>
