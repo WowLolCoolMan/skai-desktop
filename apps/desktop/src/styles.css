@@ -5345,6 +5345,10 @@ small[class], time,
 .chat-message:not(:hover):not(:focus-within) .message-actions { opacity: .7; }
 .chat-message:focus-within .message-actions, .chat-message:hover .message-actions { opacity: 1; }
 .message-meta > span, .sidebar-label, .sidebar-project-thread-count, .workspace-tab-status, .conversation-count, .panel-count, .model-picker-label { font-variant-numeric: tabular-nums; }
+.coding-project-scratchpad-count, .composer-context-meter, .update-progress-copy > span,
+.plugins-count, .plugins-category-count, .marketplace-model-more > span,
+.usage-meter-heading > span, .pet-workshop-blink-control output,
+.workspace-backup-preview > div > span:last-of-type { font-variant-numeric: tabular-nums; }
 .sidebar-muted, .sidebar-project-no-threads, .sidebar-project-thread-count, .form-helper, .composer-hint, .settings-save-status { font-size: max(var(--skai-text-xs), 12px); }
 .sidebar-project-tree-open span, .sidebar-project-thread > span, .sidebar-history-item, .workspace-tab-select > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-history-item { display: flex; align-items: center; gap: 8px; }
