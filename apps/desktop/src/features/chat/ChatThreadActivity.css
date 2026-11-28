@@ -37,3 +37,9 @@
 .thread-run-report dl > div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 7px; }
 .thread-run-report dt { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
 .thread-run-report dd { margin: 0; overflow-wrap: anywhere; color: var(--skai-color-text); font-size: var(--skai-text-3xs); line-height: 1.35; }
+.thread-run-failure { margin-top: 8px; padding: 7px 8px; border: 1px solid color-mix(in srgb, var(--skai-color-danger) 42%, var(--skai-color-border)); border-radius: var(--skai-radius-sm); background: color-mix(in srgb, var(--skai-color-danger) 7%, transparent); }
+.thread-run-failure > strong { color: var(--skai-color-danger); font-size: var(--skai-text-3xs); }
+.thread-run-failure dl { display: grid; gap: 5px; margin: 6px 0 0; }
+.thread-run-failure dl > div { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; }
+.thread-run-failure dt { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.thread-run-failure dd { margin: 0; overflow-wrap: anywhere; color: var(--skai-color-text); font-size: var(--skai-text-3xs); line-height: 1.35; }
