@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Card } from "../../components/ui/Primitives";
+import { Button, Card, StatusBadge } from "../../components/ui/Primitives";
 import { NavIcon } from "../../components/ui/NavIcon";
 import "./pluginsMcpHealth.css";
+import "./VoicePreflight.css";
 import { installedVoiceModels, refreshInstalledVoiceModels, saveVoiceSetting, selectedVoiceSettings, speakNativeResponse, stopNativeSpeech, voiceProfiles } from "../../services/nativeTts";
 import { request } from "./marketplaceRequest";
 
@@ -23,6 +24,7 @@ type StoredVoiceClip = {
 };
 
 type PreviewableVoiceClip = StoredVoiceClip & { previewUrl: string };
+type VoicePreflightCheck = { label: string; status: "idle" | "checking" | "pass" | "warn" | "fail"; detail: string };
 
 const WORKBENCH_PROFILES_KEY = "skai.voice.workbench.profiles";
 const WORKBENCH_NOTICE_KEY = "skai.voice.workbench.rightsNoticeAcknowledged";
@@ -124,6 +126,14 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
   const [storedClips, setStoredClips] = useState<PreviewableVoiceClip[]>([]);
   const [clipsLoading, setClipsLoading] = useState(false);
   const [clipQuery, setClipQuery] = useState("");
+  const [voicePreflight, setVoicePreflight] = useState<VoicePreflightCheck[]>([
+    { label: "Microphone", status: "idle", detail: "Not checked; the test asks only when you start it." },
+    { label: "Speaker output", status: "idle", detail: "Not checked." },
+    { label: "Selected runtime", status: "idle", detail: "Not checked." },
+    { label: "Agent Host voice", status: "idle", detail: "Not checked." },
+    { label: "Native fallback", status: "idle", detail: "Not checked." },
+  ]);
+  const [voicePreflightRunning, setVoicePreflightRunning] = useState(false);
   const previewUrls = useRef(new Set<string>());
   const makePreviewable = (clip: StoredVoiceClip): PreviewableVoiceClip => {
     const blob = clip.blob.type.startsWith("audio/")
@@ -240,6 +250,42 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
     setClipStorageNotice(`Removed ${clip.name} from this voice profile.`);
   };
   const acknowledgeRightsNotice = () => { localStorage.setItem(WORKBENCH_NOTICE_KEY, "true"); setRightsNoticeOpen(false); };
+  const runVoicePreflight = async () => {
+    if (voicePreflightRunning) return;
+    setVoicePreflightRunning(true);
+    const checks: VoicePreflightCheck[] = [
+      { label: "Microphone", status: "checking", detail: "Checking microphone permission…" },
+      { label: "Speaker output", status: "checking", detail: "Checking browser audio output…" },
+      { label: "Selected runtime", status: "checking", detail: "Checking the selected local voice runtime…" },
+      { label: "Agent Host voice", status: "checking", detail: "Reading local voice status…" },
+      { label: "Native fallback", status: "checking", detail: "Checking the built-in speech fallback…" },
+    ];
+    setVoicePreflight(checks);
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) checks[0] = { label: "Microphone", status: "fail", detail: "This window does not expose microphone capture." };
+      else {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+          checks[0] = { label: "Microphone", status: "pass", detail: "Microphone permission and capture are available." };
+        } catch (error) {
+          checks[0] = { label: "Microphone", status: "fail", detail: error instanceof Error ? error.message : "Microphone permission was not granted." };
+        }
+      }
+      checks[1] = typeof window.speechSynthesis === "object" ? { label: "Speaker output", status: "pass", detail: "Browser speech output is available for playback." } : { label: "Speaker output", status: "fail", detail: "Browser speech output is unavailable." };
+      checks[2] = activeRuntime ? { label: "Selected runtime", status: "pass", detail: `${activeRuntime.name} is installed and selected.` } : { label: "Selected runtime", status: "warn", detail: "No local voice runtime is installed; native fallback may still work." };
+      try {
+        const response = await request("voice.status");
+        checks[3] = response.ok ? { label: "Agent Host voice", status: "pass", detail: "Agent Host returned a local voice status." } : { label: "Agent Host voice", status: "fail", detail: response.error?.message ?? "Agent Host voice status failed." };
+      } catch (error) {
+        checks[3] = { label: "Agent Host voice", status: "fail", detail: error instanceof Error ? error.message : "Agent Host voice status failed." };
+      }
+      checks[4] = typeof window.speechSynthesis === "object" ? { label: "Native fallback", status: "pass", detail: "Native speech fallback is ready if the local runtime is unavailable." } : { label: "Native fallback", status: "fail", detail: "No native fallback is available in this window." };
+      setVoicePreflight([...checks]);
+    } finally {
+      setVoicePreflightRunning(false);
+    }
+  };
   return (
     <div className="voice-workbench-view">
       <header className="voice-workbench-header">
@@ -254,6 +300,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
         </div>
       </header>
       {rightsNoticeOpen && <Card className="voice-workbench-notice"><p className="section-kicker">ONE-TIME NOTICE</p><h3>Use voice clips responsibly</h3><p>Only create an identifiable voice profile when you have the person’s permission or the rights to use the recordings. Skai keeps profile metadata local and does not treat a voice profile as proof of identity.</p><Button variant="primary" type="button" onClick={acknowledgeRightsNotice}>I understand</Button></Card>}
+      <Card className="voice-preflight-card"><div className="voice-preflight-heading"><div><p className="section-kicker">VOICE PREFLIGHT</p><h3>Check the voice path before starting a live session</h3><p className="marketplace-muted">This is an explicit local check. Microphone access is requested only after you press the button; no audio is recorded or uploaded.</p></div><Button variant="secondary" type="button" disabled={voicePreflightRunning} aria-busy={voicePreflightRunning} onClick={() => void runVoicePreflight()}>{voicePreflightRunning ? "Checking…" : "Run voice preflight"}</Button></div><div className="voice-preflight-grid">{voicePreflight.map((check) => <div className="voice-preflight-row" key={check.label}><span><strong>{check.label}</strong><small>{check.detail}</small></span><StatusBadge tone={check.status === "pass" ? "success" : check.status === "fail" ? "danger" : check.status === "warn" ? "warning" : "neutral"}>{check.status === "pass" ? "Ready" : check.status === "fail" ? "Blocked" : check.status === "warn" ? "Fallback" : check.status === "checking" ? "Checking" : "Not checked"}</StatusBadge></div>)}</div></Card>
       <div className="voice-workbench-grid">
         <Card>
           <p className="section-kicker">VOICE PROFILES</p>
