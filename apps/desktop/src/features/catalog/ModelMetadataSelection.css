@@ -35,6 +35,15 @@
 .model-fit-card { display:grid; gap:8px; margin-top:16px; padding:16px; }
 .model-fit-card h3 { margin:0; font-size:var(--skai-text-lg); }
 .model-fit-card ul { display:grid; gap:6px; margin:0; padding-left:20px; color:var(--skai-color-text-muted); font-size:var(--skai-text-sm); line-height:1.45; }
+.model-capability-test { display:grid; gap:10px; margin-top:6px; padding:12px; border:1px solid color-mix(in srgb,var(--skai-color-accent) 34%,var(--skai-color-border)); border-radius:var(--skai-radius-md); background:color-mix(in srgb,var(--skai-color-accent) 5%,var(--skai-color-surface)); }
+.model-capability-test > div:first-child { display:grid; gap:4px; }
+.model-capability-test strong { font-size:var(--skai-text-sm); }
+.model-capability-test span { color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); line-height:1.45; }
+.model-capability-test-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.model-capability-test-result { margin:0; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); line-height:1.4; }
+.model-capability-test-result.is-success { color:var(--skai-color-success); }
+.model-capability-test-result.is-error { color:var(--skai-color-danger); }
+.model-capability-test-preview { display:block; max-height:80px; overflow:auto; padding:8px; border:1px solid var(--skai-color-border); border-radius:var(--skai-radius-sm); color:var(--skai-color-text-muted); background:var(--skai-color-surface-soft); font-size:var(--skai-text-3xs); white-space:pre-wrap; overflow-wrap:anywhere; }
 @media (max-width:900px) { .models-page-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }.models-library-layout { grid-template-columns:1fr; }.model-inspector { order:-1; }.catalog-discovery-status { margin-left:0; } }
 @media (max-width:560px) { .models-page-overview { grid-template-columns:1fr 1fr; }.models-library-layout .catalog-row { grid-template-columns:auto minmax(0,1fr); }.catalog-row-meta { grid-column:2; justify-content:flex-start; }.model-install-review-actions { justify-content:flex-start; flex-wrap:wrap; } }
 
