@@ -1040,6 +1040,31 @@ async function main() {
               await selectPanel(label);
             };
             await selectPanel("Editor");
+            if (width >= 900) {
+              const firstViewport = await cdp.evaluate(`(() => {
+                const grid = document.querySelector('.coding-session-grid.is-chat');
+                const thread = grid?.querySelector(':scope > .project-thread-panel:not([hidden])');
+                const files = grid?.querySelector(':scope > .coding-project-browser');
+                const composer = thread?.querySelector('.composer-card');
+                const rect = (element) => { const value = element?.getBoundingClientRect(); return value ? { x: value.x, y: value.y, width: value.width, height: value.height, right: value.right, bottom: value.bottom } : null; };
+                return {
+                  splitOpen: Boolean(grid?.classList.contains('is-split-open')),
+                  grid: rect(grid),
+                  thread: rect(thread),
+                  files: rect(files),
+                  composer: Boolean(composer),
+                  documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
+                };
+              })()`);
+              const aligned = firstViewport.splitOpen && firstViewport.thread && firstViewport.files && firstViewport.composer
+                && firstViewport.thread.width >= 280 && firstViewport.files.width >= 280
+                && Math.abs(firstViewport.thread.y - firstViewport.files.y) < 3
+                && firstViewport.thread.bottom <= (firstViewport.grid?.bottom ?? Infinity) + 2
+                && firstViewport.files.bottom <= (firstViewport.grid?.bottom ?? Infinity) + 2
+                && !firstViewport.documentOverflow;
+              if (!aligned) throw new Error(`Coding split did not keep the chat composer and workbench aligned in the first viewport: ${JSON.stringify(firstViewport)}`);
+              console.log(`[coding-first-viewport] ${JSON.stringify(firstViewport)}`);
+            }
             if (exerciseFocusLayout && width === 1440 && height === 900) {
               await addPanel("Scratchpad");
               const scratchpadReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-scratchpad-panel #coding-project-scratchpad textarea'))`);
@@ -1272,6 +1297,8 @@ async function main() {
           await cdp.send("Input.insertText", { text: "# Revised starter project\n\nTemporary smoke edit for the isolated workspace." });
           const draftReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { if (document.querySelector('#coding-file-editor button:last-child')?.disabled === false) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!draftReady) throw new Error(`Monaco did not accept the isolated edit: ${JSON.stringify(await cdp.evaluate(`(() => { const selectors = ['.app-main','.app-content','.coding-session-grid','.coding-project-browser','.project-file-layout','.file-editor-panel','.monaco-editor-shell','.monaco-editor','.monaco-editor .view-lines']; return { viewport: [innerWidth, innerHeight], widths: Object.fromEntries(selectors.map((selector) => { const element = document.querySelector(selector); const rect = element?.getBoundingClientRect(); return [selector, rect && { x: rect.x, y: rect.y, w: rect.width, h: rect.height, client: [element.clientWidth, element.clientHeight], scroll: [element.scrollWidth, element.scrollHeight] }]; })), file: document.querySelector('#coding-file-editor')?.innerText, editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 140), active: document.activeElement?.outerHTML?.slice(0, 120), buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }; })()`))}`);
+          const reviewButtonState = await cdp.evaluate(`(() => { const root = document.querySelector('#coding-file-editor'); return { heading: root?.innerText ?? null, buttons: [...(root?.querySelectorAll('button') ?? [])].map((button) => ({ text: button.innerText.trim(), disabled: button.disabled })), editor: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0, 160) ?? null, selectedFile: document.querySelector('.file-editor-heading span')?.textContent ?? null, workspace: document.querySelector('.coding-session-grid')?.className ?? null }; })()`);
+          if (!reviewButtonState.buttons.some((button) => button.text === "Review diff" && !button.disabled)) throw new Error(`The isolated Monaco edit did not enable Review diff: ${JSON.stringify(reviewButtonState)}`);
           await clickButtonText(cdp, "Review diff", "#coding-file-editor");
           await sleep(350);
           if (process.env.UI_MATRIX_CAPTURE === "1" && width === 1440 && height === 900) {
@@ -1282,7 +1309,10 @@ async function main() {
           const diffReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-diff-cell.is-added') && document.querySelector('.coding-diff-cell.is-context') && document.querySelectorAll('.coding-diff-line > .coding-diff-cell').length >= 2 && document.querySelector('.coding-diff-header')?.innerText.includes('Original') && document.querySelector('.coding-diff-header')?.innerText.includes('Working copy'))`);
           if (!diffReady) throw new Error(`Review diff did not render a side-by-side comparison with additions and context beside the Coding Agent thread: ${JSON.stringify(await cdp.evaluate(`(() => ({ heading: document.querySelector('#coding-file-editor')?.innerText, editorText: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0,160), shell: document.querySelector('.coding-diff-preview')?.innerText, buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }))()`))}`);
           const reviewLayout = await cdp.evaluate(`(() => { const thread = document.querySelector('.project-thread-panel')?.getBoundingClientRect(); const editor = document.querySelector('.coding-project-browser')?.getBoundingClientRect(); return { thread: thread?.width ?? 0, editor: editor?.width ?? 0 }; })()`);
-          if (width >= 1100 && reviewLayout.editor <= reviewLayout.thread) throw new Error(`The Coding change view did not give its side-by-side diff more room than chat: ${JSON.stringify(reviewLayout)}`);
+          if (width >= 1100 && reviewLayout.editor <= reviewLayout.thread) {
+            const reviewGrid = await cdp.evaluate(`(() => { const grid = document.querySelector('.coding-session-grid'); const style = grid ? getComputedStyle(grid) : null; return { className: grid?.className ?? '', columns: style?.gridTemplateColumns ?? '', areas: style?.gridTemplateAreas ?? '' }; })()`);
+            throw new Error(`The Coding change view did not give its side-by-side diff more room than chat: ${JSON.stringify({ ...reviewLayout, grid: reviewGrid })}`);
+          }
           const threadStillVisible = await cdp.evaluate(`Boolean(document.querySelector('.project-thread-panel .chat-page.is-coding-agent'))`);
           if (!threadStillVisible) throw new Error("Opening the file diff hid the Coding Agent conversation.");
           await clickButtonText(cdp, "Editor", "#coding-file-editor");

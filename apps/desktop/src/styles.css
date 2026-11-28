@@ -5478,6 +5478,34 @@ body:has(.coding-session-grid.is-focus-layout) .app-content-coding .coding-proje
 .skai-browser-empty { display: grid; min-height: 100%; place-content: center; gap: 6px; padding: 20px; color: var(--skai-color-text-muted); text-align: center; }
 .skai-browser-empty strong { color: var(--skai-color-text); font-size: var(--skai-text-sm); }
 .skai-browser-empty span { font-size: var(--skai-text-xs); }
+
+/* First-viewport contract: when Coding has an opened split, place the
+   conversation and workbench on the same explicit row. Earlier grid-area
+   declarations named rows that do not exist in the three-column split grid;
+   Chromium then auto-placed the workbench into a full-width implicit row and
+   pushed the composer below the fold. */
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open {
+  grid-template-areas: none;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .project-thread-panel,
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open > .coding-project-browser {
+  grid-area: auto;
+  grid-row: 1;
+}
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .project-thread-panel { grid-column: 1; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-thread-first > .coding-project-browser { grid-column: 3; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .coding-project-browser { grid-column: 1; }
+.app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open:not(.is-thread-first) > .project-thread-panel { grid-column: 3; }
+@media (min-width: 1101px) {
+  /* Diff review is a file-first task: give the comparison enough width to
+     show both columns without forcing horizontal scrolling. */
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-reviewing-diff.is-thread-first {
+    grid-template-columns: minmax(300px, .82fr) 12px minmax(420px, 1.18fr);
+  }
+  .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open.is-reviewing-diff:not(.is-thread-first) {
+    grid-template-columns: minmax(420px, 1.18fr) 12px minmax(300px, .82fr);
+  }
+}
 @media (max-width: 900px) {
   .app-content-coding .coding-page-active .coding-session-grid.is-chat.is-split-open {
     grid-template-columns: minmax(0, 1fr);
