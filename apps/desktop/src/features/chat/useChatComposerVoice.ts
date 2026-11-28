@@ -49,6 +49,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const [voiceListening, setVoiceListening] = useState(false);
   const [handsFreeActive, setHandsFreeActive] = useState(false);
   const [voiceExpressiveness, setVoiceExpressiveness] = useState(() => selectedVoiceSettings().expressiveness);
+  const [voicePlaybackRate, setVoicePlaybackRate] = useState(() => selectedVoiceSettings().playbackRate);
   const [voiceActivitySensitivity, setVoiceActivitySensitivity] = useState(() => selectedVoiceSettings().voiceActivitySensitivity);
   const [voiceInputLevel, setVoiceInputLevel] = useState(0);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -123,7 +124,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   }, []);
 
   useEffect(() => {
-    const refreshVoiceSettings = () => { const settings = selectedVoiceSettings(); setVoiceExpressiveness(settings.expressiveness); setVoiceActivitySensitivity(settings.voiceActivitySensitivity); };
+    const refreshVoiceSettings = () => { const settings = selectedVoiceSettings(); setVoiceExpressiveness(settings.expressiveness); setVoicePlaybackRate(settings.playbackRate); setVoiceActivitySensitivity(settings.voiceActivitySensitivity); };
     window.addEventListener("skai:voice-settings-updated", refreshVoiceSettings);
     return () => window.removeEventListener("skai:voice-settings-updated", refreshVoiceSettings);
   }, []);
@@ -880,5 +881,5 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       setVoicePackInstalling(false);
     }
   };
-  return { voiceListening, handsFreeActive, voiceSessionStatus, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceInterruptions, voiceAudioEvidence, voiceEvidenceRetention, updateVoiceEvidenceRetention, clearVoiceSessionEvidence, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight };
+  return { voiceListening, handsFreeActive, voiceSessionStatus, voiceExpressiveness, setVoiceExpressiveness, voicePlaybackRate, setVoicePlaybackRate, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceInterruptions, voiceAudioEvidence, voiceEvidenceRetention, updateVoiceEvidenceRetention, clearVoiceSessionEvidence, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight };
 }

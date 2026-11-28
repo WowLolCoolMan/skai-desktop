@@ -106,6 +106,7 @@ const cloudVoiceIdKey = "skai.voice.cloudVoiceId";
 const cloudModelIdKey = "skai.voice.cloudModelId";
 const qwenSpeakerKey = "skai.voice.qwenSpeaker";
 const expressivenessKey = "skai.voice.expressiveness";
+const playbackRateKey = "skai.voice.playbackRate";
 const voiceActivitySensitivityKey = "skai.voice.activitySensitivity";
 const savedVoicePresetsKey = "skai.voice.presets.v1";
 let activeCloudAudio: HTMLAudioElement | null = null;
@@ -130,6 +131,7 @@ export function selectedVoiceSettings() {
     cloudVoiceId: localStorage.getItem(cloudVoiceIdKey) ?? selectedProvider.defaultVoiceId,
     qwenSpeaker: localStorage.getItem(qwenSpeakerKey) ?? "Ryan",
     expressiveness: normalizeExpressiveness(localStorage.getItem(expressivenessKey)),
+    playbackRate: normalizePlaybackRate(localStorage.getItem(playbackRateKey)),
     voiceActivitySensitivity: normalizeExpressiveness(localStorage.getItem(voiceActivitySensitivityKey)),
   };
 }
@@ -139,9 +141,14 @@ function normalizeExpressiveness(value: string | number | null) {
   return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
 }
 
-export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness" | "voiceActivitySensitivity", value: string | boolean | number) {
-  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey, qwenSpeaker: qwenSpeakerKey, expressiveness: expressivenessKey, voiceActivitySensitivity: voiceActivitySensitivityKey }[key];
-  const safeValue = key === "primaryModelId" ? resolveInstalledVoiceModel(String(value)) : key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value), true) : key === "expressiveness" || key === "voiceActivitySensitivity" ? normalizeExpressiveness(Number(value)) : value;
+function normalizePlaybackRate(value: string | number | null) {
+  const numeric = Number(value ?? 1);
+  return Number.isFinite(numeric) ? Math.max(0.75, Math.min(1.5, Math.round(numeric * 20) / 20)) : 1;
+}
+
+export function saveVoiceSetting(key: "profileId" | "primaryModelId" | "lowResourceModelId" | "lowResourceMode" | "voiceOutputEnabled" | "source" | "cloudProvider" | "cloudModelId" | "cloudVoiceId" | "qwenSpeaker" | "expressiveness" | "voiceActivitySensitivity" | "playbackRate", value: string | boolean | number) {
+  const storageKey = { profileId: selectedProfileKey, primaryModelId: primaryModelKey, lowResourceModelId: lowResourceModelKey, lowResourceMode: lowResourceModeKey, voiceOutputEnabled: voiceOutputKey, source: voiceSourceKey, cloudProvider: cloudProviderKey, cloudModelId: cloudModelIdKey, cloudVoiceId: cloudVoiceIdKey, qwenSpeaker: qwenSpeakerKey, expressiveness: expressivenessKey, voiceActivitySensitivity: voiceActivitySensitivityKey, playbackRate: playbackRateKey }[key];
+  const safeValue = key === "primaryModelId" ? resolveInstalledVoiceModel(String(value)) : key === "lowResourceModelId" ? resolveInstalledVoiceModel(String(value), true) : key === "expressiveness" || key === "voiceActivitySensitivity" ? normalizeExpressiveness(Number(value)) : key === "playbackRate" ? normalizePlaybackRate(Number(value)) : value;
   localStorage.setItem(storageKey, String(safeValue));
   window.dispatchEvent(new CustomEvent("skai:voice-settings-updated"));
 }
@@ -231,8 +238,8 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const fallbackPitch = settings.source === "local" && runtimeId === "os-native" ? profile.pitch : 1;
   try {
     const speech = settings.source === "cloud"
-      ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, expressiveness, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId })
-      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate, expressiveness, modelId: runtimeId, speaker: runtimeId === "qwen3-tts" ? settings.qwenSpeaker : undefined });
+      ? await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate * settings.playbackRate, expressiveness, provider: settings.cloudProvider, modelId: settings.cloudModelId, voiceId: settings.cloudVoiceId })
+      : await window.skaiAgent?.request("voice.speak", { text: safeText, profileId: profile.id, rate: profile.rate * settings.playbackRate, expressiveness, modelId: runtimeId, speaker: runtimeId === "qwen3-tts" ? settings.qwenSpeaker : undefined });
     if (speech?.ok) {
       if (generation !== speechGeneration) return false;
       window.dispatchEvent(new CustomEvent("skai:voice-caption", { detail: { text: safeText } }));
@@ -309,7 +316,7 @@ export async function speakNativeResponse(text: string, force = false, profileId
   const utterance = new SpeechSynthesisUtterance(safeText.replace(/[`*_>#]/g, "").replace(/\s+/g, " ").trim().slice(0, 4000));
   window.dispatchEvent(new CustomEvent("skai:voice-caption", { detail: { text: utterance.text } }));
   utterance.voice = localVoice;
-  utterance.rate = profile.rate;
+    utterance.rate = profile.rate * settings.playbackRate;
   utterance.pitch = fallbackPitch;
   utterance.onstart = () => setVoicePlaybackActive(true);
   const browserPlaybackFinished = new Promise<void>((resolve) => {
