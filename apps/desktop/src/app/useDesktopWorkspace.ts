@@ -418,7 +418,7 @@ export function useDesktopWorkspace(): DesktopWorkspace {
       if (result.status !== "completed") { setError("Image generation ended without a completed result."); return false; }
       const createdAt = new Date().toISOString();
       const imageSource = generationProvider === "comfyui" ? "comfyui" : "diffusers";
-      const images: ImageHistoryEntry[] = (result.images ?? []).map((image) => ({ ...image, mediaType: image.mediaType ?? "image", createdAt, provider: imageSource, prompt: generationPrompt.trim(), model: generationModel, seed: generationSeed, width: generationWidth, height: generationHeight, ...(generationWorkflow ? { workflow: generationWorkflow } : {}) }));
+      const images: ImageHistoryEntry[] = (result.images ?? []).map((image) => ({ ...image, mediaType: image.mediaType ?? "image", createdAt, provider: imageSource, origin: source ? "edited" : "generated", prompt: generationPrompt.trim(), model: generationModel, seed: generationSeed, width: generationWidth, height: generationHeight, ...(generationWorkflow ? { workflow: generationWorkflow } : {}) }));
       setGeneratedImages((current) => [...images, ...current].slice(0, 24));
       void saveImageHistory(images);
       return true;

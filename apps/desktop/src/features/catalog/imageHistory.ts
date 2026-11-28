@@ -10,6 +10,7 @@ export type ImageHistoryEntry = {
   width?: number;
   height?: number;
   workflow?: string;
+  origin?: "generated" | "edited" | "imported" | "user-authored";
 };
 
 const databaseName = "skai-image-history";
