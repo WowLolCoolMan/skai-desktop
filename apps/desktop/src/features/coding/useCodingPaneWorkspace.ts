@@ -6,8 +6,8 @@ export type CodingPanePage = { id: string; panel: CodingPanePanel; filePath?: st
 export type CodingPanePreset = "single" | "chat-files" | "chat-terminal" | "review" | "research";
 
 const DEFAULT_PAGES: CodingPanePage[] = [
-  { id: "coding-side-chat", panel: "side-chat" },
   { id: "coding-editor", panel: "editor" },
+  { id: "coding-side-chat", panel: "side-chat" },
   { id: "coding-files-changes", panel: "files-changes" },
 ];
 
@@ -17,8 +17,8 @@ const MAX_PAGES = 24;
 const PRESET_PAGES: Record<CodingPanePreset, CodingPanePage[]> = {
   single: [{ id: "coding-editor", panel: "editor" }, { id: "coding-files-changes", panel: "files-changes" }],
   "chat-files": [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-files-changes", panel: "files-changes" }],
-  "chat-terminal": [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-editor", panel: "editor" }],
-  review: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-files-changes", panel: "files-changes" }, { id: "coding-editor", panel: "editor" }],
+  "chat-terminal": [{ id: "coding-editor", panel: "editor" }, { id: "coding-side-chat", panel: "side-chat" }],
+  review: [{ id: "coding-editor", panel: "editor" }, { id: "coding-side-chat", panel: "side-chat" }, { id: "coding-files-changes", panel: "files-changes" }],
   research: [{ id: "coding-side-chat", panel: "side-chat" }, { id: "coding-scratchpad", panel: "scratchpad" }, { id: "coding-files-changes", panel: "files-changes" }],
 };
 
@@ -26,6 +26,7 @@ const pagesKey = (projectId: string) => `skai.coding.panePages.${projectId}`;
 const versionKey = (projectId: string) => `skai.coding.panePagesVersion.${projectId}`;
 const activePageKey = (projectId: string) => `skai.coding.activePanePage.${projectId}`;
 const splitOpenKey = (projectId: string) => `skai.coding.splitOpen.${projectId}`;
+const PANE_ORDER: CodingPanePanel[] = ["editor", "side-chat", "files-changes", "scratchpad", "preview"];
 
 function normalizeCodingPanePage(value: unknown): CodingPanePage | null {
   if (!value || typeof value !== "object") return null;
@@ -71,6 +72,10 @@ export function useCodingPaneWorkspace(projectId: string, legacyProjectId = proj
             .filter((page) => page.panel !== "editor" || page === primaryEditor)
             .map((page) => page === primaryEditor ? { id: "coding-editor", panel: "editor" as const } : page)
             .slice(0, MAX_PAGES);
+          const legacyDefaultOrder = restoredPages.map((page) => page.panel).join(",") === "side-chat,editor,files-changes";
+          if (legacyDefaultOrder) {
+            restoredPages = [...restoredPages].sort((a, b) => PANE_ORDER.indexOf(a.panel) - PANE_ORDER.indexOf(b.panel));
+          }
         }
       }
       localStorage.setItem(versionKey(paneScopeId), "8");

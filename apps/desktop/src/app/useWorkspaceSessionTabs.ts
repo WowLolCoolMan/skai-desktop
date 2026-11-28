@@ -124,6 +124,8 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     }
     const project = tab.projectId ? coding.projects.find((item) => item.id === tab.projectId) : null;
     if (project) {
+      const selectedProjectConversation = tab.conversationId ? chat.conversations.find((item) => item.id === tab.conversationId) : undefined;
+      setWorkspaceTabs((current) => current.map((item) => item.id === tab.id ? { ...item, route: "coding", projectId: project.id, title: selectedProjectConversation?.title ?? "New coding thread" } : item));
       void coding.selectProject(project);
       if (!tab.conversationId && tab.route === "coding") ensureProjectThread(project, tab.id);
     }
@@ -162,7 +164,13 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
   }, [closedWorkspaceTabs, selectWorkspaceTab]);
   const openProjectTab = useCallback((project: import("../../shared/contracts").DesktopProject) => {
     const existingTab = workspaceTabs.find((tab) => tab.projectId === project.id);
-    if (existingTab) { selectWorkspaceTab(existingTab); return; }
+    if (existingTab) {
+      const existingConversation = existingTab.conversationId ? chat.conversations.find((conversation) => conversation.id === existingTab.conversationId) : undefined;
+      const normalizedTab = { ...existingTab, route: "coding" as const, projectId: project.id, title: existingConversation?.title ?? "New coding thread" };
+      setWorkspaceTabs((current) => current.map((tab) => tab.id === existingTab.id ? normalizedTab : tab));
+      selectWorkspaceTab(normalizedTab);
+      return;
+    }
     try {
       const preferred = JSON.parse(localStorage.getItem("skai.preferredModels.v1") ?? "{}");
       const choice = preferred?.coding as { model?: string; provider?: string; endpoint?: string | null } | undefined;
@@ -201,7 +209,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       const legacyProject = route === "coding" ? coding.projects.find((project) => project.id === localStorage.getItem("skai.selectedProject")) : undefined;
       restoredTab = {
         ...activeTab,
-        title: legacyProject?.name ?? legacyConversation?.title ?? activeTab.title,
+        title: legacyProject ? legacyConversation?.title ?? "New coding thread" : legacyConversation?.title ?? activeTab.title,
         route: legacyProject ? "coding" : "chat",
         conversationId: legacyConversation?.id ?? null,
         projectId: legacyProject?.id ?? null,
@@ -246,9 +254,30 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       route: route === "coding" && coding.selectedProject ? "coding" : "chat",
       conversationId: chat.conversationId,
       projectId: route === "coding" ? coding.selectedProject?.id ?? tab.projectId : null,
-      title: route === "coding" && coding.selectedProject ? chat.activeConversation?.title ?? "New coding thread" : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
+      title: route === "coding" && coding.selectedProject ? (chat.conversationId && chat.activeConversation?.id === chat.conversationId ? chat.activeConversation.title : "New coding thread") : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
     }));
   }, [activeWorkspaceTabId, agentMode, chat.activeConversation?.title, chat.conversationId, coding.selectedProject?.id, coding.selectedProject?.name, route, workspaceSessionRestored]);
+  useEffect(() => {
+    const selectedProject = route === "coding" ? coding.selectedProject : null;
+    if (!selectedProject) return;
+    const projectTabs = workspaceTabs.filter((tab) => tab.projectId === selectedProject.id);
+    const projectTab = projectTabs.find((tab) => tab.id === activeWorkspaceTabId) ?? projectTabs[0];
+    if (!projectTab) return;
+    const selectedConversation = chat.conversationId
+      ? chat.conversations.find((conversation) => conversation.id === chat.conversationId)
+      : chat.activeConversation;
+    const projectConversation = selectedConversation?.projectId === selectedProject.id ? selectedConversation : undefined;
+    const conversationId = projectConversation?.id ?? null;
+    const title = projectConversation?.title ?? "New coding thread";
+    const needsTabUpdate = projectTab.route !== "coding"
+      || projectTab.projectId !== selectedProject.id
+      || projectTab.title !== title
+      || projectTab.conversationId !== conversationId;
+    if (needsTabUpdate) {
+      setWorkspaceTabs((current) => current.map((tab) => tab.id === projectTab.id ? { ...tab, route: "coding", projectId: selectedProject.id, conversationId, title } : tab));
+    }
+    if (activeWorkspaceTabId !== projectTab.id) setActiveWorkspaceTabId(projectTab.id);
+  }, [activeWorkspaceTabId, chat.activeConversation, chat.conversationId, chat.conversations, coding.selectedProject, route, workspaceSessionRestored, workspaceTabs]);
   useEffect(() => {
     const bridge = window.skaiAgent;
     const removeConversation = bridge?.onTrayOpenConversation?.((id) => { selectConversation(id); onNavigate("chat"); });

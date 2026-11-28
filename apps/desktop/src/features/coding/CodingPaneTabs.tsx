@@ -19,8 +19,8 @@ type CodingPaneTabsProps = {
 
 export function CodingPaneTabs({ pages, activePageId, changeCount, contextLabel, isSplitOpen, onSelect, onClose, onReorder, onOpenPanel, onApplyPreset, onCloseSplit }: CodingPaneTabsProps) {
   const actions = [
-    { label: "Side chat", onSelect: () => onOpenPanel("side-chat") },
     { label: "Editor", onSelect: () => onOpenPanel("editor") },
+    { label: "Side chat", onSelect: () => onOpenPanel("side-chat") },
     { label: "Files & Changes", onSelect: () => onOpenPanel("files-changes") },
     { label: "Scratchpad", onSelect: () => onOpenPanel("scratchpad") },
     { label: "Preview", onSelect: () => onOpenPanel("preview") },

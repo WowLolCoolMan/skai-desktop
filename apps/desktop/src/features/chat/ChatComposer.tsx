@@ -15,11 +15,12 @@ import "./VoiceTranscriptControls.css";
 import "./ComposerIntentControls.css";
 import "./VoiceTimeline.css";
 
-export type ComposerTarget = "answer" | "plan" | "edit" | "review" | "research" | "media";
+export type ComposerTarget = "answer" | "plan" | "agent" | "edit" | "review" | "research" | "media";
 
 const composerTargetLabels: Record<ComposerTarget, string> = {
   answer: "Answer",
   plan: "Plan",
+  agent: "Agent",
   edit: "Edit",
   review: "Review",
   research: "Research",
@@ -29,6 +30,7 @@ const composerTargetLabels: Record<ComposerTarget, string> = {
 const composerTargetDescriptions: Record<ComposerTarget, string> = {
   answer: "Explain or solve without changing project files.",
   plan: "Read-only planning: inspect context and propose changes without writing files or running commands.",
+  agent: "Full-tool agent mode with approval prompts before mutating actions.",
   edit: "Work toward an approved implementation or file change.",
   review: "Inspect for risks and findings without writing changes.",
   research: "Collect and synthesize evidence before recommending a path.",
@@ -546,7 +548,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     setOneTurnToolIds(contextSnapshot.toolIds.filter((id) => !contextSnapshot.persistentToolIds.includes(id)));
   };
   const filteredSkills = availableSkills.filter((skill) => `${skill.name} ${skill.id} ${skill.description ?? ""} ${skill.category ?? ""}`.toLowerCase().includes(toolQuery.trim().toLowerCase()));
-  const toolPolicyLabel = target === "plan" ? "Read-only planning skills only" : target === "review" || target === "research" || modeLabel === "Review" ? "Read-only skills only" : target === "edit" || modeLabel === "Coding" || modeLabel === "Agent" ? "Mutating skills require approval" : "Conversation skills stay local";
+  const toolPolicyLabel = target === "plan" ? "Read-only planning skills only" : target === "review" || target === "research" || modeLabel === "Review" ? "Read-only skills only" : target === "agent" || target === "edit" || modeLabel === "Coding" || modeLabel === "Agent" ? "Mutating skills require approval" : "Conversation skills stay local";
   const skillBlockedByMode = (skill: ComposerSkill) => (target === "plan" || target === "review" || target === "research" || modeLabel === "Review") && (skill.permissions ?? []).some((permission) => /write|execute|shell|desktop|network|mutat/i.test(permission));
   const toggleComposerSkill = (skillId: string) => {
     if (toolScope === "persistent") {
