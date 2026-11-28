@@ -428,9 +428,11 @@ export function CodingSessionView({ workspaceTabId = "workspace-home", conversat
     if (!await onSaveFile()) return false;
     if (selectedFile && previousContent !== fileDraft) {
       const snapshot: FileHistorySnapshot = { id: typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`, savedAtUtc: new Date().toISOString(), content: previousContent };
-      const next = [snapshot, ...fileHistory.filter((item) => item.content !== previousContent)].slice(0, 8);
-      setFileHistory(next);
-      try { localStorage.setItem(fileHistoryStorageKey(selectedProject.id, selectedFile), JSON.stringify(next)); } catch { /* History is optional and never blocks a saved file. */ }
+      let bounded = [snapshot, ...fileHistory.filter((item) => item.content !== previousContent)].slice(0, 8);
+      let serialized = JSON.stringify(bounded);
+      while (serialized.length > 900_000 && bounded.length > 1) { bounded = bounded.slice(0, -1); serialized = JSON.stringify(bounded); }
+      setFileHistory(bounded);
+      try { localStorage.setItem(fileHistoryStorageKey(selectedProject.id, selectedFile), serialized); } catch { /* History is optional and never blocks a saved file. */ }
     }
     setFileSaveNotice(`Saved ${selectedFile?.split(/[\\/]/).at(-1) ?? "file"}`);
     setFileSaveNoticePath(selectedFile);
