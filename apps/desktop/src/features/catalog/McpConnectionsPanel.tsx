@@ -38,12 +38,24 @@ export function McpConnectionsPanel({
   const [callBusy, setCallBusy] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
   const [callResult, setCallResult] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const reviewCall = (connection: McpConnection, tool: McpTool) => {
     setDraft({ connection, tool });
     setArgumentsText("{}");
     setCallError(null);
     setCallResult(null);
+    setCopyStatus(null);
+  };
+
+  const copyReproducibleRequest = async () => {
+    if (!draft) return;
+    try {
+      const parsed = JSON.parse(argumentsText);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Arguments must be a JSON object.");
+      await navigator.clipboard.writeText(JSON.stringify({ serverId: draft.connection.serverId, tool: draft.tool.toolName, arguments: parsed }, null, 2));
+      setCopyStatus("Copied a credential-free request template.");
+    } catch (cause) { setCopyStatus(cause instanceof Error ? cause.message : "Could not copy the request template."); }
   };
 
   const submitCall = async () => {
@@ -127,9 +139,10 @@ export function McpConnectionsPanel({
                 </label>
                 {callError && <p className="surface-error" role="alert">{callError}</p>}
                 {callResult && <div className="plugins-tool-call-result"><strong>Tool result</strong><pre>{callResult}</pre></div>}
-                <Button variant={draft.tool.isMutating ? "danger" : "primary"} disabled={callBusy || connection.state !== "healthy"} onClick={() => void submitCall()}>
+                <div className="plugins-tool-call-actions"><Button variant="ghost" type="button" disabled={callBusy} onClick={() => void copyReproducibleRequest()}>Copy request</Button><Button variant={draft.tool.isMutating ? "danger" : "primary"} disabled={callBusy || connection.state !== "healthy"} onClick={() => void submitCall()}>
                   {callBusy ? "Running…" : draft.tool.isMutating ? "Approve write and run" : "Approve read and run"}
-                </Button>
+                </Button></div>
+                {copyStatus && <p className="plugins-tool-copy-status" role="status">{copyStatus}</p>}
               </section>}
               {tools.length === 0 ? <p className="plugins-tool-empty">No live tool manifest. Refresh health while the server is connected to inspect its current tools.</p> : <div className="plugins-tool-groups">
                 <ToolReviewGroup title="Read-only tools" tools={readTools} access="Read approval" onRun={(tool) => reviewCall(connection, tool)} />

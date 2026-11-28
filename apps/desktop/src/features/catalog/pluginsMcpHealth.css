@@ -24,3 +24,5 @@
 .plugins-tool-call details { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .plugins-tool-call details pre, .plugins-tool-call-result pre { max-height: 240px; overflow: auto; margin: 8px 0 0; padding: 10px; border-radius: var(--skai-radius-md); background: var(--skai-color-surface); color: var(--skai-color-text); white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--skai-font-mono, ui-monospace, monospace); }
 .plugins-tool-call-result { min-width: 0; color: var(--skai-color-text); font-size: var(--skai-text-xs); }
+.plugins-tool-call-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.plugins-tool-copy-status { margin:0; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); }
