@@ -5361,6 +5361,7 @@ small[class], time,
 :is(.coding-session-grid.is-chat.is-split-open).is-thread-first > .project-thread-panel { grid-column: 1; }
 :is(.coding-session-grid.is-chat.is-split-open).is-thread-first > .coding-project-browser { grid-column: 2; }
 :where(button, a, input, textarea, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: 2px; }
+:is(button, a, input, textarea, select, summary, [tabindex]):focus-visible { box-shadow: inset 0 0 0 2px var(--skai-color-focus-ring); }
 :where(.card, .panel, .workspace-tab-strip, .sidebar-history-list):focus-within { scroll-margin-block: 8px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
