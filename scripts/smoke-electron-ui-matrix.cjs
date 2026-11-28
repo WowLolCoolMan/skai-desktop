@@ -482,6 +482,37 @@ async function main() {
         await cdp.evaluate(`window.history.pushState({ ...(window.history.state ?? {}), skaiNavigation: { route: '${renderedRoute}', index: 0, length: 1 } }, '', '#/${route}'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
         const routeReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.title.endsWith(' · ${renderedRoute}')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
         if (!routeReady) throw new Error(`UI matrix did not render #/${route}; expected document title suffix "· ${renderedRoute}" and saw "${await cdp.evaluate("document.title")}".`);
+        if (route === "chat" && process.env.UI_MATRIX_EXERCISE_LONG_LABELS === "1" && ((width === 1440 && height === 900) || (width === 960 && height === 640)) && theme === "dark" && collapsed === "false") {
+          const longLabelState = await cdp.evaluate(`(() => {
+            const modeButton = document.querySelector('.sidebar-agent-trigger');
+            const modeIcon = modeButton?.querySelector('.nav-icon:first-child');
+            const modeChevron = modeButton?.querySelector('.nav-icon:last-child');
+            const modeLabel = modeButton?.querySelector('strong');
+            const newButton = document.querySelector('.new-chat-button');
+            const newIcon = newButton?.querySelector('.nav-icon');
+            const newLabel = newButton?.querySelector('span');
+            const shortcut = newButton?.querySelector('kbd');
+            const routeContext = document.querySelector('.toolbar-route-context');
+            const routeIcon = routeContext?.querySelector(':scope > .nav-icon');
+            const routeLabel = routeContext?.querySelector('.toolbar-route-context-copy strong');
+            const routeMode = routeContext?.querySelector('.toolbar-mode-chip');
+            const label = 'Zusammenarbeitsmodus für zusätzliche Projektkonversationen — 開発エージェントの設定';
+            for (const element of [modeLabel, newLabel, routeLabel]) { if (element) { element.textContent = label; element.style.fontSize = '20px'; } }
+            if (routeLabel) routeLabel.title = label;
+            const rect = (element) => { const r = element?.getBoundingClientRect(); return r && { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+            const fits = (button, icon, text, trailing) => { const b = rect(button), i = rect(icon), t = rect(text), a = rect(trailing); return Boolean(b && i && t && a && i.right <= t.left + 2 && t.right <= a.left + 2 && a.right <= b.right + 2 && i.top >= b.top - 2 && i.bottom <= b.bottom + 2 && t.top >= b.top - 2 && t.bottom <= b.bottom + 2 && a.top >= b.top - 2 && a.bottom <= b.bottom + 2 && button.scrollWidth <= button.clientWidth + 2); };
+            return {
+              mode: { fit: fits(modeButton, modeIcon, modeLabel, modeChevron), button: rect(modeButton), icon: rect(modeIcon), label: rect(modeLabel), trailing: rect(modeChevron) },
+              newThread: { fit: fits(newButton, newIcon, newLabel, shortcut), button: rect(newButton), icon: rect(newIcon), label: rect(newLabel), trailing: rect(shortcut) },
+              route: { button: rect(routeContext), icon: rect(routeIcon), label: rect(routeLabel), trailing: rect(routeMode), overflow: getComputedStyle(routeContext).overflow, labelOverflow: getComputedStyle(routeLabel).textOverflow, title: routeLabel?.getAttribute('title'), labelFits: Boolean(rect(routeContext) && rect(routeLabel) && rect(routeLabel).left >= rect(routeIcon).right - 2 && (!routeMode || rect(routeLabel).right <= rect(routeMode).left + 2) && rect(routeLabel).right <= rect(routeContext).right + 2 && getComputedStyle(routeContext).overflow === 'hidden' && getComputedStyle(routeLabel).textOverflow === 'ellipsis' && Boolean(routeLabel.getAttribute('title'))) },
+            };
+          })()`);
+          if (!longLabelState.mode.fit || !longLabelState.newThread.fit || !longLabelState.route.labelFits) throw new Error(`A long mixed-script label pushed an adjacent icon or action out of alignment: ${JSON.stringify(longLabelState)}`);
+          const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+          fs.mkdirSync(captureDirectory, { recursive: true });
+          fs.writeFileSync(path.join(captureDirectory, `long-label-layout-${width}.png`), Buffer.from(screenshot.data, "base64"));
+          console.log(`[long-label-layout] ${JSON.stringify({ viewport: `${width}x${height}`, mode: { fit: longLabelState.mode.fit, button: longLabelState.mode.button, icon: longLabelState.mode.icon, label: longLabelState.mode.label, trailing: longLabelState.mode.trailing }, newThread: { fit: longLabelState.newThread.fit, button: longLabelState.newThread.button, icon: longLabelState.newThread.icon, label: longLabelState.newThread.label, trailing: longLabelState.newThread.trailing }, route: { fit: longLabelState.route.labelFits, button: longLabelState.route.button, label: longLabelState.route.label, trailing: longLabelState.route.trailing } })}`);
+        }
         // Workspace tabs belong to active Chat/Coding workspaces only. Non-chat
         // destinations should keep the Codex-style shell focused on the page,
         // without leaving a stale current-thread tab above it.
@@ -915,6 +946,19 @@ async function main() {
           }
           const projectReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-heading') && (document.querySelector('.coding-project-browser') || document.querySelector('.project-thread-panel'))) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectReady) throw new Error(`Coding workflow could not open the seeded project: ${JSON.stringify(await cdp.evaluate(`(() => ({ title: document.title, url: location.href, body: document.body.innerText.slice(0, 900), projectHeading: document.querySelector('.coding-project-heading')?.innerText ?? null, noProject: document.querySelector('.coding-no-project')?.innerText ?? null, addToSplit: Boolean(document.querySelector('.coding-split-launcher button')), projects: [...document.querySelectorAll('.project-directory-row')].map((row) => row.innerText) }))()`))}`);
+          const projectOverviewDisclosure = await cdp.evaluate(`(() => { const details = document.querySelector('.coding-project-overview-disclosure'); const summary = details?.querySelector(':scope > summary'); const box = details?.getBoundingClientRect(); const summaryBox = summary?.getBoundingClientRect(); return { exists: Boolean(details), open: details?.open ?? null, summary: summary?.innerText?.trim() ?? '', summaryVisible: Boolean(summaryBox && summaryBox.height > 0 && getComputedStyle(details).display !== 'none'), box: box && { y: box.y, height: box.height }, splitOpen: document.querySelector('.coding-session-grid')?.classList.contains('is-split-open') ?? false }; })()`);
+          if (!projectOverviewDisclosure.exists) throw new Error("The project metrics and actions must remain available in a project overview disclosure.");
+          if (!projectOverviewDisclosure.splitOpen) {
+            if (projectOverviewDisclosure.open || !projectOverviewDisclosure.summaryVisible || !projectOverviewDisclosure.summary.includes("Project overview")) throw new Error(`Project overview should begin as a compact, accessible disclosure before the workspace: ${JSON.stringify(projectOverviewDisclosure)}`);
+            await clickInRenderer(cdp, ".coding-project-overview-disclosure > summary");
+            const overviewExpanded = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const details = document.querySelector('.coding-project-overview-disclosure'); if (details?.open && details.querySelector('.coding-project-metrics')) return true; await new Promise((r) => setTimeout(r, 25)); } return false; })()`);
+            if (!overviewExpanded) throw new Error("Opening Project overview did not reveal its metrics and quick actions.");
+            await clickInRenderer(cdp, ".coding-project-overview-disclosure > summary");
+            const overviewCollapsed = await cdp.evaluate(`document.querySelector('.coding-project-overview-disclosure')?.open === false`);
+            if (!overviewCollapsed) throw new Error("Closing Project overview did not restore its compact state.");
+          }
+          const codingStack = await cdp.evaluate(`(() => { const page = document.querySelector('.coding-page-active'); return [...(page?.children ?? [])].map((element) => { const rect = element.getBoundingClientRect(); const style = getComputedStyle(element); return { className: element.className?.toString?.() ?? element.tagName, x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height), display: style.display, overflowY: style.overflowY, scrollHeight: element.scrollHeight, children: element.classList.contains('coding-health-banner') ? [...element.children].map((child) => { const r = child.getBoundingClientRect(), s = getComputedStyle(child); return { tag: child.tagName, className: child.className?.toString?.() ?? '', x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height), flex: s.flex, minWidth: s.minWidth, overflowWrap: s.overflowWrap, whiteSpace: s.whiteSpace }; }) : undefined }; }); })()`);
+          console.log(`[coding-stack] ${JSON.stringify(codingStack)}`);
           await clickButtonContainingText(cdp, "Activity", ".coding-project-heading-actions");
           const projectActivityReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('dialog [aria-label="Project activity"] h2')?.textContent === 'Recent activity') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectActivityReady) throw new Error("Coding project did not open its local project activity timeline.");
@@ -1088,6 +1132,8 @@ async function main() {
                   grid: rect(grid),
                   thread: rect(thread),
                   files: rect(files),
+                  composerBounds: rect(composer),
+                  viewportHeight: innerHeight,
                   composer: Boolean(composer),
                   documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
                 };
@@ -1097,6 +1143,9 @@ async function main() {
                 && Math.abs(firstViewport.thread.y - firstViewport.files.y) < 3
                 && firstViewport.thread.bottom <= (firstViewport.grid?.bottom ?? Infinity) + 2
                 && firstViewport.files.bottom <= (firstViewport.grid?.bottom ?? Infinity) + 2
+                && firstViewport.grid?.y >= 0
+                && firstViewport.grid?.bottom <= firstViewport.viewportHeight + 2
+                && firstViewport.composerBounds?.bottom <= firstViewport.viewportHeight + 2
                 && !firstViewport.documentOverflow;
               if (!aligned) throw new Error(`Coding split did not keep the chat composer and workbench aligned in the first viewport: ${JSON.stringify(firstViewport)}`);
               console.log(`[coding-first-viewport] ${JSON.stringify(firstViewport)}`);
@@ -1694,6 +1743,8 @@ async function main() {
             await cdp.evaluate(`(() => { const select = document.querySelector('[aria-label="Response target"]'); if (!select) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'edit'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await sleep(80);
             if (!(await cdp.evaluate(`document.querySelector('.chat-page.is-coding-agent') !== null`))) throw new Error("Selecting the Edit composer target did not switch the thread into Coding Agent context.");
+             const planFirstVisible = await cdp.evaluate(`(() => { const input = document.querySelector('.composer-card textarea'); if (!input) return false; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(input, 'Refactor the parser'); input.dispatchEvent(new Event('input', { bubbles: true })); return Boolean(document.querySelector('.composer-plan-first')); })()`);
+             if (!planFirstVisible) throw new Error("Edit target did not expose the approval-gated Plan before changing action.");
             await cdp.evaluate(`(() => { const select = document.querySelector('[aria-label="Response target"]'); if (!select) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'answer'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await sleep(80);
             const responseControls = await cdp.evaluate(`(() => { const buttons = [...document.querySelectorAll('.chat-response-mode-options button')].map((button) => button.textContent?.trim()); const select = document.querySelector('#chat-response-mode-select'); return { buttons, options: select ? [...select.options].map((option) => option.textContent?.trim()) : [] }; })()`);
