@@ -182,10 +182,11 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     }).catch(() => onError("Chat workspace data could not be loaded."));
   }, [connection, onError, request]);
 
-  const saveConversation = async (nextMessages: Message[], id = conversationId) => {
+  const saveConversation = async (nextMessages: Message[], id = conversationId, modelOverride?: string) => {
+    const conversationModel = modelOverride?.trim() || model;
     const existingTitle = id ? conversations.find((conversation) => conversation.id === id)?.title : undefined;
     const title = existingTitle || nextMessages.find((item) => item.role === "user")?.content.slice(0, 80) || "New chat";
-    const payload = { id: id ?? undefined, title, mode, responseMode, model, modelProvider: provider, modelSizeBytes: modelMetadata?.sizeBytes ?? null, modelContextLength: modelMetadata?.contextLength ?? null, messages: nextMessages, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) };
+    const payload = { id: id ?? undefined, title, mode, responseMode, model: conversationModel, modelProvider: provider, modelSizeBytes: modelMetadata?.sizeBytes ?? null, modelContextLength: modelOverride ? null : modelMetadata?.contextLength ?? null, messages: nextMessages, ...(mode === "Coding Agent" && project ? { projectId: project.id, projectName: project.name, projectInstructions: project.instructions ?? "" } : {}) };
     // Keep a bounded local recovery copy while the host write is in flight. This
     // mirrors the durable-draft behavior used by local-first chat clients and
     // prevents a transient host restart from losing the user's latest turn.
@@ -210,10 +211,10 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
         title,
         mode,
         responseMode,
-        model,
+        model: conversationModel,
         modelProvider: provider,
         modelSizeBytes: modelMetadata?.sizeBytes ?? null,
-        modelContextLength: modelMetadata?.contextLength ?? null,
+        modelContextLength: modelOverride ? null : modelMetadata?.contextLength ?? null,
         messages: nextMessages,
         updatedAt: new Date().toISOString(),
         pinned: existing?.pinned ?? false,
@@ -405,7 +406,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content, createdAtUtc: new Date().toISOString() }];
-    setMessages(completed); await saveConversation(completed, conversationId);
+    setMessages(completed); await saveConversation(completed, conversationId, retryModel);
     void speakNativeResponse(completed.at(-1)?.content ?? "", false);
   };
 
