@@ -5354,6 +5354,10 @@ html[data-text-scale="large"] .workspace-tab-select { padding-right: 40px; }
 .chat-message:target { outline: 2px solid var(--skai-color-accent); outline-offset: 4px; }
 .new-activity-divider { grid-column: 1 / -1; justify-self: center; padding: 4px 9px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-pill); color: var(--skai-color-accent-text); background: var(--skai-color-surface); font-size: var(--skai-text-xs); font-weight: 600; }
 .message-actions .ui-button { min-height: 28px; }
+.message-actions { flex-wrap: wrap; align-items: center; }
+.message-retry-model { max-width: 170px; min-height: 28px; padding: 3px 7px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font-size: var(--skai-text-xs); }
+.message-retry-model:focus-visible { outline: 2px solid var(--skai-color-accent); outline-offset: 1px; }
+.message-retry-model:disabled { cursor: not-allowed; opacity: .55; }
 .chat-message .message-actions .ui-button { color: var(--skai-color-text); }
 .chat-message:not(:hover):not(:focus-within) .message-actions { opacity: .7; }
 .chat-message:focus-within .message-actions, .chat-message:hover .message-actions { opacity: 1; }

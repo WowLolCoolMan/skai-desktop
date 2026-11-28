@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import type { Message } from "../../app/types";
+import type { Message, Model } from "../../app/types";
 import { Button } from "../../components/ui/Primitives";
 import { AttachmentList } from "./AttachmentList";
 import { MessageContent } from "./MessageContent";
@@ -13,12 +13,13 @@ type ChatMessageProps = {
   conversationId: string | null;
   copied: boolean;
   onCopy: (content: string, index: number) => void;
-  onRetry: (index: number) => void;
+  models: Model[];
+  onRetry: (index: number, model?: string) => void;
   onFork: (index: number) => void;
   onEdit: (index: number, content: string) => Promise<boolean>;
 };
 
-export function ChatMessage({ message, index, model, busy, conversationId, copied, onCopy, onRetry, onFork, onEdit }: ChatMessageProps) {
+export function ChatMessage({ message, index, model, models, busy, conversationId, copied, onCopy, onRetry, onFork, onEdit }: ChatMessageProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [saving, setSaving] = useState(false);
@@ -49,6 +50,7 @@ export function ChatMessage({ message, index, model, busy, conversationId, copie
       {message.role === "user" && <Button variant="ghost" disabled={busy || !conversationId || saving} onClick={() => setEditing(true)}>Edit</Button>}
       {message.role === "assistant" && <><Button variant="ghost" type="button" onClick={() => void speakNativeResponse(message.content, true)} aria-label="Read this reply aloud">Read aloud</Button><Button variant="ghost" type="button" onClick={stopNativeSpeech} aria-label="Stop reading this reply">Stop audio</Button></>}
       {message.role === "assistant" && <Button variant="ghost" disabled={busy} onClick={() => onRetry(index)}>Retry</Button>}
+      {message.role === "assistant" && models.length > 0 && <select className="message-retry-model" aria-label="Retry this reply with another model" defaultValue="" disabled={busy} onChange={(event) => { const next = event.target.value; event.currentTarget.value = ""; if (next) onRetry(index, next); }}><option value="">Retry with model…</option>{models.filter((item) => item.model !== model).slice(0, 24).map((item) => <option value={item.model} key={item.model}>{item.displayName || item.model}</option>)}</select>}
       <Button variant="ghost" onClick={() => onFork(index)} disabled={!conversationId}>Fork from here</Button>
     </div></div>
     {editing ? <div className="message-edit-form"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} aria-label="Edit user message" autoFocus /><div className="message-edit-actions"><Button variant="ghost" type="button" disabled={saving} onClick={() => { setDraft(message.content); setEditing(false); }}>Cancel</Button><Button variant="primary" type="button" disabled={saving || !draft.trim()} onClick={() => void saveEdit()}>{saving ? "Regenerating…" : "Save & regenerate"}</Button></div></div> : <><div id={contentId} className={`message-content-region${hasLongContent && !expanded ? " is-collapsed" : ""}`}><MessageContent content={message.content} /></div>{hasLongContent && <Button className="message-content-toggle" variant="ghost" type="button" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded((value) => !value)}>{expanded ? "Collapse response" : "Show full response"}</Button>}</>}

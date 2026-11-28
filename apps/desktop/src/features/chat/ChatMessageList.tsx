@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { Message } from "../../app/types";
+import type { Message, Model } from "../../app/types";
 import { Button } from "../../components/ui/Primitives";
 import { ChatMessage } from "./ChatMessage";
 
@@ -26,14 +26,15 @@ type ChatMessageListProps = {
   messages: Message[];
   busy: boolean;
   model: string;
+  models: Model[];
   copiedMessage: number | null;
   onCopy: (content: string, index: number) => void;
-  onRetry: (index: number) => void;
+  onRetry: (index: number, model?: string) => void;
   onFork: (index: number) => void;
   onEdit: (index: number, content: string) => Promise<boolean>;
 };
 
-export function ChatMessageList({ conversationId, messages, busy, model, copiedMessage, onCopy, onRetry, onFork, onEdit }: ChatMessageListProps) {
+export function ChatMessageList({ conversationId, messages, busy, model, models, copiedMessage, onCopy, onRetry, onFork, onEdit }: ChatMessageListProps) {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [newOutputCount, setNewOutputCount] = useState(0);
   const [newActivityStartIndex, setNewActivityStartIndex] = useState<number | null>(null);
@@ -129,7 +130,7 @@ export function ChatMessageList({ conversationId, messages, busy, model, copiedM
       const timestamp = message.createdAtUtc && Number.isFinite(Date.parse(message.createdAtUtc)) ? message.createdAtUtc : null;
       const previousTimestamp = index > 0 ? messages[index - 1].createdAtUtc : null;
       const dayChanged = timestamp && (!previousTimestamp || !Number.isFinite(Date.parse(previousTimestamp)) || localDayKey(timestamp) !== localDayKey(previousTimestamp));
-      return <Fragment key={`message-${index}`}>{dayChanged && <time className="chat-date-separator" dateTime={timestamp!}>{dayLabel(timestamp!)}</time>}{newActivityStartIndex === index && <div className="new-activity-divider" role="separator">New activity</div>}<ChatMessage message={message} index={index} model={model} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={onCopy} onRetry={onRetry} onFork={onFork} onEdit={onEdit} /></Fragment>;
+      return <Fragment key={`message-${index}`}>{dayChanged && <time className="chat-date-separator" dateTime={timestamp!}>{dayLabel(timestamp!)}</time>}{newActivityStartIndex === index && <div className="new-activity-divider" role="separator">New activity</div>}<ChatMessage message={message} index={index} model={model} models={models} busy={busy} conversationId={conversationId} copied={copiedMessage === index} onCopy={onCopy} onRetry={onRetry} onFork={onFork} onEdit={onEdit} /></Fragment>;
     })}{busy ? <article className="message-bubble chat-message assistant"><p className="typing">Thinking…</p></article> : null}</div>
     {showJumpToLatest && <div className="chat-latest-action"><Button variant="secondary" type="button" onClick={jumpToLatest}>{newOutputCount ? `${newOutputCount} new ${newOutputCount === 1 ? "message" : "messages"} · ` : ""}Jump to latest ↓</Button></div>}
   </>;

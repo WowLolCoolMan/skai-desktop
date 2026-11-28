@@ -391,7 +391,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     }
   };
 
-  const retryMessage = async (messageIndex: number) => {
+  const retryMessage = async (messageIndex: number, modelOverride?: string) => {
     if (busy || !conversationId) return;
     if (!isLocalEndpoint(endpoint)) { onError(LOCAL_ENDPOINT_ERROR); return; }
     const originalMessages = messages;
@@ -399,7 +399,9 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (messages[messageIndex]?.role !== "assistant" || !prefix.some((message) => message.role === "user")) return;
     stopNativeSpeech();
     setMessages(prefix); setBusy(true); onError(null);
-    const response = await request("chat.complete", { provider, endpoint, model, modelContextLength: modelMetadata?.contextLength ?? null, messages: prefix, responseMode, skills: skillMentions(prefix) });
+    const retryModel = modelOverride?.trim() || model;
+    const retryContextLength = retryModel === model ? modelMetadata?.contextLength ?? null : null;
+    const response = await request("chat.complete", { provider, endpoint, model: retryModel, modelContextLength: retryContextLength, messages: prefix, responseMode, skills: skillMentions(prefix) });
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content, createdAtUtc: new Date().toISOString() }];

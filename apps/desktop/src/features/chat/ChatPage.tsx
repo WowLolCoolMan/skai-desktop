@@ -59,7 +59,7 @@ type ChatPageProps = {
   onApplyImport: (preview: ConversationImportPreview) => Promise<{ imported: number; skippedDuplicates: number; reassignedIds: number; total: number } | null>;
   onFork: () => void;
   onForkFromMessage: (index: number) => void;
-  onRetryMessage: (index: number) => void;
+  onRetryMessage: (index: number, model?: string) => void;
   onEditMessage: (index: number, content: string) => Promise<boolean>;
   onTogglePinned: () => void;
   onArchive: () => void;
@@ -233,7 +233,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
               {!isCodingAgent && <div className="chat-start-actions"><button type="button" onClick={() => onNavigate("projects")}><strong>Open a project</strong><span>Choose a folder and work with its files.</span></button><button type="button" onClick={() => onNavigate("models")}><strong>Choose a model</strong><span>Review models available on this computer.</span></button></div>}
             </section></div>
           ) : (
-            <ChatMessageList conversationId={conversationId} messages={messages} busy={busy} model={model} copiedMessage={copiedMessage} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />
+            <ChatMessageList conversationId={conversationId} messages={messages} busy={busy} model={model} models={models} copiedMessage={copiedMessage} onCopy={(content, itemIndex) => void copyMessage(content, itemIndex)} onRetry={onRetryMessage} onFork={onForkFromMessage} onEdit={onEditMessage} />
           )}
         </section>
         {workspaceMode === "project" ? <div className="project-task-planner-slot" hidden={!showProjectTaskPlanner}><ChatTaskComposer expanded={showProjectTaskPlanner} onExpand={() => setShowProjectTaskPlanner(true)} showToggle={false} busy={taskBusy === "planning"} worktreeAvailable={worktreeAvailable} onPlanTask={(title, instruction, environment, requiresApproval, gitHubIssueUrl, acceptanceCriteria) => onPlanTask(title, instruction, environment, conversationId, requiresApproval, projectId, gitHubIssueUrl, acceptanceCriteria)} /></div> : showCodingWorkflowTools && <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment, requiresApproval, gitHubIssueUrl, acceptanceCriteria) => onPlanTask(title, instruction, environment, conversationId, requiresApproval, undefined, gitHubIssueUrl, acceptanceCriteria)} />}
