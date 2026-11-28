@@ -835,6 +835,8 @@ body:has(.coding-snapshot-notice) .coding-terminal-inspector { pointer-events: n
   padding-inline: 10px;
 }
 .coding-secondary-tab-group { display: flex; min-width: 0; overflow: hidden; border-left: 1px solid var(--skai-color-border); }
+.coding-empty-actions { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface); color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.coding-empty-actions span { min-width: 0; }
 .coding-secondary-tab-group .coding-pane-tab-strip { min-width: 0; padding-inline: 10px; }
 .sidebar-project-menu-trigger { opacity: 0; margin-left: auto; padding: 2px 5px; border: 0; border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: transparent; cursor: pointer; }
 .sidebar-project-tree-row:hover .sidebar-project-menu-trigger, .sidebar-project-menu-trigger[aria-expanded="true"] { opacity: 1; }

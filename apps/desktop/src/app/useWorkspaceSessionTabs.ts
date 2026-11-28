@@ -7,6 +7,8 @@ import { createWorkspaceTabId, hasStoredWorkspaceTabs as readHasStoredWorkspaceT
 import type { ConnectionState, Route } from "./types";
 import { isLocalEndpoint, localProviderOrFallback } from "../services/localOnly";
 
+const codingThreadTitle = (conversation?: { title?: string | null } | null) => conversation?.title?.trim() || "New coding thread";
+
 type WorkspaceSessionTabOptions = {
   chat: ReturnType<typeof useChatWorkspace>;
   coding: ReturnType<typeof useCodingWorkspace>;
@@ -68,12 +70,13 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     onNavigate(destination);
   }, [chat, coding, onNavigate, workspaceTabs]);
   const openNewWorkspaceTab = useCallback(() => {
-    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: agentMode === "Coding Agent" ? "New coding thread" : "New chat", route: "chat", conversationId: null, projectId: null };
+    const codingRoute = agentMode === "Coding Agent";
+    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: codingRoute ? codingThreadTitle(null) : "New chat", route: codingRoute ? "coding" : "chat", conversationId: null, projectId: null };
     setWorkspaceTabs((current) => [...current, tab].slice(-16));
     setActiveWorkspaceTabId(tab.id);
     chat.startNewChat();
-    chat.setResponseMode(agentMode === "Coding Agent" ? "coding" : "think");
-    onNavigate("chat");
+    chat.setResponseMode(codingRoute ? "coding" : "think");
+    onNavigate(codingRoute ? "coding" : "chat");
   }, [agentMode, chat, onNavigate]);
   const openNewProjectThread = useCallback((project: import("../../shared/contracts").DesktopProject) => {
     try {
@@ -261,7 +264,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       route: codingRoute ? "coding" : "chat",
       conversationId: codingRoute ? codingConversation?.id ?? null : chat.conversationId,
       projectId: codingRoute ? coding.selectedProject?.id ?? null : null,
-      title: codingRoute ? codingConversation?.title ?? "New coding thread" : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? "New coding thread" : "New chat"),
+      title: codingRoute ? codingThreadTitle(codingConversation) : chat.activeConversation?.title ?? (agentMode === "Coding Agent" ? codingThreadTitle(null) : "New chat"),
     }));
   }, [activeWorkspaceTabId, agentMode, chat.activeConversation?.id, chat.activeConversation?.projectId, chat.activeConversation?.title, chat.conversationId, coding.selectedProject?.id, route, workspaceSessionRestored]);
   useEffect(() => {
@@ -275,7 +278,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       : chat.activeConversation;
     const projectConversation = selectedConversation?.projectId === selectedProject.id ? selectedConversation : undefined;
     const conversationId = projectConversation?.id ?? null;
-    const title = projectConversation?.title ?? "New coding thread";
+    const title = codingThreadTitle(projectConversation);
     const needsTabUpdate = projectTab.route !== "coding"
       || projectTab.projectId !== selectedProject.id
       || projectTab.title !== title
