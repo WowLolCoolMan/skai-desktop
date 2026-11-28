@@ -7,7 +7,7 @@ import { OverflowMenu } from "../../components/ui/OverflowMenu";
 import { ModelPicker } from "../../components/ui/ModelPicker";
 import { ChatMessageList } from "./ChatMessageList";
 import { ChatThreadActivity } from "./ChatThreadActivity";
-import { ChatComposer } from "./ChatComposer";
+import { ChatComposer, type ComposerTarget } from "./ChatComposer";
 import { ChatTaskComposer } from "./ChatTaskComposer";
 import { ChatSchedulesPanel } from "./ChatSchedulesPanel";
 import type { ChatResponseMode, ConversationImportPreview } from "./useChatWorkspace";
@@ -89,6 +89,12 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [rewriteBusy, setRewriteBusy] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<{ original: string; candidate: string } | null>(null);
+  const [composerTarget, setComposerTarget] = useState<ComposerTarget>(() => {
+    const stored = localStorage.getItem("skai.composer.target");
+    return stored === "answer" || stored === "edit" || stored === "review" || stored === "research" || stored === "media"
+      ? stored
+      : responseMode === "coding" ? "edit" : responseMode === "security" ? "review" : "answer";
+  });
   const [showCodingWorkflowTools, setShowCodingWorkflowTools] = useState(false);
   const [showConversationDetails, setShowConversationDetails] = useState(false);
   const [showProjectTaskPlanner, setShowProjectTaskPlanner] = useState(false);
@@ -96,6 +102,29 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const threadTasks = tasks.filter((task) => task.conversationId === conversationId);
   useEffect(() => { if (!renameOpen) setRenameDraft(conversationTitle); }, [conversationTitle, renameOpen]);
   useEffect(() => { setDocumentsOnly(false); }, [conversationId]);
+  useEffect(() => {
+    if (workspaceMode === "project") setComposerTarget("edit");
+    else if (responseMode === "coding") setComposerTarget("edit");
+    else if (responseMode === "security") setComposerTarget("review");
+  }, [responseMode, workspaceMode]);
+  const changeComposerTarget = (target: ComposerTarget) => {
+    setComposerTarget(target);
+    localStorage.setItem("skai.composer.target", target);
+    if (target === "media") {
+      onNavigate("images");
+      return;
+    }
+    if (workspaceMode === "project") return;
+    if (target === "edit") onResponseModeChange("coding");
+    else if (target === "review") onResponseModeChange("security");
+    else if (target === "answer" || target === "research") onResponseModeChange("think");
+  };
+  const changeResponseMode = (mode: ChatResponseMode) => {
+    onResponseModeChange(mode);
+    const target: ComposerTarget = mode === "coding" ? "edit" : mode === "security" ? "review" : "answer";
+    setComposerTarget(target);
+    localStorage.setItem("skai.composer.target", target);
+  };
   const sendDraft = (text: string) => {
     onSend(text, attachments, documentsOnly, false, temporaryChat);
     updateDraft("");
@@ -183,7 +212,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
     <div className="chat-context-bar">
       <div className="chat-heading-copy"><p className="section-kicker">{temporaryChat ? "TEMPORARY CHAT" : isCodingAgent ? "CODING AGENT" : "CHAT"}</p><strong>{conversationId ? conversationTitle : isCodingAgent ? "New coding thread" : "New chat"}</strong>{temporaryChat && <small className="chat-temporary-indicator">Temporary</small>}<span>{temporaryChat ? "This conversation won’t appear in Recents." : `Saved on this device · ${provider}`}</span><span className="chat-working-context" aria-label={`Working in ${activeProject?.name ?? (isCodingAgent ? "coding workspace" : "local workspace")}`}><b>Working in</b><strong>{activeProject?.name ?? (isCodingAgent ? "Coding workspace" : "Local workspace")}</strong><small>{modeDescription}</small></span></div>
       <div className="chat-header-actions">
-        {!isCodingAgent && <label className="chat-response-mode" htmlFor="chat-response-mode-select"><span>Response</span><select id="chat-response-mode-select" value={responseMode} onChange={(event) => onResponseModeChange(event.target.value as ChatResponseMode)}><option value="think">Chat · balanced</option><option value="coding">Coding · implementation</option><option value="security">Security · risk review</option></select></label>}
+        {!isCodingAgent && <label className="chat-response-mode" htmlFor="chat-response-mode-select"><span>Response</span><select id="chat-response-mode-select" value={responseMode} onChange={(event) => changeResponseMode(event.target.value as ChatResponseMode)}><option value="think">Chat · balanced</option><option value="coding">Coding · implementation</option><option value="security">Security · risk review</option></select></label>}
         {isCodingAgent && workspaceMode !== "project" && <span className="coding-mode-badge">CODING AGENT</span>}
         {workspaceMode === "project" && <Button className="project-task-plan-trigger" variant={showProjectTaskPlanner ? "secondary" : "ghost"} type="button" aria-expanded={showProjectTaskPlanner} onClick={() => setShowProjectTaskPlanner((open) => !open)}>{showProjectTaskPlanner ? "Close planner" : "Plan task"}</Button>}
         {workspaceMode !== "project" && <Button variant={showConversationDetails ? "secondary" : "ghost"} type="button" aria-expanded={showConversationDetails} onClick={() => setShowConversationDetails((visible) => !visible)}>Details</Button>}
@@ -206,7 +235,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
         </section>
         {workspaceMode === "project" ? <div className="project-task-planner-slot" hidden={!showProjectTaskPlanner}><ChatTaskComposer expanded={showProjectTaskPlanner} onExpand={() => setShowProjectTaskPlanner(true)} showToggle={false} busy={taskBusy === "planning"} worktreeAvailable={worktreeAvailable} onPlanTask={(title, instruction, environment, requiresApproval, gitHubIssueUrl, acceptanceCriteria) => onPlanTask(title, instruction, environment, conversationId, requiresApproval, projectId, gitHubIssueUrl, acceptanceCriteria)} /></div> : showCodingWorkflowTools && <ChatTaskComposer busy={taskBusy === "planning"} onPlanTask={(title, instruction, environment, requiresApproval, gitHubIssueUrl, acceptanceCriteria) => onPlanTask(title, instruction, environment, conversationId, requiresApproval, undefined, gitHubIssueUrl, acceptanceCriteria)} />}
         {draftPersistenceWarning && <p className="chat-draft-save-warning" role="status">{draftPersistenceWarning}</p>}
-        <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={updateDraft} onSubmit={submit} onStop={onStop} onQueueRemove={onRemoveQueued} onUpdateQueued={onUpdateQueued} onMoveQueued={onMoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} onAudioTranscript={(fileName, transcript) => onSetAttachments([...attachments, { fileName: `${fileName}.audio-transcript.txt`, mediaType: "text/plain", content: transcript }].slice(0, 5))} onSetAttachments={onSetAttachments} provider={provider} endpoint={endpoint} model={model} models={models} placeholder={isCodingAgent ? "Message your coding agent…" : undefined} accessLabel={isCodingAgent ? "Project access" : "Local access"} projects={projects} projectId={projectId} onOpenProject={onOpenProject} modeLabel={modeLabel} modeDescription={modeDescription} onOpenTaskPlanner={() => workspaceMode === "project" ? setShowProjectTaskPlanner(true) : setShowCodingWorkflowTools(true)} modelControl={<ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} />} />
+        <ChatComposer draft={draft} busy={busy} rewriteBusy={rewriteBusy} documentsOnly={documentsOnly} attachments={attachments} queuedMessages={queuedMessages} onDraftChange={updateDraft} onSubmit={submit} onStop={onStop} onQueueRemove={onRemoveQueued} onUpdateQueued={onUpdateQueued} onMoveQueued={onMoveQueued} onAttach={onAttach} onFilesDropped={onFilesDropped} onRemoveAttachment={onRemoveAttachment} onNavigate={onNavigate} onToggleDocumentsOnly={() => setDocumentsOnly((enabled) => !enabled)} onVoiceTranscript={submitVoiceTranscript} onAudioTranscript={(fileName, transcript) => onSetAttachments([...attachments, { fileName: `${fileName}.audio-transcript.txt`, mediaType: "text/plain", content: transcript }].slice(0, 5))} onSetAttachments={onSetAttachments} provider={provider} endpoint={endpoint} model={model} models={models} placeholder={isCodingAgent ? "Message your coding agent…" : undefined} accessLabel={isCodingAgent ? "Project access" : "Local access"} projects={projects} projectId={projectId} onOpenProject={onOpenProject} modeLabel={modeLabel} modeDescription={modeDescription} target={composerTarget} onTargetChange={changeComposerTarget} onOpenTaskPlanner={() => workspaceMode === "project" ? setShowProjectTaskPlanner(true) : setShowCodingWorkflowTools(true)} modelControl={<ModelPicker model={model} provider={provider} endpoint={endpoint} models={models} onChange={onModelChange} onOpenModels={() => onNavigate("models")} />} />
       </main>
       <aside className="chat-rail" hidden={!showConversationDetails && !showCodingWorkflowTools && !threadTasks.length}>
         {threadTasks.length > 0 && <section className="chat-activity-rail" aria-label="Task activity"><div className="chat-activity-heading"><div><p className="section-kicker">THREAD WORK</p><strong>Task activity</strong></div><span>{threadTasks.length} task{threadTasks.length === 1 ? "" : "s"}</span></div><ChatThreadActivity tasks={threadTasks} taskBusy={taskBusy} workspaceMode={workspaceMode} onTaskAction={onTaskAction} onOpenFile={onOpenFile} onNavigate={onNavigate} /></section>}

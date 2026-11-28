@@ -1680,9 +1680,16 @@ async function main() {
         if (route === "chat" && process.env.UI_MATRIX_EXERCISE_CHAT === "1") {
           const activeChatClass = await cdp.evaluate(`document.querySelector('.chat-page')?.className ?? ''`);
           if (!activeChatClass.includes("is-coding-agent") && process.env.UI_MATRIX_EXERCISE_CHAT_SEARCH !== "1") {
-            const responseButtons = await cdp.evaluate(`([...document.querySelectorAll('.chat-response-mode-options button')].map((button) => button.textContent?.trim()))`);
-            if (!responseButtons.includes("Coding")) throw new Error("A regular Chat thread did not render its response-mode controls.");
-            await cdp.evaluate(`([...document.querySelectorAll('.chat-response-mode-options button')].find((button) => button.textContent?.trim() === 'Coding')?.click(), 1)`);
+            const targetControl = await cdp.evaluate(`(() => { const select = document.querySelector('[aria-label="Response target"]'); return select ? { options: [...select.options].map((option) => option.value), value: select.value } : null; })()`);
+            if (!targetControl || !targetControl.options.includes("answer") || !targetControl.options.includes("edit") || !targetControl.options.includes("review") || !targetControl.options.includes("research") || !targetControl.options.includes("media")) throw new Error(`Chat composer did not expose the complete target selector: ${JSON.stringify(targetControl)}`);
+            await cdp.evaluate(`(() => { const select = document.querySelector('[aria-label="Response target"]'); if (!select) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'edit'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await sleep(80);
+            if (!(await cdp.evaluate(`document.querySelector('.chat-page.is-coding-agent') !== null`))) throw new Error("Selecting the Edit composer target did not switch the thread into Coding Agent context.");
+            await cdp.evaluate(`(() => { const select = document.querySelector('[aria-label="Response target"]'); if (!select) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'answer'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await sleep(80);
+            const responseControls = await cdp.evaluate(`(() => { const buttons = [...document.querySelectorAll('.chat-response-mode-options button')].map((button) => button.textContent?.trim()); const select = document.querySelector('#chat-response-mode-select'); return { buttons, options: select ? [...select.options].map((option) => option.textContent?.trim()) : [] }; })()`);
+            if (!responseControls.buttons.includes("Coding") && !responseControls.options.some((option) => option.startsWith("Coding"))) throw new Error(`A regular Chat thread did not render its response-mode controls: ${JSON.stringify(responseControls)}`);
+            await cdp.evaluate(`(() => { const button = [...document.querySelectorAll('.chat-response-mode-options button')].find((item) => item.textContent?.trim() === 'Coding'); if (button) { button.click(); return true; } const select = document.querySelector('#chat-response-mode-select'); if (!select) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'coding'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await sleep(80);
             const codingModeOpened = await cdp.evaluate(`Boolean(document.querySelector('.chat-page.is-coding-agent'))`);
             if (!codingModeOpened) throw new Error("Selecting Coding response mode did not switch the thread into Coding Agent context.");

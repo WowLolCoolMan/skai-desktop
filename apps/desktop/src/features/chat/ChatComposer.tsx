@@ -12,6 +12,25 @@ import { isLocalEndpoint } from "../../services/localOnly";
 import { useChatComposerVoice } from "./useChatComposerVoice";
 import { commandPreferencesEvent, readCommandPreferences, type CommandPreferences } from "../commands/preferences";
 import "./VoiceTranscriptControls.css";
+import "./ComposerIntentControls.css";
+
+export type ComposerTarget = "answer" | "edit" | "review" | "research" | "media";
+
+const composerTargetLabels: Record<ComposerTarget, string> = {
+  answer: "Answer",
+  edit: "Edit",
+  review: "Review",
+  research: "Research",
+  media: "Media",
+};
+
+const composerTargetDescriptions: Record<ComposerTarget, string> = {
+  answer: "Explain or solve without changing project files.",
+  edit: "Work toward an approved implementation or file change.",
+  review: "Inspect for risks and findings without writing changes.",
+  research: "Collect and synthesize evidence before recommending a path.",
+  media: "Open Visuals Workshop for image and media generation.",
+};
 
 type ChatComposerProps = {
   draft: string;
@@ -47,6 +66,8 @@ type ChatComposerProps = {
   onOpenProject?: (project: DesktopProject) => void;
   modeLabel?: string;
   modeDescription?: string;
+  target?: ComposerTarget;
+  onTargetChange?: (target: ComposerTarget) => void;
 };
 
 type PlannedComputerAction =
@@ -84,7 +105,7 @@ function parsePlannedComputerAction(value: Record<string, unknown>): PlannedComp
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onStop, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response" }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onStop, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response", target = "answer", onTargetChange }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
@@ -473,6 +494,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         </div>
         {projects.length > 0 && onOpenProject && <label className="composer-project-switcher"><NavIcon name="project" /><span className="sr-only">Open a project workspace</span><select aria-label="Open a project workspace" value={projectId ?? ""} onChange={(event) => { const project = projects.find((item) => item.id === event.target.value); if (project) onOpenProject(project); }}><option value="">Open project…</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}
         <span className="composer-mode-chip" title={modeDescription}><span className="composer-mode-chip-dot" aria-hidden="true" />{modeLabel}</span>
+        {onTargetChange && <label className="composer-target-selector" title={composerTargetDescriptions[target]}><span>Target</span><select aria-label="Response target" value={target} onChange={(event) => onTargetChange(event.target.value as ComposerTarget)}>{(Object.keys(composerTargetLabels) as ComposerTarget[]).map((value) => <option key={value} value={value}>{composerTargetLabels[value]}</option>)}</select></label>}
         <div className="composer-access-anchor" ref={accessMenuRef}>
           <button ref={accessTriggerRef} type="button" className="composer-access-button" onClick={() => setAccessOpen((open) => !open)} aria-haspopup="dialog" aria-expanded={accessOpen}>{accessLabel}<span aria-hidden="true">⌄</span></button>
           {accessOpen && <section className="composer-access-popover" role="dialog" aria-label={`${accessLabel} and available tools`}>
