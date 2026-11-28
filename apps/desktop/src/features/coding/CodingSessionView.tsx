@@ -37,7 +37,9 @@ function splitPaneRatioStorageKey(projectId: string) {
 
 function readSplitPanePercent(projectId: string) {
   const stored = Number(localStorage.getItem(splitPaneRatioStorageKey(projectId)));
-  return Number.isFinite(stored) && stored >= 30 && stored <= 70 ? stored : 54;
+  // Start balanced so the first Coding viewport keeps the latest chat turn
+  // readable while leaving enough width for a real file or diff preview.
+  return Number.isFinite(stored) && stored >= 30 && stored <= 70 ? stored : 50;
 }
 
 function languageForPath(path: string | null) {
