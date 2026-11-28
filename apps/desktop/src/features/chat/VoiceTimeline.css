@@ -1,0 +1,7 @@
+.voice-mode-timeline { display:grid; gap:8px; width:min(100%, 440px); padding:12px; border:1px solid color-mix(in srgb, var(--skai-color-accent) 36%, var(--skai-color-border)); border-radius:var(--skai-radius-xl); background:color-mix(in srgb, var(--skai-color-accent) 6%, var(--skai-color-surface-soft)); text-align:left; }
+.voice-mode-timeline-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.voice-mode-timeline-heading strong { color:var(--skai-color-text); font-size:var(--skai-text-sm); }
+.voice-mode-timeline-heading small { color:var(--skai-color-text-muted); font-size:var(--skai-text-2xs); }
+.voice-mode-timeline ol { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.voice-mode-timeline li { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:8px; align-items:start; color:var(--skai-color-text-muted); font-size:var(--skai-text-xs); line-height:1.4; }
+.voice-mode-timeline time { color:var(--skai-color-accent-strong); font-variant-numeric:tabular-nums; white-space:nowrap; }
