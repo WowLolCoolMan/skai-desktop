@@ -4690,6 +4690,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .coding-split-launcher .overflow-menu-trigger { display: inline-flex; width: auto; min-width: 96px; height: 30px; justify-content: center; padding-inline: 9px; white-space: nowrap; }
 .coding-project-browser.is-editor-panel .project-file-layout,
 .coding-project-browser.is-files-changes-panel .project-file-layout { min-width: 0; }
+.coding-files-changes-switch { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); }
+.coding-files-changes-switch button { min-height: 28px; padding: 4px 10px; font-size: var(--skai-text-xs); white-space: nowrap; }
+.coding-files-changes-switch button[aria-pressed="true"] { color: var(--skai-color-text); background: var(--skai-color-surface); }
 .app-shell:has(.app-sidebar.is-coding-agent) > .app-main { min-width: 0; }
 @media (max-width: 640px) {
   .app-shell:has(.app-sidebar.is-coding-agent) { grid-template-columns: 52px minmax(0, 1fr); }
