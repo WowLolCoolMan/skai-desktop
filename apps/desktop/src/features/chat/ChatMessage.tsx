@@ -3,6 +3,7 @@ import type { Message } from "../../app/types";
 import { Button } from "../../components/ui/Primitives";
 import { AttachmentList } from "./AttachmentList";
 import { MessageContent } from "./MessageContent";
+import { speakNativeResponse, stopNativeSpeech } from "../../services/nativeTts";
 
 type ChatMessageProps = {
   message: Message;
@@ -46,6 +47,7 @@ export function ChatMessage({ message, index, model, busy, conversationId, copie
       <Button variant="ghost" onClick={() => onCopy(message.content, index)}>{copied ? "Copied" : "Copy"}</Button>
       <Button variant="ghost" type="button" title="Copy link to this message" onClick={() => { const url = new URL(window.location.href); url.hash = messageId; const copy = navigator.clipboard?.writeText; if (!copy) { window.location.hash = messageId; return; } void copy.call(navigator.clipboard, url.toString()).then(() => { setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 1500); }).catch(() => { window.location.hash = messageId; }); }}>{linkCopied ? "Link copied" : "Copy link"}</Button>
       {message.role === "user" && <Button variant="ghost" disabled={busy || !conversationId || saving} onClick={() => setEditing(true)}>Edit</Button>}
+      {message.role === "assistant" && <><Button variant="ghost" type="button" onClick={() => void speakNativeResponse(message.content, true)} aria-label="Read this reply aloud">Read aloud</Button><Button variant="ghost" type="button" onClick={stopNativeSpeech} aria-label="Stop reading this reply">Stop audio</Button></>}
       {message.role === "assistant" && <Button variant="ghost" disabled={busy} onClick={() => onRetry(index)}>Retry</Button>}
       <Button variant="ghost" onClick={() => onFork(index)} disabled={!conversationId}>Fork from here</Button>
     </div></div>
