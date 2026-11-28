@@ -34,6 +34,8 @@ const composerTargetDescriptions: Record<ComposerTarget, string> = {
 
 type RecommendedComposerTool = "files" | "audio" | "voice" | "computer" | "plan" | "marketplace";
 
+type ComposerSkill = { id: string; name: string; description?: string; category?: string; enabled?: boolean; source?: string };
+
 const recommendedComposerTools: Record<RecommendedComposerTool, { label: string; detail: string }> = {
   files: { label: "Add files", detail: "Attach local source material" },
   audio: { label: "Transcribe audio", detail: "Use local audio transcription" },
@@ -51,7 +53,7 @@ type ChatComposerProps = {
   attachments: ChatAttachment[];
   queuedMessages: DesktopQueuedMessage[];
   onDraftChange: (draft: string) => void;
-  onSubmit: () => void;
+  onSubmit: (selectedToolIds?: string[]) => void;
   onStop: () => Promise<boolean>;
   onQueueRemove: (index: number) => void;
   onUpdateQueued: (index: number, text: string) => Promise<boolean>;
@@ -125,6 +127,18 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const [workflowPreferences, setWorkflowPreferences] = useState<CommandPreferences>(readCommandPreferences);
 
   const [omniOpen, setOmniOpen] = useState(false);
+  const [toolPickerOpen, setToolPickerOpen] = useState(false);
+  const [toolQuery, setToolQuery] = useState("");
+  const [availableSkills, setAvailableSkills] = useState<ComposerSkill[]>([]);
+  const [toolLoadStatus, setToolLoadStatus] = useState<string | null>(null);
+  const [toolScope, setToolScope] = useState<"turn" | "persistent">("turn");
+  const [oneTurnToolIds, setOneTurnToolIds] = useState<string[]>([]);
+  const [persistentToolIds, setPersistentToolIds] = useState<string[]>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem("skai.composer.tools") ?? "[]");
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").slice(0, 12) : [];
+    } catch { return []; }
+  });
   const [accessOpen, setAccessOpen] = useState(false);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerScreens, setComputerScreens] = useState<Awaited<ReturnType<NonNullable<typeof window.skaiAgent.computer>['capture']>>>([]);
@@ -266,6 +280,27 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     document.addEventListener("keydown", closeOnEscape);
     return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeOnEscape); };
   }, [accessOpen, omniOpen]);
+  useEffect(() => {
+    if (!omniOpen || !toolPickerOpen) return;
+    let cancelled = false;
+    setToolLoadStatus("Loading installed skills…");
+    void window.skaiAgent.request("skills.list").then((response) => {
+      if (cancelled) return;
+      const result = response.ok ? response.result : null;
+      const items = Array.isArray(result) ? result : (result && typeof result === "object" && Array.isArray((result as { skills?: unknown }).skills) ? (result as { skills: unknown[] }).skills : []);
+      const skills = items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")).map((item) => ({
+        id: typeof item.id === "string" ? item.id : "",
+        name: typeof item.name === "string" ? item.name : typeof item.id === "string" ? item.id : "",
+        description: typeof item.description === "string" ? item.description : "",
+        category: typeof item.category === "string" ? item.category : "",
+        enabled: item.enabled !== false,
+        source: typeof item.source === "string" ? item.source : "",
+      })).filter((skill) => skill.id && skill.enabled);
+      setAvailableSkills(skills);
+      setToolLoadStatus(response.ok ? (skills.length ? null : "No enabled local skills yet. Browse Marketplace to install one.") : (response.error?.message ?? "Installed skills could not be loaded."));
+    }).catch((error) => { if (!cancelled) setToolLoadStatus(error instanceof Error ? error.message : "Installed skills could not be loaded."); });
+    return () => { cancelled = true; };
+  }, [omniOpen, toolPickerOpen]);
   useEffect(() => {
     if (commandQuery === null && contextQuery === null) return;
     const activeId = commandQuery !== null ? activeCommandId : activeContextId;
@@ -458,6 +493,20 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     else if (tool === "plan") { setOmniOpen(false); onOpenTaskPlanner?.(); }
     else { setOmniOpen(false); onNavigate("marketplace"); }
   };
+  const selectedToolIds = [...new Set([...persistentToolIds, ...oneTurnToolIds])];
+  const filteredSkills = availableSkills.filter((skill) => `${skill.name} ${skill.id} ${skill.description ?? ""} ${skill.category ?? ""}`.toLowerCase().includes(toolQuery.trim().toLowerCase()));
+  const toggleComposerSkill = (skillId: string) => {
+    if (toolScope === "persistent") {
+      setPersistentToolIds((current) => {
+        const next = current.includes(skillId) ? current.filter((id) => id !== skillId) : [...current, skillId].slice(-12);
+        localStorage.setItem("skai.composer.tools", JSON.stringify(next));
+        return next;
+      });
+      return;
+    }
+    setOneTurnToolIds((current) => current.includes(skillId) ? current.filter((id) => id !== skillId) : [...current, skillId].slice(-12));
+  };
+  const closeToolPicker = () => { setToolPickerOpen(false); setToolQuery(""); };
   const removeDuplicateAttachments = () => {
     const seen = new Set<string>();
     onSetAttachments(attachments.filter((attachment) => {
@@ -514,15 +563,25 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         <div className="composer-add-anchor" ref={addMenuRef}>
           <button ref={addTriggerRef} className="composer-tool-button composer-add-button" type="button" onClick={() => setOmniOpen((open) => !open)} disabled={rewriteBusy} aria-label="Add to message" title="Add to message" aria-haspopup="menu" aria-expanded={omniOpen}><NavIcon name="plus" /><span className="composer-toolbar-label">Add</span></button>
           {omniOpen && <div className="composer-add-menu" role="menu" aria-label="Add to message">
-            <p className="composer-menu-label">Add to this message</p>
-            <button className="composer-menu-option" type="button" role="menuitem" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><NavIcon name="document" /><span><strong>Files and folders</strong><small>Attach up to 5 images, documents, PDFs, or videos</small></span></button>
-            <button className="composer-menu-option" type="button" role="menuitem" onClick={openAudioPickerFromOmni} disabled={busy || voiceListening || handsFreeActive}><NavIcon name="audio" /><span><strong>Audio file</strong><small>Transcribe audio on this device</small></span></button>
-            <button className="composer-menu-option" type="button" role="menuitemcheckbox" aria-checked={documentsOnly} onClick={() => { onToggleDocumentsOnly(); setOmniOpen(false); }} disabled={busy || rewriteBusy}><NavIcon name="document" /><span><strong>Documents only</strong><small>Use attached documents as evidence</small></span>{documentsOnly && <b aria-hidden="true">✓</b>}</button>
-            <button className="composer-menu-option" type="button" role="menuitem" onClick={startVoiceFromOmni} disabled={rewriteBusy || handsFreeActive || audioTranscribing}><NavIcon name="microphone" /><span><strong>Voice input</strong><small>Dictate one message on this device</small></span></button>
-            <button className="composer-menu-option" type="button" role="menuitem" onClick={startHandsFreeFromOmni} disabled={rewriteBusy || voiceListening || audioTranscribing}><NavIcon name="headset" /><span><strong>Voice Mode</strong><small>Start a hands-free conversation</small></span></button>
-            <button className="composer-menu-option" type="button" role="menuitem" onClick={() => { setOmniOpen(false); setComputerOpen(true); void captureComputerScreens(); }}><NavIcon name="image" /><span><strong>Computer use</strong><small>Capture a screen or control a local app</small></span></button>
-            {onOpenTaskPlanner && <button className="composer-menu-option" type="button" role="menuitem" onClick={() => { setOmniOpen(false); onOpenTaskPlanner(); }}><NavIcon name="code" /><span><strong>Plan a task</strong><small>Prepare a plan for review</small></span></button>}
-            <button className="composer-menu-option" type="button" role="menuitem" onClick={() => { setOmniOpen(false); onNavigate("marketplace"); }}><NavIcon name="marketplace" /><span><strong>Browse tools and skills</strong><small>Explore available local integrations</small></span></button>
+            {toolPickerOpen ? <div className="composer-tool-picker" role="group" aria-label="Skills and tools for the next turn">
+              <div className="composer-tool-picker-heading"><button type="button" className="composer-tool-picker-back" onClick={closeToolPicker} aria-label="Back to add menu">‹</button><div><strong>Skills and tools</strong><small>{selectedToolIds.length ? `${selectedToolIds.length} selected` : "None selected"} · only enabled local skills are shown</small></div></div>
+              <input className="composer-tool-search" value={toolQuery} onChange={(event) => setToolQuery(event.target.value)} placeholder="Search installed skills…" aria-label="Search installed skills" autoFocus />
+              <label className="composer-tool-scope"><span>Apply selection</span><select value={toolScope} onChange={(event) => setToolScope(event.target.value as "turn" | "persistent")} aria-label="Tool selection scope"><option value="turn">This turn only</option><option value="persistent">Remember for future turns</option></select></label>
+              <div className="composer-tool-list">{filteredSkills.map((skill) => { const checked = selectedToolIds.includes(skill.id); return <label className={`composer-tool-row${checked ? " is-selected" : ""}`} key={skill.id}><input type="checkbox" checked={checked} onChange={() => toggleComposerSkill(skill.id)} /><span><strong>{skill.name}</strong><small>{skill.description || skill.category || skill.id}</small></span><em>{skill.source || "Local"}</em></label>; })}</div>
+              {toolLoadStatus && <p className="composer-tool-empty" role="status">{toolLoadStatus}</p>}
+              <div className="composer-tool-picker-actions"><button type="button" onClick={() => { closeToolPicker(); onNavigate("marketplace"); }}>Browse Marketplace</button><button type="button" onClick={closeToolPicker}>Done</button></div>
+            </div> : <>
+              <p className="composer-menu-label">Add to this message</p>
+              <button className="composer-menu-option" type="button" role="menuitem" onClick={openFilePickerFromOmni} disabled={attachments.length >= 5}><NavIcon name="document" /><span><strong>Files and folders</strong><small>Attach up to 5 images, documents, PDFs, or videos</small></span></button>
+              <button className="composer-menu-option" type="button" role="menuitem" onClick={openAudioPickerFromOmni} disabled={busy || voiceListening || handsFreeActive}><NavIcon name="audio" /><span><strong>Audio file</strong><small>Transcribe audio on this device</small></span></button>
+              <button className="composer-menu-option" type="button" role="menuitemcheckbox" aria-checked={documentsOnly} onClick={() => { onToggleDocumentsOnly(); setOmniOpen(false); }} disabled={busy || rewriteBusy}><NavIcon name="document" /><span><strong>Documents only</strong><small>Use attached documents as evidence</small></span>{documentsOnly && <b aria-hidden="true">✓</b>}</button>
+              <button className="composer-menu-option" type="button" role="menuitem" onClick={startVoiceFromOmni} disabled={rewriteBusy || handsFreeActive || audioTranscribing}><NavIcon name="microphone" /><span><strong>Voice input</strong><small>Dictate one message on this device</small></span></button>
+              <button className="composer-menu-option" type="button" role="menuitem" onClick={startHandsFreeFromOmni} disabled={rewriteBusy || voiceListening || audioTranscribing}><NavIcon name="headset" /><span><strong>Voice Mode</strong><small>Start a hands-free conversation</small></span></button>
+              <button className="composer-menu-option" type="button" role="menuitem" onClick={() => { setOmniOpen(false); setComputerOpen(true); void captureComputerScreens(); }}><NavIcon name="image" /><span><strong>Computer use</strong><small>Capture a screen or control a local app</small></span></button>
+              {onOpenTaskPlanner && <button className="composer-menu-option" type="button" role="menuitem" onClick={() => { setOmniOpen(false); onOpenTaskPlanner(); }}><NavIcon name="code" /><span><strong>Plan a task</strong><small>Prepare a plan for review</small></span></button>}
+              <button className="composer-menu-option" type="button" role="menuitem" onClick={() => setToolPickerOpen(true)}><NavIcon name="sparkle" /><span><strong>Skills and tools</strong><small>{selectedToolIds.length ? `${selectedToolIds.length} selected · configure scope` : "Choose local skills for this turn"}</small></span></button>
+              <button className="composer-menu-option" type="button" role="menuitem" onClick={() => { setOmniOpen(false); onNavigate("marketplace"); }}><NavIcon name="marketplace" /><span><strong>Browse tools and skills</strong><small>Explore available local integrations</small></span></button>
+            </>}
           </div>}
         </div>
         {projects.length > 0 && onOpenProject && <label className="composer-project-switcher"><NavIcon name="project" /><span className="sr-only">Open a project workspace</span><select aria-label="Open a project workspace" value={projectId ?? ""} onChange={(event) => { const project = projects.find((item) => item.id === event.target.value); if (project) onOpenProject(project); }}><option value="">Open project…</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}
@@ -554,7 +613,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         {modelControl}
         {busy && modeLabel !== "Coding" && <button className="composer-tool-button composer-stop-button" type="button" onClick={() => void onStop()} aria-label="Stop local response" title="Stop the active local response"><NavIcon name="stop" /><span className="composer-toolbar-label">Stop</span></button>}
         <button className={`composer-tool-button composer-microphone-button${voiceListening ? " is-active" : ""}`} type="button" onClick={toggleVoiceInput} disabled={rewriteBusy || handsFreeActive || audioTranscribing} aria-pressed={voiceListening} aria-label={voiceListening ? "Stop dictation" : "Dictate a message"} title={voiceListening ? "Stop dictation" : "Dictate a message on this device"}><NavIcon name={voiceListening ? "stop" : "microphone"} /><span className="composer-toolbar-label">{voiceListening ? "Stop" : "Dictate"}</span></button>
-        {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-keyshortcuts="Control+Alt+V Meta+Alt+V" aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation · Ctrl+Alt+V" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation · Ctrl+Alt+V"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /><span className="composer-toolbar-label">{handsFreeActive ? "End voice" : "Voice"}</span></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={onSubmit} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={`${rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"} · ${workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"}`}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
+        {!hasMessageContent ? <button className={`composer-send-button composer-voice-mode-button${handsFreeActive ? " is-active" : ""}`} type="button" disabled={rewriteBusy || (busy && !handsFreeActive) || (voiceListening && !handsFreeActive) || audioTranscribing} onClick={toggleHandsFree} aria-pressed={handsFreeActive} aria-keyshortcuts="Control+Alt+V Meta+Alt+V" aria-label={handsFreeActive ? "End voice mode" : "Start voice mode"} title={handsFreeActive ? "End voice conversation · Ctrl+Alt+V" : busy ? "Voice Mode is available after the response finishes" : "Start a hands-free voice conversation · Ctrl+Alt+V"}><NavIcon name={handsFreeActive ? "stop" : "microphone"} /><span className="composer-toolbar-label">{handsFreeActive ? "End voice" : "Voice"}</span></button> : <button className="composer-send-button" type="button" disabled={rewriteBusy || (documentsOnly && attachments.length === 0)} onClick={() => { onSubmit(selectedToolIds); setOneTurnToolIds([]); }} aria-label={rewriteBusy ? "Rewriting message" : busy ? "Queue message" : "Send message"} title={`${rewriteBusy ? "Rewriting…" : busy ? "Queue message" : "Send message"} · ${workflowPreferences.sendBehavior === "enter-sends" ? "Enter" : "Shift+Enter"}`}>{rewriteBusy ? <NavIcon name="stop" /> : <span aria-hidden="true">↑</span>}</button>}
       </div>
     </div>
     <ModalDialog open={computerOpen} onClose={() => { if (computerBusy) stopComputerTask(); setComputerOpen(false); }} titleId="computer-use-title" className="ui-dialog computer-use-dialog">

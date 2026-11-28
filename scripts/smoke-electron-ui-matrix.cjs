@@ -1686,6 +1686,11 @@ async function main() {
             const recommendations = await cdp.evaluate(`([...document.querySelectorAll('.composer-tool-recommendations button')].map((button) => button.textContent?.trim()))`);
             if (!recommendations.includes("Add files") || !recommendations.includes("Plan a task")) throw new Error(`Draft-aware tool recommendations were incomplete: ${JSON.stringify(recommendations)}`);
             await cdp.evaluate(`(() => { const input = document.querySelector('.composer-card textarea'); if (!input) return false; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await clickInRenderer(cdp, ".composer-add-button");
+            await cdp.evaluate(`(() => { const item = [...document.querySelectorAll('.composer-menu-option')].find((node) => node.textContent?.includes('Skills and tools')); item?.click(); return Boolean(item); })()`);
+            const toolPicker = await cdp.evaluate(`(() => ({ picker: Boolean(document.querySelector('.composer-tool-picker')), search: Boolean(document.querySelector('.composer-tool-search')), scope: document.querySelector('.composer-tool-scope select')?.value ?? null, back: Boolean(document.querySelector('.composer-tool-picker-back')) }))()`);
+            if (!toolPicker.picker || !toolPicker.search || toolPicker.scope !== "turn" || !toolPicker.back) throw new Error(`Composer tool picker did not expose scoped local skill controls: ${JSON.stringify(toolPicker)}`);
+            await cdp.evaluate(`document.querySelector('.composer-tool-picker-actions button:last-child')?.click(); 1`);
             await cdp.evaluate(`(() => { const select = document.querySelector('[aria-label="Response target"]'); if (!select) return false; const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; setter.call(select, 'edit'); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await sleep(80);
             if (!(await cdp.evaluate(`document.querySelector('.chat-page.is-coding-agent') !== null`))) throw new Error("Selecting the Edit composer target did not switch the thread into Coding Agent context.");

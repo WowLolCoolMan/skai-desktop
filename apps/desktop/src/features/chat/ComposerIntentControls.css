@@ -73,3 +73,25 @@
 }
 
 .composer-tool-recommendations .nav-icon { width: 12px; height: 12px; }
+
+.composer-tool-picker { display: grid; gap: 8px; min-width: min(360px, 82vw); }
+.composer-tool-picker-heading { display: flex; align-items: center; gap: 8px; }
+.composer-tool-picker-heading > div { display: grid; gap: 2px; min-width: 0; }
+.composer-tool-picker-heading strong { color: var(--skai-color-text); font-size: var(--skai-text-xs); }
+.composer-tool-picker-heading small, .composer-tool-row small { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.composer-tool-picker-back { width: 24px; height: 24px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: transparent; font-size: 18px; }
+.composer-tool-search { width: 100%; min-height: 30px; padding: 6px 8px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); }
+.composer-tool-scope { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.composer-tool-scope select { max-width: 190px; padding: 4px 6px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text); background: var(--skai-color-surface-soft); font-size: var(--skai-text-3xs); }
+.composer-tool-list { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.composer-tool-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 7px; border: 1px solid transparent; border-radius: var(--skai-radius-sm); cursor: pointer; }
+.composer-tool-row:hover, .composer-tool-row.is-selected { border-color: var(--skai-color-border); background: var(--skai-color-surface-soft); }
+.composer-tool-row input { accent-color: var(--skai-color-accent); }
+.composer-tool-row span { display: grid; gap: 2px; min-width: 0; }
+.composer-tool-row strong { overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.composer-tool-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-tool-row em { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); font-style: normal; }
+.composer-tool-empty { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
+.composer-tool-picker-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.composer-tool-picker-actions button { padding: 5px 8px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: transparent; font-size: var(--skai-text-3xs); }
+.composer-tool-picker-actions button:hover, .composer-tool-picker-actions button:focus-visible, .composer-tool-picker-back:hover, .composer-tool-picker-back:focus-visible { color: var(--skai-color-text); border-color: var(--skai-color-accent); }

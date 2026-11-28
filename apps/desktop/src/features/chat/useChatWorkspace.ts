@@ -226,7 +226,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     return savedId;
   };
 
-  const sendMessage = async (text: string, messageAttachments: ChatAttachment[], documentsOnly = false, speakReply = false, temporary = false) => {
+  const sendMessage = async (text: string, messageAttachments: ChatAttachment[], documentsOnly = false, speakReply = false, temporary = false, selectedToolIds: string[] = []) => {
     if (!isLocalEndpoint(endpoint)) { onError(LOCAL_ENDPOINT_ERROR); return; }
     stopNativeSpeech();
     const next = [...messages, { role: "user" as const, content: text || "Attached files", createdAtUtc: new Date().toISOString(), attachments: messageAttachments.length ? messageAttachments : undefined }];
@@ -302,7 +302,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     });
     let response: Awaited<ReturnType<typeof request>>;
     try {
-      response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: skillMentions(next), streamResponse: true, progressChannel, operationId, ...(speakReply ? { voiceMode: true, voiceExpressiveness } : {}), ...(documentsOnly ? { documentsOnly: true } : {}) });
+      response = await request("chat.complete", { provider, endpoint, model: responseModel, modelContextLength: modelMetadata?.contextLength ?? null, messages: next, responseMode, skills: [...new Set([...skillMentions(next), ...selectedToolIds])].slice(0, 12), streamResponse: true, progressChannel, operationId, ...(speakReply ? { voiceMode: true, voiceExpressiveness } : {}), ...(documentsOnly ? { documentsOnly: true } : {}) });
     } catch (error) {
       setBusy(false);
       onError(error instanceof Error ? error.message : "The model request failed.");

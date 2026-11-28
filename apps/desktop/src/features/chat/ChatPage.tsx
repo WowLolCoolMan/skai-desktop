@@ -38,7 +38,7 @@ type ChatPageProps = {
   archived: boolean;
   smartPromptRewritingEnabled: boolean;
   onRewritePrompt: (draft: string) => Promise<string | null>;
-  onSend: (text: string, attachments: ChatAttachment[], documentsOnly: boolean, speakReply?: boolean, temporary?: boolean) => void;
+  onSend: (text: string, attachments: ChatAttachment[], documentsOnly: boolean, speakReply?: boolean, temporary?: boolean, selectedToolIds?: string[]) => void;
   onStop: () => Promise<boolean>;
   onStartTemporaryChat: () => void;
   onQueue: (text: string, attachments: ChatAttachment[]) => void;
@@ -89,6 +89,7 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [rewriteBusy, setRewriteBusy] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<{ original: string; candidate: string } | null>(null);
+  const [rewriteToolIds, setRewriteToolIds] = useState<string[]>([]);
   const [composerTarget, setComposerTarget] = useState<ComposerTarget>(() => {
     const stored = localStorage.getItem("skai.composer.target");
     return stored === "answer" || stored === "edit" || stored === "review" || stored === "research" || stored === "media"
@@ -125,14 +126,15 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
     setComposerTarget(target);
     localStorage.setItem("skai.composer.target", target);
   };
-  const sendDraft = (text: string) => {
-    onSend(text, attachments, documentsOnly, false, temporaryChat);
+  const sendDraft = (text: string, selectedToolIds: string[] = []) => {
+    onSend(text, attachments, documentsOnly, false, temporaryChat, selectedToolIds);
     updateDraft("");
     setDocumentsOnly(false);
     setRewritePreview(null);
+    setRewriteToolIds([]);
   };
 
-  const submit = () => {
+  const submit = (selectedToolIds: string[] = []) => {
     const text = draft.trim();
     if (rewriteBusy || (!text && attachments.length === 0) || (documentsOnly && attachments.length === 0)) return;
     if (busy) onQueue(text, attachments);
@@ -143,11 +145,11 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
         // A guarded rewrite returns the original draft for low-context prompts
         // and unsafe model suggestions. Send it directly instead of opening a
         // misleading review dialog.
-        if (candidate.trim() === text) sendDraft(text);
-        else setRewritePreview({ original: text, candidate });
+        if (candidate.trim() === text) sendDraft(text, selectedToolIds);
+        else { setRewriteToolIds(selectedToolIds); setRewritePreview({ original: text, candidate }); }
       }).finally(() => setRewriteBusy(false));
       return;
-    } else { sendDraft(text); return; }
+    } else { sendDraft(text, selectedToolIds); return; }
     updateDraft("");
     setDocumentsOnly(false);
   };
@@ -245,6 +247,6 @@ export function ChatPage({ workspaceTabId, capacity, provider, model, responseMo
     {importSummary && <p className="chat-import-summary" role="status">{importSummary}</p>}
     <ModalDialog open={renameOpen} onClose={() => setRenameOpen(false)} titleId="rename-conversation-title" initialFocusRef={renameInputRef}><form onSubmit={(event) => { event.preventDefault(); void renameConversation(); }}><div className="dialog-heading"><div><p className="section-kicker">CONVERSATION</p><h3 id="rename-conversation-title">Rename chat</h3><p>Use a short name that makes this thread easy to find later.</p></div><button type="button" onClick={() => setRenameOpen(false)} aria-label="Close rename dialog">×</button></div><label>Conversation name<input ref={renameInputRef} value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} maxLength={200} autoComplete="off" /></label><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setRenameOpen(false)}>Cancel</Button><Button variant="primary" type="submit" disabled={renameBusy || !renameDraft.trim()}>{renameBusy ? "Saving…" : "Save name"}</Button></div></form></ModalDialog>
     <ModalDialog open={Boolean(importPreview)} onClose={() => { if (!importBusy) setImportPreview(null); }} titleId="conversation-import-title" className="ui-dialog conversation-import-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL ARCHIVE · PREVIEW</p><h3 id="conversation-import-title">Import conversations</h3><p>Review the merge plan before anything is written to this device.</p></div><button type="button" disabled={importBusy} onClick={() => setImportPreview(null)} aria-label="Close conversation import preview">×</button></div>{importPreview && <><div className="conversation-import-summary"><strong>{importPreview.fileName}</strong><dl><div><dt>Conversations in archive</dt><dd>{importPreview.total}</dd></div><div><dt>New conversations</dt><dd>{importPreview.importCount}</dd></div><div><dt>Duplicates skipped</dt><dd>{importPreview.skippedDuplicates}</dd></div><div><dt>Conflicting IDs reassigned</dt><dd>{importPreview.reassignedIds}</dd></div></dl>{importPreview.sampleTitles.length > 0 && <div><span>Examples to import</span><ul>{importPreview.sampleTitles.map((title, index) => <li key={`${title}-${index}`}>{title}</li>)}</ul></div>}{importPreview.importCount === 0 && <p>Everything in this archive already exists here. No changes are needed.</p>}<small>Imported conversations are merged into local history. Existing conversations are never overwritten; repeat imports skip duplicates.</small></div><div className="dialog-actions"><Button variant="ghost" type="button" disabled={importBusy} onClick={() => setImportPreview(null)}>Cancel</Button><Button variant="primary" type="button" disabled={importBusy || importPreview.importCount === 0} onClick={() => void confirmConversationImport()}>{importBusy ? "Importing…" : `Import ${importPreview.importCount} conversation${importPreview.importCount === 1 ? "" : "s"}`}</Button></div></>}</ModalDialog>
-    <ModalDialog open={Boolean(rewritePreview)} onClose={() => setRewritePreview(null)} titleId="rewrite-prompt-title" className="ui-dialog rewrite-prompt-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL MODEL · REVIEW BEFORE SEND</p><h3 id="rewrite-prompt-title">Smart prompt rewrite</h3><p>Edit the suggestion, use your original draft, or cancel. Nothing is sent until you choose.</p></div><button type="button" onClick={() => setRewritePreview(null)} aria-label="Close prompt rewrite preview">×</button></div><div className="rewrite-prompt-fields"><label>Original draft<textarea value={rewritePreview?.original ?? ""} readOnly rows={4} /></label><label>Rewritten prompt<textarea value={rewritePreview?.candidate ?? ""} onChange={(event) => setRewritePreview((current) => current ? { ...current, candidate: event.target.value } : current)} maxLength={24_000} rows={7} /></label></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setRewritePreview(null)}>Cancel</Button><Button variant="secondary" type="button" onClick={() => rewritePreview && sendDraft(rewritePreview.original)}>Use original</Button><Button variant="primary" type="button" disabled={!rewritePreview?.candidate.trim()} onClick={() => rewritePreview && sendDraft(rewritePreview.candidate.trim())}>Use rewritten prompt</Button></div></ModalDialog>
+    <ModalDialog open={Boolean(rewritePreview)} onClose={() => setRewritePreview(null)} titleId="rewrite-prompt-title" className="ui-dialog rewrite-prompt-dialog"><div className="dialog-heading"><div><p className="section-kicker">LOCAL MODEL · REVIEW BEFORE SEND</p><h3 id="rewrite-prompt-title">Smart prompt rewrite</h3><p>Edit the suggestion, use your original draft, or cancel. Nothing is sent until you choose.</p></div><button type="button" onClick={() => setRewritePreview(null)} aria-label="Close prompt rewrite preview">×</button></div><div className="rewrite-prompt-fields"><label>Original draft<textarea value={rewritePreview?.original ?? ""} readOnly rows={4} /></label><label>Rewritten prompt<textarea value={rewritePreview?.candidate ?? ""} onChange={(event) => setRewritePreview((current) => current ? { ...current, candidate: event.target.value } : current)} maxLength={24_000} rows={7} /></label></div><div className="dialog-actions"><Button variant="ghost" type="button" onClick={() => setRewritePreview(null)}>Cancel</Button><Button variant="secondary" type="button" onClick={() => rewritePreview && sendDraft(rewritePreview.original, rewriteToolIds)}>Use original</Button><Button variant="primary" type="button" disabled={!rewritePreview?.candidate.trim()} onClick={() => rewritePreview && sendDraft(rewritePreview.candidate.trim(), rewriteToolIds)}>Use rewritten prompt</Button></div></ModalDialog>
   </div>;
 }
