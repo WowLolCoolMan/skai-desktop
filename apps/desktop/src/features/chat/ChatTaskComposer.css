@@ -1,0 +1,11 @@
+.task-scope-picker { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.task-scope-picker legend { padding: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.task-scope-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.task-scope-option { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: var(--skai-color-surface-soft); cursor: pointer; }
+.task-scope-option.is-selected { border-color: var(--skai-color-accent); background: color-mix(in srgb, var(--skai-color-accent) 10%, var(--skai-color-surface-soft)); }
+.task-scope-option input { margin-top: 2px; accent-color: var(--skai-color-accent); }
+.task-scope-option span { display: grid; gap: 3px; min-width: 0; }
+.task-scope-option strong { font-size: var(--skai-text-sm); }
+.task-scope-option small { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); line-height: 1.35; }
+.task-scope-summary { margin: 0; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+@media (max-width: 760px) { .task-scope-options { grid-template-columns: 1fr; } }

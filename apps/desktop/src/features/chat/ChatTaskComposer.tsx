@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import type { TaskEnvironment } from "../../../shared/contracts";
 import { Button } from "../../components/ui/Primitives";
 import { EnvironmentPicker } from "../../components/ui/EnvironmentPicker";
+import "./ChatTaskComposer.css";
 
 const PREFILL_KEY = "skai.chat.taskPrefill";
 
@@ -16,6 +17,14 @@ const TASK_TEMPLATES: TaskTemplate[] = [
   { id: "documentation", label: "Documentation", title: "Improve project documentation", instruction: "Review the existing documentation for stale or missing guidance, then make a focused update with accurate commands, boundaries, and examples.", acceptance: "The documentation matches the current workflow and links or commands are internally consistent.", environment: "local" },
   { id: "security", label: "Security review", title: "Review a security boundary", instruction: "Inspect the requested code path for trust boundaries, unsafe inputs, secrets, permissions, and failure handling. Report concrete findings before proposing changes.", acceptance: "Findings include severity, evidence, affected files, and a safe remediation or an explicit no-findings note.", environment: "local" },
 ];
+
+const SCOPE_OPTIONS = [
+  ["workspace", "Workspace files", "Read or edit files in the selected project"],
+  ["git", "Git changes", "Inspect or create a reviewable branch/diff"],
+  ["runtime", "Local runtime", "Use the configured local model or service"],
+  ["ui", "UI workflow", "Exercise the desktop interface and visual states"],
+  ["external", "External access", "Only when a specific approved integration is needed"],
+] as const;
 
 function consumeTaskPrefill(): TaskPrefill | null {
   try {
@@ -52,6 +61,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [gitHubIssueUrl, setGitHubIssueUrl] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
+  const [scope, setScope] = useState<string[]>(["workspace"]);
   const [templateId, setTemplateId] = useState("");
   const [status, setStatus] = useState("");
 
@@ -99,7 +109,8 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
       setStatus("Use a GitHub issue link like https://github.com/owner/repository/issues/123.");
       return;
     }
-    const saved = await onPlanTask(safeTitle, safeInstruction, environment, requiresApproval, safeIssueUrl, acceptanceCriteria.trim().slice(0, 4_000));
+    const scopeText = scope.length ? `\n\nExecution scope: ${scope.map((id) => SCOPE_OPTIONS.find(([option]) => option === id)?.[1] ?? id).join(", ")}.` : "\n\nExecution scope: No extra scope selected; ask before expanding access.";
+    const saved = await onPlanTask(safeTitle, `${safeInstruction}${scopeText}`.slice(0, 6_000), environment, requiresApproval, safeIssueUrl, acceptanceCriteria.trim().slice(0, 4_000));
     setStatus(saved ? "Plan saved to this conversation for review." : "The plan could not be saved. Check the status message and retry.");
   };
 
@@ -110,6 +121,7 @@ export function ChatTaskComposer({ busy, onPlanTask, initialOpen = false, expand
     </div>
     {open && <form id="chat-task-composer-fields" onSubmit={(event) => void submit(event)}>
       <div className="task-composer-fields"><label>Start from a template <span className="settings-help">A bounded starting brief; edit every field before saving.</span><select value={templateId} onChange={(event) => applyTemplate(event.target.value)}><option value="">Custom task</option>{TASK_TEMPLATES.map((template) => <option value={template.id} key={template.id}>{template.label}</option>)}</select></label><label>Task title<input value={title} maxLength={200} onChange={(event) => { setTemplateId(""); setTitle(event.target.value); }} required /></label><label>Task brief<textarea value={instruction} maxLength={6000} rows={3} onChange={(event) => { setTemplateId(""); setInstruction(event.target.value); }} required /></label><label>GitHub issue link <span className="settings-help">Optional · links the plan to its issue</span><input value={gitHubIssueUrl} maxLength={512} type="url" placeholder="https://github.com/owner/repository/issues/123" onChange={(event) => setGitHubIssueUrl(event.target.value)} /></label><label>Acceptance criteria <span className="settings-help">Optional · included in the agent task context</span><textarea value={acceptanceCriteria} maxLength={4000} rows={2} placeholder="List the checks or outcomes this task must satisfy…" onChange={(event) => setAcceptanceCriteria(event.target.value)} /></label></div>
+      <fieldset className="task-scope-picker"><legend>Task scope <span className="settings-help">The selected boundary is included in the saved plan.</span></legend><div className="task-scope-options">{SCOPE_OPTIONS.map(([id, label, detail]) => <label className={`task-scope-option${scope.includes(id) ? " is-selected" : ""}`} key={id}><input type="checkbox" checked={scope.includes(id)} onChange={() => setScope((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} /><span><strong>{label}</strong><small>{detail}</small></span></label>)}</div><p className="task-scope-summary" role="status">{scope.length ? `Plan boundary: ${scope.map((id) => SCOPE_OPTIONS.find(([option]) => option === id)?.[1] ?? id).join(" · ")}` : "No extra scope selected; the agent must ask before expanding access."}</p></fieldset>
       <EnvironmentPicker value={environment} worktreeAvailable={worktreeAvailable} onChange={setEnvironment} />
       <label className="task-require-approval"><input type="checkbox" checked={requiresApproval} onChange={(event) => setRequiresApproval(event.target.checked)} /> Require approval before starting the local agent run</label>
       <div className="task-composer-footer"><span role="status">{status || "Review the brief before saving the plan."}</span><Button variant="primary" type="submit" disabled={busy || !title.trim() || !instruction.trim()}>{busy ? "Saving plan…" : "Save plan in thread"}</Button></div>
