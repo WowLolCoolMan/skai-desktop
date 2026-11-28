@@ -57,6 +57,60 @@ export function WorkspaceBackupManager() {
     finally { setBusy(""); }
   };
 
+  const exportWorkspaceManifest = async () => {
+    setBusy("manifest"); setError(""); setNotice("");
+    const safeRequest = async (method: string, params: Record<string, unknown> = {}) => {
+      try { return await request(method, params); } catch { return null; }
+    };
+    const listRecords = (value: unknown) => Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : [];
+    const compactRecords = (value: unknown, labelKeys: string[]) => listRecords(value).map((item) => {
+      const id = typeof item.id === "string" ? item.id : undefined;
+      const label = labelKeys.map((key) => item[key]).find((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0);
+      return { ...(id ? { id } : {}), ...(label ? { label } : {}) };
+    });
+    try {
+      const [projects, conversations, tasks, connections, models, backup] = await Promise.all([
+        safeRequest("projects.list"),
+        safeRequest("conversations.list", { includeArchived: true }),
+        safeRequest("tasks.list"),
+        safeRequest("mcp.connections.list"),
+        safeRequest("models.list"),
+        safeRequest("workspace.backup.preview", { categories: allCategories }),
+      ]);
+      const layoutKeys = ["skai.workspace.tabs.v1", "skai.workspace.activeTab.v1", "skai.sidebar.width", "skai.theme", "skai.density"];
+      const layouts = Object.fromEntries(layoutKeys.map((key) => [key, window.localStorage.getItem(key)]));
+      const manifest = {
+        format: "skai.workspace.manifest.v1",
+        generatedAtUtc: new Date().toISOString(),
+        sourcePlatform: navigator.platform || "unknown",
+        privacy: "Inventory only. This manifest contains labels, IDs, counts, and selected layout preferences; it does not include prompts, message content, credentials, file contents, or secrets.",
+        counts: {
+          projects: listRecords(projects).length,
+          chats: listRecords(conversations).length,
+          tasks: listRecords(tasks).length,
+          tools: listRecords(connections).length,
+          models: listRecords(models).length,
+        },
+        projects: compactRecords(projects, ["name", "title"]),
+        chats: compactRecords(conversations, ["title", "name"]),
+        tasks: compactRecords(tasks, ["title", "name"]),
+        tools: compactRecords(connections, ["name", "serverName", "id"]),
+        models: compactRecords(models, ["displayName", "model", "name"]),
+        backupCategories: listRecords((backup as { categories?: unknown } | null)?.categories).map((category) => ({
+          id: typeof category.id === "string" ? category.id : undefined,
+          label: typeof category.label === "string" ? category.label : undefined,
+          count: typeof category.count === "number" ? category.count : 0,
+        })),
+        layouts,
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a"); link.href = url; link.download = `skai-workspace-manifest-${new Date().toISOString().replace(/[.:]/g, "-")}.json`; link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      setNotice("Workspace manifest saved to your Downloads. It contains inventory and layout metadata only.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Workspace manifest export failed."); }
+    finally { setBusy(""); }
+  };
+
   useEffect(() => { void refreshStorage(); }, [refreshStorage]);
 
   const toggleCategory = (category: BackupCategory) => {
@@ -129,7 +183,7 @@ export function WorkspaceBackupManager() {
   };
 
   return <section className="workspace-backup-manager" aria-label="Workspace backup and data ownership">
-    <div className="workspace-backup-heading"><div><p className="section-kicker">PORTABLE WORKSPACE</p><h3>Backup and restore</h3><p>Choose exactly what to carry to another Skai installation. Credentials and machine-specific folder paths stay on this device.</p></div><StatusBadge tone="neutral">Local-first</StatusBadge></div>
+    <div className="workspace-backup-heading"><div><p className="section-kicker">PORTABLE WORKSPACE</p><h3>Backup and restore</h3><p>Choose exactly what to carry to another Skai installation. Credentials and machine-specific folder paths stay on this device.</p></div><div className="workspace-backup-heading-actions"><StatusBadge tone="neutral">Local-first</StatusBadge><Button variant="secondary" type="button" disabled={busy !== ""} onClick={() => void exportWorkspaceManifest()}>{busy === "manifest" ? "Preparing manifest…" : "Export workspace manifest"}</Button></div></div>
     <div className="workspace-backup-card">
       <div className="workspace-backup-card-heading"><div><h4>Create a backup</h4><p>Preview each category before exporting. Encryption is optional and uses a passphrase you control.</p></div></div>
       <div className="workspace-backup-categories">{allCategories.map(category => <label key={category}><input type="checkbox" checked={selected.includes(category)} onChange={() => toggleCategory(category)} /><span>{category === "conversations" ? "Chats" : category === "projects" ? "Project metadata" : category[0].toUpperCase() + category.slice(1)}</span></label>)}</div>
