@@ -134,6 +134,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
     { label: "Native fallback", status: "idle", detail: "Not checked." },
   ]);
   const [voicePreflightRunning, setVoicePreflightRunning] = useState(false);
+  const [voiceQualityTest, setVoiceQualityTest] = useState<{ status: "idle" | "running" | "pass" | "warn" | "fail"; detail: string }>({ status: "idle", detail: "Not run." });
   const previewUrls = useRef(new Set<string>());
   const makePreviewable = (clip: StoredVoiceClip): PreviewableVoiceClip => {
     const blob = clip.blob.type.startsWith("audio/")
@@ -286,6 +287,24 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
       setVoicePreflightRunning(false);
     }
   };
+  const runVoiceQualityTest = async () => {
+    if (voiceQualityTest.status === "running") return;
+    if (!activeRuntime || settings.source !== "local") {
+      setVoiceQualityTest({ status: "warn", detail: settings.source !== "local" ? "Switch Voice source to Local before running this test." : "Install a local voice runtime before running this test." });
+      return;
+    }
+    setVoiceQualityTest({ status: "running", detail: "Starting a short local sample…" });
+    const startedAt = performance.now();
+    try {
+      const played = await speakNativeResponse("Skai local voice quality sample.", true);
+      const latencyMs = Math.round(performance.now() - startedAt);
+      if (!played) throw new Error("The selected local runtime did not start playback.");
+      setVoiceQualityTest({ status: "pass", detail: `Playback started locally in ${latencyMs} ms. Stop it any time.` });
+      window.setTimeout(() => stopNativeSpeech(), 2600);
+    } catch (error) {
+      setVoiceQualityTest({ status: "fail", detail: error instanceof Error ? error.message : "The local voice sample could not start." });
+    }
+  };
   return (
     <div className="voice-workbench-view">
       <header className="voice-workbench-header">
@@ -300,7 +319,7 @@ export function VoiceWorkbench({ onBack }: { onBack: () => void }) {
         </div>
       </header>
       {rightsNoticeOpen && <Card className="voice-workbench-notice"><p className="section-kicker">ONE-TIME NOTICE</p><h3>Use voice clips responsibly</h3><p>Only create an identifiable voice profile when you have the person’s permission or the rights to use the recordings. Skai keeps profile metadata local and does not treat a voice profile as proof of identity.</p><Button variant="primary" type="button" onClick={acknowledgeRightsNotice}>I understand</Button></Card>}
-      <Card className="voice-preflight-card"><div className="voice-preflight-heading"><div><p className="section-kicker">VOICE PREFLIGHT</p><h3>Check the voice path before starting a live session</h3><p className="marketplace-muted">This is an explicit local check. Microphone access is requested only after you press the button; no audio is recorded or uploaded.</p></div><Button variant="secondary" type="button" disabled={voicePreflightRunning} aria-busy={voicePreflightRunning} onClick={() => void runVoicePreflight()}>{voicePreflightRunning ? "Checking…" : "Run voice preflight"}</Button></div><div className="voice-preflight-grid">{voicePreflight.map((check) => <div className="voice-preflight-row" key={check.label}><span><strong>{check.label}</strong><small>{check.detail}</small></span><StatusBadge tone={check.status === "pass" ? "success" : check.status === "fail" ? "danger" : check.status === "warn" ? "warning" : "neutral"}>{check.status === "pass" ? "Ready" : check.status === "fail" ? "Blocked" : check.status === "warn" ? "Fallback" : check.status === "checking" ? "Checking" : "Not checked"}</StatusBadge></div>)}</div></Card>
+      <Card className="voice-preflight-card"><div className="voice-preflight-heading"><div><p className="section-kicker">VOICE PREFLIGHT</p><h3>Check the voice path before starting a live session</h3><p className="marketplace-muted">This is an explicit local check. Microphone access is requested only after you press the button; no audio is recorded or uploaded.</p></div><Button variant="secondary" type="button" disabled={voicePreflightRunning} aria-busy={voicePreflightRunning} onClick={() => void runVoicePreflight()}>{voicePreflightRunning ? "Checking…" : "Run voice preflight"}</Button></div><div className="voice-preflight-grid">{voicePreflight.map((check) => <div className="voice-preflight-row" key={check.label}><span><strong>{check.label}</strong><small>{check.detail}</small></span><StatusBadge tone={check.status === "pass" ? "success" : check.status === "fail" ? "danger" : check.status === "warn" ? "warning" : "neutral"}>{check.status === "pass" ? "Ready" : check.status === "fail" ? "Blocked" : check.status === "warn" ? "Fallback" : check.status === "checking" ? "Checking" : "Not checked"}</StatusBadge></div>)}</div><div className="voice-quality-test"><div><strong>Local quality sample</strong><small>Measures startup time and plays one short phrase through the selected local runtime.</small></div><Button variant="ghost" type="button" disabled={voiceQualityTest.status === "running"} onClick={() => void runVoiceQualityTest()}>{voiceQualityTest.status === "running" ? "Testing…" : "Run quality sample"}</Button>{voiceQualityTest.status !== "idle" && <span role="status"><StatusBadge tone={voiceQualityTest.status === "pass" ? "success" : voiceQualityTest.status === "fail" ? "danger" : voiceQualityTest.status === "warn" ? "warning" : "neutral"}>{voiceQualityTest.status === "pass" ? "Passed" : voiceQualityTest.status === "fail" ? "Failed" : voiceQualityTest.status === "warn" ? "Needs setup" : "Testing"}</StatusBadge>{voiceQualityTest.detail}</span>}</div></Card>
       <div className="voice-workbench-grid">
         <Card>
           <p className="section-kicker">VOICE PROFILES</p>
