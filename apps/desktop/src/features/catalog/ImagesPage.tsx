@@ -238,6 +238,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const [imageRuntime, setImageRuntime] = useState<ImageRuntime | null>(null);
   const [imageRuntimeInstall, setImageRuntimeInstall] = useState<ImageRuntimeInstall | null>(null);
   const [imageRuntimeBusy, setImageRuntimeBusy] = useState(false);
+  const [storageEstimate, setStorageEstimate] = useState<{ usage?: number; quota?: number }>({});
   const [savedWorkflows, setSavedWorkflows] = useState<Workflow[]>(() => {
     try {
       const value = JSON.parse(localStorage.getItem("skai.image.workflows") ?? "[]") as unknown;
@@ -253,6 +254,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   useEffect(() => { localStorage.setItem("skai.visuals.lockedSeed", String(lockedSeed)); }, [lockedSeed]);
   useEffect(() => { localStorage.setItem("skai.visuals.variation", String(variation)); }, [variation]);
   useEffect(() => { void refreshImageRuntime(); }, []);
+  useEffect(() => { void navigator.storage?.estimate().then((estimate) => setStorageEstimate({ usage: estimate.usage, quota: estimate.quota })).catch(() => undefined); }, [localMedia.length, images.length, visualComments.length]);
   useEffect(() => {
     setToolWorkflows((current) => {
       if (current[activeTool] === workflow) return current;
@@ -369,9 +371,30 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
   const pendingVisualJobs = visualJobs.filter((job) => job.status === "queued" || job.status === "running").length;
   const availableVisualJobSlots = Math.max(0, 8 - pendingVisualJobs);
   const briefPrompt = [prompt.trim(), generationBrief.subject && `Subject: ${generationBrief.subject.trim()}`, generationBrief.composition && `Composition: ${generationBrief.composition.trim()}`, generationBrief.style && `Style and lighting: ${generationBrief.style.trim()}`, generationBrief.motion && `Motion: ${generationBrief.motion.trim()}`, generationBrief.exclusions && `Avoid: ${generationBrief.exclusions.trim()}`, generationBrief.constraints && `Output constraints: ${generationBrief.constraints.trim()}`].filter(Boolean).join("\n");
-  const canGenerate = Boolean(briefPrompt && (generationProvider === "diffusers"
-    ? imageRuntime?.dependenciesAvailable
-    : endpoint.trim() && workflow.includes("{{prompt}}") && (!workflow.includes("{{image}}") || sourceImage) && (!sourceImage || workflow.includes("{{image}}"))));
+  const workflowValidation = (() => {
+    const issues: string[] = [];
+    if (!briefPrompt) issues.push("Add a prompt before queueing.");
+    if (generationProvider === "diffusers") {
+      if (!imageRuntime?.dependenciesAvailable) issues.push("Install the local image runtime.");
+    } else {
+      if (!endpoint.trim()) issues.push("Add the local ComfyUI endpoint.");
+      if (!workflow.trim()) issues.push("Choose or import a workflow.");
+      else {
+        try {
+          const graph = JSON.parse(workflow) as Record<string, { class_type?: unknown }>;
+          const nodes = Object.values(graph).filter((node) => node && typeof node === "object");
+          if (!nodes.length) issues.push("Workflow has no nodes.");
+          if (!nodes.some((node) => typeof node.class_type === "string")) issues.push("Workflow nodes are missing class types.");
+        } catch { issues.push("Workflow JSON is invalid."); }
+        if (!workflow.includes("{{prompt}}")) issues.push("Workflow needs a {{prompt}} input.");
+        if (workflow.includes("{{image}}") && !sourceImage) issues.push("Choose the source image required by this workflow.");
+        if (sourceImage && !workflow.includes("{{image}}")) issues.push("Remove the source image or use a workflow with a {{image}} input.");
+      }
+    }
+    if (storageEstimate.usage && storageEstimate.quota && storageEstimate.usage / storageEstimate.quota > 0.95) issues.push("Local storage is nearly full; clear media history before queueing.");
+    return issues;
+  })();
+  const canGenerate = workflowValidation.length === 0;
   useEffect(() => { if (!preserveImageSelectionRef.current) setSelectedImage(images[0] ?? null); }, [images]);
   const updateVisualJobs = (update: (current: VisualJob[]) => VisualJob[]) => {
     const next = update(visualJobsRef.current);
@@ -473,6 +496,7 @@ export function ImagesPage({ provider, endpoint, prompt, workflow, busy, cancelR
           <label>Local ComfyUI endpoint<input value={endpoint} onChange={(event) => { setCheckpoints([]); setCheckpoint(""); onChange("endpoint", event.target.value); }} placeholder="http://127.0.0.1:8188" /></label>
           {(activeTool === "image" || activeTool === "edit") && <div className="image-checkpoint-builder"><div className="workflow-source-row"><label>Installed checkpoint<select value={checkpoint} onChange={(event) => setCheckpoint(event.target.value)} disabled={checkpoints.length === 0}><option value="">{checkpoints.length ? "Choose a local checkpoint…" : "Discover local checkpoints first"}</option>{checkpoints.map((name) => <option key={name} value={name}>{name}</option>)}</select></label><Button variant="secondary" type="button" disabled={discoveringCheckpoints || !endpoint.trim()} onClick={() => void discoverCheckpoints()}>{discoveringCheckpoints ? "Discovering…" : "Discover checkpoints"}</Button></div><div className="workflow-source-row"><Button variant="secondary" type="button" disabled={!checkpoint} onClick={() => buildWorkflow("generate")}>Create image workflow</Button><Button variant="secondary" type="button" disabled={!checkpoint} onClick={() => buildWorkflow("edit")}>Create edit workflow</Button></div></div>}
           <div className="workflow-source-row"><label>Saved workflow<select value={selectedWorkflowName} onChange={(event) => { const selected = savedWorkflows.find((item) => item.name === event.target.value); setSelectedWorkflowName(event.target.value); if (selected) { setWorkflowName(selected.name); setToolWorkflow(selected.workflow); } }}><option value="">{savedWorkflows.length ? "Choose a saved workflow…" : "No saved workflows yet"}</option>{savedWorkflows.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><Button variant="secondary" type="button" disabled={importingWorkflow} onClick={() => void importWorkflow()}>{importingWorkflow ? "Importing…" : "Import workflow"}</Button></div>
+          <details className="visuals-queue-validation" open={workflowValidation.length > 0}><summary>Queue validation · {workflowValidation.length ? `${workflowValidation.length} issue${workflowValidation.length === 1 ? "" : "s"}` : "ready"}</summary>{workflowValidation.length ? <ul>{workflowValidation.map((issue) => <li key={issue}>{issue}</li>)}</ul> : <p>Prompt, workflow nodes, endpoint, source inputs, and local storage are ready for queueing.</p>}</details>
           {workflowError && <p className="form-error" role="alert">{workflowError}</p>}
           <label>ComfyUI API workflow<textarea value={workflow} onChange={(event) => setToolWorkflow(event.target.value)} placeholder="Import a local ComfyUI API workflow containing {{prompt}}." rows={5} /><small>ComfyUI video and audio workflows work when their output nodes save supported files. Video and music model packs or custom nodes must be installed in your local ComfyUI first. Source-image workflows use {"{{image}}"}.</small><div className="workflow-save-row"><input value={workflowName} onChange={(event) => setWorkflowName(event.target.value)} placeholder="Workflow name" maxLength={80} aria-label="Workflow name" /><Button variant="secondary" type="button" disabled={!workflow.trim() || !workflowName.trim()} onClick={saveWorkflow}>Save workflow</Button></div></label>
         </>}
