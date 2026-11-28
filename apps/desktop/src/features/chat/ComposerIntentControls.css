@@ -86,6 +86,8 @@
 .composer-tool-list { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
 .composer-tool-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 7px; border: 1px solid transparent; border-radius: var(--skai-radius-sm); cursor: pointer; }
 .composer-tool-row:hover, .composer-tool-row.is-selected { border-color: var(--skai-color-border); background: var(--skai-color-surface-soft); }
+.composer-tool-row.is-blocked { cursor: not-allowed; opacity: .62; }
+.composer-tool-row.is-blocked:hover { border-color: transparent; background: transparent; }
 .composer-tool-row input { accent-color: var(--skai-color-accent); }
 .composer-tool-row span { display: grid; gap: 2px; min-width: 0; }
 .composer-tool-row strong { overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-2xs); text-overflow: ellipsis; white-space: nowrap; }

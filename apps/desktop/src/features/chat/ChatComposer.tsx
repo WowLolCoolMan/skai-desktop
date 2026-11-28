@@ -34,7 +34,7 @@ const composerTargetDescriptions: Record<ComposerTarget, string> = {
 
 type RecommendedComposerTool = "files" | "audio" | "voice" | "computer" | "plan" | "marketplace";
 
-type ComposerSkill = { id: string; name: string; description?: string; category?: string; enabled?: boolean; source?: string };
+type ComposerSkill = { id: string; name: string; description?: string; category?: string; permissions?: string[]; enabled?: boolean; source?: string };
 type ComposerContextItem = { id: string; label: string; detail: string; shortcut: string; prompt: string };
 
 const recommendedComposerTools: Record<RecommendedComposerTool, { label: string; detail: string }> = {
@@ -296,6 +296,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
         name: typeof item.name === "string" ? item.name : typeof item.id === "string" ? item.id : "",
         description: typeof item.description === "string" ? item.description : "",
         category: typeof item.category === "string" ? item.category : "",
+        permissions: Array.isArray(item.permissions) ? item.permissions.filter((permission): permission is string => typeof permission === "string") : [],
         enabled: item.enabled !== false,
         source: typeof item.source === "string" ? item.source : "",
       })).filter((skill) => skill.id && skill.enabled);
@@ -498,6 +499,8 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   };
   const selectedToolIds = [...new Set([...persistentToolIds, ...oneTurnToolIds])];
   const filteredSkills = availableSkills.filter((skill) => `${skill.name} ${skill.id} ${skill.description ?? ""} ${skill.category ?? ""}`.toLowerCase().includes(toolQuery.trim().toLowerCase()));
+  const toolPolicyLabel = target === "review" || target === "research" || modeLabel === "Review" ? "Read-only skills only" : target === "edit" || modeLabel === "Coding" || modeLabel === "Agent" ? "Mutating skills require approval" : "Conversation skills stay local";
+  const skillBlockedByMode = (skill: ComposerSkill) => (target === "review" || target === "research" || modeLabel === "Review") && (skill.permissions ?? []).some((permission) => /write|execute|shell|desktop|network|mutat/i.test(permission));
   const toggleComposerSkill = (skillId: string) => {
     if (toolScope === "persistent") {
       setPersistentToolIds((current) => {
@@ -567,10 +570,10 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
           <button ref={addTriggerRef} className="composer-tool-button composer-add-button" type="button" onClick={() => setOmniOpen((open) => !open)} disabled={rewriteBusy} aria-label="Add to message" title="Add to message" aria-haspopup="menu" aria-expanded={omniOpen}><NavIcon name="plus" /><span className="composer-toolbar-label">Add</span></button>
           {omniOpen && <div className="composer-add-menu" role="menu" aria-label="Add to message">
             {toolPickerOpen ? <div className="composer-tool-picker" role="group" aria-label="Skills and tools for the next turn">
-              <div className="composer-tool-picker-heading"><button type="button" className="composer-tool-picker-back" onClick={closeToolPicker} aria-label="Back to add menu">‹</button><div><strong>Skills and tools</strong><small>{selectedToolIds.length ? `${selectedToolIds.length} selected` : "None selected"} · only enabled local skills are shown</small></div></div>
+              <div className="composer-tool-picker-heading"><button type="button" className="composer-tool-picker-back" onClick={closeToolPicker} aria-label="Back to add menu">‹</button><div><strong>Skills and tools</strong><small>{selectedToolIds.length ? `${selectedToolIds.length} selected` : "None selected"} · {modeLabel} mode · {toolPolicyLabel}</small></div></div>
               <input className="composer-tool-search" value={toolQuery} onChange={(event) => setToolQuery(event.target.value)} placeholder="Search installed skills…" aria-label="Search installed skills" autoFocus />
               <label className="composer-tool-scope"><span>Apply selection</span><select value={toolScope} onChange={(event) => setToolScope(event.target.value as "turn" | "persistent")} aria-label="Tool selection scope"><option value="turn">This turn only</option><option value="persistent">Remember for future turns</option></select></label>
-              <div className="composer-tool-list">{filteredSkills.map((skill) => { const checked = selectedToolIds.includes(skill.id); return <label className={`composer-tool-row${checked ? " is-selected" : ""}`} key={skill.id}><input type="checkbox" checked={checked} onChange={() => toggleComposerSkill(skill.id)} /><span><strong>{skill.name}</strong><small>{skill.description || skill.category || skill.id}</small></span><em>{skill.source || "Local"}</em></label>; })}</div>
+              <div className="composer-tool-list">{filteredSkills.map((skill) => { const blocked = skillBlockedByMode(skill); const checked = selectedToolIds.includes(skill.id); return <label className={`composer-tool-row${checked ? " is-selected" : ""}${blocked ? " is-blocked" : ""}`} key={skill.id}><input type="checkbox" checked={checked} disabled={blocked} onChange={() => toggleComposerSkill(skill.id)} /><span><strong>{skill.name}</strong><small>{blocked ? "Unavailable in this read-only mode" : skill.description || skill.category || skill.id}</small></span><em>{blocked ? "Read-only" : skill.permissions?.length ? "Approval" : (skill.source || "Local")}</em></label>; })}</div>
               {toolLoadStatus && <p className="composer-tool-empty" role="status">{toolLoadStatus}</p>}
               <div className="composer-tool-picker-actions"><button type="button" onClick={() => { closeToolPicker(); onNavigate("marketplace"); }}>Browse Marketplace</button><button type="button" onClick={closeToolPicker}>Done</button></div>
             </div> : <>
