@@ -9,6 +9,7 @@ type BackupCategory = "conversations" | "settings" | "personas" | "projects";
 type ExportPreview = { categories: Array<{ id: BackupCategory; label: string; count: number; description: string }>; sourcePlatform: string; portability: string; redaction: string; privacyNote: string; maxArchiveBytes: number };
 type RestorePreview = { integrity: string; encrypted: boolean; createdAtUtc: string; sourcePlatform: string; targetPlatform: string; archiveDigest: string; stateFingerprint: string; portability: string; excluded: string[]; categories: Array<{ id: BackupCategory; label: string; incoming: number; existing: number; collisions: number; description: string }> };
 type StorageOverview = { localRoot: string; totalBytes: number; rows: Array<{ label: string; bytes: number; exists: boolean }>; privacy: Array<{ integration: string; data: string; route: string }>; retention: string; cleanup: string };
+type RestoreReport = { atUtc: string; sourceFile: string; imported: Record<string, number>; skipped: Record<string, number>; selected: BackupCategory[] };
 
 const allCategories: BackupCategory[] = ["conversations", "settings", "personas", "projects"];
 const formatBytes = (bytes: number) => bytes <= 0 ? "0 B" : bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1_000))} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`;
@@ -31,6 +32,9 @@ export function WorkspaceBackupManager() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [reloadRequired, setReloadRequired] = useState(false);
+  const [restoreReport, setRestoreReport] = useState<RestoreReport | null>(() => {
+    try { return JSON.parse(window.localStorage.getItem("skai.workspace.lastRestoreReport") ?? "null") as RestoreReport | null; } catch { return null; }
+  });
 
   const request = useCallback(async (method: string, params: Record<string, unknown> = {}) => {
     const response = await window.skaiAgent?.request(method, params);
@@ -174,6 +178,9 @@ export function WorkspaceBackupManager() {
         archiveDigest: restorePreview.archiveDigest,
         stateFingerprint: restorePreview.stateFingerprint,
       }) as { imported: Record<string, number>; skipped: Record<string, number> };
+      const report: RestoreReport = { atUtc: new Date().toISOString(), sourceFile: fileName || "selected backup", imported: result.imported, skipped: result.skipped, selected: restoreCategories };
+      setRestoreReport(report);
+      window.localStorage.setItem("skai.workspace.lastRestoreReport", JSON.stringify(report));
       setNotice(`Restore complete. ${restoreCategories.map(category => `${category}: ${result.imported[category] ?? 0} restored, ${result.skipped[category] ?? 0} kept`).join(" · ")}.`);
       setReloadRequired(restoreCategories.includes("settings") && (result.imported.settings ?? 0) > 0);
       await refreshStorage();
@@ -200,6 +207,7 @@ export function WorkspaceBackupManager() {
       <label className="workspace-backup-field">Passphrase <input type="password" autoComplete="current-password" value={restorePassphrase} onChange={event => { setRestorePassphrase(event.target.value); setRestorePreview(null); }} placeholder="Only needed for encrypted backups" /></label>
       {restorePreview && <div className="workspace-backup-preview"><strong>Integrity verified · {restorePreview.encrypted ? "Encrypted" : "Unencrypted"} · {new Date(restorePreview.createdAtUtc).toLocaleString()}</strong><p>Platform migration: {restorePreview.sourcePlatform} → {restorePreview.targetPlatform}. Machine-specific settings remain local.</p>{restorePreview.categories.map(category => <div className="workspace-restore-category" key={category.id}><label><input type="checkbox" checked={restoreCategories.includes(category.id)} onChange={() => setRestoreCategories(current => current.includes(category.id) ? current.filter(item => item !== category.id) : [...current, category.id])} /><span>{category.label}</span></label><span>{category.incoming} incoming · {category.collisions} matching IDs</span>{category.collisions > 0 && <select aria-label={`Conflict handling for ${category.label}`} value={policies[category.id] ?? "keep"} onChange={event => setPolicies(current => ({ ...current, [category.id]: event.target.value as "keep" | "replace" }))}><option value="keep">Keep current items</option><option value="replace">Replace matching items</option></select>}<small>{category.description}</small></div>)}<p>{restorePreview.portability}</p><p>Excluded from this archive: {restorePreview.excluded.join(", ")}.</p></div>}
       <div className="workspace-backup-actions"><Button variant="secondary" type="button" disabled={!archive || busy !== ""} onClick={() => void previewRestore()}>{busy === "preview-restore" ? "Checking backup…" : "Preview restore"}</Button><Button variant="primary" type="button" disabled={!restorePreview || restoreCategories.length === 0 || busy !== ""} onClick={() => void applyRestore()}>{busy === "restore" ? "Restoring…" : "Restore selected"}</Button></div>
+      {restoreReport && <div className="workspace-backup-preview workspace-migration-report"><strong>Last migration report · {new Date(restoreReport.atUtc).toLocaleString()}</strong><p>{restoreReport.sourceFile} · {restoreReport.selected.length} categor{restoreReport.selected.length === 1 ? "y" : "ies"} selected.</p>{restoreReport.selected.map((category) => <div key={category}><span>{category}</span><span>{restoreReport.imported[category] ?? 0} restored · {restoreReport.skipped[category] ?? 0} kept</span></div>)}</div>}
       {reloadRequired && <Button variant="ghost" type="button" onClick={() => window.location.reload()}>Reload Skai to apply restored settings</Button>}
     </div>
     {error && <p className="workspace-backup-message workspace-backup-error" role="alert">{error}</p>}{notice && <p className="workspace-backup-message workspace-backup-notice" role="status">{notice}</p>}
