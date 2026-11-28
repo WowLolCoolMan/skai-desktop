@@ -19,6 +19,7 @@ const activeStatuses = ["queued", "running", "verifying", "awaiting_approval", "
 
 export function ChatThreadActivity({ tasks, messages, taskBusy, workspaceMode, onTaskAction, onOpenFile, onNavigate }: ChatThreadActivityProps) {
   const [copiedCorrelationId, setCopiedCorrelationId] = useState<string | null>(null);
+  const [exportedFailureId, setExportedFailureId] = useState<string | null>(null);
   const activeCount = tasks.filter((task) => task.status === "running" || task.status === "verifying").length;
   const queuedCount = tasks.filter((task) => task.status === "queued").length;
   const approvalCount = tasks.filter((task) => task.status === "awaiting_approval").length;
@@ -60,6 +61,23 @@ export function ChatThreadActivity({ tasks, messages, taskBusy, workspaceMode, o
     }
   };
 
+  const exportFailureBundle = (task: DesktopTask) => {
+    const bundle = {
+      format: "skai-failure-bundle.v1",
+      exportedAt: new Date().toISOString(),
+      run: { id: task.id, title: task.title, status: task.status, role: task.role, responseMode: task.responseMode ?? null, environment: task.environment ?? "local", projectId: task.projectId ?? null, parentRunId: task.parentRunId ?? null },
+      request: { instruction: task.instruction, acceptanceCriteria: task.acceptanceCriteria ?? null, requiresApproval: task.requiresApproval ?? true, dependsOn: task.dependsOn },
+      result: { summary: task.resultSummary ?? null, capacityWaitReason: task.capacityWaitReason ?? null, changedFiles: task.changedFiles ?? [], artifacts: task.artifactLabels ?? [] },
+      verification: task.verificationEvidence ? { checkLabel: task.verificationEvidence.checkLabel, command: task.verificationEvidence.command, relativeWorkingDirectory: task.verificationEvidence.relativeWorkingDirectory, source: task.verificationEvidence.source, exitCode: task.verificationEvidence.exitCode, timedOut: task.verificationEvidence.timedOut, outputTruncated: task.verificationEvidence.outputTruncated } : null,
+      privacy: "This bundle excludes chat history, credentials, exact absolute paths, and provider endpoints. Inspect before sharing.",
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a"); link.href = url; link.download = `skai-failure-${task.id.slice(0, 12)}.json`; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setExportedFailureId(task.id);
+    window.setTimeout(() => setExportedFailureId((current) => current === task.id ? null : current), 1600);
+  };
+
   const renderTask = (task: DesktopTask) => <article className={`thread-run-card thread-run-${task.status}`} key={task.id}>
     <div className="thread-run-heading"><strong>{task.title}</strong><span>{task.status.replaceAll("_", " ")}</span></div>
     <div className="thread-run-correlation"><span>Run ID</span><button type="button" title={`Copy correlation ID ${task.id}`} aria-label={`Copy correlation ID ${task.id}`} onClick={() => void copyCorrelationId(task.id)}>{copiedCorrelationId === task.id ? "Copied" : task.id.slice(0, 16)}</button></div>
@@ -70,6 +88,7 @@ export function ChatThreadActivity({ tasks, messages, taskBusy, workspaceMode, o
     <div className="thread-run-actions">
       {["queued", "running", "verifying"].includes(task.status) && <Button variant="ghost" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "cancel")}>Stop</Button>}
       {task.status === "blocked" && <Button variant="secondary" type="button" disabled={taskBusy === task.id} onClick={() => onTaskAction(task.id, "retry")}>Retry</Button>}
+      {(task.status === "failed" || task.status === "blocked") && <Button variant="secondary" type="button" onClick={() => exportFailureBundle(task)}>{exportedFailureId === task.id ? "Bundle downloaded" : "Export safe bundle"}</Button>}
       {task.status === "completed" && <Button variant="secondary" type="button" onClick={() => { const file = task.changedFiles?.[0]; if (file && workspaceMode === "project") onOpenFile(file); onNavigate("coding"); }}>{task.changedFiles?.length ? "Review first file" : "Review changes"}</Button>}
     </div>
   </article>;
