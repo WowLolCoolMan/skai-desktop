@@ -29,6 +29,8 @@ function TerminalOutput({ text, exitCode, label, className = "" }: { text: strin
   </section>;
 }
 
+type TerminalProfile = { id: string; name: string; command: string; cwd: string; targetMode: "local" | "ssh"; host: string; username: string; port: string };
+
 type TerminalPanelProps = {
   projects: DesktopProject[];
   initialProjectId?: string | null;
@@ -61,6 +63,9 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
   const [sshOutput, setSshOutput] = useState<string | null>(null);
   const [sshExitCode, setSshExitCode] = useState<number | null>(null);
   const [sshError, setSshError] = useState("");
+  const [profiles, setProfiles] = useState<TerminalProfile[]>([]);
+  const [profileName, setProfileName] = useState("");
+  const [profileSelection, setProfileSelection] = useState("");
 
   const profileKey = projectId ? `skai.ssh.profile.${projectId}` : "";
 
@@ -84,6 +89,35 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
   useEffect(() => {
     if (profileKey && loadedProfileKey === profileKey) localStorage.setItem(profileKey, JSON.stringify({ host: sshHost, username: sshUsername, port: sshPort }));
   }, [profileKey, loadedProfileKey, sshHost, sshUsername, sshPort]);
+
+  useEffect(() => {
+    if (!projectId) { setProfiles([]); setProfileSelection(""); return; }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(`skai.terminal.profiles.${projectId}`) ?? "[]") as unknown;
+      setProfiles(Array.isArray(parsed) ? parsed.filter((item): item is TerminalProfile => Boolean(item && typeof item === "object" && typeof (item as TerminalProfile).id === "string" && typeof (item as TerminalProfile).name === "string" && typeof (item as TerminalProfile).command === "string" && typeof (item as TerminalProfile).cwd === "string")).slice(0, 8) : []);
+      setProfileSelection("");
+    } catch { setProfiles([]); }
+  }, [projectId]);
+
+  const saveProfile = () => {
+    const name = profileName.trim();
+    if (!projectId || !name || !command.trim()) return;
+    const profile: TerminalProfile = { id: typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}`, name: name.slice(0, 80), command: command.trim(), cwd: cwd.trim() || ".", targetMode, host: sshHost.trim(), username: sshUsername.trim(), port: sshPort };
+    const next = [profile, ...profiles.filter((item) => item.name.toLowerCase() !== profile.name.toLowerCase())].slice(0, 8);
+    setProfiles(next); setProfileName("");
+    try { localStorage.setItem(`skai.terminal.profiles.${projectId}`, JSON.stringify(next)); } catch { /* Profiles are optional local convenience. */ }
+  };
+  const applyProfile = (id: string) => {
+    const profile = profiles.find((item) => item.id === id);
+    if (!profile) return;
+    setProfileSelection(id); setCommand(profile.command); setCwd(profile.cwd); setTargetMode(profile.targetMode); setSshHost(profile.host); setSshUsername(profile.username); setSshPort(profile.port || "22");
+  };
+  const deleteProfile = (id: string) => {
+    const next = profiles.filter((item) => item.id !== id);
+    setProfiles(next);
+    setProfileSelection("");
+    if (projectId) { try { localStorage.setItem(`skai.terminal.profiles.${projectId}`, JSON.stringify(next)); } catch { /* Optional local convenience. */ } }
+  };
 
   const run = () => {
     if (!command.trim() || !projectId || busy) return;
@@ -121,6 +155,7 @@ export function TerminalPanel({ projects, initialProjectId, busy, output, exitCo
         <label>Port<input type="number" min={1} max={65535} value={sshPort} onChange={(event) => setSshPort(event.target.value)} aria-label="SSH port" /></label>
       </>}
     </div>
+    <div className="terminal-profile-row" aria-label="Saved terminal profiles"><label>Saved environment<select value={profileSelection} onChange={(event) => applyProfile(event.target.value)}><option value="">Choose a saved profile…</option>{profiles.map((profile) => <option value={profile.id} key={profile.id}>{profile.name}</option>)}</select></label><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Profile name" aria-label="New terminal profile name" maxLength={80} /><Button variant="secondary" type="button" disabled={!profileName.trim() || !command.trim()} onClick={saveProfile}>Save profile</Button>{profileSelection && <Button variant="ghost" type="button" onClick={() => deleteProfile(profileSelection)}>Remove profile</Button>}</div>
     {targetMode === "ssh" && <p className="terminal-safety-note">Uses system OpenSSH keys or agent. The host must already be trusted in known_hosts. Password prompts and forwarding are disabled.</p>}
     <div className="terminal-command-row">
       <input value={command} onChange={(event) => setCommand(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") run(); }} placeholder={targetMode === "ssh" ? "git status" : "git status"} aria-label={targetMode === "ssh" ? "Remote SSH command" : "Terminal command"} />

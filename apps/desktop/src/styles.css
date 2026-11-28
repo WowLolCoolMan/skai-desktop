@@ -2852,6 +2852,9 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .coding-file-history > div:first-child small, .coding-file-history article small { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
 .coding-file-history article { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid var(--skai-color-border); }
 .coding-file-history article > div { display: grid; gap: 2px; min-width: 0; }
+.terminal-profile-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 10px 0; padding: 10px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-lg); background: var(--skai-color-surface-soft); }
+.terminal-profile-row label { display: grid; gap: 4px; min-width: 210px; color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); }
+.terminal-profile-row input { min-width: 150px; }
 @media (max-width: 760px) { .response-branch-columns { grid-template-columns: 1fr; } }
 
 
