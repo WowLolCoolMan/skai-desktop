@@ -63,7 +63,7 @@ export function AppearanceOptions() {
       <div className="appearance-option">
         <span>Text size</span>
         <div className="appearance-range">
-          <input type="range" min={80} max={150} step={5} value={Math.round(textScale * 100)} onChange={(event) => setTextScale(Number(event.target.value) / 100)} onPointerUp={() => set("textScale", textScale)} onKeyUp={() => set("textScale", textScale)} aria-label="Text size" />
+          <input type="range" min={80} max={200} step={5} value={Math.round(textScale * 100)} onChange={(event) => setTextScale(Number(event.target.value) / 100)} onPointerUp={() => set("textScale", textScale)} onKeyUp={() => set("textScale", textScale)} aria-label="Text size" />
           <output>{Math.round(textScale * 100)}%</output>
           {options.textScale !== 1 && <Button type="button" variant="ghost" onClick={() => set("textScale", 1)}>100%</Button>}
         </div>

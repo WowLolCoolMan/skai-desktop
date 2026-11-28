@@ -5327,6 +5327,17 @@ small[class], time,
 .sidebar-history-menu-trigger:focus-visible,
 .sidebar-project-menu-trigger:focus-visible,
 .sidebar-project-new-thread:focus-visible { opacity: 1; }
+html[data-text-scale="large"] .sidebar-history-menu-trigger,
+html[data-text-scale="large"] .sidebar-project-menu-trigger,
+html[data-text-scale="large"] .sidebar-project-new-thread,
+html[data-text-scale="large"] .workspace-tab-close { opacity: 1; pointer-events: auto; }
+html[data-text-scale="large"] .sidebar-history-menu-trigger,
+html[data-text-scale="large"] .sidebar-project-menu-trigger,
+html[data-text-scale="large"] .sidebar-project-new-thread { min-width: 32px; min-height: 32px; width: 32px; height: 32px; }
+html[data-text-scale="large"] .sidebar-history-menu-trigger { flex-basis: 32px; }
+html[data-text-scale="large"] .sidebar-project-new-thread { flex-basis: 32px; }
+html[data-text-scale="large"] .workspace-tab-close { min-width: 32px; min-height: 32px; width: 32px; height: 32px; }
+html[data-text-scale="large"] .workspace-tab-select { padding-right: 40px; }
 .coding-unsaved-close-dialog .dialog-actions { position: sticky; bottom: 0; justify-content: flex-end; padding-top: 10px; background: var(--skai-color-surface); }
 
 /* Gap-audit completion: transcript content and shared interaction geometry. */

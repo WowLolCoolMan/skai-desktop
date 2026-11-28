@@ -131,7 +131,9 @@ function applyTheme(theme: ThemeDefinition | null) {
   const fonts = buildFontRoles(effectiveFonts(theme));
   for (const [property, value] of Object.entries(fonts.properties)) set(property, value);
   // Text size multiplies the UI font role's scale; corner style sets the radius scale.
-  if (options.textScale !== 1 || fonts.properties["--skai-text-scale"]) set("--skai-text-scale", (Number(fonts.properties["--skai-text-scale"] ?? 1) * options.textScale).toFixed(4));
+  const effectiveTextScale = Number(fonts.properties["--skai-text-scale"] ?? 1) * options.textScale;
+  root.dataset.textScale = effectiveTextScale >= 1.5 ? "large" : "normal";
+  if (options.textScale !== 1 || fonts.properties["--skai-text-scale"]) set("--skai-text-scale", effectiveTextScale.toFixed(4));
   if (options.cornerStyle !== "default") set("--skai-radius-scale", String(RADIUS_SCALE[options.cornerStyle]));
   root.dataset.chatWidth = options.chatWidth;
   root.dataset.messageStyle = options.messageStyle;

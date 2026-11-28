@@ -16,7 +16,7 @@ const SCHEMA_FILE = "theme.schema.json";
 // Appearance options in appearance.json (Phase 7). Each is validated; anything else is ignored.
 const OPTION_RULES = {
   animateBackground: (value) => typeof value === "boolean",
-  textScale: (value) => typeof value === "number" && Number.isFinite(value) && value >= 0.8 && value <= 1.5,
+  textScale: (value) => typeof value === "number" && Number.isFinite(value) && value >= 0.8 && value <= 2,
   cornerStyle: (value) => ["square", "subtle", "default", "round"].includes(value),
   chatWidth: (value) => ["narrow", "default", "wide", "full"].includes(value),
   messageStyle: (value) => ["bubbles", "flat", "cards"].includes(value),

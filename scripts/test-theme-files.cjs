@@ -236,6 +236,8 @@ async function serviceTests() {
     // Appearance options: validated on save and read; reset restores every default.
     assert.equal((await service.handle("appearance.saveAppearanceOptions", { textScale: 1.2, cornerStyle: "round", chatWidth: "wide", messageStyle: "cards", motion: "full", accent: "#3366ff" })).ok, true);
     assert.deepEqual((await service.snapshot()).options, { animateBackground: false, textScale: 1.2, cornerStyle: "round", chatWidth: "wide", messageStyle: "cards", motion: "full", accent: "#3366ff" });
+    assert.equal((await service.handle("appearance.saveAppearanceOptions", { textScale: 2 })).ok, true);
+    assert.equal((await service.snapshot()).options.textScale, 2);
     for (const bad of [{ textScale: 3 }, { cornerStyle: "pointy" }, { accent: "red" }, { accent: "#33f; x" }, { motion: true }, { sidebarSecret: 1 }]) await assert.rejects(service.handle("appearance.saveAppearanceOptions", bad), JSON.stringify(bad));
     assert.equal((await service.handle("appearance.resetAppearance", {})).ok, true);
     const reset = await service.snapshot();

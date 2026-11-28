@@ -893,13 +893,23 @@ async function main() {
           const projectActivityReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 60; i++) { if (document.querySelector('dialog [aria-label="Project activity"] h2')?.textContent === 'Recent activity') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!projectActivityReady) throw new Error("Coding project did not open its local project activity timeline.");
           await clickInRenderer(cdp, 'dialog [aria-label="Close activity"]');
+          const seededProjectName = await cdp.evaluate(`document.querySelector('.coding-project-heading strong')?.textContent?.trim() ?? ''`);
           const seededCodingThreadVisible = await cdp.evaluate(`Boolean([...document.querySelectorAll('.sidebar-project-thread')].find((button) => button.innerText.trim() === 'Review the starter project'))`);
-          if (!seededCodingThreadVisible) await cdp.evaluate(`document.querySelector('button[aria-label="Expand Skai Starter Project"]')?.click(); 1`);
+          if (!seededCodingThreadVisible) {
+            // The fixture uses a different project label in long-content runs;
+            // expand the active project by its rendered name instead of relying
+            // on the capture-only "Skai Starter Project" label.
+            await cdp.evaluateWith(function (projectName) {
+              const button = [...document.querySelectorAll('button[aria-label^="Expand "]')].find((item) => item.getAttribute('aria-label')?.slice('Expand '.length).trim() === projectName);
+              button?.click();
+              return Boolean(button);
+            }, seededProjectName);
+          }
           const seededCodingThreadReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if ([...document.querySelectorAll('.sidebar-project-thread')].some((button) => button.innerText.trim() === 'Review the starter project')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-          if (!seededCodingThreadReady) throw new Error("Coding workflow could not find the seeded project conversation.");
+          if (!seededCodingThreadReady) throw new Error(`Coding workflow could not find the seeded project conversation: ${JSON.stringify({ project: seededProjectName, projects: [...document.querySelectorAll('.sidebar-project')].map((item) => item.innerText), threads: [...document.querySelectorAll('.sidebar-project-thread')].map((item) => item.innerText) })}`);
           await clickButtonText(cdp, "Review the starter project", ".sidebar-project-thread-list");
-          const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.project-thread-panel .chat-page.is-coding-agent')?.innerText.includes('Review this project structure')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
-          if (!seededCodingThreadActive) throw new Error("Coding workflow opened the project without restoring its linked Coding Agent conversation.");
+          const seededCodingThreadActive = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { const panel = document.querySelector('.project-thread-panel .chat-page.is-coding-agent'); if (panel && getComputedStyle(panel.closest('.project-thread-panel')).display !== 'none') return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
+          if (!seededCodingThreadActive) throw new Error(`Coding workflow opened the project without restoring its linked Coding Agent conversation: ${JSON.stringify(await cdp.evaluate(`(() => ({ project: document.querySelector('.coding-project-heading strong')?.textContent?.trim(), threadButtons: [...document.querySelectorAll('.sidebar-project-thread')].map((item) => item.innerText), panel: document.querySelector('.project-thread-panel')?.innerText?.slice(0, 240), classes: document.querySelector('.project-thread-panel')?.className }))()`))}`);
           const projectThreadButtons = await cdp.evaluate(`(() => ({ header: [...document.querySelectorAll('.coding-project-heading-actions button')].some((button) => button.textContent?.trim() === 'New thread'), sidebar: Boolean(document.querySelector('.sidebar-project-new-thread')) }))()`);
           if (!projectThreadButtons.header || !projectThreadButtons.sidebar) throw new Error(`The active project did not expose project-scoped New thread actions in the header and sidebar: ${JSON.stringify(projectThreadButtons)}`);
           if (exerciseCodingPanels && width === 1440 && height === 900) {
@@ -1152,13 +1162,14 @@ async function main() {
             await cdp.evaluateWith(function (fileName) { [...document.querySelectorAll('.coding-project-browser.is-editor-panel .project-file-item')].find((item) => item.title === fileName)?.click(); return 1; }, readmeButton);
             const monacoReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { if (document.querySelector('.coding-project-browser.is-editor-panel .monaco-editor') && document.querySelector('.coding-project-browser.is-editor-panel .file-editor-heading')?.innerText.includes('README.md') && document.querySelector('.coding-project-browser.is-editor-panel .project-file-explorer')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!monacoReady) throw new Error("Selecting a project file did not open Monaco beside the file tree in the Editor pane.");
-            const markdownPreviewButton = await cdp.evaluate(`([...document.querySelectorAll('.coding-project-browser.is-editor-panel .file-editor-heading button')].find((button) => button.textContent?.trim() === 'Preview')?.click(), Boolean([...document.querySelectorAll('.coding-project-browser.is-editor-panel .file-editor-heading button')].find((button) => button.textContent?.trim() === 'Preview')))`);
+            const markdownPreviewButton = await cdp.evaluate(`Boolean([...document.querySelectorAll('.coding-project-browser.is-editor-panel .file-editor-heading button')].find((button) => button.textContent?.trim() === 'Preview'))`);
             if (!markdownPreviewButton) throw new Error("The Markdown editor did not expose its source/preview toggle.");
-            const markdownPreviewReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { const preview = document.querySelector('.coding-project-browser.is-editor-panel .markdown-document-preview'); if (preview && (preview.querySelector('h1,h2,h3') || preview.textContent.trim())) return { ready: true, hasUnsafeHtml: Boolean(preview.querySelector('script,iframe,object')) }; await new Promise((r) => setTimeout(r, 50)); } return { ready: false }; })()`);
+            await clickButtonText(cdp, "Preview", ".coding-project-browser.is-editor-panel .file-editor-heading");
+            const markdownPreviewReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 100; i++) { const preview = document.querySelector('.coding-project-browser.is-editor-panel .markdown-document-preview'); if (preview && (preview.querySelector('h1,h2,h3') || preview.textContent.trim())) return { ready: true, hasUnsafeHtml: Boolean(preview.querySelector('script,iframe,object')) }; await new Promise((r) => setTimeout(r, 50)); } return { ready: false }; })()`);
             if (!markdownPreviewReady.ready || markdownPreviewReady.hasUnsafeHtml) throw new Error(`The Markdown preview was missing content or rendered unsafe HTML: ${JSON.stringify(markdownPreviewReady)}`);
             await capturePanel("markdown-preview");
-            await cdp.evaluate(`([...document.querySelectorAll('.coding-project-browser.is-editor-panel .file-editor-heading button')].find((button) => button.textContent?.trim() === 'Editor')?.click(), true)`);
-            const markdownSourceRestored = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel .monaco-editor'))`);
+            await clickButtonText(cdp, "Editor", ".coding-project-browser.is-editor-panel .file-editor-heading");
+            const markdownSourceRestored = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-project-browser.is-editor-panel .monaco-editor')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!markdownSourceRestored) throw new Error("Returning from Markdown preview did not restore its editable source.");
             const hideFiles = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-editor-panel button[aria-label="Hide file explorer"]'))`);
             if (!hideFiles) throw new Error("The editor did not expose a hide control for the file tree.");
@@ -1171,7 +1182,10 @@ async function main() {
             await assertMainChat("Editor with Monaco and file tree");
             await capturePanel("monaco-with-files");
             await selectPanel("Files & Changes");
-            const filesChangesReady = await cdp.evaluate(`Boolean(document.querySelector('.coding-project-browser.is-files-changes-panel.is-files-view .is-standalone-files-page .coding-explorer-project-files'))`);
+            // Files & Changes remembers its last Files/Changes sub-view. Re-select
+            // Files here so the workflow stays deterministic after Git review coverage.
+            await clickButtonText(cdp, "Files", ".coding-project-browser.is-files-changes-panel .coding-files-changes-switch");
+            const filesChangesReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 80; i++) { if (document.querySelector('.coding-project-browser.is-files-changes-panel.is-files-view .is-standalone-files-page .coding-explorer-project-files')) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
             if (!filesChangesReady) throw new Error("Files & Changes did not open with its Files view selected.");
             await assertMainChat("Files & Changes");
             await capturePanel("files-changes-files");
@@ -1290,11 +1304,28 @@ async function main() {
           }
           await cdp.evaluate(`(() => { const workspace = document.querySelector('.coding-session-grid'); if (workspace) workspace.scrollTop = workspace.scrollHeight; return 1; })()`);
           await clickInRenderer(cdp, ".monaco-editor");
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Home", code: "Home", modifiers: 2 });
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Home", code: "Home", modifiers: 2 });
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "End", code: "End", modifiers: 8 });
-          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "End", code: "End", modifiers: 8 });
-          await cdp.send("Input.insertText", { text: "# Revised starter project\n\nTemporary smoke edit for the isolated workspace." });
+          // Monaco renders a hidden textarea as its input surface. Focus it
+          // explicitly after the visual click so keyboard events update the
+          // model (and therefore React's draft state), not only the view layer.
+          await cdp.evaluate(`document.querySelector('.monaco-editor textarea.inputarea')?.focus(); true`);
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "End", code: "End", modifiers: 2 });
+          await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "End", code: "End", modifiers: 2 });
+          // Drive Monaco through keyboard events instead of Input.insertText.
+          // Chromium's insertText path can repaint Monaco's view without
+          // delivering the model-content event that @monaco-editor/react uses
+          // to update the controlled draft in React.
+          const smokeEdit = "\n\nTemporary smoke edit for the isolated workspace.";
+          for (const character of smokeEdit) {
+            if (character === "\n") {
+              await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+              await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+            } else {
+              await cdp.send("Input.dispatchKeyEvent", { type: "char", key: character, text: character, unmodifiedText: character });
+            }
+            // Let Monaco process each browser key event before the next one;
+            // otherwise a long synthetic edit can drop characters under load.
+            await sleep(40);
+          }
           const draftReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 30; i++) { if (document.querySelector('#coding-file-editor button:last-child')?.disabled === false) return true; await new Promise((r) => setTimeout(r, 50)); } return false; })()`);
           if (!draftReady) throw new Error(`Monaco did not accept the isolated edit: ${JSON.stringify(await cdp.evaluate(`(() => { const selectors = ['.app-main','.app-content','.coding-session-grid','.coding-project-browser','.project-file-layout','.file-editor-panel','.monaco-editor-shell','.monaco-editor','.monaco-editor .view-lines']; return { viewport: [innerWidth, innerHeight], widths: Object.fromEntries(selectors.map((selector) => { const element = document.querySelector(selector); const rect = element?.getBoundingClientRect(); return [selector, rect && { x: rect.x, y: rect.y, w: rect.width, h: rect.height, client: [element.clientWidth, element.clientHeight], scroll: [element.scrollWidth, element.scrollHeight] }]; })), file: document.querySelector('#coding-file-editor')?.innerText, editor: document.querySelector('.monaco-editor')?.innerText?.slice(0, 140), active: document.activeElement?.outerHTML?.slice(0, 120), buttons: [...document.querySelectorAll('#coding-file-editor button')].map((button) => ({ text: button.innerText, disabled: button.disabled })) }; })()`))}`);
           const reviewButtonState = await cdp.evaluate(`(() => { const root = document.querySelector('#coding-file-editor'); return { heading: root?.innerText ?? null, buttons: [...(root?.querySelectorAll('button') ?? [])].map((button) => ({ text: button.innerText.trim(), disabled: button.disabled })), editor: document.querySelector('.monaco-editor .view-lines')?.innerText?.slice(0, 160) ?? null, selectedFile: document.querySelector('.file-editor-heading span')?.textContent ?? null, workspace: document.querySelector('.coding-session-grid')?.className ?? null }; })()`);
