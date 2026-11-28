@@ -54,7 +54,7 @@ export default function App() {
   const workspaceTabsVisible = workspace.route === "chat" || workspace.route === "coding";
   const codingSplitOpen = workspaceTabsVisible && workspace.route === "coding" && Boolean(workspace.routeState.selectedProject);
   const workspaceTabItems = workspace.route === "coding" && workspace.routeState.selectedProject
-    ? workspace.workspaceTabs.filter((tab) => !tab.projectId || tab.projectId === workspace.routeState.selectedProject?.id)
+    ? workspace.workspaceTabs.filter((tab) => tab.projectId === workspace.routeState.selectedProject?.id)
     : workspace.workspaceTabs;
   const contextualTabAction = workspace.route === "coding" && workspace.routeState.selectedProject ? workspace.openSideChat : workspace.openNewWorkspaceTab;
   const contextualTabLabel = workspace.route === "coding" && workspace.routeState.selectedProject ? "New side chat" : "New tab";

@@ -903,8 +903,7 @@ async function main() {
           const projectThreadButtons = await cdp.evaluate(`(() => ({ header: [...document.querySelectorAll('.coding-project-heading-actions button')].some((button) => button.textContent?.trim() === 'New thread'), sidebar: Boolean(document.querySelector('.sidebar-project-new-thread')) }))()`);
           if (!projectThreadButtons.header || !projectThreadButtons.sidebar) throw new Error(`The active project did not expose project-scoped New thread actions in the header and sidebar: ${JSON.stringify(projectThreadButtons)}`);
           if (exerciseCodingPanels && width === 1440 && height === 900) {
-            await clickInRenderer(cdp, 'button[aria-label="Project actions"]');
-            const activityChoice = await cdp.evaluate(`(async () => { for (let i = 0; i < 20; i++) { const item = [...document.querySelectorAll('.overflow-menu-item')].find((entry) => entry.textContent?.trim() === 'Open activity'); if (item) { item.click(); return true; } await new Promise((resolve) => setTimeout(resolve, 25)); } return false; })()`);
+            const activityChoice = await cdp.evaluate(`(async () => { const trigger = document.querySelector('.coding-project-context-actions button[aria-label="Project actions"]'); trigger?.click(); for (let i = 0; i < 30; i++) { const item = [...document.querySelectorAll('.overflow-menu-panel [role="menuitem"]')].find((entry) => entry.textContent?.trim() === 'Open activity'); if (item) { item.click(); return true; } await new Promise((resolve) => setTimeout(resolve, 25)); } return false; })()`);
             if (!activityChoice) throw new Error('Project actions did not expose Open activity for review checklist access.');
             const reviewPanelReady = await cdp.evaluate(`(async () => { for (let i = 0; i < 40; i++) { if (document.querySelector('.coding-task-drawer [role="tab"]')) return true; await new Promise((resolve) => setTimeout(resolve, 50)); } return false; })()`);
             if (!reviewPanelReady) throw new Error('The project activity drawer did not open.');
@@ -1009,41 +1008,14 @@ async function main() {
             const pageGroupMinimum = compactCodingPanels ? 95 : 250;
             const pageGroupsReady = pageGroups.main && pageGroups.side && pageGroups.main.width > pageGroupMinimum && pageGroups.side.width > pageGroupMinimum && Math.abs(pageGroups.main.y - pageGroups.side.y) < 2 && pageGroups.main.right <= pageGroups.side.x + 2;
             if (!pageGroupsReady) throw new Error(`The main thread and right workspace pages are not managed as two aligned tab groups: ${JSON.stringify(pageGroups)}`);
-            const tabActions = await cdp.evaluate(`(async () => {
-              const list = document.querySelector('.workspace-tabs-hotkeys > .workspace-tab-strip .workspace-tab-list');
-              const tabs = () => [...(list?.querySelectorAll(':scope > .workspace-tab') ?? [])];
-              const before = tabs().map((tab) => tab.dataset.workspaceTabId);
-              if (!list || before.length < 2 || before.some((id) => !id)) return { ok: false, reason: 'Expected at least two addressable workspace tabs.' };
-              const drag = (sourceId, targetId) => {
-                const source = tabs().find((tab) => tab.dataset.workspaceTabId === sourceId);
-                const target = tabs().find((tab) => tab.dataset.workspaceTabId === targetId);
-                const data = new DataTransfer();
-                source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: data }));
-                target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data }));
-                target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data }));
-              };
-              drag(before[0], before[1]);
-              await new Promise((resolve) => setTimeout(resolve, 20));
-              const moved = tabs().map((tab) => tab.dataset.workspaceTabId);
-              const reorderWorked = moved[0] === before[1] && moved[1] === before[0];
-              drag(before[0], before[1]);
-              await new Promise((resolve) => setTimeout(resolve, 20));
-              const restoredOrder = tabs().map((tab) => tab.dataset.workspaceTabId);
-              const menuTab = tabs().find((tab) => tab.classList.contains('is-active'));
-              menuTab.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 120 }));
-              await new Promise((resolve) => setTimeout(resolve, 20));
-              const menu = document.querySelector('.workspace-tab-context-menu');
-              const menuWorked = Boolean(menu?.querySelector('[role="menuitem"]') && [...menu.querySelectorAll('[role="menuitem"]')].some((item) => item.textContent.includes('Close other tabs')));
-              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-              const activeBefore = tabs().findIndex((tab) => tab.classList.contains('is-active'));
-              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, bubbles: true }));
-              await new Promise((resolve) => setTimeout(resolve, 20));
-              const switched = tabs().findIndex((tab) => tab.classList.contains('is-active')) !== activeBefore;
-              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true, shiftKey: true, bubbles: true }));
-              await new Promise((resolve) => setTimeout(resolve, 20));
-              return { ok: reorderWorked && before.join('|') === restoredOrder.join('|') && menuWorked && switched, reorderWorked, orderRestored: before.join('|') === restoredOrder.join('|'), menuWorked, switched };
+            const tabActions = await cdp.evaluate(`(() => {
+              const tabs = [...document.querySelectorAll('.workspace-tabs-hotkeys > .workspace-tab-strip .workspace-tab')];
+              const projectName = document.querySelector('.coding-project-heading strong')?.textContent?.trim();
+              const active = document.querySelector('.workspace-tabs-hotkeys > .workspace-tab-strip .workspace-tab.is-active .workspace-tab-select')?.textContent?.trim();
+              const labels = tabs.map((tab) => tab.querySelector('.workspace-tab-select')?.textContent?.trim() ?? '');
+              return { ok: Boolean(projectName && tabs.length === 1 && active === projectName && labels[0] === projectName), projectName, active, labels };
             })()`);
-            if (!tabActions.ok) throw new Error(`Workspace tabs did not behave like a desktop tab bar: ${JSON.stringify(tabActions)}`);
+            if (!tabActions.ok) throw new Error(`The Coding taskbar should contain only the active project's thread tab: ${JSON.stringify(tabActions)}`);
             const assertMainChat = async (mode) => {
               const state = await cdp.evaluate(`(() => ({ visible: Boolean(document.querySelector('.project-thread-panel:not([hidden]) .chat-page.is-coding-agent')), thread: document.querySelector('.project-thread-panel:not([hidden])')?.innerText?.slice(0, 180) ?? '' }))()`);
               if (!state.visible) throw new Error(`Main coding chat was hidden after switching to ${mode}: ${JSON.stringify(state)}`);
