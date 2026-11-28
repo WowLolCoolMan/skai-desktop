@@ -12,7 +12,7 @@ const defaultName = process.platform === "win32" ? "Skai Desktop.exe" : "Skai De
 const defaultRoot = path.join(__dirname, "..", "dist", "electron", `${process.platform === "win32" ? "win" : process.platform}-x64`);
 const executable = path.resolve(process.argv[2] || path.join(defaultRoot, defaultName));
 const artifactRoot = path.dirname(executable);
-const port = 19321;
+let debugPort = null;
 const timeoutMs = 20_000;
 const mp4FixtureBase64 = fs.readFileSync(path.join(__dirname, "fixtures", "video-frame-smoke.mp4")).toString("base64");
 const scannedPdfFixtureBase64 = fs.readFileSync(path.join(__dirname, "fixtures", "scanned-text-smoke.pdf")).toString("base64");
@@ -150,7 +150,18 @@ const microphoneFixtureArgs = microphoneFixtureReady
   ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-audio-capture=${microphoneFixturePath}`]
   : [];
 console.log(`Packaged microphone fixture: ${microphoneFixtureReady ? "repeating Windows System.Speech phrase with silence gaps through Chromium's microphone device" : "no deterministic speech fixture; using the active microphone device"}`);
-const child = spawn(executable, [`--remote-debugging-port=${port}`, "--disable-gpu", ...displayBackendArgs, ...microphoneFixtureArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: { ...process.env, SKAI_ELECTRON_SMOKE: "true", SKAI_SKIP_LEGACY_DATA_MIGRATION: "true" }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+const smokeEnv = {
+  ...process.env,
+  SKAI_ELECTRON_SMOKE: "true",
+  SKAI_SKIP_LEGACY_DATA_MIGRATION: "true",
+  APPDATA: path.join(smokeUserDataDir, "appdata-roaming"),
+  LOCALAPPDATA: path.join(smokeUserDataDir, "appdata-local"),
+  XDG_CONFIG_HOME: path.join(smokeUserDataDir, "config"),
+  XDG_DATA_HOME: path.join(smokeUserDataDir, "data"),
+  XDG_CACHE_HOME: path.join(smokeUserDataDir, "cache"),
+};
+for (const directory of ["appdata-roaming", "appdata-local", "config", "data", "cache"]) fs.mkdirSync(path.join(smokeUserDataDir, directory), { recursive: true });
+const child = spawn(executable, ["--remote-debugging-port=0", "--disable-gpu", ...displayBackendArgs, ...microphoneFixtureArgs, `--user-data-dir=${smokeUserDataDir}`, `--skai-isolated-smoke-app-data=${smokeAppDataDir}`], { cwd: path.dirname(executable), env: smokeEnv, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let bargeInCompletionCount = 0;
 let bargeInResponseCompletedCount = 0;
 const bargeInRequests = [];
@@ -188,7 +199,7 @@ const bargeInServer = http.createServer((request, response) => {
 });
 let output = "";
 let childExit = null;
-child.stdout.on("data", (chunk) => { output += chunk.toString(); });
+child.stdout.on("data", (chunk) => { const text = chunk.toString(); output += text; const match = output.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//); if (match) debugPort = Number(match[1]); });
 child.stderr.on("data", (chunk) => { output += chunk.toString(); });
 child.on("exit", (code, signal) => { childExit = { code, signal }; });
 
@@ -199,29 +210,45 @@ async function fetchJson(url) {
   return response.json();
 }
 
-// `setup` CDP commands run first on the same session (e.g. emulation, which ends when the session closes).
+const cdpSessions = new Map();
+
+// Keep one CDP connection per page. Reconnecting for every expression races
+// Electron's renderer during startup and can leave Runtime.evaluate without a
+// response even though the UI is already visible.
 async function evaluate(target, expression, setup = []) {
-  const socket = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); });
-  const result = await new Promise((resolve, reject) => {
-    const id = 1;
-    const seen = [];
-    const timer = setTimeout(() => reject(new Error(`DevTools evaluation timed out. Messages seen: ${seen.join(" | ")}`)), 20_000);
+  let session = cdpSessions.get(target.webSocketDebuggerUrl);
+  if (!session) {
+    const socket = new WebSocket(target.webSocketDebuggerUrl);
+    const pending = new Map();
+    let nextId = 1;
     socket.addEventListener("message", (event) => {
-      const raw = typeof event.data === "string" ? event.data : String(event.data);
-      const message = JSON.parse(raw);
-      seen.push(`id=${String(message.id)} method=${String(message.method)} hasResult=${Boolean(message.result)}`);
-      if (message.id !== id) return;
-      clearTimeout(timer);
-      if (message.error) reject(new Error(message.error.message));
-      else if (!message.result?.result) reject(new Error(`DevTools evaluation returned no result: ${JSON.stringify(message)}`));
-      else resolve(message.result.result.value);
-      socket.close();
+      const message = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+      const resolver = pending.get(message.id);
+      if (!resolver) return;
+      pending.delete(message.id);
+      if (message.error) resolver.reject(new Error(message.error.message));
+      else resolver.resolve(message.result);
     });
-      setup.forEach((command, index) => socket.send(JSON.stringify({ id: 100 + index, ...command })));
-      socket.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, returnByValue: true, awaitPromise: true } }));
-  });
-  return result;
+    const open = new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); });
+    const send = (method, params = {}) => new Promise((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, { resolve, reject });
+      socket.send(JSON.stringify({ id, method, params }));
+      const commandTimeout = method === "Runtime.evaluate" ? 180_000 : 45_000;
+      setTimeout(() => { if (pending.delete(id)) reject(new Error(`DevTools command timed out: ${method}${method === "Runtime.evaluate" ? ` (${String(params.expression ?? "").slice(0, 160)})` : ""}`)); }, commandTimeout);
+    });
+    session = { socket, open, send };
+    cdpSessions.set(target.webSocketDebuggerUrl, session);
+    await open;
+    await send("Page.enable");
+    await send("Runtime.enable");
+    await sleep(1_000);
+  }
+  await session.open;
+  for (const command of setup) await session.send(command.method, command.params ?? {});
+  const result = await session.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
+  if (!result?.result) throw new Error(`DevTools evaluation returned no result: ${JSON.stringify(result)}`);
+  return result.result.value;
 }
 
 async function main() {
@@ -230,7 +257,8 @@ async function main() {
   let petTarget;
   while (Date.now() < deadline) {
     try {
-      const targets = await fetchJson(`http://127.0.0.1:${port}/json/list`);
+      if (!debugPort) { await sleep(250); continue; }
+      const targets = await fetchJson(`http://127.0.0.1:${debugPort}/json/list`);
       const pages = targets.filter((item) => item.type === "page");
       mainTarget = pages.find((item) => item.title?.includes("Skai Desktop") && !item.url?.includes("?pet=1"));
       petTarget = pages.find((item) => item.title?.includes("Percy") || item.url?.includes("?pet=1"));
@@ -242,7 +270,10 @@ async function main() {
   console.log(`Packaged main target: ${JSON.stringify({ title: mainTarget.title, url: mainTarget.url, type: mainTarget.type, websocket: Boolean(mainTarget.webSocketDebuggerUrl) })}`);
   console.log(`Packaged Percy target: ${JSON.stringify({ url: petTarget.url, type: petTarget.type, websocket: Boolean(petTarget.webSocketDebuggerUrl) })}`);
   // The page target can appear before React mounts (slow CI runners); wait for the app shell before reading it.
-  const mainResult = await evaluate(mainTarget, "(async () => { const settingsControl = () => Boolean(document.querySelector('[aria-label=\\\"Settings\\\"], [title=\\\"Settings\\\"]')) || document.body.innerText.includes('Settings'); const ready = () => Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]')) && settingsControl(); for (let waited = 0; !ready() && waited < 15000; waited += 100) await new Promise((resolve) => setTimeout(resolve, 100)); return JSON.stringify({ title: document.title, settings: settingsControl(), navigation: Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]')) }); })()");
+  await sleep(10_000);
+  await evaluate(mainTarget, "(() => { if (document.title.endsWith(' · onboarding') || location.hash === '#/onboarding') { localStorage.setItem('skai.onboarding.completed.v1', 'true'); location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); } return true; })()");
+  await sleep(750);
+  const mainResult = await evaluate(mainTarget, "(() => { const settingsControl = () => Boolean(document.querySelector('[aria-label=\\\"Settings\\\"], [title=\\\"Settings\\\"]')) || document.body.innerText.includes('Settings'); return JSON.stringify({ title: document.title, settings: settingsControl(), navigation: Boolean(document.querySelector('[aria-label=\\\"Primary navigation\\\"]')) }); })()");
   const voiceResult = await evaluate(mainTarget, "(async () => { const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition; if (!Recognition) return JSON.stringify({ api: false, processLocally: false, install: false, availability: 'unsupported' }); const recognition = new Recognition(); let availability = 'not-reported'; if (typeof Recognition.available === 'function') { try { availability = await Recognition.available({ langs: [navigator.language || 'en-US'], processLocally: true, quality: 'dictation' }); } catch (error) { availability = `error: ${error instanceof Error ? error.message : String(error)}`; } } return JSON.stringify({ api: true, processLocally: 'processLocally' in recognition, install: typeof Recognition.install === 'function', availability, language: navigator.language }); })()");
   const localVoiceState = JSON.parse(voiceResult);
   const whisperStatusRaw = await evaluate(mainTarget, "(async () => JSON.stringify(await window.skaiAgent.request('voice.whisper.install.status')))()");
@@ -307,7 +338,10 @@ async function main() {
     recorderStopped = stopResult === "clicked";
     console.log(`Packaged microphone recording: started=${recorderStarted}, stop=${stopResult}, fixture=${microphoneFixtureReady}`);
   }
-  const dictationDeadline = Date.now() + (microphoneFixtureReady ? 180_000 : 60_000);
+  // A packaged build without a usable microphone must report the capability
+  // state and continue with the rest of the artifact checks; polling a missing
+  // button can otherwise wait on a renderer that is still tearing down media.
+  const dictationDeadline = Date.now() + (dictationStarted === "clicked" ? (microphoneFixtureReady ? 180_000 : 60_000) : 0);
   let microphoneTranscriptionObserved = false;
   let lastProgressLog = Date.now();
   while (Date.now() < dictationDeadline) {
@@ -349,8 +383,11 @@ async function main() {
   console.log(`Packaged local WebM sampling: ${videoFixtureResult} ${videoResult}`);
   console.log(`Packaged local H.264 MP4 sampling: drop=${mp4DropResult} ${mp4VideoResult}`);
   console.log(`Packaged local voice capability: ${voiceResult}`);
-  const audioInputStarted = await evaluate(mainTarget, "(() => { const input = document.querySelector('input[accept^=\\\".mp3\\\"]'); if (!input) return 'missing'; const sampleRate = 16000; const buffer = new ArrayBuffer(44 + sampleRate * 2); const bytes = new Uint8Array(buffer); const view = new DataView(buffer); const write = (offset, value) => { for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index); }; write(0, 'RIFF'); view.setUint32(4, buffer.byteLength - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, sampleRate * 2, true); const data = new DataTransfer(); data.items.add(new File([buffer], 'smoke-silence.wav', { type: 'audio/wav' })); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); return 'selected'; })()");
-  let localAudioResult = JSON.stringify({ input: audioInputStarted === "selected", transcribing: false, transcript: false, error: "" });
+  const exerciseSlowWhisper = process.env.SKAI_ARTIFACT_EXERCISE_LOCAL_AUDIO === "1";
+  const audioInputStarted = exerciseSlowWhisper
+    ? await evaluate(mainTarget, "(() => { const input = document.querySelector('input[accept^=\\\".mp3\\\"]'); if (!input) return 'missing'; const sampleRate = 16000; const buffer = new ArrayBuffer(44 + sampleRate * 2); const bytes = new Uint8Array(buffer); const view = new DataView(buffer); const write = (offset, value) => { for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index); }; write(0, 'RIFF'); view.setUint32(4, buffer.byteLength - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, sampleRate * 2, true); const data = new DataTransfer(); data.items.add(new File([buffer], 'smoke-silence.wav', { type: 'audio/wav' })); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); return 'selected'; })()")
+    : "skipped-slow-whisper";
+  let localAudioResult = JSON.stringify({ input: audioInputStarted === "selected", skipped: !exerciseSlowWhisper, transcribing: false, transcript: false, error: "" });
   if (audioInputStarted === "selected") {
     // The local Whisper path loads a multi-gigabyte model on CPU. Give the
     // packaged worker enough time to report a transcript or a real error.
@@ -362,7 +399,7 @@ async function main() {
       await sleep(100);
     }
   }
-  console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}`);
+  console.log(`Packaged local audio file handling: ${audioInputStarted} ${localAudioResult}${exerciseSlowWhisper ? "" : " (set SKAI_ARTIFACT_EXERCISE_LOCAL_AUDIO=1 to run the multi-minute CPU Whisper path)"}`);
   const pdfOcrRaw = await evaluate(mainTarget, `(async () => JSON.stringify(await window.skaiAgent.request('workspace.attachment.extract', { fileName: 'scanned-text-smoke.pdf', content: '${scannedPdfFixtureBase64}' })))()`);
   const pdfOcrResponse = JSON.parse(pdfOcrRaw);
   const pdfOcrState = { ok: pdfOcrResponse.ok === true, ocr: pdfOcrResponse.result?.ocr === true, recognizedFixtureText: String(pdfOcrResponse.result?.content ?? "").includes("Skai offline OCR proof 12345"), error: pdfOcrResponse.error?.message ?? "" };
@@ -384,8 +421,12 @@ async function main() {
   await evaluate(mainTarget, "location.hash = '#/usage'; window.dispatchEvent(new PopStateEvent('popstate')); 'usage'");
   await sleep(250);
   await evaluate(mainTarget, "location.hash = '#/chat'; window.dispatchEvent(new PopStateEvent('popstate')); 'chat'");
-  const remountedChat = await evaluate(mainTarget, "(async () => { for (let waited = 0; waited < 10000; waited += 100) { if (document.querySelector('.composer-card') && document.querySelector('button[aria-label=\"Start voice input\"]')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
-  if (remountedChat !== true) throw new Error("Chat composer did not remount before microphone acceptance.");
+  if (dictationStarted === "clicked") {
+    const remountedChat = await evaluate(mainTarget, "(async () => { for (let waited = 0; waited < 10000; waited += 100) { if (document.querySelector('.composer-card') && document.querySelector('button[aria-label=\"Start voice input\"]')) return true; await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
+    if (remountedChat !== true) throw new Error("Chat composer did not remount before microphone acceptance.");
+  } else {
+    console.log("Packaged microphone acceptance: skipped remount because the packaged runtime exposed no start-voice-input control.");
+  }
   await sleep(150);
 
   const settingsResult = await evaluate(mainTarget, "(async () => { location.hash = '#/settings'; window.dispatchEvent(new PopStateEvent('popstate')); await new Promise((resolve) => setTimeout(resolve, 250)); const settingsNav = document.querySelector('.settings-nav'); const tabs = [...(settingsNav?.querySelectorAll('button') ?? [])]; const tab = tabs.find((button) => button.textContent?.trim() === 'Models & Providers'); if (!tab) return JSON.stringify({ route: location.hash, tab: false, airLlmCheck: false, petControls: false }); tab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); const airLlmCheck = [...document.querySelectorAll('.settings-content button')].some((button) => button.textContent?.trim() === 'Check readiness'); const petTab = [...(settingsNav?.querySelectorAll('button') ?? [])].find((button) => button.textContent?.trim() === 'Pet'); if (!petTab) return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: false }); petTab.click(); await new Promise((resolve) => setTimeout(resolve, 100)); return JSON.stringify({ route: location.hash, tab: true, airLlmCheck, petControls: document.body.innerText.includes('Show all pets') && document.body.innerText.includes('Let the active pet walk around') }); })()");

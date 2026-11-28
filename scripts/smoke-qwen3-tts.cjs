@@ -2,6 +2,7 @@
 
 /* Clean-profile acceptance for the pinned Qwen3-TTS 0.6B local adapter. */
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn, execFileSync } = require("node:child_process");
 const readline = require("node:readline");
@@ -12,7 +13,9 @@ if (process.platform !== "win32" || process.arch !== "x64") {
 }
 
 const root = path.resolve(__dirname, "..");
-const tempRoot = path.join(root, ".tmp");
+// The pinned Python runtime resolves some model files through Windows short
+// names. Keep the disposable profile out of the space-containing workspace.
+const tempRoot = os.tmpdir();
 fs.mkdirSync(tempRoot, { recursive: true });
 const profileRoot = fs.mkdtempSync(path.join(tempRoot, "qwen3-tts-smoke-"));
 const voiceRoot = path.join(profileRoot, "voice");

@@ -188,6 +188,40 @@ public static class PersonaProfileDrafting
     }
 
     /// <summary>
+    /// Supplies conservative, evidence-labelled values when a local model returns an empty or
+    /// partial structured response. A persona should remain usable on a small/offline model; these
+    /// values describe the evidence boundary instead of inventing biography or personality facts.
+    /// </summary>
+    public static Dictionary<string, string> BuildEvidenceFallbacks(string subject, string subjectType, string? description, IReadOnlyList<SavedPersonaSource> sources, PersonaVoiceCard voiceCard, IEnumerable<string> fields)
+    {
+        var sourceLabels = sources.Take(4).Select((source, index) => $"[S{index + 1}] {source.Title}").ToArray();
+        var references = sourceLabels.Length == 0 ? "the supplied public sources" : string.Join(", ", sourceLabels);
+        var kind = subjectType == "character" ? "fictional character" : "public figure";
+        var identity = string.IsNullOrWhiteSpace(description)
+            ? $"Public-source research identifies {subject} as a {kind}; consult {references} for the supported description."
+            : $"Public-source research describes {subject} as a {kind}: {description.Trim()} Evidence: {references}.";
+        var evidenceBoundary = $"Use only claims supported by {references}. The supplied evidence does not establish private facts or details absent from those sources; mark uncertain details as unverified.";
+        var knowledge = $"The researched material covers {subject} through {references}. Treat topics not present in those sources as unknown rather than filling them from general assumptions.";
+        var timeline = $"Build the timeline only from dated events or named works in {references}; no additional dates are asserted by this fallback.";
+        var voice = voiceCard.IsUsable
+            ? voiceCard.Summary
+            : "No sufficiently attributed speech sample was available, so do not imitate an unsupported catchphrase, dialect, or quotation.";
+        var values = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["roles"] = identity,
+            ["knowledge"] = knowledge,
+            ["timeline"] = timeline,
+            ["evidenceBoundaries"] = evidenceBoundary,
+            ["personality"] = $"The supplied sources provide a source-grounded portrayal of {subject}; use observed traits only where {references} supports them, and leave private motives uncertain.",
+            ["thinkingStyle"] = $"Infer decision-making only from actions or analysis documented in {references}; do not present this cautious reading as a clinical or private assessment.",
+            ["interactionStyle"] = $"Keep interactions consistent with the public portrayal documented in {references}. When the sources are silent, ask or acknowledge uncertainty instead of inventing a response pattern.",
+            ["values"] = $"Use goals, loyalties, and boundaries only when they are evidenced in {references}; otherwise state that the value is not established.",
+            ["speechPatterns"] = voice,
+        };
+        return fields.Distinct(StringComparer.Ordinal).ToDictionary(field => field, field => values.GetValueOrDefault(field, evidenceBoundary), StringComparer.Ordinal);
+    }
+
+    /// <summary>
     /// Reads a model reply as field text. Strings pass through; arrays and objects (which small models
     /// emit despite instructions) are flattened into readable text instead of failing the draft.
     /// </summary>

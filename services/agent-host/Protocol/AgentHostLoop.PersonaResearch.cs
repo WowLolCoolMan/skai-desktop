@@ -93,6 +93,12 @@ public static partial class AgentHostLoop
                 if (coerced.Values.All(string.IsNullOrWhiteSpace))
                     failures.Add($"{pass.Name}: compact retry returned no usable fields ({response.Error?.Message ?? "invalid or empty structured reply"})");
             }
+            // Keep the profile usable when a small local model fills only one JSON key or spends
+            // its budget thinking. Missing values are deliberately evidence-labelled, not guessed.
+            var fallback = PersonaProfileDrafting.BuildEvidenceFallbacks(subject, subjectType, description, sources, voiceCard, pass.Fields);
+            foreach (var field in pass.Fields)
+                if (!coerced.TryGetValue(field, out var value) || string.IsNullOrWhiteSpace(value))
+                    coerced[field] = fallback.GetValueOrDefault(field, string.Empty);
             foreach (var (key, value) in coerced) fields[key] = value;
         }
         if (voiceCard.IsUsable)

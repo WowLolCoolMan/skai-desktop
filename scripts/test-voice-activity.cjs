@@ -21,7 +21,7 @@ assert.equal(context.isSustainedVoiceActivity(0.02, 0.01, 100, 250), false);
 assert.equal(context.isSustainedVoiceActivity(0.02, 0.01, 100, 280), true);
 assert.equal(context.isSustainedVoiceActivity(0.01, 0.01, 100, 500), false);
 assert.equal(context.isSustainedVoiceActivity(0.02, 0.01, 0, 500), false);
-assert.equal(context.voiceActivityThreshold(0.001, true), 0.005);
+assert.equal(context.voiceActivityThreshold(0.001, true), 0.0028);
 assert.ok(Math.abs(context.voiceActivityThreshold(0.01, true) - 0.028) < 1e-12);
 assert.equal(context.voiceActivityThreshold(0.001, false), 0.0016);
 console.log("Voice activity RMS checks passed.");

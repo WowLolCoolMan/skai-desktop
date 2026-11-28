@@ -9,7 +9,7 @@
 // of CI; the offline logic is covered by PersonaKnowledgeTests in the Core test runner.
 //
 // usage: npm run smoke:personas [-- --only "Boog from Open Season"] [-- --era-date 2010-12-31] [-- --no-chat] [-- --report out.json]
-// env:   SKAI_PERSONA_SMOKE_ENDPOINT (default http://127.0.0.1:11434), SKAI_PERSONA_SMOKE_MODEL (default llama3.2),
+// env:   SKAI_PERSONA_SMOKE_ENDPOINT (default http://127.0.0.1:11434), SKAI_PERSONA_SMOKE_MODEL (auto-detected from Ollama),
 //        SKAI_PERSONA_SMOKE_PROVIDER (default ollama)
 
 const fs = require("node:fs");
@@ -30,11 +30,28 @@ const parsedEraDate = eraDate ? new Date(`${eraDate}T00:00:00Z`) : null;
 if (eraDate && (!/^\d{4}-\d{2}-\d{2}$/.test(eraDate) || Number.isNaN(parsedEraDate.getTime()) || parsedEraDate.toISOString().slice(0, 10) !== eraDate)) {
   throw new Error("--era-date must be a valid date in YYYY-MM-DD format.");
 }
-const model = {
+let model = {
   provider: process.env.SKAI_PERSONA_SMOKE_PROVIDER || "ollama",
   endpoint: process.env.SKAI_PERSONA_SMOKE_ENDPOINT || "http://127.0.0.1:11434",
-  model: process.env.SKAI_PERSONA_SMOKE_MODEL || "llama3.2",
+  model: process.env.SKAI_PERSONA_SMOKE_MODEL || "",
 };
+
+async function resolveLocalModel() {
+  if (model.model || model.provider !== "ollama") return;
+  let response;
+  try {
+    response = await fetch(`${model.endpoint.replace(/\/$/, "")}/api/tags`);
+  } catch (error) {
+    throw new Error(`No persona smoke model was selected and Ollama is unavailable at ${model.endpoint}: ${error instanceof Error ? error.message : String(error)}. Set SKAI_PERSONA_SMOKE_MODEL to a locally installed model.`);
+  }
+  if (!response.ok) throw new Error(`Ollama model discovery failed with HTTP ${response.status}. Set SKAI_PERSONA_SMOKE_MODEL to a locally installed model.`);
+  const payload = await response.json();
+  const names = (Array.isArray(payload.models) ? payload.models : []).map((entry) => entry.name).filter(Boolean);
+  const preferred = ["qwen3:14b", "qwen3-coder:30b", "qwen3:8b", "llama3.2"].find((name) => names.includes(name));
+  model = { ...model, model: preferred || names[0] || "" };
+  if (!model.model) throw new Error(`Ollama is reachable but has no installed models. Pull one or set SKAI_PERSONA_SMOKE_MODEL explicitly.`);
+  console.log(`Persona smoke model: ${model.model} (auto-detected)`);
+}
 
 // expect: canonical name pattern, the reference host it should come from, and words a good
 // in-character reply is likely to use (any one counts).
@@ -144,6 +161,7 @@ async function runSubject(subject) {
 }
 
 (async () => {
+  await resolveLocalModel();
   const saved = await request("settings.save", { endpoint: model.endpoint, model: model.model, provider: model.provider }, 30_000);
   if (!saved.ok) throw new Error(`settings.save failed: ${saved.error?.message}`);
   const report = [];

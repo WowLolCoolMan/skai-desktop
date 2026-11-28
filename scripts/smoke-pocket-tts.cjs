@@ -5,6 +5,7 @@
  * synthesizes and validates WAV, then removes only that isolated profile. */
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn, execFileSync } = require("node:child_process");
 const readline = require("node:readline");
@@ -15,7 +16,10 @@ if (process.platform !== "win32" || process.arch !== "x64") {
 }
 
 const root = path.resolve(__dirname, "..");
-const smokeTempRoot = path.join(root, ".tmp");
+// Pocket TTS' Windows loader still resolves model files through an 8.3 short
+// path. Keep the disposable runtime outside the workspace so a repo path such
+// as `E:\Skai Desktop` cannot make a valid install fail.
+const smokeTempRoot = os.tmpdir();
 fs.mkdirSync(smokeTempRoot, { recursive: true });
 const profileRoot = fs.mkdtempSync(path.join(smokeTempRoot, "pocket-tts-smoke-"));
 const voiceRoot = path.join(profileRoot, "voice", "PocketTTS");
