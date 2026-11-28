@@ -2835,6 +2835,16 @@ html[data-pet-surface="opaque"] .pet-window-root { background: radial-gradient(c
 .conversation-checkpoint-card small { color: var(--skai-color-text-muted); line-height: 1.4; }
 .conversation-checkpoint-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
 @media (max-width: 640px) { .conversation-checkpoint-form, .conversation-checkpoint-card { grid-template-columns: 1fr; align-items: stretch; }.conversation-checkpoint-form .ui-button, .conversation-checkpoint-actions .ui-button { width: 100%; }.conversation-checkpoint-actions { justify-content: stretch; } }
+.response-branches-dialog { width: min(1080px, calc(100vw - 32px)); padding: 24px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.response-branch-list { display: grid; gap: 12px; }
+.response-branch-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-xl); background: var(--skai-color-surface-soft); }
+.response-branch-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.response-branch-heading small { color: var(--skai-color-text-muted); }
+.response-branch-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.response-branch-columns section { display: grid; min-width: 0; gap: 6px; }
+.response-branch-columns section > span { color: var(--skai-color-text-muted); font-size: var(--skai-text-xs); font-weight: 600; }
+.response-branch-columns pre { max-height: 360px; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); color: var(--skai-color-text); background: var(--skai-color-surface); font: inherit; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .response-branch-columns { grid-template-columns: 1fr; } }
 
 
 /* Project coding workspace: one focused Codex-style canvas at a time. */

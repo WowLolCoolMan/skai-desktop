@@ -29,6 +29,15 @@ export type ConversationImportPreview = {
   reassignedIds: number;
   sampleTitles: string[];
 };
+export type ConversationResponseBranch = {
+  id: string;
+  createdAtUtc: string;
+  messageIndex: number;
+  originalModel: string;
+  retryModel: string;
+  originalContent: string;
+  alternateContent: string;
+};
 const CHAT_RESPONSE_MODES: ChatResponseMode[] = ["think", "coding", "security"];
 function normalizeResponseMode(value: unknown): ChatResponseMode {
   return CHAT_RESPONSE_MODES.includes(value as ChatResponseMode) ? value as ChatResponseMode : "think";
@@ -396,6 +405,7 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     if (busy || !conversationId) return;
     if (!isLocalEndpoint(endpoint)) { onError(LOCAL_ENDPOINT_ERROR); return; }
     const originalMessages = messages;
+    const originalResponse = messages[messageIndex];
     const prefix = messages.slice(0, messageIndex);
     if (messages[messageIndex]?.role !== "assistant" || !prefix.some((message) => message.role === "user")) return;
     stopNativeSpeech();
@@ -406,7 +416,17 @@ export function useChatWorkspace({ request, connection, provider, endpoint, mode
     setBusy(false);
     if (!response.ok) { setMessages(originalMessages); onError(response.error?.message ?? "The model request failed."); return; }
     const completed = [...prefix, { role: "assistant" as const, content: (response.result as { content: string }).content, createdAtUtc: new Date().toISOString() }];
-    setMessages(completed); await saveConversation(completed, conversationId, retryModel);
+    setMessages(completed); const savedConversationId = await saveConversation(completed, conversationId, retryModel);
+    if (originalResponse?.role === "assistant") {
+      const key = `skai.conversation.response-branches.v1:${savedConversationId ?? conversationId}`;
+      const branch: ConversationResponseBranch = { id: typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`, createdAtUtc: new Date().toISOString(), messageIndex, originalModel: model, retryModel, originalContent: originalResponse.content, alternateContent: (response.result as { content: string }).content };
+      try {
+        const existing = JSON.parse(localStorage.getItem(key) ?? "[]") as unknown;
+        const branches = Array.isArray(existing) ? existing.filter((item): item is ConversationResponseBranch => Boolean(item && typeof item === "object" && typeof (item as ConversationResponseBranch).id === "string" && typeof (item as ConversationResponseBranch).originalContent === "string" && typeof (item as ConversationResponseBranch).alternateContent === "string")) : [];
+        localStorage.setItem(key, JSON.stringify([branch, ...branches].slice(0, 8)));
+        window.dispatchEvent(new Event("skai-response-branch-changed"));
+      } catch { /* Branch comparison is optional and never blocks the saved response. */ }
+    }
     void speakNativeResponse(completed.at(-1)?.content ?? "", false);
   };
 
