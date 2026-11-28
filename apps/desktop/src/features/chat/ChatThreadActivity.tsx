@@ -25,6 +25,8 @@ export function ChatThreadActivity({ tasks, messages, taskBusy, workspaceMode, o
   const attentionCount = tasks.filter((task) => task.status === "failed" || task.status === "blocked").length;
   const currentTasks = tasks.filter((task) => activeStatuses.includes(task.status));
   const earlierTasks = tasks.filter((task) => !currentTasks.includes(task));
+  const dependencyTasks = tasks.filter((task) => task.dependsOn.length > 0);
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
   const timelineEvents = [
     ...messages.map((message, index) => ({
       id: `message:${index}`,
@@ -82,6 +84,10 @@ export function ChatThreadActivity({ tasks, messages, taskBusy, workspaceMode, o
           <time dateTime={event.timestamp} title={new Date(event.timestamp).toLocaleString()}>{new Date(event.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>
         </li>)}
       </ol>
+    </details>}
+    {dependencyTasks.length > 0 && <details className="thread-dependency-graph" open>
+      <summary><strong>Task dependencies</strong><span>{dependencyTasks.length} waiting chain{dependencyTasks.length === 1 ? "" : "s"}</span></summary>
+      <div className="thread-dependency-list">{dependencyTasks.map((task) => { const prerequisites = task.dependsOn.map((id) => taskById.get(id)); const ready = prerequisites.every((item) => item?.status === "completed"); return <div className={`thread-dependency-row is-${ready ? "ready" : "waiting"}`} key={task.id}><div><strong>{task.title}</strong><small>{ready ? "Ready to run" : "Waiting on prerequisites"}</small></div><span aria-label={`${prerequisites.length} prerequisites`}>{prerequisites.map((item, index) => <span key={task.dependsOn[index]} className={`thread-dependency-chip is-${item?.status ?? "missing"}`} title={item ? `${item.title} · ${item.status}` : `Missing task ${task.dependsOn[index]}`}>{item?.title ?? "Missing task"}</span>)}</span></div>; })}</div>
     </details>}
     {currentTasks.length > 0 && <details className="thread-run-current" open={currentTasks.length === 1 || activeCount > 0}>
       <summary><strong>Task activity</strong><span>{[activeCount ? `${activeCount} active` : "", queuedCount ? `${queuedCount} queued` : "", approvalCount ? `${approvalCount} awaiting approval` : "", attentionCount ? `${attentionCount} need attention` : ""].filter(Boolean).join(" · ") || `${currentTasks.length} open`}</span></summary>

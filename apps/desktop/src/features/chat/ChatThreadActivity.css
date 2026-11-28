@@ -24,7 +24,7 @@
 .thread-activity-event strong { display: block; overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .thread-activity-event p { margin: 2px 0 0; overflow: hidden; color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .thread-activity-event time { color: var(--skai-color-text-muted); font-family: var(--skai-font-mono); font-size: var(--skai-text-3xs); white-space: nowrap; }
-.thread-activity-dot { width: 7px; height: 7px; margin-top: 4px; border-radius: 999px; background: var(--skai-color-border-strong); }
+.thread-activity-dot { width: 7px; height: 7px; margin-top: 4px; border-radius: var(--skai-radius-pill); background: var(--skai-color-border-strong); }
 .thread-activity-event.is-chat-user .thread-activity-dot { background: var(--skai-color-accent); }
 .thread-activity-event.is-chat-agent .thread-activity-dot { background: var(--skai-color-success); }
 .thread-activity-event.is-task-event .thread-activity-dot { background: var(--skai-color-warning); }
@@ -43,3 +43,19 @@
 .thread-run-failure dl > div { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; }
 .thread-run-failure dt { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); }
 .thread-run-failure dd { margin: 0; overflow-wrap: anywhere; color: var(--skai-color-text); font-size: var(--skai-text-3xs); line-height: 1.35; }
+.thread-dependency-graph { overflow: hidden; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-md); background: color-mix(in srgb, var(--skai-color-surface-soft) 82%, transparent); }
+.thread-dependency-graph > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 9px; color: var(--skai-color-text); cursor: pointer; list-style-position: inside; }
+.thread-dependency-graph > summary strong { font-size: var(--skai-text-xs); font-weight: 620; }
+.thread-dependency-graph > summary span { color: var(--skai-color-text-muted); font-size: var(--skai-text-2xs); }
+.thread-dependency-list { display: grid; }
+.thread-dependency-row { display: grid; gap: 6px; padding: 8px 9px; border-top: 1px solid var(--skai-color-border); }
+.thread-dependency-row > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.thread-dependency-row strong { overflow: hidden; color: var(--skai-color-text); font-size: var(--skai-text-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.thread-dependency-row small { color: var(--skai-color-text-muted); font-size: var(--skai-text-3xs); white-space: nowrap; }
+.thread-dependency-row.is-ready small { color: var(--skai-color-success); }
+.thread-dependency-row.is-waiting small { color: var(--skai-color-warning); }
+.thread-dependency-row > span { display: flex; flex-wrap: wrap; gap: 4px; }
+.thread-dependency-chip { max-width: 100%; overflow: hidden; padding: 3px 5px; border: 1px solid var(--skai-color-border); border-radius: var(--skai-radius-sm); color: var(--skai-color-text-muted); background: var(--skai-color-canvas); font-size: var(--skai-text-3xs); text-overflow: ellipsis; white-space: nowrap; }
+.thread-dependency-chip.is-completed { border-color: color-mix(in srgb, var(--skai-color-success) 48%, var(--skai-color-border)); color: var(--skai-color-success); }
+.thread-dependency-chip.is-running, .thread-dependency-chip.is-verifying { border-color: color-mix(in srgb, var(--skai-color-accent) 48%, var(--skai-color-border)); color: var(--skai-color-accent-text); }
+.thread-dependency-chip.is-failed, .thread-dependency-chip.is-blocked, .thread-dependency-chip.is-missing { border-color: color-mix(in srgb, var(--skai-color-danger) 48%, var(--skai-color-border)); color: var(--skai-color-danger); }
