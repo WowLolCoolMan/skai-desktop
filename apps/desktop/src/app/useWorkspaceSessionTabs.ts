@@ -104,7 +104,11 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     onNavigate("coding");
   }, [chat, coding, ensureProjectThread, onNavigate, setAgentModeState, setEndpoint, setModel, setProvider, workspaceTabs]);
   const openSideChat = useCallback(() => {
-    if (!coding.selectedProject || route !== "coding") {
+    if (route === "coding" && !coding.selectedProject) {
+      onNavigate("projects");
+      return;
+    }
+    if (route !== "coding") {
       openNewWorkspaceTab();
       return;
     }
