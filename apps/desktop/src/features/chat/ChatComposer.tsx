@@ -35,6 +35,7 @@ const composerTargetDescriptions: Record<ComposerTarget, string> = {
 type RecommendedComposerTool = "files" | "audio" | "voice" | "computer" | "plan" | "marketplace";
 
 type ComposerSkill = { id: string; name: string; description?: string; category?: string; enabled?: boolean; source?: string };
+type ComposerContextItem = { id: string; label: string; detail: string; shortcut: string; prompt: string };
 
 const recommendedComposerTools: Record<RecommendedComposerTool, { label: string; detail: string }> = {
   files: { label: "Add files", detail: "Attach local source material" },
@@ -81,6 +82,7 @@ type ChatComposerProps = {
   modeDescription?: string;
   target?: ComposerTarget;
   onTargetChange?: (target: ComposerTarget) => void;
+  contextItems?: ComposerContextItem[];
 };
 
 type PlannedComputerAction =
@@ -118,7 +120,7 @@ function parsePlannedComputerAction(value: Record<string, unknown>): PlannedComp
 
 
 
-export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onStop, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response", target = "answer", onTargetChange }: ChatComposerProps) {
+export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, attachments, queuedMessages, onDraftChange, onSubmit, onStop, onQueueRemove, onUpdateQueued, onMoveQueued, onAttach, onFilesDropped, onRemoveAttachment, onNavigate, onToggleDocumentsOnly, onVoiceTranscript, onAudioTranscript, onSetAttachments, provider, endpoint, model, models, placeholder = "Message your model…", modelControl, onOpenTaskPlanner, accessLabel = "Local access", projects = [], projectId = null, onOpenProject, modeLabel = "Chat", modeDescription = "Local response", target = "answer", onTargetChange, contextItems = [] }: ChatComposerProps) {
   const [commandIndex, setCommandIndex] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
@@ -217,10 +219,11 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
       { id: "skills", label: "Skills", detail: "Reference an installed skill by id", shortcut: "@skills", prompt: "@skills" },
       { id: "tools", label: "Tools", detail: "Reference enabled local tools", shortcut: "@tools", prompt: "@tools" },
       { id: "memory", label: "Memory", detail: "Reference approved local memory", shortcut: "@memory", prompt: "@memory" },
+      ...contextItems,
     ];
     const query = contextQuery.toLowerCase();
     return candidates.filter((candidate) => `${candidate.label} ${candidate.detail} ${candidate.shortcut}`.toLowerCase().includes(query)).slice(0, 12);
-  }, [attachments, contextQuery, projects]);
+  }, [attachments, contextItems, contextQuery, projects]);
   const activeCommandId = commandMatches[commandIndex] ? `composer-command-${commandMatches[commandIndex].id}` : undefined;
   const activeContextId = contextMatches[commandIndex] ? `composer-command-${contextMatches[commandIndex].id}` : undefined;
   const computerVisionModel = useMemo(() => {
