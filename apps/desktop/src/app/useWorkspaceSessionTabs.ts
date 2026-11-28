@@ -37,13 +37,24 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       setAgentModeState(mode);
       localStorage.setItem("skai.agentMode", mode);
       const project = conversation.projectId ? coding.projects.find((item) => item.id === conversation.projectId) : null;
-      if (project) { destination = "coding"; void coding.selectProject(project); }
-      const existing = workspaceTabs.find((tab) => tab.conversationId === id);
-      if (existing) setActiveWorkspaceTabId(existing.id);
-      else {
-        const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: conversation.title, route: destination, conversationId: id, projectId: project?.id ?? null };
-        setWorkspaceTabs((current) => [...current, tab].slice(-16));
-        setActiveWorkspaceTabId(tab.id);
+      if (project) {
+        destination = "coding";
+        void coding.selectProject(project);
+        const existingProjectTab = workspaceTabs.find((tab) => tab.projectId === project.id);
+        const tabId = existingProjectTab?.id ?? createWorkspaceTabId();
+        const projectTab: WorkspaceSessionTab = { id: tabId, title: project.name, route: "coding", conversationId: id, projectId: project.id };
+        setWorkspaceTabs((current) => current.some((tab) => tab.id === tabId)
+          ? current.map((tab) => tab.id === tabId ? projectTab : tab)
+          : [...current, projectTab].slice(-16));
+        setActiveWorkspaceTabId(tabId);
+      } else {
+        const existing = workspaceTabs.find((tab) => tab.conversationId === id);
+        if (existing) setActiveWorkspaceTabId(existing.id);
+        else {
+          const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: conversation.title, route: destination, conversationId: id, projectId: null };
+          setWorkspaceTabs((current) => [...current, tab].slice(-16));
+          setActiveWorkspaceTabId(tab.id);
+        }
       }
     }
     chat.selectConversation(id);
@@ -72,12 +83,16 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     localStorage.setItem("skai.agentMode", "Coding Agent");
     chat.startNewChat();
     chat.setResponseMode("coding");
-    const tab: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: "New coding thread", route: "coding", conversationId: null, projectId: project.id };
-    setWorkspaceTabs((current) => [...current, tab].slice(-16));
-    setActiveWorkspaceTabId(tab.id);
+    const existing = workspaceTabs.find((tab) => tab.projectId === project.id);
+    const tabId = existing?.id ?? createWorkspaceTabId();
+    const tab: WorkspaceSessionTab = { id: tabId, title: project.name, route: "coding", conversationId: null, projectId: project.id };
+    setWorkspaceTabs((current) => current.some((item) => item.id === tabId)
+      ? current.map((item) => item.id === tabId ? tab : item)
+      : [...current, tab].slice(-16));
+    setActiveWorkspaceTabId(tabId);
     void coding.selectProject(project);
     onNavigate("coding");
-  }, [chat, coding, onNavigate, setAgentModeState, setEndpoint, setModel, setProvider]);
+  }, [chat, coding, onNavigate, setAgentModeState, setEndpoint, setModel, setProvider, workspaceTabs]);
   const openSideChat = useCallback(() => {
     if (!coding.selectedProject || route !== "coding") {
       openNewWorkspaceTab();
