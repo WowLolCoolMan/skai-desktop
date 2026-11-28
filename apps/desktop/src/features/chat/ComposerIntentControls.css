@@ -35,3 +35,41 @@
   .composer-target-selector span { display: none; }
   .composer-target-selector select { max-width: 92px; }
 }
+
+.composer-tool-recommendations {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 5px 2px 1px;
+  scrollbar-width: thin;
+}
+
+.composer-tool-recommendations > span {
+  flex: 0 0 auto;
+  color: var(--skai-color-text-muted);
+  font-size: var(--skai-text-3xs);
+}
+
+.composer-tool-recommendations button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid var(--skai-color-border);
+  border-radius: var(--skai-radius-pill);
+  color: var(--skai-color-text-muted);
+  background: var(--skai-color-surface-soft);
+  font-size: var(--skai-text-2xs);
+}
+
+.composer-tool-recommendations button:hover,
+.composer-tool-recommendations button:focus-visible {
+  border-color: color-mix(in srgb, var(--skai-color-accent) 55%, var(--skai-color-border));
+  color: var(--skai-color-text);
+}
+
+.composer-tool-recommendations .nav-icon { width: 12px; height: 12px; }

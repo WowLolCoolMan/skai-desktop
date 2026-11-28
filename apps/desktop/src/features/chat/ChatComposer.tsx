@@ -32,6 +32,17 @@ const composerTargetDescriptions: Record<ComposerTarget, string> = {
   media: "Open Visuals Workshop for image and media generation.",
 };
 
+type RecommendedComposerTool = "files" | "audio" | "voice" | "computer" | "plan" | "marketplace";
+
+const recommendedComposerTools: Record<RecommendedComposerTool, { label: string; detail: string }> = {
+  files: { label: "Add files", detail: "Attach local source material" },
+  audio: { label: "Transcribe audio", detail: "Use local audio transcription" },
+  voice: { label: "Voice Mode", detail: "Start a hands-free local conversation" },
+  computer: { label: "Computer use", detail: "Inspect or control a local display" },
+  plan: { label: "Plan a task", detail: "Draft an approval-gated work plan" },
+  marketplace: { label: "Browse tools", detail: "Review local skills and integrations" },
+};
+
 type ChatComposerProps = {
   draft: string;
   busy: boolean;
@@ -426,6 +437,27 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
   const contextBudgetPercent = Math.min(100, Math.round((estimatedContextTokens / contextBudget) * 100));
   const contextBudgetLabel = estimatedContextTokens > 0 ? `Context · ~${estimatedContextTokens.toLocaleString()} / ${contextBudget.toLocaleString()}` : `Context · ${contextBudget.toLocaleString()} available`;
   const duplicateAttachmentCount = attachments.length - new Set(attachments.map((attachment) => `${attachment.fileName}\u0000${attachment.mediaType}`)).size;
+  const recommendedTools = useMemo<RecommendedComposerTool[]>(() => {
+    const text = draft.trim().toLowerCase();
+    if (!text) return [];
+    const next: RecommendedComposerTool[] = [];
+    const add = (tool: RecommendedComposerTool) => { if (!next.includes(tool)) next.push(tool); };
+    if (/\b(file|files|folder|folders|document|documents|pdf|image|images|screenshot|attach|source|readme|codebase)\b/.test(text)) add("files");
+    if (/\b(audio|recording|podcast|transcrib|meeting|voice memo)\b/.test(text)) add("audio");
+    if (/\b(speak|voice|talk|conversation|listen|dictat)\b/.test(text)) add("voice");
+    if (/\b(screen|desktop|browser|click|type into|computer|app window)\b/.test(text)) add("computer");
+    if (/\b(plan|implement|build|refactor|fix|task|acceptance|checklist)\b/.test(text)) add("plan");
+    if (/\b(tool|skill|mcp|integration|plugin|marketplace)\b/.test(text)) add("marketplace");
+    return next.slice(0, 3);
+  }, [draft]);
+  const activateRecommendedTool = (tool: RecommendedComposerTool) => {
+    if (tool === "files") openFilePickerFromOmni();
+    else if (tool === "audio") openAudioPickerFromOmni();
+    else if (tool === "voice") startHandsFreeFromOmni();
+    else if (tool === "computer") { setComputerOpen(true); void captureComputerScreens(); }
+    else if (tool === "plan") { setOmniOpen(false); onOpenTaskPlanner?.(); }
+    else { setOmniOpen(false); onNavigate("marketplace"); }
+  };
   const removeDuplicateAttachments = () => {
     const seen = new Set<string>();
     onSetAttachments(attachments.filter((attachment) => {
@@ -470,6 +502,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} trustLabel="User content · local-only" />
     <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
     <textarea ref={draftTextareaRef} value={draft} disabled={rewriteBusy} onChange={(event) => { rememberDraftSelection(event.currentTarget); onDraftChange(event.target.value); }} onSelect={(event) => rememberDraftSelection(event.currentTarget)} onClick={(event) => rememberDraftSelection(event.currentTarget)} onKeyUp={(event) => rememberDraftSelection(event.currentTarget)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : placeholder} aria-label={placeholder.replace(/…$/, "")} aria-controls={commandQuery !== null || contextQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : contextQuery !== null ? activeContextId : undefined} aria-autocomplete={commandQuery !== null || contextQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : contextQuery !== null ? contextMatches.length > 0 : undefined} rows={3} />
+    {recommendedTools.length > 0 && !busy && !rewriteBusy && <div className="composer-tool-recommendations" aria-label="Recommended local tools"><span>Suggested for this draft</span>{recommendedTools.map((tool) => <button type="button" key={tool} title={recommendedComposerTools[tool].detail} onClick={() => activateRecommendedTool(tool)}><NavIcon name={tool === "files" ? "document" : tool === "audio" || tool === "voice" ? "microphone" : tool === "computer" ? "image" : tool === "plan" ? "code" : "marketplace"} /><span>{recommendedComposerTools[tool].label}</span></button>)}</div>}
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
     {voiceListening && whisperRecorderRef.current && <p className="composer-hint" role="status">Recording locally. Select the microphone again to transcribe, or leave it to stop automatically after five minutes.</p>}
     {audioTranscribing && <p className="composer-hint" role="status">Transcribing audio with local Whisper on this device…</p>}
