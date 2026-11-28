@@ -489,6 +489,21 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     if (/\b(tool|skill|mcp|integration|plugin|marketplace)\b/.test(text)) add("marketplace");
     return next.slice(0, 3);
   }, [draft]);
+  const draftQualityHints = useMemo(() => {
+    const text = draft.trim();
+    if (!text || busy || rewriteBusy) return [];
+    const hints: string[] = [];
+    if ((target === "edit" || modeLabel === "Coding") && !projectId) {
+      hints.push("Choose a project folder so approved edits have a clear target.");
+    }
+    if (text.length < 18) {
+      hints.push("Add a little more detail about the desired outcome or constraints.");
+    }
+    if ((target === "edit" || target === "review" || modeLabel === "Coding") && /\b(build|implement|change|fix|refactor|review|update)\b/i.test(text) && !/\b(acceptance|criteria|expect|should|must|verify|test)\b/i.test(text)) {
+      hints.push("Consider adding an acceptance check or test expectation.");
+    }
+    return hints.slice(0, 2);
+  }, [busy, draft, modeLabel, projectId, rewriteBusy, target]);
   const activateRecommendedTool = (tool: RecommendedComposerTool) => {
     if (tool === "files") openFilePickerFromOmni();
     else if (tool === "audio") openAudioPickerFromOmni();
@@ -558,6 +573,7 @@ export function ChatComposer({ draft, busy, rewriteBusy = false, documentsOnly, 
     <input ref={audioPickerRef} className="sr-only" type="file" accept=".mp3,.m4a,.ogg,.wav,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" tabIndex={-1} aria-hidden="true" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void transcribeAudioFile(file); }} />
     <textarea ref={draftTextareaRef} value={draft} disabled={rewriteBusy} onChange={(event) => { rememberDraftSelection(event.currentTarget); onDraftChange(event.target.value); }} onSelect={(event) => rememberDraftSelection(event.currentTarget)} onClick={(event) => rememberDraftSelection(event.currentTarget)} onKeyUp={(event) => rememberDraftSelection(event.currentTarget)} onKeyDown={handleKeyDown} placeholder={rewriteBusy ? "Rewriting with the selected local model…" : busy ? "Type a follow-up while the model responds…" : placeholder} aria-label={placeholder.replace(/…$/, "")} aria-controls={commandQuery !== null || contextQuery !== null ? "composer-command-menu" : undefined} aria-activedescendant={commandQuery !== null ? activeCommandId : contextQuery !== null ? activeContextId : undefined} aria-autocomplete={commandQuery !== null || contextQuery !== null ? "list" : undefined} aria-expanded={commandQuery !== null ? commandMatches.length > 0 : contextQuery !== null ? contextMatches.length > 0 : undefined} rows={3} />
     {recommendedTools.length > 0 && !busy && !rewriteBusy && <div className="composer-tool-recommendations" aria-label="Recommended local tools"><span>Suggested for this draft</span>{recommendedTools.map((tool) => <button type="button" key={tool} title={recommendedComposerTools[tool].detail} onClick={() => activateRecommendedTool(tool)}><NavIcon name={tool === "files" ? "document" : tool === "audio" || tool === "voice" ? "microphone" : tool === "computer" ? "image" : tool === "plan" ? "code" : "marketplace"} /><span>{recommendedComposerTools[tool].label}</span></button>)}</div>}
+     {draftQualityHints.length > 0 && <div className="composer-draft-hints" role="status" aria-label="Draft quality suggestions"><span className="composer-draft-hints-label">Draft check</span>{draftQualityHints.map((hint) => <span className="composer-draft-hint" key={hint}>{hint}</span>)}</div>}
     {documentsOnly && attachments.length === 0 && <p className="composer-hint" role="status">Attach at least one document before sending in Documents-only mode.</p>}
     {voiceListening && whisperRecorderRef.current && <p className="composer-hint" role="status">Recording locally. Select the microphone again to transcribe, or leave it to stop automatically after five minutes.</p>}
     {audioTranscribing && <p className="composer-hint" role="status">Transcribing audio with local Whisper on this device…</p>}

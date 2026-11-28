@@ -46,6 +46,29 @@
   scrollbar-width: thin;
 }
 
+.composer-draft-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 0;
+  color: var(--text-muted, #a8a0b5);
+  font-size: 11px;
+}
+
+.composer-draft-hints-label {
+  color: var(--accent, #f6a04d);
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.composer-draft-hint {
+  border: 1px solid color-mix(in srgb, var(--accent, #f6a04d) 24%, transparent);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
 .composer-tool-recommendations > span {
   flex: 0 0 auto;
   color: var(--skai-color-text-muted);
