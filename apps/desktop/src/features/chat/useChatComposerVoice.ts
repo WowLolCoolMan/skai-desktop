@@ -23,6 +23,7 @@ type SpeechRecognitionConstructor = (new () => SpeechRecognitionLike) & {
 type SpeechWindow = Window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
 type VoiceDevice = { deviceId: string; label: string };
 type VoiceTranscriptLine = { id: number; speaker: "you" | "skai"; text: string };
+type VoiceAudioEvidence = { blob: Blob; fileName: string };
 export type VoicePreflight = {
   microphone: "ready" | "blocked" | "unsupported" | "unknown";
   runtime: "ready" | "missing" | "unknown";
@@ -69,6 +70,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
   const [pendingVoiceTranscript, setPendingVoiceTranscript] = useState<string | null>(null);
   const [voicePaused, setVoicePaused] = useState(false);
   const [voiceSessionTranscript, setVoiceSessionTranscript] = useState<VoiceTranscriptLine[]>([]);
+  const [voiceAudioEvidence, setVoiceAudioEvidence] = useState<VoiceAudioEvidence | null>(null);
   const [voicePreflight, setVoicePreflight] = useState<VoicePreflight | null>(null);
   const [audioTranscriptReady, setAudioTranscriptReady] = useState(false);
   const audioPickerRef = useRef<HTMLInputElement>(null);
@@ -210,7 +212,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
     setVoiceTranscriptPreview("");
     if (voiceInteractionMode === "hands-free" && handsFreeRef.current && !voicePaused) void startHandsFreeListeningRef.current();
   };
-  const clearVoiceSessionTranscript = () => setVoiceSessionTranscript([]);
+  const clearVoiceSessionEvidence = () => { setVoiceSessionTranscript([]); setVoiceAudioEvidence(null); };
 
   const stopInterimTranscriptRecognition = () => {
     if (interimRecognitionRestartRef.current !== null) window.clearTimeout(interimRecognitionRestartRef.current);
@@ -684,6 +686,7 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
             return;
           }
           setVoiceListening(false);
+          setVoiceAudioEvidence({ blob, fileName: `skai-voice-turn-${new Date().toISOString().replace(/[.:]/g, "-")}.webm` });
           setVoiceTurnTranscribing(true);
           awaitingResponseRef.current = true;
           sawBusyRef.current = false;
@@ -824,5 +827,5 @@ export function useChatComposerVoice({ draft, busy, onDraftChange, onVoiceTransc
       setVoicePackInstalling(false);
     }
   };
-  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, clearVoiceSessionTranscript, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight };
+  return { voiceListening, handsFreeActive, voiceExpressiveness, setVoiceExpressiveness, voiceActivitySensitivity, voiceInputLevel, voiceOutputLevel, voiceError, voiceFallbackNotice, setVoiceFallbackNotice, voicePackNeeded, voicePackInstalling, audioTranscribing, voiceTurnTranscribing, voicePlaybackActive, audioTranscriptReady, audioPickerRef, whisperRecorderRef, toggleVoiceInput, toggleHandsFree, endVoiceMode, transcribeAudioFile, handleAudioDrop, installLocalSpeechPack, voiceInputDevices, voiceOutputDevices, voiceInputDeviceId, voiceOutputDeviceId, setVoiceInputDevice, setVoiceOutputDevice, voiceInteractionMode, setVoiceMode, pushToTalkHeld, startPushToTalk, stopPushToTalk, voiceCalibration, calibrateVoice, voiceTranscriptPreview, voiceSessionTranscript, voiceAudioEvidence, clearVoiceSessionEvidence, voiceReviewBeforeSend, setVoiceReview, pendingVoiceTranscript, submitReviewedVoiceTranscript, discardReviewedVoiceTranscript, voicePaused, pauseVoiceMode, voicePreflight, checkVoicePreflight };
 }
