@@ -57,7 +57,7 @@ export default function App() {
     ? workspace.workspaceTabs.filter((tab) => tab.projectId === workspace.routeState.selectedProject?.id)
     : workspace.workspaceTabs;
   const contextualTabAction = workspace.route === "coding" && workspace.routeState.selectedProject ? workspace.openSideChat : workspace.openNewWorkspaceTab;
-  const contextualTabLabel = workspace.route === "coding" && workspace.routeState.selectedProject ? "New side chat" : "New tab";
+  const contextualTabLabel = workspace.route === "coding" && workspace.routeState.selectedProject ? "New side chat" : workspace.route === "coding" ? "New coding thread" : "New tab";
   const applyLayoutPreset = useCallback((preset: WorkspaceLayoutPreset) => {
     const layouts: Record<WorkspaceLayoutPreset, { route: Parameters<typeof workspace.onNavigate>[0]; sidebarOpen: boolean; sidebarWidth: number }> = {
       chat: { route: "chat", sidebarOpen: false, sidebarWidth: 276 },

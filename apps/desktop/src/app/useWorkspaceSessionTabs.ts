@@ -139,7 +139,9 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
     setClosedWorkspaceTabs(nextClosed.slice(0, 10));
     const remaining = workspaceTabs.filter((item) => !tabIds.includes(item.id));
     if (!remaining.length) {
-      const replacement: WorkspaceSessionTab = { id: createWorkspaceTabId(), title: "New chat", route: "chat", conversationId: null, projectId: null };
+      const replacement: WorkspaceSessionTab = route === "coding"
+        ? { id: createWorkspaceTabId(), title: "New coding thread", route: "coding", conversationId: null, projectId: null }
+        : { id: createWorkspaceTabId(), title: "New chat", route: "chat", conversationId: null, projectId: null };
       setWorkspaceTabs([replacement]);
       selectWorkspaceTab(replacement);
       return;
@@ -149,7 +151,7 @@ export function useWorkspaceSessionTabs({ chat, coding, route, connection, onNav
       const oldIndex = workspaceTabs.findIndex((item) => item.id === activeWorkspaceTabId);
       selectWorkspaceTab(remaining[Math.min(Math.max(oldIndex, 0), remaining.length - 1)]);
     }
-  }, [activeWorkspaceTabId, closedWorkspaceTabs, selectWorkspaceTab, workspaceTabs]);
+  }, [activeWorkspaceTabId, closedWorkspaceTabs, route, selectWorkspaceTab, workspaceTabs]);
   const closeWorkspaceTab = useCallback((tabId: string) => closeWorkspaceTabs([tabId]), [closeWorkspaceTabs]);
   const reorderWorkspaceTab = useCallback((sourceId: string, targetId: string) => {
     setWorkspaceTabs((current) => reorderItem(current, sourceId, targetId, (tab) => tab.id));
