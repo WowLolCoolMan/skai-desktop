@@ -1,0 +1,19 @@
+.voice-mode-transcript-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.voice-mode-transcript-heading > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.voice-mode-transcript-heading .ui-button {
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: var(--skai-text-2xs);
+}
