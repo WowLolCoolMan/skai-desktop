@@ -1119,16 +1119,16 @@ function createTray() { return trayController.createTray(); }
 
 const allowedMethods = new Set([
     "runtime.health", "harness.adapters.list", "security.overview", "security.project.revoke", "support.bundle.preview", "support.bundle.export", "workspace.backup.preview", "workspace.backup.export", "workspace.backup.restore.preview", "workspace.backup.restore.apply", "workspace.storage.overview", "models.list", "models.runtime.status", "models.pull.start", "models.pull.status", "models.pull.cancel", "projects.list", "project.save", "project.files",
-    "project.file.read", "project.preview.read", "tasks.list", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow",
+    "project.file.read", "project.preview.read", "project.activity.list", "tasks.list", "scheduled.list", "scheduled.create", "scheduled.pause", "scheduled.resume", "scheduled.cancel", "scheduled.runNow",
     "tasks.plan", "tasks.delegate", "tasks.queue", "tasks.execute", "tasks.cancel", "tasks.retry", "tasks.steer", "tasks.worktree.release", "project.preflight", "project.checks.list", "project.check.run", "asset.generate3d", "image.generate.start",
     "image.generate.status", "image.generate.cancel", "project.terminal.start", "project.terminal.read", "project.terminal.write", "project.terminal.close", "project.git.status",
     "project.git.diff", "project.git.commit", "project.git.push", "project.git.pullRequest", "conversations.list", "conversations.search", "conversation.save",
     "conversation.metadata.save", "conversations.export", "conversations.import.preview", "conversations.import.apply", "conversation.fork", "memory.list", "memory.search",
     "memory.save", "memory.remove", "memory.enabled", "memory.export", "settings.get", "persona.list", "persona.discover", "persona.research", "persona.research.force",
-    "persona.draft", "persona.save", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add",
+    "persona.draft", "persona.save", "persona.restoreVersion", "persona.remove", "persona.activate", "persona.memory.list", "persona.memory.clear", "persona.group.complete", "persona.source.add",
     "persona.source.remove", "settings.save", "profile.get", "profile.save", "image.generate", "image.models.list", "image.runtime.status", "image.runtime.install.start",
     "image.runtime.install.status", "image.runtime.install.cancel", "pet.background.remove", "project.file.write", "project.file.undo", "project.command.run", "project.ssh.run", "chat.queue.list",
-    "chat.queue.enqueue", "chat.queue.remove", "chat.complete", "skills.list", "skills.read", "skills.remove", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect",
+    "chat.queue.enqueue", "chat.queue.remove", "chat.queue.update", "chat.queue.move", "chat.complete", "skills.list", "skills.read", "skills.remove", "mcp.connections.list", "mcp.connection.connect", "mcp.connection.disconnect",
     "mcp.connection.revoke", "mcp.tools.list", "mcp.marketplace.download", "mcp.tool.call", "workspace.attachment.extract", "workspace.attachment.extractSpreadsheet", "voice.models",
     "voice.speak", "voice.credentials.save", "voice.credentials.status", "voice.credentials.remove", "voice.stop", "voice.status", "marketplace.catalog",
     "marketplace.image-assets.search", "marketplace.image-assets.list", "marketplace.image-assets.install", "marketplace.image-assets.remove", "marketplace.models.search",
@@ -1136,7 +1136,7 @@ const allowedMethods = new Set([
     "airllm.install.start", "airllm.install.status", "airllm.install.cancel", "corpus.list", "corpus.search", "corpus.upsert", "corpus.remove", "voice.kokoro.install.start",
     "voice.kokoro.install.status", "voice.chatterbox.install.start", "voice.chatterbox.install.status", "voice.piper.install.start", "voice.piper.install.status",
     "voice.pocket.install.start", "voice.pocket.install.status", "voice.qwen3.install.start", "voice.qwen3.install.status", "voice.qwen3.remove", "voice.whisper.install.start",
-    "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel", "workspace.pickFolder",
+    "voice.whisper.install.status", "voice.whisper.transcribe", "voice.whisper.transcribe.cancel", "workspace.pickFolder", "model.transformers.list", "model.transformers.plan", "model.transformers.start", "model.transformers.status", "model.transformers.cancel", "marketplace.internet.search",
     "workspace.pickFolder",
   ]);
 allowedMethods.add("chat.cancel");

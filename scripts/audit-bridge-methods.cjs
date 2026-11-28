@@ -19,6 +19,7 @@ if (!allowBlock) {
   process.exit(1);
 }
 const allowed = new Set([...allowBlock[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]));
+for (const match of main.matchAll(/allowedMethods\.add\("([^"]+)"\)/g)) allowed.add(match[1]);
 // Handled directly in Electron before requests reach the host. Request routes
 // may live in focused IPC registration modules as well as the app entry point.
 const shellIpc = `${main}\n${read("apps/desktop/electron/workspace-ipc.cjs")}`;
